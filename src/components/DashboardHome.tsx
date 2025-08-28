@@ -188,23 +188,23 @@ export default function DashboardHome() {
     return (
         <div className='h-full bg-sap-light-gray overflow-hidden'>
             {/* Header */}
-            <div className='bg-white border-b border-sap-border px-4 py-3 sticky top-0 z-10'>
+            <div className='bg-white border-b border-sap-border px-3 py-2 sticky top-0 z-10'>
                 <div className='flex items-center justify-between'>
                     <div>
-                        <h1 className='text-xl font-bold text-sap-dark-blue'>
+                        <h1 className='text-lg font-bold text-sap-dark-blue'>
                             SAP DevOps Dashboard
                         </h1>
-                        <p className='text-sap-gray mt-0.5 text-xs'>
+                        <p className='text-sap-gray mt-0.5 text-[11px]'>
                             Enterprise CI/CD management and monitoring center
                         </p>
                     </div>
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className='flex items-center space-x-2 px-4 py-2 bg-sap-blue text-white rounded-lg hover:bg-sap-dark-blue disabled:opacity-50 transition-colors duration-200'
+                        className='flex items-center space-x-2 px-3 py-1.5 bg-sap-blue text-white rounded-lg hover:bg-sap-dark-blue disabled:opacity-50 transition-colors duration-200'
                     >
                         <svg
-                            className={`w-4 h-4 ${
+                            className={`w-3.5 h-3.5 ${
                                 refreshing ? 'animate-spin' : ''
                             }`}
                             fill='none'
@@ -225,11 +225,11 @@ export default function DashboardHome() {
 
             <div className='p-2 overflow-hidden'>
                 {/* AI Insight Cards */}
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-2 mb-2.5'>
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-2 mb-2'>
                     {aiInsights.slice(0, 3).map((c, i) => (
                         <div
                             key={i}
-                            className={`rounded-lg border p-2 shadow-sm ${
+                            className={`rounded-md border p-2 shadow-sm ${
                                 c.severity === 'warning'
                                     ? 'border-amber-200 bg-amber-50/60'
                                     : c.severity === 'success'
@@ -258,7 +258,7 @@ export default function DashboardHome() {
                                     <p className='text-xs font-medium text-gray-600'>
                                         {metric.title}
                                     </p>
-                                    <p className='text-base font-bold text-gray-900 mt-0.5'>
+                                    <p className='text-[15px] font-bold text-gray-900 mt-0.5'>
                                         {metric.value}
                                     </p>
                                     <p
@@ -293,26 +293,26 @@ export default function DashboardHome() {
                 </div>
 
                 {/* Trends (AI) + Recent Build/Release */}
-                <div className='grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-hidden'>
+                <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden'>
                     {/* AI Trend Spark Bars */}
-                    <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-4'>
-                        <div className='flex items-center justify-between mb-4'>
-                            <h3 className='text-base font-semibold text-gray-900'>
+                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-3'>
+                        <div className='flex items-center justify-between mb-2'>
+                            <h3 className='text-sm font-semibold text-gray-900'>
                                 AI Trend: Daily Successful Builds
                             </h3>
-                            <span className='text-xs text-gray-500'>
+                            <span className='text-[11px] text-gray-500'>
                                 from backend
                             </span>
                         </div>
-                        <div className='grid grid-cols-7 gap-1.5 h-24 items-end'>
+                        <div className='grid grid-cols-7 gap-1 h-20 items-end'>
                             {aiSeries.map((d) => (
                                 <div
                                     key={d.label}
                                     className='flex flex-col items-center gap-1'
                                 >
                                     <div
-                                        className='w-5 rounded-md bg-sap-blue/70'
-                                        style={{height: `${8 + d.value * 4}px`}}
+                                        className='w-4 rounded bg-sap-blue/70'
+                                        style={{height: `${6 + d.value * 3.5}px`}}
                                     />
                                     <div className='text-[10px] text-gray-500'>
                                         {d.label}
@@ -322,7 +322,7 @@ export default function DashboardHome() {
                         </div>
                     </div>
                     {/* Recent Build Cycles (Draggable & Sortable with old content) */}
-                    <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-2'>
+                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-2'>
                         <DraggableSortableTable
                             title='Recent Build Cycles'
                             initialItems={buildTableItems.slice(0, 5)}
@@ -337,7 +337,7 @@ export default function DashboardHome() {
                     </div>
 
                     {/* Recent Release Cycles (Draggable & Sortable with old content) */}
-                    <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-2'>
+                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-2'>
                         <DraggableSortableTable
                             title='Recent Release Cycles'
                             initialItems={releaseTableItems.slice(0, 4)}

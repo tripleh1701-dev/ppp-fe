@@ -756,6 +756,40 @@ export const CodePipelineIcon = ({className = '', size = 24}: IconProps) => (
     </svg>
 );
 
+// Sparkles Icon
+export const SparklesIcon = ({className = '', size = 24}: IconProps) => (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
+        <path d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' fill='currentColor' />
+        <path d='M7 14l-2 2 2 2' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M17 14l2 2-2 2' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+);
+
+// Chart Bar Icon
+export const ChartBarIcon = ({className = '', size = 24}: IconProps) => (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
+        <path d='M3 3v18h18' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M18 17V9' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M13 17V5' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M8 17v-3' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+);
+
+// Wrench Icon
+export const WrenchIcon = ({className = '', size = 24}: IconProps) => (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
+        <path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+);
+
+// Search Icon
+export const SearchIcon = ({className = '', size = 24}: IconProps) => (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
+        <circle cx='11' cy='11' r='8' stroke='currentColor' strokeWidth='2' />
+        <path d='m21 21-4.35-4.35' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    </svg>
+);
+
 // Kubernetes is available; Docker is available
 
 interface IconComponentProps extends IconProps {
@@ -794,6 +828,10 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         azdo: AzureDevOpsIcon,
         cloudbuild: CloudBuildIcon,
         codepipeline: CodePipelineIcon,
+        sparkles: SparklesIcon,
+        chartbar: ChartBarIcon,
+        wrench: WrenchIcon,
+        search: SearchIcon,
         // Shell icons
         grid: GridIcon,
         mail: MailIcon,

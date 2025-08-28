@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
+import {motion} from 'framer-motion';
 
 interface NavigationItem {
     id: string;
@@ -98,11 +99,13 @@ const getIconSvg = (iconName: string) => {
 interface NavigationSidebarProps {
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
+    isMobile?: boolean;
 }
 
 export default function NavigationSidebar({
     isCollapsed = false,
     onToggleCollapse,
+    isMobile = false,
 }: NavigationSidebarProps) {
     const pathname = usePathname();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -124,132 +127,176 @@ export default function NavigationSidebar({
         isAccessControlOpen,
     ]);
 
+    // Handle mobile close on navigation
+    const handleNavigation = (href: string) => {
+        if (isMobile && onToggleCollapse) {
+            onToggleCollapse();
+        }
+    };
+
     return (
         <>
-            <div
-                className={`${
-                    isCollapsed ? 'w-16' : 'w-64'
-                } bg-dark h-full flex flex-col transition-all duration-300 ease-in-out border-r border-slate-700/50 backdrop-blur-xl`}
+            <motion.div
+                className={`h-full flex flex-col backdrop-blur-xl relative overflow-visible z-30 ${
+                    isMobile ? 'fixed left-0 top-0 z-50 h-screen' : 'relative'
+                }`}
+                style={{
+                    backgroundImage: 'url(/images/logos/systiva-sidebar.png)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                }}
+                animate={{ width: isCollapsed ? 48 : 208 }}
+                initial={false}
+                transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
             >
+                {/* Curved Right Edge / Boundary (hidden when collapsed) */}
+                {!isCollapsed && (
+                    <div className='absolute right-0 top-0 h-full pointer-events-none z-10'>
+                        <div className='w-3 h-full bg-white/24 rounded-l-2xl shadow-[inset_0_0_12px_rgba(255,255,255,0.35)] transition-all duration-300'></div>
+                        <div className='absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-[#05E9FE]/80 via-transparent to-[#0171EC]/80 rounded-l-2xl'></div>
+                    </div>
+                )}
+                
+                {/* Minimal Collapse Handle (bottom, outside) */}
+                {!isMobile && (
+                    <div className='absolute -right-4 bottom-7 z-40 pointer-events-auto group'>
+                        <button
+                            onClick={onToggleCollapse}
+                            className={`relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl ${
+                                isCollapsed ? 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100' : 'opacity-100'
+                            }`}
+                            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                            title={isCollapsed ? 'Expand' : 'Collapse'}
+                        >
+                            <svg
+                                className={`w-3.5 h-3.5 text-white transition-transform duration-300 ${
+                                    isCollapsed ? 'rotate-180' : ''
+                                }`}
+                                viewBox='0 0 24 24'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2.5'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                            >
+                                <polyline className='arrow-shift' points='15 18 9 12 15 6'></polyline>
+                            </svg>
+                            <style jsx>{`
+                                .group:hover .arrow-shift { animation: nudge 1.2s ease-in-out infinite; }
+                                @keyframes nudge { 0%,100%{ transform: translateX(0);} 50%{ transform: translateX(-1.5px);} }
+                            `}</style>
+                        </button>
+                    </div>
+                )}
+
                 {/* Header */}
-                <div className='p-4 border-b border-slate-700/50'>
+                <div className='px-3 py-3 border-b border-white/20 flex items-center justify-between bg-black/30 backdrop-blur-sm'>
                     {!isCollapsed && (
                         <div className='flex items-center space-x-3'>
-                            <div className='w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg'>
-                                <svg
-                                    className='w-6 h-6 text-white'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    viewBox='0 0 24 24'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2.5}
-                                        d='M13 10V3L4 14h7v7l9-11h-7z'
-                                    />
-                                </svg>
+                            <div className='w-9 h-9 rounded-xl flex items-center justify-center shadow-lg overflow-hidden bg-white/10 backdrop-blur-sm'>
+                                <img
+                                    src="/images/logos/systiva-logo.svg"
+                                    alt="Systiva Logo"
+                                    className="w-full h-full object-contain p-1"
+                                />
                             </div>
-                            <div>
-                                <h2 className='text-lg font-bold text-inverse'>
-                                    DevOps Studio
+                            <div className='min-w-0'>
+                                <h2 className='text-base font-bold text-white truncate drop-shadow-lg'>
+                                    Systiva
                                 </h2>
-                                <p className='text-xs text-slate-400'>
+                                <p className='text-[11px] text-slate-200 truncate drop-shadow-md'>
                                     Enterprise CI/CD Platform
                                 </p>
                             </div>
                         </div>
                     )}
                     {isCollapsed && (
-                        <div className='flex justify-center'>
-                            <div className='w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg'>
-                                <svg
-                                    className='w-6 h-6 text-white'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    viewBox='0 0 24 24'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2.5}
-                                        d='M13 10V3L4 14h7v7l9-11h-7z'
-                                    />
-                                </svg>
+                        <div className='flex justify-center w-full'>
+                            <div className='w-9 h-9 rounded-xl flex items-center justify-center shadow-lg overflow-hidden bg-white/10 backdrop-blur-sm'>
+                                <img
+                                    src="/images/logos/systiva-logo.svg"
+                                    alt="Systiva Logo"
+                                    className="w-full h-full object-contain p-1"
+                                />
                             </div>
                         </div>
+                    )}
+                    
+                    {/* Mobile close button */}
+                    {isMobile && (
+                        <button
+                            onClick={onToggleCollapse}
+                            className='p-2 rounded-lg text-white hover:text-white hover:bg-white/20 transition-colors duration-200 backdrop-blur-sm'
+                            aria-label="Close sidebar"
+                        >
+                            <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                            </svg>
+                        </button>
                     )}
                 </div>
 
                 {/* Navigation Items */}
-                <nav className='flex-1 py-4'>
-                    <div className='space-y-1 px-3'>
-                        {navigationItems.slice(0, 3).map((item) => {
+                <nav className='flex-1 py-4 overflow-y-auto scrollbar-hide relative'>
+                    {/* Semi-transparent overlay for better text readability */}
+                    <div className='absolute inset-0 bg-black/20 pointer-events-none'></div>
+                    
+                    <div className='space-y-1 px-3 relative z-10'>
+                        {navigationItems.slice(0, 3).map((item, index) => {
                             const isActive =
-                                !isAccountSettingsOpen && // Don't highlight other items when Account Settings is open
+                                !isAccountSettingsOpen &&
                                 (pathname === item.href ||
-                                    (item.href !== '/' &&
-                                        pathname.startsWith(item.href)));
+                                    (item.href !== '/' && pathname.startsWith(item.href)));
+
+                            const onItemClick = () => {
+                                if (item.id === 'account-settings') {
+                                    setIsAccountSettingsOpen(true);
+                                    if (isMobile && onToggleCollapse) onToggleCollapse();
+                                    return;
+                                }
+                                if (item.id === 'access-control') {
+                                    setIsAccessControlOpen(true);
+                                    if (isMobile && onToggleCollapse) onToggleCollapse();
+                                    return;
+                                }
+                                handleNavigation(item.href);
+                            };
 
                             return (
                                 <div key={item.id} className='relative'>
                                     <button
-                                        className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                        onClick={onItemClick}
+                                        className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
-                                                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-r-2 border-indigo-500 shadow-sm'
-                                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                                ? 'bg-gradient-to-r from-[#0171EC]/40 to-[#05E9FE]/40 text-white border-r-2 border-[#05E9FE] shadow-lg backdrop-blur-sm'
+                                                : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
                                         }`}
-                                        onClick={() => {
-                                            if (item.id === 'access-control') {
-                                                setIsAccessControlOpen(true);
-                                            } else {
-                                                window.location.href =
-                                                    item.href;
-                                            }
-                                        }}
-                                        onMouseEnter={() =>
-                                            setHoveredItem(item.id)
-                                        }
-                                        onMouseLeave={() =>
-                                            setHoveredItem(null)
-                                        }
-                                    >
-                                        <div
-                                            className={`w-5 h-5 ${
-                                                isActive
-                                                    ? 'text-indigo-300'
-                                                    : 'text-slate-400'
-                                            }`}
+                                        onMouseEnter={() => setHoveredItem(item.id)}
+                                        onMouseLeave={() => setHoveredItem(null)}
                                         >
                                             <svg
+                                            className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
                                                 fill='none'
                                                 stroke='currentColor'
                                                 viewBox='0 0 24 24'
                                             >
-                                                <g
-                                                    dangerouslySetInnerHTML={{
-                                                        __html: getIconSvg(
-                                                            item.icon,
-                                                        ),
-                                                    }}
-                                                />
+                                            <g dangerouslySetInnerHTML={{__html: getIconSvg(item.icon)}} />
                                             </svg>
-                                        </div>
                                         {!isCollapsed && (
-                                            <span className='flex-1 text-left'>
-                                                {item.label}
-                                            </span>
-                                        )}
-                                        {!isCollapsed && isActive && (
-                                            <div className='w-2 h-2 bg-indigo-400 rounded-full shadow-sm'></div>
+                                            <span className='truncate drop-shadow-sm'>{item.label}</span>
                                         )}
                                     </button>
 
-                                    {/* Tooltip for collapsed state */}
                                     {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full top-0 ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-xl shadow-xl z-50 whitespace-nowrap border border-slate-700'>
+                                        <div className='absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-md whitespace-nowrap z-50 shadow-lg'>
                                             {item.label}
-                                            <div className='absolute top-2 -left-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-700'></div>
+                                        </div>
+                                    )}
+                                    
+                                    {index === 2 && (
+                                        <div className='my-3 px-3'>
+                                            <div className='h-px bg-white/20'></div>
                                         </div>
                                     )}
                                 </div>
@@ -257,274 +304,56 @@ export default function NavigationSidebar({
                         })}
                     </div>
 
-                    {/* Divider */}
-                    {!isCollapsed && (
-                        <div className='mx-3 my-4 border-t border-slate-700/50'></div>
-                    )}
-
-                    {/* Main Navigation */}
-                    <div className='space-y-1 px-3'>
-                        {navigationItems.slice(3, 5).map((item) => {
+                    {/* Secondary Navigation Items */}
+                    <div className='space-y-1 px-3 relative z-10'>
+                        {navigationItems.slice(3).map((item) => {
                             const isActive =
-                                !isAccountSettingsOpen && // Don't highlight other items when Account Settings is open
+                                !isAccountSettingsOpen &&
                                 (pathname === item.href ||
-                                    (item.href !== '/' &&
-                                        pathname.startsWith(item.href)));
+                                    (item.href !== '/' && pathname.startsWith(item.href)));
 
-                            return (
-                                <div key={item.id} className='relative'>
-                                    <Link
-                                        href={item.href}
-                                        className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                            isActive
-                                                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-r-2 border-indigo-500 shadow-sm'
-                                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
-                                        }`}
-                                        onMouseEnter={() =>
-                                            setHoveredItem(item.id)
-                                        }
-                                        onMouseLeave={() =>
-                                            setHoveredItem(null)
-                                        }
-                                    >
-                                        <div
-                                            className={`w-5 h-5 ${
-                                                isActive
-                                                    ? 'text-indigo-300'
-                                                    : 'text-slate-400'
-                                            }`}
-                                        >
-                                            <svg
-                                                fill='none'
-                                                stroke='currentColor'
-                                                viewBox='0 0 24 24'
-                                            >
-                                                <g
-                                                    dangerouslySetInnerHTML={{
-                                                        __html: getIconSvg(
-                                                            item.icon,
-                                                        ),
-                                                    }}
-                                                />
-                                            </svg>
-                                        </div>
-                                        {!isCollapsed && (
-                                            <span className='flex-1'>
-                                                {item.label}
-                                            </span>
-                                        )}
-                                        {!isCollapsed && isActive && (
-                                            <div className='w-2 h-2 bg-indigo-400 rounded-full shadow-sm'></div>
-                                        )}
-                                    </Link>
-
-                                    {/* Tooltip for collapsed state */}
-                                    {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full top-0 ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-xl shadow-xl z-50 whitespace-nowrap border border-slate-700'>
-                                            {item.label}
-                                            <div className='absolute top-2 -left-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-700'></div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Another Divider */}
-                    {!isCollapsed && (
-                        <div className='mx-3 my-4 border-t border-slate-700/50'></div>
-                    )}
-
-                    {/* Security & Management */}
-                    <div className='space-y-1 px-3'>
-                        {navigationItems.slice(5).map((item) => {
-                            const isActive =
-                                !isAccountSettingsOpen && // Don't highlight other items when Account Settings is open
-                                (pathname === item.href ||
-                                    (item.href !== '/' &&
-                                        pathname.startsWith(item.href)));
-
-                            // Special handling for Account Settings
+                            const onItemClick = () => {
                             if (item.id === 'account-settings') {
+                                    setIsAccountSettingsOpen(true);
+                                    if (isMobile && onToggleCollapse) onToggleCollapse();
+                                    return;
+                                }
+                                if (item.id === 'access-control') {
+                                    setIsAccessControlOpen(true);
+                                    if (isMobile && onToggleCollapse) onToggleCollapse();
+                                    return;
+                                }
+                                handleNavigation(item.href);
+                            };
+
                                 return (
                                     <div key={item.id} className='relative'>
                                         <button
-                                            onClick={() =>
-                                                setIsAccountSettingsOpen(true)
-                                            }
-                                            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                                isAccountSettingsOpen
-                                                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-r-2 border-indigo-500 shadow-sm'
-                                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
-                                            }`}
-                                            onMouseEnter={() =>
-                                                setHoveredItem(item.id)
-                                            }
-                                            onMouseLeave={() =>
-                                                setHoveredItem(null)
-                                            }
-                                        >
-                                            <div
-                                                className={`w-5 h-5 ${
-                                                    isAccountSettingsOpen
-                                                        ? 'text-indigo-300'
-                                                        : 'text-slate-400'
-                                                }`}
-                                            >
-                                                <svg
-                                                    fill='none'
-                                                    stroke='currentColor'
-                                                    viewBox='0 0 24 24'
-                                                >
-                                                    <g
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: getIconSvg(
-                                                                item.icon,
-                                                            ),
-                                                        }}
-                                                    />
-                                                </svg>
-                                            </div>
-                                            {!isCollapsed && (
-                                                <span className='flex-1 text-left'>
-                                                    {item.label}
-                                                </span>
-                                            )}
-                                            {!isCollapsed &&
-                                                isAccountSettingsOpen && (
-                                                    <div className='w-2 h-2 bg-indigo-400 rounded-full shadow-sm'></div>
-                                                )}
-                                        </button>
-
-                                        {/* Tooltip for collapsed state */}
-                                        {isCollapsed &&
-                                            hoveredItem === item.id && (
-                                                <div className='absolute left-full top-0 ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg z-50 whitespace-nowrap'>
-                                                    {item.label}
-                                                    <div className='absolute top-2 -left-1 w-2 h-2 bg-gray-900 transform rotate-45'></div>
-                                                </div>
-                                            )}
-                                    </div>
-                                );
-                            }
-
-                            // Special handling for Access Control (open panel instead of navigating)
-                            if (item.id === 'access-control') {
-                                return (
-                                    <div key={item.id} className='relative'>
-                                        <button
-                                            onClick={() =>
-                                                setIsAccessControlOpen(true)
-                                            }
-                                            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                                isAccessControlOpen
-                                                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-r-2 border-indigo-500 shadow-sm'
-                                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
-                                            }`}
-                                            onMouseEnter={() =>
-                                                setHoveredItem(item.id)
-                                            }
-                                            onMouseLeave={() =>
-                                                setHoveredItem(null)
-                                            }
-                                        >
-                                            <div
-                                                className={`w-5 h-5 ${
-                                                    isAccessControlOpen
-                                                        ? 'text-indigo-300'
-                                                        : 'text-slate-400'
-                                                }`}
-                                            >
-                                                <svg
-                                                    fill='none'
-                                                    stroke='currentColor'
-                                                    viewBox='0 0 24 24'
-                                                >
-                                                    <g
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: getIconSvg(
-                                                                item.icon,
-                                                            ),
-                                                        }}
-                                                    />
-                                                </svg>
-                                            </div>
-                                            {!isCollapsed && (
-                                                <span className='flex-1 text-left'>
-                                                    {item.label}
-                                                </span>
-                                            )}
-                                            {!isCollapsed &&
-                                                isAccessControlOpen && (
-                                                    <div className='w-2 h-2 bg-indigo-400 rounded-full shadow-sm'></div>
-                                                )}
-                                        </button>
-
-                                        {/* Tooltip for collapsed state */}
-                                        {isCollapsed &&
-                                            hoveredItem === item.id && (
-                                                <div className='absolute left-full top-0 ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg z-50 whitespace-nowrap'>
-                                                    {item.label}
-                                                    <div className='absolute top-2 -left-1 w-2 h-2 bg-gray-900 transform rotate-45'></div>
-                                                </div>
-                                            )}
-                                    </div>
-                                );
-                            }
-
-                            // Regular navigation items
-                            return (
-                                <div key={item.id} className='relative'>
-                                    <Link
-                                        href={item.href}
-                                        className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                        onClick={onItemClick}
+                                        className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
-                                                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-r-2 border-indigo-500 shadow-sm'
-                                                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                                                ? 'bg-gradient-to-r from-[#0171EC]/40 to-[#05E9FE]/40 text-white border-r-2 border-[#05E9FE] shadow-lg backdrop-blur-sm'
+                                                : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
                                         }`}
-                                        onMouseEnter={() =>
-                                            setHoveredItem(item.id)
-                                        }
-                                        onMouseLeave={() =>
-                                            setHoveredItem(null)
-                                        }
-                                    >
-                                        <div
-                                            className={`w-5 h-5 ${
-                                                isActive
-                                                    ? 'text-indigo-300'
-                                                    : 'text-slate-400'
-                                            }`}
-                                        >
-                                            <svg
-                                                fill='none'
-                                                stroke='currentColor'
-                                                viewBox='0 0 24 24'
+                                        onMouseEnter={() => setHoveredItem(item.id)}
+                                        onMouseLeave={() => setHoveredItem(null)}
                                             >
-                                                <g
-                                                    dangerouslySetInnerHTML={{
-                                                        __html: getIconSvg(
-                                                            item.icon,
-                                                        ),
-                                                    }}
-                                                />
-                                            </svg>
-                                        </div>
-                                        {!isCollapsed && (
-                                            <span className='flex-1'>
-                                                {item.label}
-                                            </span>
-                                        )}
-                                        {!isCollapsed && isActive && (
-                                            <div className='w-2 h-2 bg-indigo-400 rounded-full shadow-sm'></div>
-                                        )}
-                                    </Link>
+                                                <svg
+                                            className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
+                                                    fill='none'
+                                                    stroke='currentColor'
+                                                    viewBox='0 0 24 24'
+                                                >
+                                            <g dangerouslySetInnerHTML={{__html: getIconSvg(item.icon)}} />
+                                                </svg>
+                                            {!isCollapsed && (
+                                            <span className='truncate drop-shadow-sm'>{item.label}</span>
+                                                )}
+                                        </button>
 
-                                    {/* Tooltip for collapsed state */}
                                     {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full top-0 ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-xl shadow-xl z-50 whitespace-nowrap border border-slate-700'>
+                                        <div className='absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-md whitespace-nowrap z-50 shadow-lg'>
                                             {item.label}
-                                            <div className='absolute top-2 -left-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-700'></div>
                                         </div>
                                     )}
                                 </div>
@@ -533,28 +362,14 @@ export default function NavigationSidebar({
                     </div>
                 </nav>
 
-                {/* User Section at Bottom - Harness.io style */}
-                {!isCollapsed && (
-                    <div className='px-3 py-3 border-t border-gray-200'>
-                        <button
-                            onClick={() => setIsAccountSettingsOpen(true)}
-                            className='w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-200 cursor-pointer group'
-                        >
-                            <div className='w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center group-hover:shadow-lg transition-shadow'>
-                                <span className='text-white text-sm font-semibold'>
-                                    T
-                                </span>
-                            </div>
-                            <div className='flex-1 min-w-0 text-left'>
-                                <p className='text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors'>
-                                    Tushar
-                                </p>
-                                <p className='text-xs text-gray-500 truncate'>
-                                    Tushar@company.com
-                                </p>
-                            </div>
-                            <div className='w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors'>
+                {/* Footer */}
+                <div className='p-4 border-t border-white/20 bg-black/20 backdrop-blur-sm'>
+                    {/* Keep only profile here to avoid duplicates of settings/access */}
+                    <div className='mt-2'>
+                        <div className='flex items-center space-x-3'>
+                            <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg'>
                                 <svg
+                                    className='w-5 h-5 text-white'
                                     fill='none'
                                     stroke='currentColor'
                                     viewBox='0 0 24 24'
@@ -563,51 +378,40 @@ export default function NavigationSidebar({
                                         strokeLinecap='round'
                                         strokeLinejoin='round'
                                         strokeWidth={2}
-                                        d='M9 5l7 7-7 7'
+                                        d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
                                     />
                                 </svg>
                             </div>
-                        </button>
+                            {!isCollapsed && (
+                                <div className='min-w-0 flex-1'>
+                                    <p className='text-sm font-medium text-white truncate drop-shadow-sm'>
+                                        Tushar
+                                    </p>
+                                    <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
+                                        Administrator
+                                    </p>
                     </div>
                 )}
-
-                {/* Toggle Button */}
-                <div className='p-3 border-t border-gray-200'>
-                    <button
-                        onClick={onToggleCollapse}
-                        className='w-full flex items-center justify-center px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors duration-200'
-                    >
-                        <svg
-                            className={`w-5 h-5 transform transition-transform duration-200 ${
-                                isCollapsed ? 'rotate-180' : ''
-                            }`}
-                            fill='none'
-                            stroke='currentColor'
-                            viewBox='0 0 24 24'
-                        >
-                            <path
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                                strokeWidth={2}
-                                d='M11 19l-7-7 7-7m8 14l-7-7 7-7'
-                            />
-                        </svg>
-                        {!isCollapsed && (
-                            <span className='ml-2 text-sm'>Collapse</span>
-                        )}
-                    </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Account Settings Panel */}
+            {isAccountSettingsOpen && (
             <AccountSettingsPanel
                 isOpen={isAccountSettingsOpen}
                 onClose={() => setIsAccountSettingsOpen(false)}
             />
+            )}
+
+            {/* Access Control Panel */}
+            {isAccessControlOpen && (
             <AccessControlPanel
                 isOpen={isAccessControlOpen}
                 onClose={() => setIsAccessControlOpen(false)}
             />
+            )}
         </>
     );
 }

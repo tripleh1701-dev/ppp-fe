@@ -3,6 +3,8 @@
 import {useEffect, useMemo, useState} from 'react';
 import {api} from '@/utils/api';
 import {usePathname} from 'next/navigation';
+import {Icon} from './Icons';
+import {motion} from 'framer-motion';
 
 interface SuggestionItem {
     id: string;
@@ -19,7 +21,12 @@ interface SuggestionItem {
     onSecondaryAction?: () => void;
 }
 
-export default function AISuggestionsPanel() {
+interface AISuggestionsPanelProps {
+    isMobile?: boolean;
+    isTablet?: boolean;
+}
+
+export default function AISuggestionsPanel({ isMobile = false, isTablet = false }: AISuggestionsPanelProps) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const pathname = usePathname();
     const [query, setQuery] = useState('');
@@ -94,7 +101,7 @@ export default function AISuggestionsPanel() {
             },
             {
                 id: 'i-1',
-                icon: 'chart-bar',
+                icon: 'chartbar',
                 title: 'Release readiness',
                 description:
                     'Stability score improved this week. Consider promoting latest build to staging.',
@@ -130,7 +137,7 @@ export default function AISuggestionsPanel() {
             base.push(
                 {
                     id: 'gs-1',
-                    icon: 'chart-bar',
+                    icon: 'chartbar',
                     title: 'Tool coverage suggestions',
                     description:
                         'Adopt code scanning (e.g., SonarQube) and deployment validations (e.g., Argo CD health checks).',
@@ -276,183 +283,130 @@ export default function AISuggestionsPanel() {
         );
     }
 
+    // Mobile view remains compact
+    if (isMobile) {
     return (
-        <aside
-            className={
-                'h-full border-l border-light bg-card flex flex-col shrink-0 transition-all duration-200 ' +
-                (isCollapsed ? 'w-12' : 'w-96')
-            }
-        >
-            {/* Header */}
-            <div className='flex items-center justify-between px-3 py-3 border-b border-light'>
-                <div className='flex items-center gap-2'>
-                    <svg
-                        className='w-4 h-4 text-primary'
+            <div className='bg-white border-b border-slate-200 px-4 py-3 lg:hidden'>
+                <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-sm font-medium text-slate-900'>AI Insights</h3>
+                    <button
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        className='p-1.5 rounded-lg text-white bg-brand-gradient hover:opacity-90 transition-colors duration-200'
+                        aria-label={isCollapsed ? 'Expand insights' : 'Collapse insights'}
+                    >
+                        <svg
+                            className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`}
                         fill='none'
                         stroke='currentColor'
                         viewBox='0 0 24 24'
                     >
-                        <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M13 7a4 4 0 10-2 0m1 4v4m-4 0h8'
-                        />
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
                     </svg>
-                    {!isCollapsed && (
-                        <h3 className='text-sm font-semibold text-primary'>
-                            AI Assistant
-                        </h3>
-                    )}
-                </div>
-                <button
-                    aria-label='Toggle AI panel'
-                    className='text-secondary hover:text-primary transition-colors text-sm'
-                    onClick={() => setIsCollapsed((v) => !v)}
-                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
-                >
-                    {isCollapsed ? '‹' : '›'}
                 </button>
             </div>
-
-            {/* Controls */}
             {!isCollapsed && (
-                <div className='px-3 py-2 border-b border-light space-y-2'>
-                    <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder='Search tips, actions, insights...'
-                        className='w-full text-sm px-3 py-2 rounded-md border border-light bg-white/60 focus:outline-none focus:ring-2 focus:ring-primary/20'
-                    />
-                    <div className='flex gap-1 text-xs'>
-                        {[
-                            {k: 'suggestion', label: 'Suggestions'},
-                            {k: 'action', label: 'Actions'},
-                            {k: 'insight', label: 'Insights'},
-                        ].map((t) => (
-                            <button
-                                key={t.k}
-                                onClick={() => setActiveTab(t.k as any)}
-                                className={`px-2.5 py-1 rounded-md border transition ${
-                                    activeTab === (t.k as any)
-                                        ? 'bg-primary text-inverse border-primary'
-                                        : 'bg-tertiary border-light text-primary hover:bg-slate-200'
-                                }`}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Content */}
-            {!isCollapsed && (
-                <div className='flex-1 overflow-y-auto p-3 space-y-3'>
-                    {filtered.map((s) => (
-                        <div
-                            key={s.id}
-                            className='rounded-lg border border-light bg-white/70 hover:bg-white transition shadow-sm p-3'
-                        >
-                            <div className='flex items-start gap-3'>
-                                <div className='text-xl leading-none'>
-                                    {renderIcon(s.icon)}
+                    <div className='space-y-3'>
+                        {allItems.slice(0, 2).map((item) => (
+                            <div key={item.id} className='bg-slate-50 rounded-lg p-3 border border-slate-200'>
+                                <div className='flex items-start space-x-3'>
+                                    <div className='w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0'>
+                                        <Icon name={item.icon} className='w-4 h-4 text-primary-600' />
                                 </div>
                                 <div className='min-w-0 flex-1'>
-                                    <div className='flex items-center justify-between gap-2'>
-                                        <div className='truncate font-medium text-primary'>
-                                            {s.title}
+                                        <h4 className='text-sm font-medium text-slate-900 truncate'>{item.title}</h4>
+                                        <p className='text-xs text-slate-600 mt-1 line-clamp-2'>{item.description}</p>
                                         </div>
-                                        <div className='text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700'>
-                                            {s.confidence}%
                                         </div>
                                     </div>
-                                    <p className='text-xs text-secondary mt-1'>
-                                        {s.description}
-                                    </p>
-                                    {s.tags && s.tags.length > 0 && (
-                                        <div className='flex flex-wrap gap-1 mt-2'>
-                                            {s.tags.map((t) => (
-                                                <span
-                                                    key={t}
-                                                    className='text-[10px] px-2 py-0.5 rounded-full bg-tertiary border border-light text-primary'
-                                                >
-                                                    {t}
-                                                </span>
                                             ))}
                                         </div>
                                     )}
-                                    {s.details && s.details.length > 0 && (
-                                        <div className='mt-2'>
+            </div>
+        );
+    }
+
+    // Tablet/Desktop: horizontal collapse to the right
+    const expandedWidth = isTablet ? 260 : 300; // px (more compact)
+    const collapsedWidth = 0; // fully collapse to the right
+
+    return (
+        <>
+            {/* Floating AI badge – visible when collapsed */}
+            {!isMobile && isCollapsed && (
                                             <button
-                                                className='text-[11px] text-brand hover:text-brand-dark'
-                                                onClick={() =>
-                                                    setExpandedId((id) =>
-                                                        id === s.id
-                                                            ? null
-                                                            : s.id,
-                                                    )
-                                                }
-                                            >
-                                                {expandedId === s.id
-                                                    ? 'Hide details'
-                                                    : 'Show details'}
-                                            </button>
-                                            {expandedId === s.id && (
-                                                <ul className='mt-1 list-disc list-inside text-[12px] text-primary space-y-1'>
-                                                    {s.details.map((d, i) => (
-                                                        <li key={i}>{d}</li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    )}
-                                    <div className='mt-2 flex gap-2'>
-                                        {s.actionLabel && (
-                                            <button
-                                                className='text-xs px-2.5 py-1 rounded-md border border-primary bg-primary text-inverse hover:bg-primary-dark transition'
-                                                onClick={s.onAction}
-                                            >
-                                                {s.actionLabel}
+                    onClick={() => setIsCollapsed(false)}
+                    className='fixed right-4 top-1/2 -translate-y-1/2 z-[70] w-9 h-9 rounded-full bg-brand-gradient text-white shadow-xl ring-2 ring-white/40 hover:opacity-95 transition-all duration-200 flex items-center justify-center pointer-events-auto'
+                    aria-label='Open AI Insights'
+                    title='AI Insights'
+                >
+                    <Icon name='sparkles' className='w-4 h-4 text-white' />
                                             </button>
                                         )}
-                                        {s.secondaryActionLabel && (
+
+            <motion.aside
+                className='relative bg-white border-l border-slate-200 flex-shrink-0 hidden lg:block overflow-visible'
+                style={{ width: expandedWidth }}
+                animate={{ width: isCollapsed ? collapsedWidth : expandedWidth }}
+                initial={false}
+                transition={{ type: 'tween', duration: 0.22, ease: 'easeOut' }}
+            >
+                {/* Collapse handle pinned to viewport edge */}
                                             <button
-                                                className='text-xs px-2.5 py-1 rounded-md border border-light bg-tertiary hover:bg-slate-200 text-primary transition'
-                                                onClick={s.onSecondaryAction}
-                                            >
-                                                {s.secondaryActionLabel}
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className={`absolute top-1/2 -translate-y-1/2 ${isCollapsed ? '-right-4' : '-left-3'} w-6 h-6 rounded-full bg-brand-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 ring-2 ring-white/40 flex items-center justify-center z-20`}
+                    aria-label={isCollapsed ? 'Expand AI insights' : 'Collapse AI insights'}
+                    title={isCollapsed ? 'Expand' : 'Collapse'}
+                >
+                    <svg
+                        className={`w-3 h-3 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='2.5'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                    >
+                        <polyline points='15 18 9 12 15 6'></polyline>
+                    </svg>
                                             </button>
-                                        )}
+
+                {/* Content wrapper that fades/slides when collapsed */}
+                <motion.div
+                    className='h-full flex flex-col'
+                    animate={{ opacity: isCollapsed ? 0 : 1, x: isCollapsed ? 12 : 0 }}
+                    transition={{ duration: 0.18 }}
+                >
+                    <div className='px-4 py-3 border-b border-slate-200'>
+                        <div className='flex items-center justify-between mb-1'>
+                            <h3 className='text-base font-semibold text-slate-900'>AI Insights</h3>
+                            {/* Top chevron hidden; use side handle or floating badge */}
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
 
-                    {/* Quick shortcuts */}
-                    <div className='mt-4 p-3 rounded-lg border border-light bg-white/70'>
-                        <div className='text-[11px] font-semibold text-primary mb-2'>
-                            Quick shortcuts
+                    <motion.div className='p-3 space-y-3 overflow-y-auto' style={{ maxHeight: 'calc(100vh - 160px)' }}
+                        animate={{ opacity: isCollapsed ? 0 : 1 }} transition={{ duration: 0.16 }}
+                    >
+                        {allItems.map((item) => (
+                            <div key={item.id} className='bg-slate-50 rounded-lg p-3 border border-slate-200 hover:border-slate-300 transition-colors duration-200'>
+                                <div className='flex items-start space-x-2'>
+                                    <div className='w-8 h-8 bg-primary-100 rounded-md flex items-center justify-center flex-shrink-0'>
+                                        <Icon name={item.icon} className='w-4 h-4 text-primary-600' />
+                            </div>
+                                    <div className='min-w-0 flex-1'>
+                                        <div className='flex items-center justify-between mb-1'>
+                                            <h4 className='text-[13px] font-medium text-slate-900 truncate'>{item.title}</h4>
+                                            <span className='text-[11px] text-slate-600 bg-slate-200 px-2 py-0.5 rounded-full'>
+                                                {item.confidence}%
+                                            </span>
                         </div>
-                        <div className='flex flex-wrap gap-2'>
-                            {[
-                                'Retry last failed build',
-                                'Open pipeline YAML',
-                                'View test analytics',
-                                'Open access audit',
-                            ].map((q) => (
-                                <button
-                                    key={q}
-                                    className='text-[11px] px-2 py-1 rounded-md border border-light bg-tertiary hover:bg-slate-200 text-primary'
-                                >
-                                    {q}
-                                </button>
-                            ))}
+                                        <p className='text-[12px] leading-5 text-slate-600 mb-1'>{item.description}</p>
                         </div>
                     </div>
                 </div>
-            )}
-        </aside>
+                        ))}
+                    </motion.div>
+                </motion.div>
+            </motion.aside>
+        </>
     );
 }
