@@ -29,6 +29,17 @@ interface Enterprise {
     services: Service[];
 }
 
+// Interface for the enterprise_products_services table (matches backend response)
+interface EnterpriseProductService {
+    id: string;
+    enterpriseId: string;
+    productId: string;
+    serviceId: string;
+    enterpriseName?: string;
+    productName?: string;
+    serviceName?: string;
+}
+
 // Modular colorful animated trash can icon/button
 function ToolbarTrashButton({
     onClick,
@@ -176,6 +187,10 @@ export default function EnterpriseConfiguration() {
         'None' | 'Enterprise' | 'Product'
     >('None');
 
+    // New state for enterprise_products_services table
+    const [enterpriseProductServices, setEnterpriseProductServices] = useState<EnterpriseProductService[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const t = e.target as Node;
@@ -196,15 +211,112 @@ export default function EnterpriseConfiguration() {
         return () => document.removeEventListener('mousedown', onDoc);
     }, [sortOpen, hideOpen, groupOpen, showSearch]);
 
-    const loadEnterprises = async () => {
-        const data = await api.get<Enterprise[]>('/api/enterprises');
-        // Ensure services array exists for UI expectations
+    // Load data from the enterprise_products_services table
+    const loadEnterpriseProductServices = async () => {
+        try {
+            setIsLoading(true);
+            
+            // Try to load from the new enterprise_products_services table first
+            try {
+                // First, get all relationships from the main endpoint
+                const relationships = await api.get<Array<{id: number; enterpriseId: number; productId: number; serviceId: number}>>('/api/enterprise-products-services');
+                
+                // Convert to EnterpriseProductService format for state
+                const convertedRelationships: EnterpriseProductService[] = relationships.map(r => ({
+                    id: r.id.toString(),
+                    enterpriseId: r.enterpriseId?.toString() || '',
+                    productId: r.productId?.toString() || '',
+                    serviceId: r.serviceId?.toString() || '',
+                    enterpriseName: '',
+                    productName: '',
+                    serviceName: ''
+                }));
+                setEnterpriseProductServices(convertedRelationships || []);
+                
+                if (relationships && relationships.length > 0) {
+                    // Get unique IDs for fetching names
+                    const enterpriseIds = Array.from(new Set(relationships.map(r => r.enterpriseId).filter(id => id !== null)));
+                    const productIds = Array.from(new Set(relationships.map(r => r.productId).filter(id => id !== null)));
+                    const serviceIds = Array.from(new Set(relationships.map(r => r.serviceId).filter(id => id !== null)));
+                    
+                    // Fetch names from respective tables
+                    const enterprises = await api.get<Array<{id: number; name: string}>>('/api/enterprises');
+                    const products = await api.get<Array<{id: number; name: string}>>('/api/products');
+                    const services = await api.get<Array<{id: number; name: string}>>('/api/services');
+                    
+                    // Create lookup maps
+                    const enterpriseMap = new Map(enterprises.map(e => [e.id, e.name]));
+                    const productMap = new Map(products.map(p => [p.id, p.name]));
+                    const serviceMap = new Map(services.map(s => [s.id, s.name]));
+                    
+                    // Convert to the format expected by the table
+                    const enterpriseProductMap = new Map<string, { name: string; products: Map<string, string[]> }>();
+                    
+                    relationships.forEach(item => {
+                        const enterpriseId = item.enterpriseId?.toString() || '';
+                        const productId = item.productId?.toString() || '';
+                        const serviceId = item.serviceId?.toString() || '';
+                        
+                        if (enterpriseId && productId && serviceId) {
+                            const enterpriseName = enterpriseMap.get(item.enterpriseId) || '';
+                            const productName = productMap.get(item.productId) || '';
+                            const serviceName = serviceMap.get(item.serviceId) || '';
+                            
+                            if (!enterpriseProductMap.has(enterpriseId)) {
+                                enterpriseProductMap.set(enterpriseId, {
+                                    name: enterpriseName,
+                                    products: new Map()
+                                });
+                            }
+                            
+                            const enterprise = enterpriseProductMap.get(enterpriseId)!;
+                            if (!enterprise.products.has(productId)) {
+                                enterprise.products.set(productId, []);
+                            }
+                            
+                            const services = enterprise.products.get(productId)!;
+                            if (serviceName && !services.includes(serviceName)) {
+                                services.push(serviceName);
+                            }
+                        }
+                    });
+                    
+                    // Convert to Enterprise[] format for compatibility
+                    const enterpriseArray: Enterprise[] = Array.from(enterpriseProductMap.entries()).map(([id, data]) => ({
+                        id,
+                        name: data.name,
+                        services: Array.from(data.products.entries()).map(([productId, services]) => ({
+                            id: productId,
+                            name: productMap.get(parseInt(productId)) || '',
+                            categories: services
+                        }))
+                    }));
+                    
+                    setEnterprises(enterpriseArray);
+                    console.log('Loaded data from enterprise_products_services table with resolved names');
+                } else {
+                    setEnterprises([]);
+                }
+            } catch (error) {
+                console.warn('New enterprise_products_services table not available, falling back to legacy enterprises:', error);
+                
+                // Fallback: Load from the existing enterprises endpoint
+                const legacyData = await api.get<Enterprise[]>('/api/enterprises');
         setEnterprises(
-            data.map((e) => ({
+                    legacyData.map((e) => ({
                 ...e,
                 services: Array.isArray(e.services) ? e.services : [],
             })),
         );
+                console.log('Loaded data from legacy enterprises endpoint');
+            }
+        } catch (error) {
+            console.error('Failed to load enterprise data:', error);
+            setEnterpriseProductServices([]);
+            setEnterprises([]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const loadAccounts = async () => {
@@ -260,7 +372,7 @@ export default function EnterpriseConfiguration() {
     };
 
     useEffect(() => {
-        loadEnterprises().catch(() => {});
+        loadEnterpriseProductServices().catch(() => {});
         loadAccounts().catch(() => {});
     }, []);
 
@@ -273,7 +385,7 @@ export default function EnterpriseConfiguration() {
             name: enterprise.name,
             services: enterprise.services || [],
         });
-        await loadEnterprises();
+        await loadEnterpriseProductServices();
         setShowCreateForm(false);
     };
 
@@ -304,11 +416,11 @@ export default function EnterpriseConfiguration() {
                     const prod = (ent.services || []).find(
                         (s) => `${ent.id}-${s.id}` === rowId,
                     );
-                    title = `Delete product “${prod?.name ?? ''}” from “${
+                    title = `Delete product "${prod?.name ?? ''}" from "${
                         ent.name
-                    }”?`;
+                    }"?`;
                 } else if (ent) {
-                    title = `Delete enterprise “${ent.name}”?`;
+                    title = `Delete enterprise "${ent.name}"?`;
                 }
                 setDropDelete({rowId, enterpriseId, isProduct, title});
             } catch {}
@@ -642,39 +754,16 @@ export default function EnterpriseConfiguration() {
                                 const {rowId, enterpriseId, isProduct} =
                                     dropDelete;
                                 if (isProduct) {
-                                    const ent = enterprises.find(
-                                        (e) => String(e.id) === enterpriseId,
-                                    );
-                                    if (ent) {
-                                        const remaining = (
-                                            ent.services || []
-                                        ).filter(
-                                            (s) =>
-                                                `${ent.id}-${s.id}` !== rowId,
-                                        );
-                                        await api.put(
-                                            `/api/enterprises/${ent.id}`,
-                                            {
-                                                name: ent.name,
-                                                services: remaining.map(
-                                                    (s) => ({
-                                                        name: s.name,
-                                                        categories:
-                                                            s.categories,
-                                                    }),
-                                                ),
-                                            },
-                                        );
-                                    }
+                                    // Delete from enterprise_products_services table
+                                    await api.del(`/api/enterprise-products-services/${rowId}`);
                                 } else {
-                                    await api.del(
-                                        `/api/enterprises/${enterpriseId}`,
-                                    );
+                                    // Delete all records for this enterprise
+                                    await api.del(`/api/enterprise-products-services/enterprise/${enterpriseId}`);
                                 }
                                 setDropDelete(null);
                                 setTrashBounce(true);
                                 setTimeout(() => setTrashBounce(false), 700);
-                                await loadEnterprises();
+                                await loadEnterpriseProductServices();
                             } catch {
                                 setDropDelete(null);
                             }
@@ -725,14 +814,14 @@ export default function EnterpriseConfiguration() {
                             );
                             if (ent) {
                                 await api.del(`/api/enterprises/${ent.id}`);
-                                await loadEnterprises();
+                                await loadEnterpriseProductServices();
                             }
                         }}
                         onQuickAddRow={async () => {
                             setAddKey(Date.now());
                         }}
                         onCreated={async () => {
-                            await loadEnterprises();
+                            await loadEnterpriseProductServices();
                         }}
                         visibleColumns={visibleCols}
                         externalAddKey={addKey ?? undefined}
@@ -745,12 +834,12 @@ export default function EnterpriseConfiguration() {
                 message={`Delete ${(() => {
                     const t = enterprises.find((e) => e.id === pendingDeleteId);
                     return t ? t.name : 'this enterprise';
-                })()}?\n\nThis action can’t be undone. The item will be permanently removed.`}
+                })()}?\n\nThis action can't be undone. The item will be permanently removed.`}
                 onCancel={() => setPendingDeleteId(null)}
                 onConfirm={async () => {
                     if (!pendingDeleteId) return;
                     await api.del(`/api/enterprises/${pendingDeleteId}`);
-                    await loadEnterprises();
+                    await loadEnterpriseProductServices();
                     setPendingDeleteId(null);
                 }}
             />
@@ -862,7 +951,7 @@ export default function EnterpriseConfiguration() {
                                     );
                                     setShowEditModal(false);
                                     setCurrentEnterprise(null);
-                                    await loadEnterprises();
+                                    await loadEnterpriseProductServices();
                                 }}
                                 className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg'
                             >
@@ -987,13 +1076,9 @@ function CreateEnterpriseForm({onSave, onCancel}: CreateEnterpriseFormProps) {
                     categories: s.categories,
                 })),
             };
-            const created = await (
-                await fetch('/api/enterprises', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload),
-                })
-            ).json();
+            
+            // Use the API utility instead of direct fetch
+            const created = await api.post<{id: string; name: string}>('/api/enterprises', payload);
 
             const newEnterprise: Enterprise = {
                 id: created?.id || Date.now().toString(),
@@ -1227,10 +1312,10 @@ function AddServiceModal({onSave, onCancel}: AddServiceModalProps) {
                         </div>
                     </div>
 
-                    {/* Services */}
+                    {/* Products */}
                     <div>
                         <label className='block text-sm font-semibold text-primary mb-2'>
-                            Services *
+                            Products *
                         </label>
 
                         {/* Selected Categories Display */}
@@ -1269,7 +1354,7 @@ function AddServiceModal({onSave, onCancel}: AddServiceModalProps) {
                                     }
                                     className='w-full px-3 py-2.5 border border-light rounded-lg bg-card text-left focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand relative'
                                 >
-                                    Select services
+                                    Select products
                                     <svg
                                         className='absolute right-3 top-3 h-5 w-5 text-secondary'
                                         fill='none'
@@ -1305,12 +1390,12 @@ function AddServiceModal({onSave, onCancel}: AddServiceModalProps) {
                             )}
                         </div>
 
-                        {/* Add More Service Button */}
+                        {/* Add More Product Button */}
                         <button
                             onClick={() => setShowCategories(!showCategories)}
                             className='mt-2 text-sm text-brand hover:text-brand-dark font-medium'
                         >
-                            + Add new service
+                            + Add new product
                         </button>
                     </div>
                 </div>
@@ -1757,7 +1842,7 @@ function ProductSuggestions({
     }, [query, selected]);
     if (!open) return null;
     return (
-        <div className='absolute left-0 right-0 top-full mt-1 z-20 bg-card border border-light rounded-lg shadow-lg max-h-56 overflow-auto'>
+        <div className='absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-light rounded-lg shadow-xl max-h-56 overflow-auto min-w-[200px]'>
             {options.map((o) => (
                 <button
                     key={o.id}
@@ -1820,8 +1905,55 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
     const [pulse, setPulse] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setOpen(false);
+                setError(null);
+            }
+        };
+
+        if (open) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [open]);
+
+    const handleCreateService = async () => {
+        const nm = name.trim();
+        if (!nm) return;
+        
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            const created = await api.post<{
+                id: string;
+                name: string;
+            }>('/api/services', {name: nm});
+            onCreated(created.name);
+            setName('');
+            setOpen(false);
+            setPulse(true);
+            setTimeout(() => setPulse(false), 500);
+        } catch (error) {
+            console.error('Failed to create service:', error);
+            setError(error instanceof Error ? error.message : 'Failed to create service');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className='relative'>
+        <div className='relative' ref={dropdownRef}>
             <button
                 type='button'
                 onClick={() => setOpen((v) => !v)}
@@ -1841,50 +1973,53 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
                 </svg>
             </button>
             {open && (
-                <div className='absolute right-0 mt-2 z-20 bg-card border border-light rounded-lg shadow-lg p-2 flex items-center gap-2'>
-                    <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
-                                const nm = name.trim();
-                                if (!nm) return;
-                                try {
-                                    const created = await api.post<{
-                                        id: string;
-                                        name: string;
-                                    }>('/api/services', {name: nm});
-                                    onCreated(created.name);
-                                    setName('');
+                <div className='absolute right-0 mt-2 z-50 bg-card border border-light rounded-lg shadow-xl p-3 min-w-[250px]'>
+                    <div className='space-y-3'>
+                        <input
+                            value={name}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setError(null);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleCreateService();
+                                }
+                                if (e.key === 'Escape') {
                                     setOpen(false);
-                                    setPulse(true);
-                                    setTimeout(() => setPulse(false), 500);
-                                } catch {}
-                            }
-                        }}
-                        placeholder='New service'
-                        className='px-2 py-1 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
-                    />
-                    <button
-                        onClick={async () => {
-                            const nm = name.trim();
-                            if (!nm) return;
-                            try {
-                                const created = await api.post<{
-                                    id: string;
-                                    name: string;
-                                }>('/api/services', {name: nm});
-                                onCreated(created.name);
-                                setName('');
-                                setOpen(false);
-                                setPulse(true);
-                                setTimeout(() => setPulse(false), 500);
-                            } catch {}
-                        }}
-                        className='px-2.5 py-1 text-xs rounded-md bg-primary text-inverse hover:bg-primary-dark'
-                    >
-                        Add
-                    </button>
+                                    setError(null);
+                                }
+                            }}
+                            placeholder='Enter service name'
+                            className='w-full px-3 py-2 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
+                            disabled={isLoading}
+                        />
+                        
+                        {error && (
+                            <div className='text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200'>
+                                {error}
+                            </div>
+                        )}
+                        
+                        <div className='flex items-center gap-2'>
+                            <button
+                                onClick={handleCreateService}
+                                disabled={isLoading || !name.trim()}
+                                className='flex-1 px-3 py-2 text-xs rounded-md bg-primary text-inverse hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed'
+                            >
+                                {isLoading ? 'Creating...' : 'Add Service'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setOpen(false);
+                                    setError(null);
+                                }}
+                                className='px-3 py-2 text-xs rounded-md border border-light text-secondary hover:bg-slate-50'
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -1895,8 +2030,54 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
     const [pulse, setPulse] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setOpen(false);
+                setError(null);
+            }
+        };
+
+        if (open) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [open]);
+
+    const handleCreateProduct = async () => {
+        const nm = name.trim();
+        if (!nm) return;
+        
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            const created = await api.post<{
+                id: string;
+                name: string;
+            }>('/api/products', {name: nm});
+            onCreated(created.name);
+            setName('');
+            setOpen(false);
+            setPulse(true);
+            setTimeout(() => setPulse(false), 500);
+        } catch (error) {
+            console.error('Failed to create product:', error);
+            setError(error instanceof Error ? error.message : 'Failed to create product');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className='relative'>
+        <div className='relative' ref={dropdownRef}>
             <button
                 type='button'
                 onClick={() => setOpen((v) => !v)}
@@ -1916,50 +2097,53 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
                 </svg>
             </button>
             {open && (
-                <div className='absolute right-0 mt-2 z-20 bg-card border border-light rounded-lg shadow-lg p-2 flex items-center gap-2'>
-                    <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
-                                const nm = name.trim();
-                                if (!nm) return;
-                                try {
-                                    const created = await api.post<{
-                                        id: string;
-                                        name: string;
-                                    }>('/api/products', {name: nm});
-                                    onCreated(created.name);
-                                    setName('');
+                <div className='absolute right-0 mt-2 z-50 bg-card border border-light rounded-lg shadow-xl p-3 min-w-[250px]'>
+                    <div className='space-y-3'>
+                        <input
+                            value={name}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setError(null);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleCreateProduct();
+                                }
+                                if (e.key === 'Escape') {
                                     setOpen(false);
-                                    setPulse(true);
-                                    setTimeout(() => setPulse(false), 500);
-                                } catch {}
-                            }
-                        }}
-                        placeholder='New product'
-                        className='px-2 py-1 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
-                    />
-                    <button
-                        onClick={async () => {
-                            const nm = name.trim();
-                            if (!nm) return;
-                            try {
-                                const created = await api.post<{
-                                    id: string;
-                                    name: string;
-                                }>('/api/products', {name: nm});
-                                onCreated(created.name);
-                                setName('');
-                                setOpen(false);
-                                setPulse(true);
-                                setTimeout(() => setPulse(false), 500);
-                            } catch {}
-                        }}
-                        className='px-2.5 py-1 text-xs rounded-md bg-primary text-inverse hover:bg-primary-dark'
-                    >
-                        Add
-                    </button>
+                                    setError(null);
+                                }
+                            }}
+                            placeholder='Enter product name'
+                            className='w-full px-3 py-2 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
+                            disabled={isLoading}
+                        />
+                        
+                        {error && (
+                            <div className='text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200'>
+                                {error}
+                            </div>
+                        )}
+                        
+                        <div className='flex items-center gap-2'>
+                            <button
+                                onClick={handleCreateProduct}
+                                disabled={isLoading || !name.trim()}
+                                className='flex-1 px-3 py-2 text-xs rounded-md bg-primary text-inverse hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed'
+                            >
+                                {isLoading ? 'Creating...' : 'Add Product'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setOpen(false);
+                                    setError(null);
+                                }}
+                                className='px-3 py-2 text-xs rounded-md border border-light text-secondary hover:bg-slate-50'
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

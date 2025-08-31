@@ -10,15 +10,16 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
     const [isMobile, setIsMobile] = useState(false);
     const [isTablet, setIsTablet] = useState(false);
 
-    // Responsive breakpoint detection
+    // Responsive breakpoint detection for native 80% zoom simulation
     useEffect(() => {
         const checkScreenSize = () => {
             const width = window.innerWidth;
-            setIsMobile(width < 768);
-            setIsTablet(width >= 768 && width < 1024);
+            // Adjusted breakpoints to simulate 80% zoom effect naturally
+            setIsMobile(width < 1024); // Increased from 960 for better mobile experience
+            setIsTablet(width >= 1024 && width < 1440); // Adjusted for 80% zoom simulation
             
             // Auto-collapse sidebar on mobile
-            if (width < 768) {
+            if (width < 1024) {
                 setSidebarCollapsed(true);
             }
         };
@@ -45,22 +46,15 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
 
     return (
         <div className='h-screen flex bg-secondary relative'>
-            {/* Navigation Sidebar */}
+            {/* Navigation Sidebar - Flush with left edge */}
             <NavigationSidebar
                 isCollapsed={sidebarCollapsed}
                 onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
                 isMobile={isMobile}
             />
 
-            {/* Main Content Area with Curved Contours */}
-            <div className='flex-1 flex flex-col overflow-hidden min-w-0 relative'>
-                {/* Curved Contour Overlay */}
-                <div className={`absolute left-0 top-0 w-8 h-full pointer-events-none transition-all duration-300 ease-in-out ${
-                    sidebarCollapsed ? 'translate-x-0' : '-translate-x-4'
-                }`}>
-                    <div className='w-full h-full bg-gradient-to-r from-transparent via-white/5 to-white/10 rounded-r-3xl'></div>
-                </div>
-                
+            {/* Main Content Area - Fixed height layout without vertical scrolling */}
+            <div className='flex-1 flex flex-col min-w-0 relative'>
                 {/* Breadcrumbs */}
                 <Breadcrumbs
                     username='Tushar'
@@ -68,14 +62,19 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
                     isMobile={isMobile}
                 />
 
-                {/* Main Content + Right rail */}
-                <div className='flex-1 overflow-hidden flex flex-col lg:flex-row'>
-                    <div className='flex-1 min-w-0 overflow-auto order-2 lg:order-1'>
-                        {children}
+                {/* Main Content + Right rail - Compact layout with proper height constraints */}
+                <div className='flex-1 flex flex-col lg:flex-row min-h-0'>
+                    {/* Main content area - No overflow, content should fit within available space */}
+                    <div className='flex-1 min-w-0 order-2 lg:order-1'>
+                        <div className='w-full h-full px-4 py-3'>
+                            <div className='max-w-full mx-auto h-full'>
+                                {children}
+                            </div>
+                        </div>
                     </div>
                     
-                    {/* AI Suggestions Panel - Responsive */}
-                    <div className={`order-1 lg:order-2 flex-shrink-0`}> 
+                    {/* AI Suggestions Panel - Reduced width and proper anchoring */}
+                    <div className='order-1 lg:order-2 flex-shrink-0 border-l border-slate-200'> 
                         <AISuggestionsPanel isMobile={isMobile} isTablet={isTablet} />
                     </div>
                 </div>

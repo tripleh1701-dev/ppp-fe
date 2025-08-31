@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {Icon} from '@/components/Icons';
 import {api} from '@/utils/api';
@@ -13,25 +13,8 @@ interface EnterpriseMinimal {
     id: string;
     name: string;
 }
-interface GlobalSettingInput {
-    accountId: string;
-    accountName: string;
-    enterpriseName: string;
-    entities: string[];
-    selections: Record<string, string[]>; // category -> choices
-}
 
-const STORAGE_KEY = 'global-settings';
-
-const DEFAULT_ACCOUNTS: AccountMinimal[] = [
-    {id: 'acc-1001', accountName: 'Acme Corp'},
-    {id: 'acc-1002', accountName: 'Globex Ltd'},
-    {id: 'acc-1003', accountName: 'Initech'},
-];
-
-// Enterprises will be loaded from backend
-
-const ENTITY_OPTIONS = ['Finance', 'Payroll', 'People'];
+// No mock/fallback accounts
 
 const CATEGORY_OPTIONS: Record<string, string[]> = {
     plan: ['Jira', 'Azure DevOps', 'Trello', 'Asana', 'Other'],
@@ -78,8 +61,6 @@ const OPTION_ICON: Record<string, {name: string}> = {
     'Google Cloud Build': {name: 'cloudbuild'},
     'AWS CodePipeline': {name: 'codepipeline'},
     CircleCI: {name: 'circleci'},
-    JFrog: {name: 'docker'},
-    'Tricentis Tosca': {name: 'jest'},
     Cypress: {name: 'cypress'},
     Selenium: {name: 'selenium'},
     Jest: {name: 'jest'},
@@ -93,14 +74,10 @@ const OPTION_ICON: Record<string, {name: string}> = {
     Prometheus: {name: 'prometheus'},
     Grafana: {name: 'grafana'},
     SonarQube: {name: 'sonarqube'},
-    Integrations: {name: 'docker'},
-    Extensions: {name: 'npm'},
-    'SAC Deployments': {name: 'maven'},
-    PQR: {name: 'git'},
+    Slack: {name: 'slack'},
     Other: {name: 'maven'},
 };
 
-// Brand color accents per tool (used for ring/glow)
 const BRAND_COLOR: Record<string, string> = {
     Jira: '#2684FF',
     GitHub: '#24292E',
@@ -113,7 +90,6 @@ const BRAND_COLOR: Record<string, string> = {
     'Google Cloud Build': '#4285F4',
     'AWS CodePipeline': '#FF9900',
     CircleCI: '#161616',
-    JFrog: '#41BF47',
     'Tricentis Tosca': '#C21325',
     Cypress: '#17202C',
     Selenium: '#43B02A',
@@ -128,11 +104,20 @@ const BRAND_COLOR: Record<string, string> = {
     Prometheus: '#E6522C',
     Grafana: '#F46800',
     SonarQube: '#4C9BD6',
-    Integrations: '#2496ED',
-    Extensions: '#CB3837',
-    'SAC Deployments': '#FF6B35',
-    PQR: '#F1502F',
+    Slack: '#4A154B',
     Other: '#64748B',
+};
+
+type CategorySelections = Record<string, string[]>;
+
+const CATEGORY_COLORS: Record<string, string> = {
+    plan: '#6366F1',
+    code: '#22C55E',
+    build: '#F59E0B',
+    test: '#06B6D4',
+    release: '#EC4899',
+    deploy: '#8B5CF6',
+    others: '#64748B',
 };
 
 export default function NewGlobalSettingsPage() {
@@ -140,13 +125,28 @@ export default function NewGlobalSettingsPage() {
 
     const [accounts, setAccounts] = useState<AccountMinimal[]>([]);
     const [enterprises, setEnterprises] = useState<EnterpriseMinimal[]>([]);
-    const [data, setData] = useState<GlobalSettingInput>({
-        accountId: '',
-        accountName: '',
-        enterpriseName: '',
-        entities: [],
-        selections: {},
-    });
+    const [accountId, setAccountId] = useState('');
+    const [accountName, setAccountName] = useState('');
+    const [enterpriseId, setEnterpriseId] = useState('');
+    const [enterpriseName, setEnterpriseName] = useState('');
+    const [entities, setEntities] = useState<string[]>([]);
+    const [entityOptions, setEntityOptions] = useState<string[]>([]);
+    const [entitiesLoading, setEntitiesLoading] = useState(false);
+
+    // Base selections (used for "apply to many")
+    const [baseSelections, setBaseSelections] = useState<CategorySelections>(
+        {},
+    );
+    // Per-entity selections override
+    const [selectionsByEntity, setSelectionsByEntity] = useState<
+        Record<string, CategorySelections>
+    >({});
+
+    // Modal state
+    const [configureEntity, setConfigureEntity] = useState<string | null>(null);
+    const [copyOpen, setCopyOpen] = useState(false);
+    const [copyFrom, setCopyFrom] = useState<string>('');
+    const [copyTargets, setCopyTargets] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         (async () => {
@@ -155,15 +155,13 @@ export default function NewGlobalSettingsPage() {
                     api.get<AccountMinimal[]>('/api/accounts'),
                     api.get<EnterpriseMinimal[]>('/api/enterprises'),
                 ]);
-                if (Array.isArray(accountsApi) && accountsApi.length > 0) {
+                if (Array.isArray(accountsApi)) {
                     setAccounts(
                         accountsApi.map((a) => ({
                             id: String(a.id),
                             accountName: a.accountName,
                         })),
                     );
-                } else {
-                    setAccounts(DEFAULT_ACCOUNTS);
                 }
                 if (Array.isArray(enterprisesApi)) {
                     setEnterprises(
@@ -174,95 +172,371 @@ export default function NewGlobalSettingsPage() {
                     );
                 }
             } catch {
-                setAccounts(DEFAULT_ACCOUNTS);
+                setAccounts([]);
                 setEnterprises([]);
             }
         })();
     }, []);
 
-    // Entities state
-    const [entityOptions, setEntityOptions] = useState<string[]>([]);
-    const [entitiesLoading, setEntitiesLoading] = useState(false);
-
     // Load entities when account + enterprise are selected
     useEffect(() => {
         const loadEntities = async () => {
-            if (!data.accountId || !data.enterpriseName) {
+            if (!enterpriseId && !enterpriseName) {
                 setEntityOptions([]);
+                setEntities([]);
+                setSelectionsByEntity({});
                 return;
             }
             setEntitiesLoading(true);
-            // Reset user selections when context changes
-            setData((prev) => ({...prev, entities: []}));
             try {
-                const qs = new URLSearchParams({
-                    accountId: data.accountId,
-                    enterpriseName: data.enterpriseName,
-                }).toString();
-                const entities = await api.get<string[]>(
+                // Prefer enterpriseId if available; else use enterpriseName
+                const qs = new URLSearchParams(
+                    enterpriseId
+                        ? {enterpriseId}
+                        : {enterpriseName: enterpriseName},
+                ).toString();
+                const list = await api.get<string[]>(
                     `/api/business-units/entities?${qs}`,
                 );
-                setEntityOptions(Array.isArray(entities) ? entities : []);
-            } catch {
+                let opts = Array.isArray(list) ? list : [];
+
+                // No client-side or demo fallback: trust backend entirely
+                setEntityOptions(opts || []);
+                // Reset selections when context changes
+                setEntities(opts || []);
+                setSelectionsByEntity({});
+                setBaseSelections({});
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to load entities', e);
                 setEntityOptions([]);
+                setEntities([]);
+                setSelectionsByEntity({});
+                setBaseSelections({});
             } finally {
                 setEntitiesLoading(false);
             }
         };
         loadEntities().catch(() => {});
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.accountId, data.enterpriseName]);
+    }, [accountId, enterpriseName]);
 
-    const canSave =
-        data.accountId && data.enterpriseName && data.entities.length > 0;
+    // Derived
+    const canSave = accountId && enterpriseName && entityOptions.length > 0;
+
+    // Helpers
+    const ensureEntitySelection = (entity: string) => {
+        setSelectionsByEntity((prev) => ({
+            ...prev,
+            [entity]: prev[entity] || {},
+        }));
+    };
 
     const toggleEntity = (name: string) => {
-        setData((prev) => {
-            const exists = prev.entities.includes(name);
-            const nextEntities = exists
-                ? prev.entities.filter((e) => e !== name)
-                : [...prev.entities, name];
-            return {...prev, entities: nextEntities};
+        setEntities((prev) => {
+            const exists = prev.includes(name);
+            const next = exists
+                ? prev.filter((e) => e !== name)
+                : [...prev, name];
+            // initialize/destroy per-entity selection
+            setSelectionsByEntity((p) => {
+                const clone = {...p};
+                if (!exists) {
+                    clone[name] = clone[name] || {};
+                } else {
+                    delete clone[name];
+                }
+                return clone;
+            });
+            return next;
         });
     };
 
-    const toggleSelection = (category: string, option: string) => {
-        setData((prev) => {
-            const current = prev.selections[category] || [];
-            const exists = current.includes(option);
-            const next = exists
+    const toggleBaseSelection = (category: string, option: string) => {
+        setBaseSelections((prev) => {
+            const current = prev[category] || [];
+            const next = current.includes(option)
                 ? current.filter((o) => o !== option)
                 : [...current, option];
-            return {
-                ...prev,
-                selections: {...prev.selections, [category]: next},
-            };
+            return {...prev, [category]: next};
         });
     };
+
+    const toggleEntitySelection = (
+        entity: string,
+        category: string,
+        option: string,
+    ) => {
+        setSelectionsByEntity((prev) => {
+            const byEntity = {...prev};
+            const current = byEntity[entity]?.[category] || [];
+            const next = current.includes(option)
+                ? current.filter((o) => o !== option)
+                : [...current, option];
+            byEntity[entity] = {
+                ...(byEntity[entity] || {}),
+                [category]: next,
+            };
+            return byEntity;
+        });
+    };
+
+    const selectionsSummary = (sel: CategorySelections | undefined) => {
+        const s = sel || {};
+        const total = Object.values(s).reduce(
+            (acc, arr) => acc + (arr?.length || 0),
+            0,
+        );
+        return total;
+    };
+
+    const getEntitySelections = (entity: string): CategorySelections => {
+        return selectionsByEntity[entity] || {};
+    };
+
+    const SelectionPill = ({entity}: {entity: string}) => {
+        const s = getEntitySelections(entity);
+        const total = selectionsSummary(s);
+        const entries = Object.entries(CATEGORY_OPTIONS).map(([cat]) => ({
+            cat,
+            count: (s[cat] || []).length,
+        }));
+        const sum = entries.reduce((a, b) => a + b.count, 0) || 1;
+        const [open, setOpen] = useState(false);
+        const [coords, setCoords] = useState<{
+            top: number;
+            left: number;
+        } | null>(null);
+        const stateLabel = total === 0 ? 'Pending' : 'Configured';
+        const stateClass =
+            total === 0
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return (
+            <>
+                <span
+                    onMouseEnter={(e) => {
+                        const r = (
+                            e.currentTarget as HTMLElement
+                        ).getBoundingClientRect();
+                        const left = Math.min(
+                            Math.max(12, r.left),
+                            window.innerWidth - 380,
+                        );
+                        const top = Math.min(
+                            r.bottom + 8,
+                            window.innerHeight - 220,
+                        );
+                        setCoords({top, left});
+                        setOpen(true);
+                    }}
+                    onMouseLeave={() => setOpen(false)}
+                    className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-medium border ${stateClass}`}
+                >
+                    <span>{stateLabel}</span>
+                    <span className='inline-block h-1 w-1 rounded-full bg-slate-300'></span>
+                    <span>{total} selected</span>
+                </span>
+                {open && coords && (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: coords.top,
+                            left: coords.left,
+                            zIndex: 70,
+                        }}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl p-4 w-auto min-w-[360px] max-w-[500px] whitespace-normal break-words'
+                        onMouseEnter={() => setOpen(true)}
+                        onMouseLeave={() => setOpen(false)}
+                    >
+                        <div className='mb-2 text-xs font-semibold text-secondary'>
+                            Selections for {entity}
+                        </div>
+                        {total === 0 ? (
+                            <div className='rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm leading-relaxed whitespace-normal break-words p-3'>
+                                No settings configured yet for {entity}. Click
+                                Configure to select tools per category.
+                            </div>
+                        ) : (
+                            <>
+                                <div className='mb-3 h-2 w-full overflow-hidden rounded-full bg-slate-100'>
+                                    <div className='flex h-full w-full'>
+                                        {entries.map(({cat, count}) => {
+                                            const width = `${Math.max(
+                                                0,
+                                                Math.round((count / sum) * 100),
+                                            )}%`;
+                                            return (
+                                                <div
+                                                    key={cat}
+                                                    title={`${cat}: ${count}`}
+                                                    style={{
+                                                        width,
+                                                        backgroundColor:
+                                                            CATEGORY_COLORS[
+                                                                cat
+                                                            ],
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <div className='grid grid-cols-2 gap-3'>
+                                    {Object.entries(CATEGORY_OPTIONS).map(
+                                        ([cat]) => {
+                                            const list = s[cat] || [];
+                                            return (
+                                                <div
+                                                    key={cat}
+                                                    className='rounded-lg border border-slate-200 p-2'
+                                                >
+                                                    <div className='mb-1 flex items-center justify-between'>
+                                                        <div className='text-xs font-semibold capitalize text-primary'>
+                                                            {cat}
+                                                        </div>
+                                                        <div className='text-[10px] text-secondary'>
+                                                            {list.length}
+                                                        </div>
+                                                    </div>
+                                                    {list.length === 0 ? (
+                                                        <div className='text-[11px] text-secondary'>
+                                                            None
+                                                        </div>
+                                                    ) : (
+                                                        <div className='flex flex-wrap gap-1'>
+                                                            {list.map(
+                                                                (tool) => (
+                                                                    <span
+                                                                        key={
+                                                                            tool
+                                                                        }
+                                                                        className='inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-primary'
+                                                                    >
+                                                                        <Icon
+                                                                            name={
+                                                                                OPTION_ICON[
+                                                                                    tool
+                                                                                ]
+                                                                                    ?.name ||
+                                                                                'git'
+                                                                            }
+                                                                            size={
+                                                                                12
+                                                                            }
+                                                                        />
+                                                                        {tool}
+                                                                    </span>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </>
+        );
+    };
+
+    const applyCopy = () => {
+        if (!copyFrom) return;
+        setSelectionsByEntity((prev) => {
+            const src = prev[copyFrom] || {};
+            const next = {...prev};
+            Object.entries(copyTargets)
+                .filter(([, v]) => v)
+                .forEach(([entity]) => {
+                    if (entity === copyFrom) return;
+                    next[entity] = JSON.parse(JSON.stringify(src));
+                });
+            return next;
+        });
+        setCopyOpen(false);
+        setCopyTargets({});
+    };
+
+    const areSelectionsUniform = useMemo(() => {
+        if (entities.length <= 1) return true;
+        const first = selectionsByEntity[entities[0]] || {};
+        const same = entities.every((e) => {
+            const cur = selectionsByEntity[e] || {};
+            return JSON.stringify(cur) === JSON.stringify(first);
+        });
+        return same;
+    }, [entities, selectionsByEntity]);
 
     const save = async () => {
         if (!canSave) return;
-        const record = {
-            id: Date.now().toString(),
-            accountId: data.accountId,
-            accountName:
-                accounts.find((a) => a.id === data.accountId)?.accountName ||
-                '',
-            enterpriseName: data.enterpriseName,
-            entities: data.entities,
-            categories: {
-                plan: data.selections.plan || [],
-                code: data.selections.code || [],
-                build: data.selections.build || [],
-                test: data.selections.test || [],
-                release: data.selections.release || [],
-                deploy: data.selections.deploy || [],
-                others: data.selections.others || [],
-            },
-        };
+
+        const accountName =
+            accounts.find((a) => a.id === accountId)?.accountName || '';
+
+        // If user did not configure per-entity, use baseSelections for all
+        const effectiveByEntity: Record<string, CategorySelections> = {};
+        (entityOptions || []).forEach((e) => {
+            effectiveByEntity[e] =
+                Object.keys(selectionsByEntity[e] || {}).length > 0
+                    ? selectionsByEntity[e]
+                    : baseSelections;
+        });
+
+        // If all entities share identical selections, save one record with all entities
+        const listForSave = entityOptions || [];
+        const firstSel = effectiveByEntity[listForSave[0]] || {};
+        const uniform = listForSave.every(
+            (e) =>
+                JSON.stringify(effectiveByEntity[e] || {}) ===
+                JSON.stringify(firstSel),
+        );
+
         try {
-            await api.post('/api/global-settings', record);
-        } catch {}
+            if (uniform) {
+                await api.post('/api/global-settings', {
+                    accountId,
+                    accountName,
+                    enterpriseName,
+                    entities: listForSave,
+                    categories: {
+                        plan: firstSel.plan || [],
+                        code: firstSel.code || [],
+                        build: firstSel.build || [],
+                        test: firstSel.test || [],
+                        release: firstSel.release || [],
+                        deploy: firstSel.deploy || [],
+                        others: firstSel.others || [],
+                    },
+                });
+            } else {
+                // Create one record per entity so that overrides persist cleanly
+                await Promise.all(
+                    listForSave.map((entity) =>
+                        api.post('/api/global-settings', {
+                            accountId,
+                            accountName,
+                            enterpriseName,
+                            entities: [entity],
+                            categories: {
+                                plan: effectiveByEntity[entity]?.plan || [],
+                                code: effectiveByEntity[entity]?.code || [],
+                                build: effectiveByEntity[entity]?.build || [],
+                                test: effectiveByEntity[entity]?.test || [],
+                                release:
+                                    effectiveByEntity[entity]?.release || [],
+                                deploy: effectiveByEntity[entity]?.deploy || [],
+                                others: effectiveByEntity[entity]?.others || [],
+                            },
+                        }),
+                    ),
+                );
+            }
+        } catch {
+            // no-op (toast could be added)
+        }
         router.push('/account-settings/global-settings');
     };
 
@@ -370,17 +644,19 @@ export default function NewGlobalSettingsPage() {
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                     <div>
                         <label className='block text-sm font-semibold text-primary mb-2'>
-                            Select Account
+                            Account
                         </label>
                         <select
-                            value={data.accountId}
-                            onChange={(e) =>
-                                setData((p) => ({
-                                    ...p,
-                                    accountId: e.target.value,
-                                }))
-                            }
-                            className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary relative z-10'
+                            value={accountId}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setAccountId(val);
+                                const name =
+                                    accounts.find((a) => a.id === val)
+                                        ?.accountName || '';
+                                setAccountName(name);
+                            }}
+                            className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary'
                         >
                             <option value=''>Select an account</option>
                             {accounts.map((a) => (
@@ -390,20 +666,21 @@ export default function NewGlobalSettingsPage() {
                             ))}
                         </select>
                     </div>
-
                     <div>
                         <label className='block text-sm font-semibold text-primary mb-2'>
-                            Select Enterprise
+                            Enterprise
                         </label>
                         <select
-                            value={data.enterpriseName}
-                            onChange={(e) =>
-                                setData((p) => ({
-                                    ...p,
-                                    enterpriseName: e.target.value,
-                                }))
-                            }
-                            className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary relative z-20'
+                            value={enterpriseName}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setEnterpriseName(val);
+                                const ent = enterprises.find(
+                                    (en) => en.name === val,
+                                );
+                                setEnterpriseId(ent?.id || '');
+                            }}
+                            className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary'
                         >
                             <option value=''>Select an enterprise</option>
                             {enterprises.map((ent) => (
@@ -415,76 +692,476 @@ export default function NewGlobalSettingsPage() {
                     </div>
                 </div>
 
-                {data.accountId && data.enterpriseName && (
-                    <div>
-                        <label className='block text-sm font-semibold text-primary mb-2'>
-                            Select Entities
-                        </label>
+                {accountId && enterpriseName && (
+                    <div className='space-y-4'>
+                        <div className='flex items-center justify-between'>
+                            <div className='text-sm font-semibold text-primary'>
+                                Entities
+                            </div>
+                            <div className='flex items-center gap-2'>
+                                {entities.length > 1 && (
+                                    <button
+                                        onClick={() => setCopyOpen(true)}
+                                        className='text-sm px-3 py-2 rounded-lg bg-white border border-light hover:bg-slate-50 text-primary shadow-sm'
+                                    >
+                                        Copy Settings
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                         {entitiesLoading ? (
                             <div className='text-sm text-secondary'>
                                 Loading entities…
                             </div>
                         ) : entityOptions.length === 0 ? (
                             <div className='text-sm text-secondary'>
-                                No entities found for this selection. You can
-                                add them in{' '}
-                                <a
-                                    href='/account-settings/business-unit-settings'
-                                    className='text-brand underline hover:text-brand-dark'
-                                >
-                                    Business Unit Settings
-                                </a>
-                                .
+                                <div>
+                                    No entities found for this selection. You
+                                    can add them in{' '}
+                                    <a
+                                        href='/account-settings/business-unit-settings'
+                                        className='text-brand underline hover:text-brand-dark'
+                                    >
+                                        Business Unit Settings
+                                    </a>
+                                    .
+                                </div>
                             </div>
-                        ) : (
-                            <div className='flex gap-3 flex-wrap'>
-                                {entityOptions.map((opt) => {
-                                    const checked = data.entities.includes(opt);
-                                    return (
-                                        <label
-                                            key={opt}
-                                            className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                                                checked
-                                                    ? 'bg-primary-light/40 border-primary text-primary'
-                                                    : 'bg-tertiary border-light text-primary'
-                                            }`}
-                                        >
-                                            <input
-                                                type='checkbox'
-                                                checked={checked}
-                                                onChange={() =>
-                                                    toggleEntity(opt)
-                                                }
-                                            />
-                                            <span className='text-sm'>
-                                                {opt}
-                                            </span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 )}
 
-                {data.entities.length > 0 && (
-                    <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-                        {Object.entries(CATEGORY_OPTIONS).map(
-                            ([category, options]) => (
-                                <CategoryCard
-                                    key={category}
-                                    title={category}
-                                    options={options}
-                                    selected={data.selections[category] || []}
-                                    onToggle={(opt) =>
-                                        toggleSelection(category, opt)
-                                    }
-                                />
-                            ),
+                {entityOptions.length > 0 && (
+                    <div className='space-y-4'>
+                        <div className='rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'>
+                            <table className='min-w-full divide-y divide-slate-100'>
+                                <thead className='bg-tertiary/40'>
+                                    <tr>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Account
+                                        </th>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Enterprise
+                                        </th>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Entity
+                                        </th>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Configuration
+                                        </th>
+                                        <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className='divide-y divide-slate-100'>
+                                    {(entityOptions || []).map((entity) => {
+                                        const sum = selectionsSummary(
+                                            selectionsByEntity[entity],
+                                        );
+                                        return (
+                                            <tr
+                                                key={entity}
+                                                className='transition-all duration-200 hover:bg-indigo-50/40'
+                                            >
+                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                                    <span className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-primary'>
+                                                        <svg
+                                                            className='w-3.5 h-3.5 text-slate-500'
+                                                            viewBox='0 0 24 24'
+                                                            fill='currentColor'
+                                                        >
+                                                            <path d='M10 3a1 1 0 011 1v1h2V4a1 1 0 112 0v1h1a3 3 0 013 3v1H4V8a3 3 0 013-3h1V4a1 1 0 011-1z'></path>
+                                                            <path d='M4 10h16v7a3 3 0 01-3 3H7a3 3 0 01-3-3v-7z'></path>
+                                                        </svg>
+                                                        {
+                                                            accounts.find(
+                                                                (a) =>
+                                                                    a.id ===
+                                                                    accountId,
+                                                            )?.accountName
+                                                        }
+                                                    </span>
+                                                </td>
+                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                                    <span className='inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700'>
+                                                        <svg
+                                                            className='w-3.5 h-3.5 text-indigo-600'
+                                                            viewBox='0 0 24 24'
+                                                            fill='currentColor'
+                                                        >
+                                                            <path d='M3 21V8l9-5 9 5v13h-6v-6H9v6H3z'></path>
+                                                        </svg>
+                                                        {enterpriseName}
+                                                    </span>
+                                                </td>
+                                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                                    {entity}
+                                                </td>
+                                                <td className='px-6 py-4 whitespace-nowrap text-sm'>
+                                                    <SelectionPill
+                                                        entity={entity}
+                                                    />
+                                                </td>
+                                                <td className='px-6 py-4 whitespace-nowrap text-right text-sm'>
+                                                    <button
+                                                        onClick={() => {
+                                                            ensureEntitySelection(
+                                                                entity,
+                                                            );
+                                                            setConfigureEntity(
+                                                                entity,
+                                                            );
+                                                        }}
+                                                        className='inline-flex items-center px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
+                                                    >
+                                                        Configure
+                                                    </button>
+                                                    {entityOptions.length >
+                                                        1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setCopyFrom(
+                                                                    entity,
+                                                                );
+                                                                const targets: Record<
+                                                                    string,
+                                                                    boolean
+                                                                > = {};
+                                                                (
+                                                                    entityOptions ||
+                                                                    []
+                                                                )
+                                                                    .filter(
+                                                                        (e) =>
+                                                                            e !==
+                                                                            entity,
+                                                                    )
+                                                                    .forEach(
+                                                                        (e) =>
+                                                                            (targets[
+                                                                                e
+                                                                            ] =
+                                                                                true),
+                                                                    );
+                                                                setCopyTargets(
+                                                                    targets,
+                                                                );
+                                                                setCopyOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                            className='ml-2 inline-flex items-center px-3 py-2 rounded-lg bg-white border border-light hover:bg-slate-50 text-primary shadow-sm'
+                                                        >
+                                                            Copy to others
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {entityOptions.length > 1 && (
+                            <div className='rounded-xl border border-slate-200 bg-gradient-to-r from-indigo-50 to-cyan-50 p-4 text-sm text-primary'>
+                                Tip: Configure one entity and use &quot;Copy
+                                settings&quot; to replicate.
+                            </div>
                         )}
                     </div>
                 )}
             </div>
+
+            {/* Configure Modal */}
+            {configureEntity && (
+                <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
+                    <div className='absolute inset-0 bg-black/50 animate-[fadeIn_200ms_ease-out]'></div>
+                    <div className='relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-light overflow-hidden animate-[slideUp_240ms_ease-out]'>
+                        <div className='px-6 py-4 border-b border-light flex items-center justify-between'>
+                            <div>
+                                <div className='text-sm text-secondary'>
+                                    Configure entity
+                                </div>
+                                <h3 className='text-lg font-bold text-primary'>
+                                    {configureEntity}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setConfigureEntity(null)}
+                                className='h-10 w-10 inline-flex items-center justify-center rounded-full border border-light text-secondary hover:bg-slate-100'
+                                aria-label='Close'
+                            >
+                                <svg
+                                    className='w-5 h-5'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth='2'
+                                        d='M6 18L18 6M6 6l12 12'
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className='p-6 space-y-6 max-h-[70vh] overflow-y-auto'>
+                            <div className='rounded-2xl border border-slate-200 overflow-hidden bg-white'>
+                                <table className='min-w-full divide-y divide-slate-100'>
+                                    <thead className='bg-tertiary/40'>
+                                        <tr>
+                                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                                Category
+                                            </th>
+                                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                                Tools
+                                            </th>
+                                            <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className='divide-y divide-slate-100'>
+                                        {Object.entries(CATEGORY_OPTIONS).map(
+                                            ([category, options]) => {
+                                                const selected =
+                                                    selectionsByEntity[
+                                                        configureEntity || ''
+                                                    ]?.[category] || [];
+                                                const isSelected = (
+                                                    opt: string,
+                                                ) => selected.includes(opt);
+                                                return (
+                                                    <tr
+                                                        key={category}
+                                                        className='align-top'
+                                                    >
+                                                        <td className='px-6 py-4 whitespace-nowrap text-sm font-semibold capitalize text-primary'>
+                                                            {category}
+                                                        </td>
+                                                        <td className='px-6 py-4'>
+                                                            <div className='flex flex-wrap gap-2'>
+                                                                {options.map(
+                                                                    (opt) => {
+                                                                        const active =
+                                                                            isSelected(
+                                                                                opt,
+                                                                            );
+                                                                        return (
+                                                                            <button
+                                                                                key={
+                                                                                    opt
+                                                                                }
+                                                                                type='button'
+                                                                                onClick={() =>
+                                                                                    toggleEntitySelection(
+                                                                                        configureEntity as string,
+                                                                                        category,
+                                                                                        opt,
+                                                                                    )
+                                                                                }
+                                                                                className={`relative inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-transform duration-200 ${
+                                                                                    active
+                                                                                        ? 'bg-white text-primary border-indigo-500 shadow-md scale-[1.01] ring-2 ring-indigo-200/60'
+                                                                                        : 'bg-white text-primary border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.01]'
+                                                                                }`}
+                                                                            >
+                                                                                <div className='h-5 w-5 flex items-center justify-center'>
+                                                                                    <Icon
+                                                                                        name={
+                                                                                            OPTION_ICON[
+                                                                                                opt
+                                                                                            ]
+                                                                                                ?.name ||
+                                                                                            'git'
+                                                                                        }
+                                                                                        size={
+                                                                                            16
+                                                                                        }
+                                                                                        className={
+                                                                                            'text-primary'
+                                                                                        }
+                                                                                    />
+                                                                                </div>
+                                                                                <span>
+                                                                                    {
+                                                                                        opt
+                                                                                    }
+                                                                                </span>
+                                                                                {active && (
+                                                                                    <span className='pointer-events-none absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-gradient-to-br from-indigo-500 to-emerald-500 text-white flex items-center justify-center text-[9px] shadow-md ring-2 ring-white'>
+                                                                                        ✓
+                                                                                    </span>
+                                                                                )}
+                                                                            </button>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className='px-6 py-4 whitespace-nowrap text-right'>
+                                                            <div className='inline-flex gap-2'>
+                                                                <button
+                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    onClick={() => {
+                                                                        // Select all in category
+                                                                        options.forEach(
+                                                                            (
+                                                                                opt,
+                                                                            ) => {
+                                                                                if (
+                                                                                    !isSelected(
+                                                                                        opt,
+                                                                                    )
+                                                                                ) {
+                                                                                    toggleEntitySelection(
+                                                                                        configureEntity as string,
+                                                                                        category,
+                                                                                        opt,
+                                                                                    );
+                                                                                }
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Select All
+                                                                </button>
+                                                                <button
+                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    onClick={() => {
+                                                                        // Clear all in category
+                                                                        options.forEach(
+                                                                            (
+                                                                                opt,
+                                                                            ) => {
+                                                                                if (
+                                                                                    isSelected(
+                                                                                        opt,
+                                                                                    )
+                                                                                ) {
+                                                                                    toggleEntitySelection(
+                                                                                        configureEntity as string,
+                                                                                        category,
+                                                                                        opt,
+                                                                                    );
+                                                                                }
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Clear
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            },
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
+                            <button
+                                onClick={() => setConfigureEntity(null)}
+                                className='px-4 py-2 text-sm font-medium text-secondary bg-tertiary hover:bg-slate-200 rounded-lg'
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Copy Modal */}
+            {copyOpen && (
+                <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
+                    <div className='absolute inset-0 bg-black/50'></div>
+                    <div className='relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-light overflow-hidden'>
+                        <div className='px-6 py-4 border-b border-light'>
+                            <h3 className='text-lg font-bold text-primary'>
+                                Copy settings across entities
+                            </h3>
+                            <p className='text-sm text-secondary mt-1'>
+                                Select a source entity and the target entities
+                                to receive the same settings.
+                            </p>
+                        </div>
+                        <div className='p-6 space-y-6'>
+                            <div>
+                                <label className='block text-sm font-semibold text-primary mb-2'>
+                                    Source entity
+                                </label>
+                                <select
+                                    value={copyFrom}
+                                    onChange={(e) =>
+                                        setCopyFrom(e.target.value)
+                                    }
+                                    className='block w-full px-3 py-2.5 border border-light rounded-lg bg-card text-primary'
+                                >
+                                    <option value=''>Select source</option>
+                                    {entities.map((e) => (
+                                        <option key={e} value={e}>
+                                            {e}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className='block text-sm font-semibold text-primary mb-2'>
+                                    Target entities
+                                </label>
+                                <div className='flex flex-wrap gap-3'>
+                                    {entities
+                                        .filter((e) => e !== copyFrom)
+                                        .map((e) => (
+                                            <label
+                                                key={e}
+                                                className='inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-tertiary border-light text-primary'
+                                            >
+                                                <input
+                                                    type='checkbox'
+                                                    checked={!!copyTargets[e]}
+                                                    onChange={(ev) =>
+                                                        setCopyTargets((p) => ({
+                                                            ...p,
+                                                            [e]: ev.target
+                                                                .checked,
+                                                        }))
+                                                    }
+                                                />
+                                                <span className='text-sm'>
+                                                    {e}
+                                                </span>
+                                            </label>
+                                        ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
+                            <button
+                                onClick={() => setCopyOpen(false)}
+                                className='px-4 py-2 text-sm font-medium text-secondary bg-tertiary hover:bg-slate-200 rounded-lg'
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={applyCopy}
+                                disabled={
+                                    !copyFrom ||
+                                    !Object.values(copyTargets).some(Boolean)
+                                }
+                                className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark disabled:opacity-50 rounded-lg'
+                            >
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

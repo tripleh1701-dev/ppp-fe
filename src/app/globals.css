@@ -24,72 +24,325 @@
     --bg-secondary: #f8fafc;
 }
 
-/* Base sizing tuned for 100% zoom on desktop */
-html { font-size: 14px; }
+/* ===== GLOBAL TYPOGRAPHY SYSTEM ===== */
+/* Professional, consistent typography across all screens */
 
-/* Brand gradient helpers */
-.brand-gradient { background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); }
-.text-brand-gradient { background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-
-/* Typography (compact) */
-h1 { font-size: clamp(1.25rem, 0.9rem + 1.4vw, 1.85rem); font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; }
-h2 { font-size: clamp(1.15rem, 0.9rem + 1.0vw, 1.6rem); font-weight: 700; color: var(--text-primary); }
-h3 { font-size: clamp(1rem, 0.85rem + 0.7vw, 1.3rem); font-weight: 600; color: var(--text-primary); }
-.small-label { font-size: .75rem; color: var(--text-tertiary); }
-
-/* Compact cards and panels */
-.card-compact { padding: 0.75rem; border-radius: 0.75rem; }
-.section-compact { padding: 0.75rem 1rem; }
-.gap-compact { gap: 0.5rem; }
-
-/* Compact table */
-.table-compact th { padding: .5rem .6rem; font-weight: 600; color: var(--text-primary); background: var(--bg-secondary); }
-.table-compact td { padding: .4rem .6rem; color: var(--text-secondary); }
-.table-compact .chip { padding: .1rem .4rem; font-size: .7rem; border-radius: .375rem; }
-
-/* Compact table row height globally */
-.table-compact th, .table-compact td { padding-top: .35rem; padding-bottom: .35rem; }
-.table-compact tr { height: 1.9rem; }
-
-/* Responsive utilities for tables */
-.table-responsive { width: 100%; overflow-x: auto; }
-
-/* Compact tabs/cards for AI */
-.ai-card { padding: .6rem .7rem; border-radius: .6rem; }
-.ai-card h4 { font-size: 13px; }
-.ai-card p { font-size: 12px; line-height: 1.2rem; }
-.ai-tabs { display: flex; gap: .35rem; }
-.ai-tabs button { font-size: 12px; padding: .35rem .5rem; border-radius: .5rem; }
-
-/* Inputs compact */
-.input-compact { height: 2.25rem; padding: 0 .6rem; }
-.select-compact { height: 2.25rem; padding-right: 2rem; }
-.btn-compact { height: 2.25rem; padding: 0 .8rem; border-radius: .6rem; }
-
-/* Ensure page areas scroll when needed */
-.main-scroll { overflow: auto; }
-
-/* Reduce vertical whitespace on standard laptop heights */
-@media (max-height: 900px) {
-    .section-compact { padding: 0.5rem .75rem; }
-    .card-compact { padding: 0.6rem; }
-    h1 { font-size: 1.6rem; }
-    h2 { font-size: 1.35rem; }
-    h3 { font-size: 1.15rem; }
+/* Base font settings for compact, data-dense layout */
+html { 
+    font-size: 13px; /* Reduced from 14px for more compact layout */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
 }
 
-/* App-wide compact mode hooks */
-.ui-compact .container { padding-left: 1rem; padding-right: 1rem; }
-.ui-compact .toolbar { padding: .5rem .75rem; }
-.ui-compact .panel { padding: .75rem; }
-.ui-compact .table { @apply table-compact; }
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+}
 
-/* Buttons */
-.button-brand { @apply bg-brand-gradient text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300; }
+/* ===== TYPOGRAPHY UTILITY CLASSES ===== */
+/* Compact text styling for data-dense layouts */
 
-/* Inputs */
-.input-brand:focus { outline: none; box-shadow: 0 0 0 3px rgba(1,113,236,0.25); border-color: var(--brand-blue); }
+/* Headings - Compact hierarchy */
+.heading-xl {
+    @apply text-xl font-bold text-slate-900 leading-tight;
+}
+
+.heading-lg {
+    @apply text-lg font-bold text-slate-900 leading-tight;
+}
+
+.heading-md {
+    @apply text-base font-semibold text-slate-900 leading-snug;
+}
+
+.heading-sm {
+    @apply text-sm font-semibold text-slate-900 leading-snug;
+}
+
+/* Body text - Compact and readable */
+.text-body-lg {
+    @apply text-sm font-medium text-slate-700 leading-relaxed;
+}
+
+.text-body {
+    @apply text-xs font-medium text-slate-700 leading-relaxed;
+}
+
+.text-body-sm {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* Screen descriptions and helper text - Compact */
+.screen-description {
+    @apply text-xs font-normal text-slate-600 leading-relaxed;
+}
+
+.helper-text {
+    @apply text-xs font-normal text-slate-500 leading-relaxed;
+}
+
+/* Breadcrumbs - Compact styling */
+.breadcrumb-text {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* Table controls - Compact styling */
+.table-control {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* AI Assistant text - Compact styling */
+.ai-text {
+    @apply text-xs font-medium text-slate-700 leading-relaxed;
+}
+
+/* Labels and small text - Compact */
+.label-text {
+    @apply text-xs font-semibold text-slate-700 leading-relaxed uppercase tracking-wide;
+}
+
+.small-label { 
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* ===== LAYOUT UTILITIES ===== */
+/* Native 80% zoom simulation through proper spacing and sizing */
+
+/* Container utilities for dense, content-rich layouts */
+.container-dense {
+    @apply max-w-[1440px] mx-auto px-6;
+}
+
+.container-fluid {
+    @apply w-full px-6;
+}
+
+/* Spacing utilities for 80% zoom effect */
+.spacing-dense {
+    @apply gap-4;
+}
+
+.spacing-normal {
+    @apply gap-6;
+}
+
+.spacing-relaxed {
+    @apply gap-8;
+}
+
+/* ===== COMPONENT STYLES ===== */
+/* Consistent styling for common UI elements */
+
+/* Cards - Professional appearance */
+.card-base {
+    @apply bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+}
+
+.card-compact {
+    @apply p-4;
+}
+
+.card-normal {
+    @apply p-6;
+}
+
+.card-relaxed {
+    @apply p-8;
+}
+
+/* Buttons - Consistent styling */
+.btn-primary {
+    @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200;
+}
+
+.btn-secondary {
+    @apply bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors duration-200;
+}
+
+.btn-sm {
+    @apply px-3 py-1.5 text-sm;
+}
+
+.btn-md {
+    @apply px-4 py-2 text-sm;
+}
+
+.btn-lg {
+    @apply px-6 py-3 text-base;
+}
+
+/* Inputs - Consistent styling */
+.input-base {
+    @apply w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors duration-200;
+}
+
+.input-sm {
+    @apply px-2.5 py-1.5 text-xs;
+}
+
+.input-md {
+    @apply px-3 py-2 text-sm;
+}
+
+.input-lg {
+    @apply px-4 py-3 text-base;
+}
+
+/* Tables - Professional appearance */
+.table-base {
+    @apply w-full text-sm;
+}
+
+.table-header {
+    @apply bg-slate-50 border-b border-slate-200;
+}
+
+.table-header-cell {
+    @apply px-4 py-3 text-left font-semibold text-slate-900;
+}
+
+.table-cell {
+    @apply px-4 py-3 border-b border-slate-100 text-slate-700;
+}
+
+/* Enhanced table styling */
+.table-enhanced {
+    @apply w-full bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden;
+}
+
+.table-enhanced-header {
+    @apply bg-slate-50 border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900;
+}
+
+.table-enhanced-row {
+    @apply border-b border-slate-100 hover:bg-slate-50 transition-colors duration-200 ease-in-out;
+}
+
+.table-enhanced-cell {
+    @apply px-4 py-3 text-sm text-slate-700;
+}
+
+/* Standardized row heights */
+.table-row-h-12 {
+    @apply h-12;
+}
+
+.table-row-h-14 {
+    @apply h-14;
+}
+
+/* Enhanced hover effects */
+.hover-lift {
+    @apply hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ease-in-out;
+}
+
+.hover-glow {
+    @apply hover:shadow-lg hover:ring-2 hover:ring-primary-500/20 transition-all duration-200 ease-in-out;
+}
+
+/* Smooth animations */
+.animate-smooth {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+.animate-fast {
+    @apply transition-all duration-150 ease-in-out;
+}
+
+.animate-slow {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+/* ===== RESPONSIVE UTILITIES ===== */
+/* Mobile-first responsive design */
+
+@media (max-width: 768px) {
+    .container-dense {
+        @apply px-4;
+    }
+    
+    .card-normal {
+        @apply p-4;
+    }
+    
+    .spacing-normal {
+        @apply gap-4;
+    }
+}
+
+@media (max-width: 1024px) {
+    .container-dense {
+        @apply px-5;
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+/* Ensure proper contrast and readability */
+
+/* Focus states */
+.focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2;
+}
+
+/* Selection styling */
+::selection {
+    @apply bg-primary-100 text-primary-900;
+}
+
+::-moz-selection {
+    @apply bg-primary-100 text-primary-900;
+}
+
+/* ===== ANIMATIONS ===== */
+/* Smooth transitions and micro-interactions */
+
+.transition-base {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+.transition-fast {
+    @apply transition-all duration-150 ease-in-out;
+}
+
+.transition-slow {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+/* ===== LEGACY SUPPORT ===== */
+/* Maintain compatibility with existing components */
+
+/* Brand gradient helpers */
+.brand-gradient { 
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); 
+}
+
+.text-brand-gradient { 
+    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); 
+    -webkit-background-clip: text; 
+    background-clip: text; 
+    -webkit-text-fill-color: transparent; 
+}
+
+/* Ensure page areas scroll when needed */
+.main-scroll { 
+    @apply overflow-auto; 
+}
 
 /* Links */
-a { color: var(--brand-blue); }
-a:hover { color: #0261c8; }
+a { 
+    @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+}
+
+/* ===== UTILITY OVERRIDES ===== */
+/* Override any conflicting Tailwind utilities */
+
+.text-responsive {
+    @apply text-sm font-medium text-slate-700 leading-relaxed;
+}
+
+.container-responsive {
+    @apply max-w-[1440px] mx-auto px-6;
+}

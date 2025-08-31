@@ -873,14 +873,14 @@ function SortableAccountRow({
                 damping: 30,
                 mass: 0.6,
             }}
-            className={`w-full grid items-center gap-0 rounded-md overflow-visible border border-slate-200 transition-all duration-200 transform-gpu ${
+            className={`w-full grid items-center gap-0 rounded-md overflow-visible border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 ${
                 isDragging
-                    ? 'cursor-grabbing ring-2 ring-sky-300/40 bg-white shadow-xl'
-                    : 'cursor-grab hover:bg-slate-50/50 hover:shadow-sm hover:ring-1 hover:ring-slate-200'
+                    ? 'cursor-grabbing ring-2 ring-primary-300/40 bg-white shadow-xl'
+                    : 'cursor-grab hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200'
             } ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} ${
-                isSelected ? 'ring-2 ring-sky-300/60 bg-sky-50/60' : ''
-            } ${inFillRange ? 'bg-sky-50/40' : ''} ${
-                isExpanded ? 'bg-sky-50 border-l-4 border-l-sky-400' : ''
+                isSelected ? 'ring-2 ring-primary-300/60 bg-primary-50/60' : ''
+            } ${inFillRange ? 'bg-primary-50/40' : ''} ${
+                isExpanded ? 'bg-primary-50 border-l-4 border-l-primary-400' : ''
             }`}
             style={{
                 gridTemplateColumns: cssTemplate,
@@ -2131,7 +2131,7 @@ export default function AccountsTable({
                         return (
                             <div className='rounded-xl border border-slate-300 shadow-sm bg-white pb-1'>
                                 <div
-                                    className='sticky top-0 z-30 grid w-full overflow-visible gap-0 px-0 py-1 text-[12px] font-semibold text-slate-800 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 divide-x divide-slate-200 shadow-md'
+                                    className='sticky top-0 z-30 grid w-full overflow-visible gap-0 px-0 py-2 text-xs font-semibold text-slate-900 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 divide-x divide-slate-200 shadow-sm'
                                     style={{gridTemplateColumns: cssTemplate}}
                                 >
                                     {cols.map((c, idx) => (

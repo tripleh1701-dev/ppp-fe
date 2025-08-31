@@ -39,6 +39,11 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
                 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
                 <meta name="apple-mobile-web-app-title" content="Systiva" />
                 
+                {/* App icons */}
+                <link rel="icon" type="image/svg+xml" href="/images/logos/systiva-logo.svg" />
+                <link rel="alternate icon" href="/images/logos/systiva-logo.svg" />
+                <link rel="apple-touch-icon" href="/images/logos/systiva-logo.svg" />
+                
                 {/* Preload critical fonts */}
                 <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
                 

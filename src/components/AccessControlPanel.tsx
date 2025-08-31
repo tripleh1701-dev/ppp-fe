@@ -162,15 +162,15 @@ export default function AccessControlPanel({
                         ? 'translate-x-0 opacity-100'
                         : 'translate-x-full opacity-0 pointer-events-none'
                 }`}
-                style={{left: `${sidebarWidth}px`, width: '192px'}}
+                style={{left: `${sidebarWidth}px`, width: '180px'}}
                 aria-hidden={!isOpen}
             >
-                <div className='flex items-center justify-between p-5 border-b border-light bg-gradient-to-r from-slate-50 to-white'>
+                <div className='flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white'>
                     <div>
-                        <h2 className='text-lg font-bold text-primary'>
+                        <h2 className='text-sm font-bold text-slate-800'>
                             Access Control
                         </h2>
-                        <p className='text-xs text-secondary mt-1'>
+                        <p className='text-[10px] text-slate-600 mt-1'>
                             Manage users, groups and roles
                         </p>
                     </div>
@@ -194,14 +194,17 @@ export default function AccessControlPanel({
                     </button>
                 </div>
 
-                <div className='p-5 space-y-3 overflow-y-auto h-full pb-20'>
+                <div
+                    className='p-3 space-y-2 overflow-hidden'
+                    style={{ height: 'calc(100% - 140px)' }}
+                >
                     {cards.map((card, index) => (
                         <div
                             key={card.id}
                             onClick={() => handleCardClick(card.id, card.href)}
-                            className={`group relative overflow-hidden rounded-2xl p-3 cursor-pointer border border-light bg-white transition-all duration-300 hover:shadow-2xl hover:border-primary/60 ${
+                            className={`group relative overflow-hidden rounded-lg p-2 cursor-pointer border border-slate-200 bg-white transition-all duration-300 hover:shadow-lg hover:border-[#0171EC]/60 hover:bg-gradient-to-br hover:from-[#0171EC]/5 hover:to-[#05E9FE]/5 ${
                                 selectedCard === card.id
-                                    ? 'ring-2 ring-primary/60'
+                                    ? 'ring-2 ring-[#0171EC]/60'
                                     : ''
                             }`}
                             style={{
@@ -209,7 +212,7 @@ export default function AccessControlPanel({
                                 animation: isOpen
                                     ? 'slideInFromLeft 0.5s ease-out forwards'
                                     : 'none',
-                                height: '118px',
+                                height: '88px',
                             }}
                         >
                             <div
@@ -217,11 +220,11 @@ export default function AccessControlPanel({
                             />
                             {card.bgIllustration}
                             <div className='relative z-10'>
-                                <h3 className='text-xs font-semibold text-primary group-hover:text-brand-dark transition-colors'>
-                                    {card.title}
-                                </h3>
+                                                            <h3 className='text-[10px] font-semibold text-slate-800 group-hover:text-[#0171EC] transition-colors'>
+                                {card.title}
+                            </h3>
                             </div>
-                            <div className='absolute inset-0 bg-gradient-to-br from-primary-light/0 via-primary-light/10 to-primary-light/0 opacity-0 group-hover:opacity-100 transition-opacity' />
+                            <div className='absolute inset-0 bg-gradient-to-br from-[#0171EC]/0 via-[#0171EC]/10 to-[#05E9FE]/0 opacity-0 group-hover:opacity-100 transition-opacity' />
                         </div>
                     ))}
                 </div>

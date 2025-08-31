@@ -1,8 +1,20 @@
-export const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+// Ensure the API base doesn't end with /api to avoid double /api/ prefixes
+const rawApiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+export const API_BASE = rawApiBase.endsWith('/api') ? rawApiBase.slice(0, -4) : rawApiBase;
+
+// Debug log to see what the API base is set to
+console.log('Raw API_BASE:', rawApiBase);
+console.log('Cleaned API_BASE:', API_BASE);
+console.log('NEXT_PUBLIC_API_BASE env var:', process.env.NEXT_PUBLIC_API_BASE);
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`.replace(/\/+$/, ''), {
+    // Ensure we don't have double slashes or double /api/ prefixes
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    const url = `${API_BASE}${cleanPath}`;
+    
+    console.log('API Request URL:', url); // Debug log
+    
+    const res = await fetch(url, {
         headers: {
             'Content-Type': 'application/json',
             ...(options?.headers || {}),

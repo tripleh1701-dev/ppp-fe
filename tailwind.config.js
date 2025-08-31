@@ -20,8 +20,24 @@ module.exports = {
                     800: '#004da8',
                     900: '#003b85',
                 },
+                accent: {
+                    50: '#e6feff',
+                    100: '#ccfdff',
+                    200: '#99fbff',
+                    300: '#66f9ff',
+                    400: '#33f7ff',
+                    500: '#05E9FE', // brand cyan
+                    600: '#00c7d9',
+                    700: '#00a5b3',
+                    800: '#00838e',
+                    900: '#006168',
+                },
                 brandBlue: '#0171EC',
                 brandCyan: '#05E9FE',
+                brand: {
+                    blue: '#0171EC',
+                    cyan: '#05E9FE',
+                },
                 // Professional color palette
                 slate: {
                     50: '#f8fafc',
@@ -66,35 +82,37 @@ module.exports = {
                 brand: '#0171EC',
                 brandCyan: '#05E9FE',
             },
-            // Responsive breakpoints
+            // Responsive breakpoints for native 80% zoom simulation
+            // These breakpoints create a denser, more content-rich layout naturally
             screens: {
                 'xs': '475px',
                 'sm': '640px',
                 'md': '768px',
-                'lg': '1024px',
+                'lg': '1024px',      // Increased for better desktop experience
                 'xl': '1280px',
-                '2xl': '1536px',
-                '3xl': '1920px',
-                '4xl': '2560px',
+                '2xl': '1440px',     // Maximum content width for 80% zoom effect
+                '3xl': '1600px',
+                '4xl': '1920px',
                 // Device-specific breakpoints
-                'mobile': {'max': '767px'},
-                'tablet': {'min': '768px', 'max': '1023px'},
-                'desktop': {'min': '1024px'},
+                'mobile': {'max': '1023px'},      // Mobile-first approach
+                'tablet': {'min': '1024px', 'max': '1439px'}, // Tablet range
+                'desktop': {'min': '1440px'},     // Desktop and above
                 'retina': {'min-resolution': '2dppx'},
             },
-            // Modern typography scale
+            // Modern typography scale for professional appearance
+            // Font sizes optimized for readability and consistency
             fontSize: {
-                'xs': ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.025em' }],
-                'sm': ['0.875rem', { lineHeight: '1.25rem', letterSpacing: '0.025em' }],
-                'base': ['1rem', { lineHeight: '1.5rem', letterSpacing: '0.025em' }],
-                'lg': ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '0.025em' }],
-                'xl': ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '0.025em' }],
-                '2xl': ['1.5rem', { lineHeight: '2rem', letterSpacing: '0.025em' }],
-                '3xl': ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '0.025em' }],
-                '4xl': ['2.25rem', { lineHeight: '2.5rem', letterSpacing: '0.025em' }],
-                '5xl': ['3rem', { lineHeight: '1', letterSpacing: '0.025em' }],
-                '6xl': ['3.75rem', { lineHeight: '1', letterSpacing: '0.025em' }],
-                // Responsive typography
+                'xs': ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.025em' }],        // 12px
+                'sm': ['0.875rem', { lineHeight: '1.25rem', letterSpacing: '0.025em' }],   // 14px
+                'base': ['1rem', { lineHeight: '1.5rem', letterSpacing: '0.025em' }],      // 16px
+                'lg': ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '0.025em' }],   // 18px
+                'xl': ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '0.025em' }],    // 20px
+                '2xl': ['1.5rem', { lineHeight: '2rem', letterSpacing: '0.025em' }],       // 24px
+                '3xl': ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '0.025em' }],  // 30px
+                '4xl': ['2.25rem', { lineHeight: '2.5rem', letterSpacing: '0.025em' }],    // 36px
+                '5xl': ['3rem', { lineHeight: '1', letterSpacing: '0.025em' }],            // 48px
+                '6xl': ['3.75rem', { lineHeight: '1', letterSpacing: '0.025em' }],         // 60px
+                // Responsive typography for dynamic scaling
                 'responsive-xs': ['clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem)', { lineHeight: '1.25rem' }],
                 'responsive-sm': ['clamp(0.875rem, 0.8rem + 0.375vw, 1rem)', { lineHeight: '1.5rem' }],
                 'responsive-base': ['clamp(1rem, 0.9rem + 0.5vw, 1.125rem)', { lineHeight: '1.75rem' }],
@@ -103,14 +121,20 @@ module.exports = {
                 'responsive-2xl': ['clamp(1.5rem, 1.3rem + 1vw, 2rem)', { lineHeight: '2.25rem' }],
                 'responsive-3xl': ['clamp(1.875rem, 1.6rem + 1.375vw, 2.5rem)', { lineHeight: '2.5rem' }],
             },
-            // Spacing scale
+            // Spacing scale for native 80% zoom simulation
+            // Increased spacing to create denser, more content-rich layouts
             spacing: {
-                '18': '4.5rem',
-                '88': '22rem',
-                '128': '32rem',
-                '144': '36rem',
+                '18': '4.5rem',      // 72px
+                '88': '22rem',       // 352px
+                '128': '32rem',      // 512px
+                '144': '36rem',      // 576px
+                // Additional spacing for 80% zoom effect
+                '22': '5.5rem',      // 88px
+                '26': '6.5rem',      // 104px
+                '30': '7.5rem',      // 120px
+                '34': '8.5rem',      // 136px
             },
-            // Modern shadows
+            // Modern shadows for professional appearance
             boxShadow: {
                 'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
                 'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -154,62 +178,73 @@ module.exports = {
                     '50%': { transform: 'translateY(-5px)' },
                 },
             },
-            // Container queries support
+            // Container queries support for native 80% zoom simulation
+            // Container widths optimized for denser layouts
             container: {
                 center: true,
                 padding: {
-                    DEFAULT: '1rem',
-                    sm: '2rem',
-                    lg: '4rem',
-                    xl: '5rem',
-                    '2xl': '6rem',
+                    DEFAULT: '1.5rem',  // 24px - Increased for better spacing
+                    sm: '2rem',          // 32px
+                    lg: '3rem',          // 48px
+                    xl: '4rem',          // 64px
+                    '2xl': '5rem',       // 80px
+                },
+                // Max-widths optimized for 80% zoom effect
+                screens: {
+                    sm: '640px',
+                    md: '768px',
+                    lg: '1024px',
+                    xl: '1280px',
+                    '2xl': '1440px',     // Maximum width for 80% zoom simulation
                 },
             },
             // Modern backdrop filters
             backdropBlur: {
                 xs: '2px',
-                },
             },
         },
+    },
     plugins: [
-        // Custom plugin for responsive utilities
+        // Custom plugin for responsive utilities and native 80% zoom simulation
         function({ addUtilities, theme }) {
             const newUtilities = {
+                // Typography utilities
                 '.text-responsive': {
-                    fontSize: 'clamp(1rem, 0.9rem + 0.5vw, 1.125rem)',
-                    lineHeight: '1.75rem',
+                    fontSize: 'clamp(0.875rem, 0.8rem + 0.375vw, 1rem)',
+                    lineHeight: '1.5rem',
                 },
                 '.container-responsive': {
-                    width: '100%',
+                    maxWidth: '1440px',
                     marginLeft: 'auto',
                     marginRight: 'auto',
-                    paddingLeft: 'max(1rem, calc((100vw - 1200px) / 2))',
-                    paddingRight: 'max(1rem, calc((100vw - 1200px) / 2))',
+                    paddingLeft: '1.5rem',
+                    paddingRight: '1.5rem',
                 },
-                '.aspect-video': {
-                    aspectRatio: '16 / 9',
+                // Layout utilities for 80% zoom effect
+                '.layout-dense': {
+                    maxWidth: '1440px',
+                    marginLeft: 'auto',
+                    marginRight: 'auto',
                 },
-                '.aspect-square': {
-                    aspectRatio: '1 / 1',
+                '.spacing-dense': {
+                    gap: '1rem',
                 },
-                '.scrollbar-hide': {
-                    '-ms-overflow-style': 'none',
-                    'scrollbar-width': 'none',
-                    '&::-webkit-scrollbar': {
-                        display: 'none',
-                    },
+                '.spacing-normal': {
+                    gap: '1.5rem',
                 },
-                '.text-brand-gradient': {
-                    background: 'linear-gradient(135deg, #0171EC 0%, #05E9FE 100%)',
-                    '-webkit-background-clip': 'text',
-                    'background-clip': 'text',
-                    '-webkit-text-fill-color': 'transparent',
+                '.spacing-relaxed': {
+                    gap: '2rem',
                 },
-                '.bg-brand-gradient': {
-                    background: 'linear-gradient(135deg, #0171EC 0%, #05E9FE 100%)',
+                // Component utilities
+                '.card-base': {
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                    transition: 'all 0.2s ease-in-out',
                 },
-                '.ring-brand': {
-                    '--tw-ring-color': '#0171EC',
+                '.card-hover': {
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 },
             };
             addUtilities(newUtilities);

@@ -32,28 +32,20 @@ function SortableRow({
         <Reorder.Item
             value={item.id}
             id={item.id}
-            whileDrag={{scale: 1.05, boxShadow: '0 8px 16px rgba(0,0,0,0.15)'}}
-            className={`grid grid-cols-[40px_1fr_110px] items-center ${
-                dense ? 'gap-2 p-2' : 'gap-3 p-3'
-            } rounded-xl bg-white shadow-sm cursor-grab transition ${
+            whileDrag={{scale: 1.02, boxShadow: '0 8px 16px rgba(0,0,0,0.15)'}}
+            className={`grid grid-cols-[40px_1fr_110px] items-center h-10 ${
+                dense ? 'gap-2 px-2' : 'gap-3 px-3'
+            } rounded-md bg-white border-b border-slate-100 cursor-grab transition-all duration-200 ease-in-out ${
                 rowClassName ?? ''
-            } hover:shadow-md`}
+            } hover:bg-slate-50 hover:shadow-sm hover:border-slate-200`}
         >
-            <div className='flex items-center justify-center text-slate-500 text-[11px]'>
+            <div className='flex items-center justify-center text-slate-500 text-xs font-medium'>
                 {index + 1}
             </div>
-            <div
-                className={`font-medium text-slate-900 ${
-                    dense ? 'text-[12px]' : ''
-                }`}
-            >
+            <div className='font-medium text-slate-900 text-xs'>
                 {item.name}
             </div>
-            <div
-                className={`text-right text-slate-600 ${
-                    dense ? 'text-[12px]' : ''
-                }`}
-            >
+            <div className='text-right text-slate-600 font-medium text-xs'>
                 {item.qty}
             </div>
         </Reorder.Item>
@@ -150,15 +142,15 @@ export default function DraggableSortableTable({
     // Top-right sort button removed; use column header sort controls instead
 
     return (
-        <div className={dense || frameless ? 'p-0 w-full' : 'p-6 w-full'}>
+        <div className={dense || frameless ? 'p-0 w-full' : 'p-4 w-full'}>
             <div
                 className={
                     dense
-                        ? 'flex items-center mb-2.5'
-                        : 'flex items-center mb-3'
+                        ? 'flex items-center mb-2'
+                        : 'flex items-center mb-2'
                 }
             >
-                <h2 className='text-lg font-semibold'>
+                <h2 className='text-sm font-semibold'>
                     {title ?? 'Draggable & Sortable Table'}
                 </h2>
             </div>
@@ -177,55 +169,55 @@ export default function DraggableSortableTable({
             >
                 <div
                     className={`grid grid-cols-[40px_1fr_110px] ${
-                        dense ? 'gap-2 px-2 py-1' : 'gap-2.5 px-3 py-2'
-                    } text-[10px] text-slate-600 border-b ${
-                        dense ? 'mb-2' : 'mb-3'
+                        dense ? 'gap-2 px-2 py-2' : 'gap-3 px-3 py-2'
+                    } text-xs font-semibold text-slate-700 border-b border-slate-200 ${
+                        dense ? 'mb-1' : 'mb-2'
                     } ${frameless ? '' : `rounded-md ${theme.headerBar}`}`}
                 >
-                    <div>#</div>
-                    <div className='flex items-center gap-1'>
+                    <div className='flex items-center justify-center'>#</div>
+                    <div className='flex items-center gap-2'>
                         <span>{columnLabels?.name ?? 'Item'}</span>
                         <button
                             type='button'
                             onClick={() => toggleSort('name')}
-                            className='inline-flex items-center -mr-1'
+                            className='inline-flex items-center p-1 rounded hover:bg-slate-100 transition-colors duration-200 ease-in-out'
                             aria-label='Sort by name'
                         >
                             <ArrowUp
-                                className={`w-3 h-3 ${
+                                className={`w-4 h-4 ${
                                     sortColumn === 'name' && sortDir === 'asc'
-                                        ? 'text-sky-600'
+                                        ? 'text-primary-600'
                                         : 'text-slate-400'
                                 }`}
                             />
                             <ArrowDown
-                                className={`w-3 h-3 ${
+                                className={`w-4 h-4 ${
                                     sortColumn === 'name' && sortDir === 'desc'
-                                        ? 'text-sky-600'
+                                        ? 'text-primary-600'
                                         : 'text-slate-400'
                                 }`}
                             />
                         </button>
                     </div>
-                    <div className='flex items-center justify-end gap-1'>
+                    <div className='flex items-center justify-end gap-2'>
                         <span>{columnLabels?.qty ?? 'Qty'}</span>
                         <button
                             type='button'
                             onClick={() => toggleSort('qty')}
-                            className='inline-flex items-center'
+                            className='inline-flex items-center p-1 rounded hover:bg-slate-100 transition-colors duration-200 ease-in-out'
                             aria-label='Sort by quantity'
                         >
                             <ArrowUp
-                                className={`w-3 h-3 ${
+                                className={`w-4 h-4 ${
                                     sortColumn === 'qty' && sortDir === 'asc'
-                                        ? 'text-sky-600'
+                                        ? 'text-primary-600'
                                         : 'text-slate-400'
                                 }`}
                             />
                             <ArrowDown
-                                className={`w-3 h-3 ${
+                                className={`w-4 h-4 ${
                                     sortColumn === 'qty' && sortDir === 'desc'
-                                        ? 'text-sky-600'
+                                        ? 'text-primary-600'
                                         : 'text-slate-400'
                                 }`}
                             />

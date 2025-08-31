@@ -3,6 +3,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {api} from '@/utils/api';
 import DraggableSortableTable from './DraggableSortableTable';
+import APITest from './APITest';
 
 interface DashboardMetric {
     title: string;
@@ -186,22 +187,22 @@ export default function DashboardHome() {
     );
 
     return (
-        <div className='h-full bg-sap-light-gray overflow-hidden'>
-            {/* Header */}
-            <div className='bg-white border-b border-sap-border px-3 py-2 sticky top-0 z-10'>
+        <div className='h-full bg-slate-50 flex flex-col'>
+            {/* Header - Compact */}
+            <div className='bg-white border-b border-slate-200 px-4 py-3 flex-shrink-0'>
                 <div className='flex items-center justify-between'>
                     <div>
-                        <h1 className='text-lg font-bold text-sap-dark-blue'>
+                        <h1 className='text-lg font-bold text-slate-900'>
                             SAP DevOps Dashboard
                         </h1>
-                        <p className='text-sap-gray mt-0.5 text-[11px]'>
+                        <p className='text-xs text-slate-600 mt-0.5'>
                             Enterprise CI/CD management and monitoring center
                         </p>
                     </div>
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className='flex items-center space-x-2 px-3 py-1.5 bg-sap-blue text-white rounded-lg hover:bg-sap-dark-blue disabled:opacity-50 transition-colors duration-200'
+                        className='flex items-center space-x-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 transition-all duration-200 ease-in-out hover:shadow-sm text-xs font-medium'
                     >
                         <svg
                             className={`w-3.5 h-3.5 ${
@@ -223,59 +224,61 @@ export default function DashboardHome() {
                 </div>
             </div>
 
-            <div className='p-2 overflow-hidden'>
-                {/* AI Insight Cards */}
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-2 mb-2'>
+            {/* Content - Compact layout with proper height constraints */}
+            <div className='flex-1 p-4 space-y-4 overflow-hidden'>
+                {/* AI Insight Cards - Compact grid */}
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'>
                     {aiInsights.slice(0, 3).map((c, i) => (
                         <div
                             key={i}
-                            className={`rounded-md border p-2 shadow-sm ${
+                            className={`rounded-md border p-3 shadow-sm hover:shadow-md transition-all duration-200 ease-in-out ${
                                 c.severity === 'warning'
-                                    ? 'border-amber-200 bg-amber-50/60'
+                                    ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50'
                                     : c.severity === 'success'
-                                    ? 'border-emerald-200 bg-emerald-50/60'
-                                    : 'border-sky-200 bg-sky-50/60'
+                                    ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                                    : 'border-sky-200 bg-sky-50/60 hover:bg-sky-50'
                             }`}
                         >
-                            <div className='text-[11px] font-semibold text-gray-800 mb-0.5'>
+                            <div className='text-xs font-semibold text-slate-900 mb-1'>
                                 {c.title}
                             </div>
-                            <div className='text-[11px] text-gray-700 leading-5'>
+                            <div className='text-xs text-slate-700 leading-relaxed'>
                                 {c.body}
                             </div>
                         </div>
                     ))}
                 </div>
-                {/* Metrics Grid */}
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2'>
+
+                {/* Metrics Grid - Compact layout */}
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3'>
                     {dashboardMetrics.map((metric, index) => (
                         <div
                             key={index}
-                            className='bg-white rounded-md shadow-sm border border-gray-200 p-1.5 hover:shadow-md transition-shadow duration-200'
+                            className='bg-white rounded-md shadow-sm border border-slate-200 p-3 hover:shadow-md hover:border-primary-300 transition-all duration-200 ease-in-out'
                         >
                             <div className='flex items-center justify-between'>
-                                <div>
-                                    <p className='text-xs font-medium text-gray-600'>
+                                <div className='flex-1 min-w-0'>
+                                    <p className='text-xs font-medium text-slate-600 mb-0.5'>
                                         {metric.title}
                                     </p>
-                                    <p className='text-[15px] font-bold text-gray-900 mt-0.5'>
+                                    <p className='text-lg font-bold text-slate-900 mb-0.5'>
                                         {metric.value}
                                     </p>
                                     <p
-                                        className={`text-xs mt-1 ${
+                                        className={`text-xs font-medium ${
                                             metric.trend === 'up'
                                                 ? 'text-green-600'
                                                 : metric.trend === 'down'
                                                 ? 'text-red-600'
-                                                : 'text-gray-600'
+                                                : 'text-slate-600'
                                         }`}
                                     >
                                         {metric.change}
                                     </p>
                                 </div>
-                                <div className='w-7 h-7 bg-sap-light-blue rounded-md flex items-center justify-center'>
+                                <div className='w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-400 rounded-md flex items-center justify-center shadow-sm'>
                                     <svg
-                                        className='w-3.5 h-3.5 text-sap-blue'
+                                        className='w-5 h-5 text-white'
                                         fill='none'
                                         stroke='currentColor'
                                         viewBox='0 0 24 24'
@@ -292,37 +295,38 @@ export default function DashboardHome() {
                     ))}
                 </div>
 
-                {/* Trends (AI) + Recent Build/Release */}
-                <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 overflow-hidden'>
-                    {/* AI Trend Spark Bars */}
-                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-3'>
-                        <div className='flex items-center justify-between mb-2'>
-                            <h3 className='text-sm font-semibold text-gray-900'>
+                {/* Trends and Tables - Compact layout */}
+                <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0'>
+                    {/* AI Trend Spark Bars - Compact */}
+                    <div className='bg-white rounded-md shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all duration-200 ease-in-out'>
+                        <div className='flex items-center justify-between mb-3'>
+                            <h3 className='text-sm font-semibold text-slate-900'>
                                 AI Trend: Daily Successful Builds
                             </h3>
-                            <span className='text-[11px] text-gray-500'>
+                            <span className='text-xs text-slate-500'>
                                 from backend
                             </span>
                         </div>
-                        <div className='grid grid-cols-7 gap-1 h-20 items-end'>
+                        <div className='grid grid-cols-7 gap-1.5 h-16 items-end'>
                             {aiSeries.map((d) => (
                                 <div
                                     key={d.label}
                                     className='flex flex-col items-center gap-1'
                                 >
                                     <div
-                                        className='w-4 rounded bg-sap-blue/70'
-                                        style={{height: `${6 + d.value * 3.5}px`}}
+                                        className='w-3 rounded bg-gradient-to-b from-primary-600 to-primary-400 shadow-sm'
+                                        style={{height: `${6 + d.value * 2.5}px`}}
                                     />
-                                    <div className='text-[10px] text-gray-500'>
+                                    <div className='text-xs text-slate-500 font-medium'>
                                         {d.label}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    {/* Recent Build Cycles (Draggable & Sortable with old content) */}
-                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-2'>
+
+                    {/* Recent Build Cycles - Compact table */}
+                    <div className='bg-white rounded-md shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all duration-200 ease-in-out'>
                         <DraggableSortableTable
                             title='Recent Build Cycles'
                             initialItems={buildTableItems.slice(0, 5)}
@@ -336,8 +340,8 @@ export default function DashboardHome() {
                         />
                     </div>
 
-                    {/* Recent Release Cycles (Draggable & Sortable with old content) */}
-                    <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-2'>
+                    {/* Recent Release Cycles - Compact table */}
+                    <div className='bg-white rounded-md shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all duration-200 ease-in-out'>
                         <DraggableSortableTable
                             title='Recent Release Cycles'
                             initialItems={releaseTableItems.slice(0, 4)}
@@ -350,6 +354,11 @@ export default function DashboardHome() {
                             frameless
                         />
                     </div>
+                </div>
+
+                {/* API Test Component */}
+                <div className='mt-6'>
+                    <APITest />
                 </div>
             </div>
         </div>

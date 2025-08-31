@@ -1,6 +1,8 @@
 'use client';
 
 import {useEffect, useMemo, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
+import {Pin, PinOff} from 'lucide-react';
 import ConfirmModal from '@/components/ConfirmModal';
 import {
     PlusIcon,
@@ -56,21 +58,70 @@ export default function BusinessUnitSettingsPage() {
     const groupRef = useRef<HTMLDivElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
     const searchContainerRef = useRef<HTMLDivElement>(null);
+    const [trashHot, setTrashHot] = useState(false);
     const [visibleCols, setVisibleCols] = useState<
-        Array<'enterprise' | 'account' | 'entities' | 'actions'>
-    >(['enterprise', 'account', 'entities', 'actions']);
+        Array<'enterprise' | 'account' | 'entities'>
+    >(['enterprise', 'account', 'entities']);
     const [hideQuery, setHideQuery] = useState('');
     const [activeGroup, setActiveGroup] = useState<
         'None' | 'Enterprise' | 'Account'
     >('None');
 
+    // Inline draft rows for quick-create
+    type DraftBU = {
+        key: string;
+        accountId: string;
+        enterpriseId: string;
+        entities: string[];
+    };
+    const [addingRows, setAddingRows] = useState<DraftBU[]>([]);
+    const saveTimersRef = useRef<Record<string, any>>({});
+    const addingSavingRef = useRef<Set<string>>(new Set());
+
+    const addDraftRow = () => {
+        setAddingRows((prev) => [
+            ...prev,
+            {
+                key: `draft-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2)}`,
+                accountId: '',
+                enterpriseId: '',
+                entities: [],
+            },
+        ]);
+    };
+
     const loadAll = async () => {
         const [bus, acc, ent] = await Promise.all([
-            api.get<BUSetting[]>('/api/business-units'),
+            api.get<any[]>('/api/business-units'),
             api.get<AccountMinimal[]>('/api/accounts'),
             api.get<EnterpriseMinimal[]>('/api/enterprises'),
         ]);
-        setItems(bus);
+        // Transform business units data to parse entities from JSON string to array
+        const transformedBus = bus.map(item => ({
+            ...item,
+            id: String(item.id),
+            accountId: String(item.clientId || ''),
+            accountName: item.accountName || '',
+            enterpriseId: String(item.enterpriseId || ''),
+            enterpriseName: item.enterpriseName || '',
+            // Parse entities from JSON string to array
+            entities: (() => {
+                try {
+                    if (!item.entities) return [];
+                    const parsed = JSON.parse(item.entities);
+                    // Handle different formats - could be object with keys or array
+                    if (Array.isArray(parsed)) return parsed;
+                    if (typeof parsed === 'object') return Object.keys(parsed);
+                    return [];
+                } catch (e) {
+                    console.error('Failed to parse entities:', e);
+                    return [];
+                }
+            })()
+        }));
+        setItems(transformedBus);
         setAccounts(acc);
         setEnterprises(ent);
     };
@@ -134,7 +185,10 @@ export default function BusinessUnitSettingsPage() {
                             Business Unit Settings
                         </h1>
                         <p className='text-sm text-secondary mt-1'>
-                            Create and manage business unit configurations
+                            Create and manage business unit configurations — map
+                            each Account to an Enterprise and define one or more
+                            Entities that scope permissions, workflows, and
+                            reporting.
                         </p>
                     </div>
                 </div>
@@ -143,6 +197,15 @@ export default function BusinessUnitSettingsPage() {
             <div className='bg-card border-b border-light px-6 py-4'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-3'>
+                        <button
+                            onClick={() => {
+                                addDraftRow();
+                            }}
+                            className='inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200'
+                        >
+                            <PlusIcon className='h-5 w-5 mr-2' />
+                            Create New BU Settings
+                        </button>
                         {/* Search chip + expandable input */}
                         <div
                             ref={searchContainerRef}
@@ -235,7 +298,6 @@ export default function BusinessUnitSettingsPage() {
                                                         'enterprise',
                                                         'account',
                                                         'entities',
-                                                        'actions',
                                                     ] as const
                                                 )
                                                     .filter((c) =>
@@ -334,20 +396,49 @@ export default function BusinessUnitSettingsPage() {
                         </div>
                     </div>
                     <button
-                        onClick={() => {
-                            setEditing(null);
-                            setShowForm(true);
+                        className={`inline-flex items-center justify-center h-9 w-9 rounded-full border ${
+                            trashHot
+                                ? 'border-rose-300 text-rose-700 bg-rose-50'
+                                : 'border-light text-secondary hover:text-red-600 hover:bg-red-50'
+                        }`}
+                        title='Trash (drag rows here)'
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            setTrashHot(true);
                         }}
-                        className='inline-flex items-center ml-3 px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200'
+                        onDragEnter={(e) => {
+                            e.preventDefault();
+                            setTrashHot(true);
+                        }}
+                        onDragLeave={() => setTrashHot(false)}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            setTrashHot(false);
+                            try {
+                                let idStr: string | null = null;
+                                const json =
+                                    e.dataTransfer.getData('application/json');
+                                if (json) {
+                                    const payload = JSON.parse(json);
+                                    if (payload && payload.id)
+                                        idStr = String(payload.id);
+                                }
+                                if (!idStr) {
+                                    const txt =
+                                        e.dataTransfer.getData('text/plain');
+                                    if (txt) idStr = txt.trim();
+                                }
+                                if (idStr) setPendingDeleteId(idStr);
+                            } catch {}
+                        }}
                     >
-                        <PlusIcon className='h-5 w-5 mr-2' />
-                        Create New BU Settings
+                        <TrashIcon className='w-5 h-5' />
                     </button>
                 </div>
             </div>
 
             <div className='flex-1 p-6'>
-                {filtered.length === 0 ? (
+                {filtered.length === 0 && addingRows.length === 0 ? (
                     <div className='text-center py-12'>
                         <div className='w-16 h-16 bg-tertiary rounded-full flex items-center justify-center mx-auto mb-4'>
                             <svg
@@ -373,32 +464,94 @@ export default function BusinessUnitSettingsPage() {
                     </div>
                 ) : (
                     <div className='overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-sm'>
-                        <table className='min-w-full divide-y divide-slate-100'>
+                        <table
+                            className='min-w-full divide-y divide-slate-100'
+                            style={{tableLayout: 'fixed'}}
+                        >
+                            <colgroup>
+                                <col style={{width: '32%'}} />
+                                <col style={{width: '32%'}} />
+                                <col style={{width: '36%'}} />
+                            </colgroup>
                             <thead className='bg-tertiary/40'>
                                 <tr>
                                     {visibleCols.includes('enterprise') && (
-                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                            Enterprise
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider sticky left-0 z-10 bg-tertiary/40'>
+                                            <span className='inline-flex items-center gap-1'>
+                                                Enterprise
+                                                <span className='inline-block ml-1 text-slate-400'>
+                                                    📌
+                                                </span>
+                                            </span>
                                         </th>
                                     )}
                                     {visibleCols.includes('account') && (
                                         <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                            Account
+                                            <span className='inline-flex items-center gap-1'>
+                                                Account
+                                                <span className='inline-block ml-1 text-slate-400'>
+                                                    📌
+                                                </span>
+                                            </span>
                                         </th>
                                     )}
                                     {visibleCols.includes('entities') && (
                                         <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                            Entities
+                                            <span className='inline-flex items-center gap-1'>
+                                                Entities
+                                                <span className='inline-block ml-1 text-slate-400'>
+                                                    📌
+                                                </span>
+                                            </span>
                                         </th>
                                     )}
-                                    {visibleCols.includes('actions') && (
-                                        <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                            Actions
-                                        </th>
-                                    )}
+                                    {/* Actions column removed */}
                                 </tr>
                             </thead>
                             <tbody className='divide-y divide-slate-100'>
+                                {addingRows.map((d) => (
+                                    <DraftRow
+                                        key={d.key}
+                                        draft={d}
+                                        accounts={accounts}
+                                        enterprises={enterprises}
+                                        onChange={(next) =>
+                                            setAddingRows((prev) =>
+                                                prev.map((r) =>
+                                                    r.key === d.key ? next : r,
+                                                ),
+                                            )
+                                        }
+                                        onCancel={() =>
+                                            setAddingRows((prev) =>
+                                                prev.filter(
+                                                    (r) => r.key !== d.key,
+                                                ),
+                                            )
+                                        }
+                                        onSaved={async () => {
+                                            await loadAll();
+                                            setAddingRows((prev) =>
+                                                prev.filter(
+                                                    (r) => r.key !== d.key,
+                                                ),
+                                            );
+                                        }}
+                                    />
+                                ))}
+                                <tr>
+                                    <td className='px-6 py-3' colSpan={3}>
+                                        <button
+                                            onClick={() => addDraftRow()}
+                                            className='w-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-600 border border-dashed border-slate-300 rounded-md bg-slate-50/40 hover:bg-slate-100'
+                                        >
+                                            <span className='inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300'>
+                                                +
+                                            </span>
+                                            <span>Add new row</span>
+                                        </button>
+                                    </td>
+                                </tr>
                                 {filtered.map((item) => (
                                     <tr
                                         key={item.id}
@@ -406,46 +559,77 @@ export default function BusinessUnitSettingsPage() {
                                     >
                                         {visibleCols.includes('enterprise') && (
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
-                                                {item.enterpriseName}
+                                                <div
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        try {
+                                                            e.dataTransfer.effectAllowed =
+                                                                'move';
+                                                            e.dataTransfer.setData(
+                                                                'application/json',
+                                                                JSON.stringify({
+                                                                    id: item.id,
+                                                                }),
+                                                            );
+                                                            e.dataTransfer.setData(
+                                                                'text/plain',
+                                                                String(item.id),
+                                                            );
+                                                            const ghost =
+                                                                document.createElement(
+                                                                    'div',
+                                                                );
+                                                            ghost.style.width =
+                                                                '0px';
+                                                            ghost.style.height =
+                                                                '0px';
+                                                            document.body.appendChild(
+                                                                ghost,
+                                                            );
+                                                            e.dataTransfer.setDragImage(
+                                                                ghost,
+                                                                0,
+                                                                0,
+                                                            );
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    document.body.removeChild(
+                                                                        ghost,
+                                                                    );
+                                                                } catch {}
+                                                            }, 0);
+                                                        } catch {}
+                                                    }}
+                                                    className='inline-flex items-center cursor-grab active:cursor-grabbing select-none'
+                                                    title='Drag to trash to delete'
+                                                >
+                                                    <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 border border-slate-300'>
+                                                        {item.enterpriseName}
+                                                    </span>
+                                                </div>
                                             </td>
                                         )}
                                         {visibleCols.includes('account') && (
                                             <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
-                                                {item.accountName}
+                                                <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 border border-slate-300'>
+                                                    {item.accountName}
+                                                </span>
                                             </td>
                                         )}
                                         {visibleCols.includes('entities') && (
                                             <td className='px-6 py-4'>
-                                                <div className='flex flex-wrap gap-2'>
-                                                    {item.entities.map(
+                                                <div className='flex flex-wrap gap-1.5'>
+                                                    {Array.isArray(item.entities) ? item.entities.map(
                                                         (e, idx) => (
                                                             <span
                                                                 key={idx}
-                                                                className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${colorClass(
-                                                                    idx,
-                                                                )}`}
+                                                                className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-50 text-sky-700 border border-sky-200'
                                                             >
                                                                 {e}
                                                             </span>
                                                         ),
-                                                    )}
+                                                    ) : null}
                                                 </div>
-                                            </td>
-                                        )}
-                                        {visibleCols.includes('actions') && (
-                                            <td className='px-6 py-4 whitespace-nowrap text-right text-sm'>
-                                                <ActionsMenu
-                                                    onView={() =>
-                                                        setViewing(item)
-                                                    }
-                                                    onEdit={() => {
-                                                        setEditing(item);
-                                                        setShowForm(true);
-                                                    }}
-                                                    onDelete={() =>
-                                                        handleDelete(item.id)
-                                                    }
-                                                />
                                             </td>
                                         )}
                                     </tr>
@@ -507,6 +691,294 @@ function colorClass(index: number): string {
         'bg-rose-50 text-rose-700 border-rose-200',
     ];
     return classes[index % classes.length];
+}
+
+function DraftRow({
+    draft,
+    accounts,
+    enterprises,
+    onChange,
+    onCancel,
+    onSaved,
+}: {
+    draft: {
+        key: string;
+        accountId: string;
+        enterpriseId: string;
+        entities: string[];
+    };
+    accounts: AccountMinimal[];
+    enterprises: EnterpriseMinimal[];
+    onChange: (next: {
+        key: string;
+        accountId: string;
+        enterpriseId: string;
+        entities: string[];
+    }) => void;
+    onCancel: () => void;
+    onSaved: () => void;
+}) {
+    const [entityInput, setEntityInput] = useState('');
+    const [showEntityAdder, setShowEntityAdder] = useState(false);
+    const canSave =
+        draft.accountId && draft.enterpriseId && draft.entities.length > 0;
+
+    const addEntity = () => {
+        const v = entityInput.trim();
+        if (!v) return;
+        if (!draft.entities.includes(v))
+            onChange({...draft, entities: [...draft.entities, v]});
+        setEntityInput('');
+        setShowEntityAdder(false);
+    };
+    const removeEntity = (name: string) =>
+        onChange({
+            ...draft,
+            entities: draft.entities.filter((e) => e !== name),
+        });
+
+    const [saving, setSaving] = useState(false);
+    // Debounced autosave on valid draft changes
+    useEffect(() => {
+        if (!canSave) return;
+        const t = setTimeout(async () => {
+            if (saving) return;
+            setSaving(true);
+            try {
+                const accountName =
+                    accounts.find((a) => a.id === draft.accountId)
+                        ?.accountName || '';
+                const ent = enterprises.find(
+                    (e) => e.id === draft.enterpriseId,
+                );
+                const accIdNumeric = /^\d+$/.test(draft.accountId)
+                    ? Number(draft.accountId)
+                    : undefined;
+                const entIdNumeric = /^\d+$/.test(draft.enterpriseId)
+                    ? Number(draft.enterpriseId)
+                    : undefined;
+                const payload: any = {
+                    accountName,
+                    enterpriseName: ent?.name || '',
+                    entities: draft.entities,
+                };
+                if (accIdNumeric !== undefined)
+                    payload.accountId = accIdNumeric;
+                if (entIdNumeric !== undefined)
+                    payload.enterpriseId = entIdNumeric;
+                await api.post('/api/business-units', payload);
+                await onSaved();
+            } catch {
+            } finally {
+                setSaving(false);
+            }
+        }, 700);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draft.accountId, draft.enterpriseId, JSON.stringify(draft.entities)]);
+    // Compact searchable dropdown used for enterprise/account, matching UX across app
+    const Dropdown = ({
+        placeholder,
+        options,
+        value,
+        onPick,
+        searchLabel,
+    }: {
+        placeholder: string;
+        options: {id: string; name: string}[];
+        value: string;
+        onPick: (id: string) => void;
+        searchLabel: string;
+    }) => {
+        const [open, setOpen] = useState(false);
+        const [query, setQuery] = useState('');
+        const [pos, setPos] = useState<{
+            top: number;
+            left: number;
+            width: number;
+        } | null>(null);
+        const anchorRef = useRef<HTMLDivElement>(null);
+        const dropdownRef = useRef<HTMLDivElement>(null);
+        const filtered = useMemo(
+            () =>
+                options.filter((o) =>
+                    query
+                        ? o.name.toLowerCase().includes(query.toLowerCase())
+                        : true,
+                ),
+            [options, query],
+        );
+        useEffect(() => {
+            const onDoc = (e: MouseEvent) => {
+                const t = e.target as Node;
+                if (
+                    !anchorRef.current?.contains(t) &&
+                    !dropdownRef.current?.contains(t)
+                )
+                    setOpen(false);
+            };
+            document.addEventListener('click', onDoc, true);
+            return () => document.removeEventListener('click', onDoc, true);
+        }, []);
+        useEffect(() => {
+            if (!open) return;
+            const rect = anchorRef.current?.getBoundingClientRect();
+            if (rect) {
+                const ddWidth = 220;
+                const left = Math.max(
+                    8,
+                    Math.min(window.innerWidth - ddWidth - 8, rect.left),
+                );
+                setPos({top: rect.bottom + 8, left, width: ddWidth});
+            }
+        }, [open]);
+        const currentLabel = options.find((o) => o.id === value)?.name;
+        return (
+            <div ref={anchorRef} className='relative'>
+                <button
+                    onClick={() => setOpen((v) => !v)}
+                    className='w-full text-left px-3 py-1.5 text-[12px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
+                >
+                    {currentLabel || placeholder}
+                </button>
+                {open &&
+                    pos &&
+                    createPortal(
+                        <div
+                            ref={dropdownRef}
+                            className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
+                            style={{
+                                position: 'fixed',
+                                top: pos.top,
+                                left: pos.left,
+                                width: pos.width,
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            role='listbox'
+                            aria-label={`${searchLabel} options`}
+                        >
+                            <div className='p-2 border-b border-slate-200'>
+                                <input
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder={`Search ${searchLabel}`}
+                                    className='w-full rounded border border-slate-300 px-2.5 py-1 text-[12px]'
+                                />
+                            </div>
+                            <div className='max-h-60 overflow-auto p-2 space-y-1.5'>
+                                {filtered.map((o, idx) => (
+                                    <button
+                                        key={o.id}
+                                        onClick={() => {
+                                            onPick(o.id);
+                                            setOpen(false);
+                                        }}
+                                        className={`w-full rounded-md px-2.5 py-2 text-[12px] text-white ${
+                                            [
+                                                'bg-sky-500 hover:bg-sky-400',
+                                                'bg-emerald-500 hover:bg-emerald-400',
+                                                'bg-amber-500 hover:bg-amber-400',
+                                                'bg-violet-500 hover:bg-violet-400',
+                                                'bg-rose-500 hover:bg-rose-400',
+                                            ][idx % 5]
+                                        }`}
+                                    >
+                                        {o.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>,
+                        document.body,
+                    )}
+            </div>
+        );
+    };
+
+    return (
+        <tr className='bg-indigo-50/30'>
+            <td className='px-6 py-3'>
+                <Dropdown
+                    placeholder='Select enterprise'
+                    options={enterprises.map((e: any) => ({
+                        id: String(e.numericId ?? e.id),
+                        name: e.name,
+                    }))}
+                    value={draft.enterpriseId}
+                    onPick={(id) => onChange({...draft, enterpriseId: id})}
+                    searchLabel='enterprises'
+                />
+            </td>
+            <td className='px-6 py-3'>
+                <Dropdown
+                    placeholder='Select account'
+                    options={accounts.map((a: any) => ({
+                        id: String(a.numericId ?? a.id),
+                        name: a.accountName,
+                    }))}
+                    value={draft.accountId}
+                    onPick={(id) => onChange({...draft, accountId: id})}
+                    searchLabel='accounts'
+                />
+            </td>
+            <td className='px-6 py-3'>
+                <div className='flex items-center justify-between gap-3'>
+                    <div className='flex flex-wrap gap-1.5'>
+                        {draft.entities.map((e, idx) => (
+                            <span
+                                key={`${draft.key}-${idx}`}
+                                className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            >
+                                {e}
+                                <button
+                                    className='ml-0.5 text-indigo-700/70 hover:text-indigo-900'
+                                    onClick={() => removeEntity(e)}
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                    <div className='shrink-0 flex items-center'>
+                        {showEntityAdder ? (
+                            <div className='flex items-center gap-2'>
+                                <input
+                                    value={entityInput}
+                                    onChange={(e) =>
+                                        setEntityInput(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') addEntity();
+                                        if (e.key === 'Escape') {
+                                            setShowEntityAdder(false);
+                                            setEntityInput('');
+                                        }
+                                    }}
+                                    placeholder='Enter entity name'
+                                    className='w-44 rounded border border-light px-2 py-1 text-sm'
+                                />
+                                <button
+                                    onClick={addEntity}
+                                    className='px-2 py-1 rounded bg-violet-600 text-white text-sm'
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowEntityAdder(true)}
+                                className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-50 shadow-sm'
+                                title='Add entity'
+                            >
+                                +
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </td>
+            {/* Actions column removed; autosave handles persistence */}
+        </tr>
+    );
 }
 
 interface CreateOrEditModalProps {

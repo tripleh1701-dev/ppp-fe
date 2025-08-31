@@ -285,7 +285,7 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
 
     // Mobile view remains compact
     if (isMobile) {
-    return (
+        return (
             <div className='bg-white border-b border-slate-200 px-4 py-3 lg:hidden'>
                 <div className='flex items-center justify-between mb-3'>
                     <h3 className='text-sm font-medium text-slate-900'>AI Insights</h3>
@@ -296,117 +296,223 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                     >
                         <svg
                             className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`}
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                    >
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
                             <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
-                    </svg>
-                </button>
-            </div>
-            {!isCollapsed && (
+                        </svg>
+                    </button>
+                </div>
+                
+                {!isCollapsed && (
                     <div className='space-y-3'>
-                        {allItems.slice(0, 2).map((item) => (
-                            <div key={item.id} className='bg-slate-50 rounded-lg p-3 border border-slate-200'>
-                                <div className='flex items-start space-x-3'>
-                                    <div className='w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0'>
-                                        <Icon name={item.icon} className='w-4 h-4 text-primary-600' />
-                                </div>
-                                <div className='min-w-0 flex-1'>
-                                        <h4 className='text-sm font-medium text-slate-900 truncate'>{item.title}</h4>
-                                        <p className='text-xs text-slate-600 mt-1 line-clamp-2'>{item.description}</p>
-                                        </div>
+                        {/* Search Bar */}
+                        <div className='relative'>
+                            <input
+                                type='text'
+                                placeholder='Search AI insights...'
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                className='w-full px-3 py-2 pl-9 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors duration-200'
+                            />
+                            <svg className='absolute left-3 top-2.5 w-4 h-4 text-slate-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                            </svg>
+                        </div>
+
+                        {/* Tab Navigation */}
+                        <div className='flex space-x-1 bg-slate-100 rounded-lg p-1'>
+                            {[
+                                { key: 'suggestion', label: 'Suggestions', count: allItems.filter(i => i.type === 'suggestion').length },
+                                { key: 'action', label: 'Actions', count: allItems.filter(i => i.type === 'action').length },
+                                { key: 'insight', label: 'Insights', count: allItems.filter(i => i.type === 'insight').length }
+                            ].map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setActiveTab(tab.key as any)}
+                                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                                        activeTab === tab.key
+                                            ? 'bg-white text-primary shadow-sm'
+                                            : 'text-slate-600 hover:text-slate-800'
+                                    }`}
+                                >
+                                    {tab.label}
+                                    <span className='ml-1 text-xs text-slate-400'>({tab.count})</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Content Cards */}
+                        <div className='space-y-3 max-h-64 overflow-y-auto'>
+                            {filtered.map((item) => (
+                                <div key={item.id} className='bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200'>
+                                    <div className='flex items-start space-x-3'>
+                                        <div className='flex-shrink-0 mt-0.5'>{renderIcon(item.icon)}</div>
+                                        <div className='flex-1 min-w-0'>
+                                            <h4 className='text-sm font-medium text-slate-900 mb-1'>{item.title}</h4>
+                                            <p className='text-xs text-slate-600 mb-2 leading-relaxed'>{item.description}</p>
+                                            {item.tags && (
+                                                <div className='flex flex-wrap gap-1 mb-2'>
+                                                    {item.tags.map((tag) => (
+                                                        <span key={tag} className='px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded-md'>
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {item.actionLabel && (
+                                                <button className='text-xs text-primary hover:text-primary-700 font-medium transition-colors duration-200'>
+                                                    {item.actionLabel} →
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
 
-    // Tablet/Desktop: horizontal collapse to the right
-    const expandedWidth = isTablet ? 260 : 300; // px (more compact)
-    const collapsedWidth = 0; // fully collapse to the right
-
+    // Desktop view with improved design
     return (
-        <>
-            {/* Floating AI badge – visible when collapsed */}
-            {!isMobile && isCollapsed && (
-                                            <button
-                    onClick={() => setIsCollapsed(false)}
-                    className='fixed right-4 top-1/2 -translate-y-1/2 z-[70] w-9 h-9 rounded-full bg-brand-gradient text-white shadow-xl ring-2 ring-white/40 hover:opacity-95 transition-all duration-200 flex items-center justify-center pointer-events-auto'
-                    aria-label='Open AI Insights'
-                    title='AI Insights'
-                >
-                    <Icon name='sparkles' className='w-4 h-4 text-white' />
-                                            </button>
-                                        )}
-
-            <motion.aside
-                className='relative bg-white border-l border-slate-200 flex-shrink-0 hidden lg:block overflow-visible'
-                style={{ width: expandedWidth }}
-                animate={{ width: isCollapsed ? collapsedWidth : expandedWidth }}
-                initial={false}
-                transition={{ type: 'tween', duration: 0.22, ease: 'easeOut' }}
-            >
-                {/* Collapse handle pinned to viewport edge */}
-                                            <button
+        <motion.div
+            className={`bg-white shadow-lg transition-all duration-300 ease-in-out ${
+                isCollapsed ? 'w-16' : 'w-[280px]'
+            }`}
+            initial={false}
+            animate={{ width: isCollapsed ? 64 : 280 }}
+        >
+            {/* Header */}
+            <div className='flex items-center justify-between p-3 border-b border-slate-200'>
+                <h3 className='text-base font-semibold text-slate-900'>AI Insights</h3>
+                <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className={`absolute top-1/2 -translate-y-1/2 ${isCollapsed ? '-right-4' : '-left-3'} w-6 h-6 rounded-full bg-brand-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 ring-2 ring-white/40 flex items-center justify-center z-20`}
-                    aria-label={isCollapsed ? 'Expand AI insights' : 'Collapse AI insights'}
-                    title={isCollapsed ? 'Expand' : 'Collapse'}
+                    className='p-1.5 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-all duration-200 ease-in-out'
+                    aria-label={isCollapsed ? 'Expand insights' : 'Collapse insights'}
                 >
                     <svg
-                        className={`w-3 h-3 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}
-                        viewBox='0 0 24 24'
+                        className={`w-4 h-4 transition-transform duration-300 ease-in-out ${isCollapsed ? 'rotate-180' : ''}`}
                         fill='none'
                         stroke='currentColor'
-                        strokeWidth='2.5'
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
+                        viewBox='0 0 24 24'
                     >
-                        <polyline points='15 18 9 12 15 6'></polyline>
+                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
                     </svg>
-                                            </button>
+                </button>
+            </div>
 
-                {/* Content wrapper that fades/slides when collapsed */}
-                <motion.div
-                    className='h-full flex flex-col'
-                    animate={{ opacity: isCollapsed ? 0 : 1, x: isCollapsed ? 12 : 0 }}
-                    transition={{ duration: 0.18 }}
-                >
-                    <div className='px-4 py-3 border-b border-slate-200'>
-                        <div className='flex items-center justify-between mb-1'>
-                            <h3 className='text-base font-semibold text-slate-900'>AI Insights</h3>
-                            {/* Top chevron hidden; use side handle or floating badge */}
+            {!isCollapsed && (
+                <div className='p-3 space-y-3'>
+                    {/* Search Bar */}
+                    <div className='relative'>
+                        <input
+                            type='search'
+                            placeholder='Search AI insights...'
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className='w-full px-3 py-2 pl-8 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 ease-in-out'
+                        />
+                        <svg className='absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                        </svg>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div className='flex space-x-1 bg-slate-100 rounded-md p-1'>
+                        {[
+                            { key: 'suggestion', label: 'Suggestions', count: allItems.filter(i => i.type === 'suggestion').length },
+                            { key: 'action', label: 'Actions', count: allItems.filter(i => i.type === 'action').length },
+                            { key: 'insight', label: 'Insights', count: allItems.filter(i => i.type === 'insight').length }
+                        ].map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key as any)}
+                                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ease-in-out ${
+                                    activeTab === tab.key
+                                        ? 'bg-white text-primary-600 shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200'
+                                }`}
+                            >
+                                {tab.label}
+                                <span className='ml-1 text-xs text-slate-400'>({tab.count})</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Content Cards */}
+                    <div className='space-y-3 max-h-80 overflow-y-auto'>
+                        {filtered.map((item) => (
+                            <div key={item.id} className='bg-white border border-slate-200 rounded-md p-3 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 ease-in-out'>
+                                <div className='flex items-start space-x-2'>
+                                    <div className='flex-shrink-0 mt-0.5'>{renderIcon(item.icon)}</div>
+                                    <div className='flex-1 min-w-0'>
+                                        <h4 className='text-sm font-semibold text-slate-900 mb-1'>{item.title}</h4>
+                                        <p className='text-xs text-slate-600 mb-2 leading-relaxed'>{item.description}</p>
+                                        {item.tags && (
+                                            <div className='flex flex-wrap gap-1 mb-2'>
+                                                {item.tags.map((tag) => (
+                                                    <span key={tag} className='px-1.5 py-0.5 text-xs bg-slate-100 text-slate-600 rounded font-medium'>
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {item.details && (
+                                            <div className='mb-2 space-y-0.5'>
+                                                {item.details.map((detail, idx) => (
+                                                    <div key={idx} className='flex items-center space-x-1.5 text-xs text-slate-500'>
+                                                        <div className='w-1 h-1 bg-slate-400 rounded-full'></div>
+                                                        <span>{detail}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {item.actionLabel && (
+                                            <button className='inline-flex items-center text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 ease-in-out hover:underline'>
+                                                {item.actionLabel}
+                                                <svg className='ml-1 w-3 h-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
+                                                </svg>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-
-                    <motion.div className='p-3 space-y-3 overflow-y-auto' style={{ maxHeight: 'calc(100vh - 160px)' }}
-                        animate={{ opacity: isCollapsed ? 0 : 1 }} transition={{ duration: 0.16 }}
-                    >
-                        {allItems.map((item) => (
-                            <div key={item.id} className='bg-slate-50 rounded-lg p-3 border border-slate-200 hover:border-slate-300 transition-colors duration-200'>
-                                <div className='flex items-start space-x-2'>
-                                    <div className='w-8 h-8 bg-primary-100 rounded-md flex items-center justify-center flex-shrink-0'>
-                                        <Icon name={item.icon} className='w-4 h-4 text-primary-600' />
                             </div>
-                                    <div className='min-w-0 flex-1'>
-                                        <div className='flex items-center justify-between mb-1'>
-                                            <h4 className='text-[13px] font-medium text-slate-900 truncate'>{item.title}</h4>
-                                            <span className='text-[11px] text-slate-600 bg-slate-200 px-2 py-0.5 rounded-full'>
-                                                {item.confidence}%
-                                            </span>
-                        </div>
-                                        <p className='text-[12px] leading-5 text-slate-600 mb-1'>{item.description}</p>
-                        </div>
+                        ))}
                     </div>
                 </div>
-                        ))}
-                    </motion.div>
-                </motion.div>
-            </motion.aside>
-        </>
+            )}
+
+            {/* Collapsed state - Show expand button and AI badge */}
+            {isCollapsed && (
+                <div className='flex flex-col items-center space-y-3 py-3'>
+                    {/* Expand button - clearly visible */}
+                    <button
+                        onClick={() => setIsCollapsed(false)}
+                        className='w-8 h-8 bg-primary-600 rounded-md flex items-center justify-center hover:bg-primary-700 transition-colors duration-200 ease-in-out shadow-sm'
+                        aria-label='Expand AI Insights'
+                    >
+                        <svg className='w-4 h-4 text-white' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
+                        </svg>
+                    </button>
+                    
+                    {/* AI badge */}
+                    <div className='w-8 h-8 bg-slate-100 rounded-md flex items-center justify-center'>
+                        <svg className='w-4 h-4 text-slate-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 3l1.5 3L10 7l-3.5 1L5 11l-1.5-3L0 7l3.5-1L5 3zm9 1l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zm-3 7l2 4 4 2-4 2-2 4-2-4-4-2 4-2 2-4z' />
+                        </svg>
+                    </div>
+                    
+                    <div className='text-xs text-slate-500 text-center px-1 leading-tight'>
+                        AI<br/>Insights
+                    </div>
+                </div>
+            )}
+        </motion.div>
     );
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback, useMemo} from 'react';
 import Link from 'next/link';
-import {usePathname} from 'next/navigation';
+import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
 import {motion} from 'framer-motion';
@@ -108,10 +108,23 @@ export default function NavigationSidebar({
     isMobile = false,
 }: NavigationSidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(pathname);
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
+
+    // Memoize navigation items to prevent unnecessary re-renders
+    const memoizedNavigationItems = useMemo(() => navigationItems, []);
+
+    // Prefetch routes for faster navigation
+    useEffect(() => {
+        memoizedNavigationItems.forEach(item => {
+            if (item.href !== '/') {
+                router.prefetch(item.href);
+            }
+        });
+    }, [router, memoizedNavigationItems]);
 
     // Close Account Settings panel when navigating to a different page
     useEffect(() => {
@@ -128,11 +141,37 @@ export default function NavigationSidebar({
     ]);
 
     // Handle mobile close on navigation
-    const handleNavigation = (href: string) => {
+    const handleNavigation = useCallback((href: string) => {
         if (isMobile && onToggleCollapse) {
             onToggleCollapse();
         }
-    };
+        // Use router.push for faster navigation
+        router.push(href);
+    }, [isMobile, onToggleCollapse, router]);
+
+    // Memoize the navigation item click handler
+    const handleItemClick = useCallback((item: NavigationItem) => {
+        if (item.id === 'account-settings') {
+            setIsAccountSettingsOpen(true);
+            if (isMobile && onToggleCollapse) onToggleCollapse();
+            return;
+        }
+        if (item.id === 'access-control') {
+            setIsAccessControlOpen(true);
+            if (isMobile && onToggleCollapse) onToggleCollapse();
+            return;
+        }
+        handleNavigation(item.href);
+    }, [isMobile, onToggleCollapse, handleNavigation]);
+
+    // Memoize the hover handlers
+    const handleMouseEnter = useCallback((itemId: string) => {
+        setHoveredItem(itemId);
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        setHoveredItem(null);
+    }, []);
 
     return (
         <>
@@ -140,23 +179,18 @@ export default function NavigationSidebar({
                 className={`h-full flex flex-col backdrop-blur-xl relative overflow-visible z-30 ${
                     isMobile ? 'fixed left-0 top-0 z-50 h-screen' : 'relative'
                 }`}
-                style={{
+                style={{                    
+                    backgroundColor: '#0a1a2f',
                     backgroundImage: 'url(/images/logos/systiva-sidebar.png)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center bottom',
                     backgroundRepeat: 'no-repeat',
                 }}
-                animate={{ width: isCollapsed ? 48 : 208 }}
+                animate={{ width: isCollapsed ? 48 : 200 }}
                 initial={false}
                 transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
             >
-                {/* Curved Right Edge / Boundary (hidden when collapsed) */}
-                {!isCollapsed && (
-                    <div className='absolute right-0 top-0 h-full pointer-events-none z-10'>
-                        <div className='w-3 h-full bg-white/24 rounded-l-2xl shadow-[inset_0_0_12px_rgba(255,255,255,0.35)] transition-all duration-300'></div>
-                        <div className='absolute right-0 top-0 w-1.5 h-full bg-gradient-to-b from-[#05E9FE]/80 via-transparent to-[#0171EC]/80 rounded-l-2xl'></div>
-                    </div>
-                )}
+                {/* Curved Right Edge / Boundary removed to eliminate white border */}
                 
                 {/* Minimal Collapse Handle (bottom, outside) */}
                 {!isMobile && (
@@ -191,36 +225,32 @@ export default function NavigationSidebar({
                 )}
 
                 {/* Header */}
-                <div className='px-3 py-3 border-b border-white/20 flex items-center justify-between bg-black/30 backdrop-blur-sm'>
+                <div className='px-3 py-3 flex items-center justify-between'>
                     {!isCollapsed && (
-                        <div className='flex items-center space-x-3'>
-                            <div className='w-9 h-9 rounded-xl flex items-center justify-center shadow-lg overflow-hidden bg-white/10 backdrop-blur-sm'>
-                                <img
-                                    src="/images/logos/systiva-logo.svg"
-                                    alt="Systiva Logo"
-                                    className="w-full h-full object-contain p-1"
-                                />
-                            </div>
+                        <Link href="/" className='flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200'>
+                            <img
+                                src="/images/logos/systiva-logo.svg"
+                                alt="Systiva Logo"
+                                className="w-11 h-11 object-contain"
+                            />
                             <div className='min-w-0'>
-                                <h2 className='text-base font-bold text-white truncate drop-shadow-lg'>
+                                <h2 className='text-xl font-bold text-white truncate drop-shadow-lg'>
                                     Systiva
                                 </h2>
-                                <p className='text-[11px] text-slate-200 truncate drop-shadow-md'>
+                                <p className='text-xs text-slate-300 truncate drop-shadow-md'>
                                     Enterprise CI/CD Platform
                                 </p>
                             </div>
-                        </div>
+                        </Link>
                     )}
                     {isCollapsed && (
-                        <div className='flex justify-center w-full'>
-                            <div className='w-9 h-9 rounded-xl flex items-center justify-center shadow-lg overflow-hidden bg-white/10 backdrop-blur-sm'>
-                                <img
-                                    src="/images/logos/systiva-logo.svg"
-                                    alt="Systiva Logo"
-                                    className="w-full h-full object-contain p-1"
-                                />
-                            </div>
-                        </div>
+                        <Link href="/" className='flex justify-center w-full hover:opacity-80 transition-opacity duration-200'>
+                            <img
+                                src="/images/logos/systiva-logo.svg"
+                                alt="Systiva Logo"
+                                className="w-11 h-11 object-contain"
+                            />
+                        </Link>
                     )}
                     
                     {/* Mobile close button */}
@@ -243,37 +273,23 @@ export default function NavigationSidebar({
                     <div className='absolute inset-0 bg-black/20 pointer-events-none'></div>
                     
                     <div className='space-y-1 px-3 relative z-10'>
-                        {navigationItems.slice(0, 3).map((item, index) => {
+                        {memoizedNavigationItems.slice(0, 3).map((item, index) => {
                             const isActive =
                                 !isAccountSettingsOpen &&
                                 (pathname === item.href ||
                                     (item.href !== '/' && pathname.startsWith(item.href)));
 
-                            const onItemClick = () => {
-                                if (item.id === 'account-settings') {
-                                    setIsAccountSettingsOpen(true);
-                                    if (isMobile && onToggleCollapse) onToggleCollapse();
-                                    return;
-                                }
-                                if (item.id === 'access-control') {
-                                    setIsAccessControlOpen(true);
-                                    if (isMobile && onToggleCollapse) onToggleCollapse();
-                                    return;
-                                }
-                                handleNavigation(item.href);
-                            };
-
                             return (
                                 <div key={item.id} className='relative'>
                                     <button
-                                        onClick={onItemClick}
+                                        onClick={() => handleItemClick(item)}
                                         className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
-                                                ? 'bg-gradient-to-r from-[#0171EC]/40 to-[#05E9FE]/40 text-white border-r-2 border-[#05E9FE] shadow-lg backdrop-blur-sm'
+                                                ? 'bg-[#1e5297] text-white shadow-lg backdrop-blur-sm'
                                                 : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
                                         }`}
-                                        onMouseEnter={() => setHoveredItem(item.id)}
-                                        onMouseLeave={() => setHoveredItem(null)}
+                                        onMouseEnter={() => handleMouseEnter(item.id)}
+                                        onMouseLeave={handleMouseLeave}
                                         >
                                             <svg
                                             className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
@@ -288,13 +304,16 @@ export default function NavigationSidebar({
                                         )}
                                     </button>
 
+                                    {/* Enhanced tooltips for collapsed sidebar */}
                                     {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-md whitespace-nowrap z-50 shadow-lg'>
+                                        <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
                                             {item.label}
+                                            <div className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-600'></div>
                                         </div>
                                     )}
                                     
-                                    {index === 2 && (
+                                    {/* Add separator after Dashboard section (index 1) */}
+                                    {index === 1 && (
                                         <div className='my-3 px-3'>
                                             <div className='h-px bg-white/20'></div>
                                         </div>
@@ -306,54 +325,49 @@ export default function NavigationSidebar({
 
                     {/* Secondary Navigation Items */}
                     <div className='space-y-1 px-3 relative z-10'>
-                        {navigationItems.slice(3).map((item) => {
+                        {memoizedNavigationItems.slice(3).map((item) => {
                             const isActive =
                                 !isAccountSettingsOpen &&
                                 (pathname === item.href ||
                                     (item.href !== '/' && pathname.startsWith(item.href)));
 
-                            const onItemClick = () => {
-                            if (item.id === 'account-settings') {
-                                    setIsAccountSettingsOpen(true);
-                                    if (isMobile && onToggleCollapse) onToggleCollapse();
-                                    return;
-                                }
-                                if (item.id === 'access-control') {
-                                    setIsAccessControlOpen(true);
-                                    if (isMobile && onToggleCollapse) onToggleCollapse();
-                                    return;
-                                }
-                                handleNavigation(item.href);
-                            };
-
-                                return (
-                                    <div key={item.id} className='relative'>
-                                        <button
-                                        onClick={onItemClick}
+                            return (
+                                <div key={item.id} className='relative'>
+                                    <button
+                                        onClick={() => handleItemClick(item)}
                                         className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
-                                                ? 'bg-gradient-to-r from-[#0171EC]/40 to-[#05E9FE]/40 text-white border-r-2 border-[#05E9FE] shadow-lg backdrop-blur-sm'
+                                                ? 'bg-[#1e5297] text-white shadow-lg backdrop-blur-sm'
                                                 : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
                                         }`}
-                                        onMouseEnter={() => setHoveredItem(item.id)}
-                                        onMouseLeave={() => setHoveredItem(null)}
-                                            >
-                                                <svg
+                                        onMouseEnter={() => handleMouseEnter(item.id)}
+                                        onMouseLeave={handleMouseLeave}
+                                        >
+                                            <svg
                                             className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
-                                                    fill='none'
-                                                    stroke='currentColor'
-                                                    viewBox='0 0 24 24'
-                                                >
+                                                fill='none'
+                                                stroke='currentColor'
+                                                viewBox='0 0 24 24'
+                                            >
                                             <g dangerouslySetInnerHTML={{__html: getIconSvg(item.icon)}} />
-                                                </svg>
-                                            {!isCollapsed && (
+                                            </svg>
+                                        {!isCollapsed && (
                                             <span className='truncate drop-shadow-sm'>{item.label}</span>
-                                                )}
-                                        </button>
+                                        )}
+                                    </button>
 
+                                    {/* Enhanced tooltips for collapsed sidebar */}
                                     {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-md whitespace-nowrap z-50 shadow-lg'>
+                                        <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
                                             {item.label}
+                                            <div className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-600'></div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Add separator after Builds section */}
+                                    {item.id === 'builds' && (
+                                        <div className='my-3 px-3'>
+                                            <div className='h-px bg-white/20'></div>
                                         </div>
                                     )}
                                 </div>
@@ -363,7 +377,7 @@ export default function NavigationSidebar({
                 </nav>
 
                 {/* Footer */}
-                <div className='p-4 border-t border-white/20 bg-black/20 backdrop-blur-sm'>
+                <div className='p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm'>
                     {/* Keep only profile here to avoid duplicates of settings/access */}
                     <div className='mt-2'>
                         <div className='flex items-center space-x-3'>
@@ -402,6 +416,7 @@ export default function NavigationSidebar({
             <AccountSettingsPanel
                 isOpen={isAccountSettingsOpen}
                 onClose={() => setIsAccountSettingsOpen(false)}
+                sidebarWidth={isCollapsed ? 48 : 208}
             />
             )}
 
@@ -410,6 +425,7 @@ export default function NavigationSidebar({
             <AccessControlPanel
                 isOpen={isAccessControlOpen}
                 onClose={() => setIsAccessControlOpen(false)}
+                sidebarWidth={isCollapsed ? 48 : 208}
             />
             )}
         </>
