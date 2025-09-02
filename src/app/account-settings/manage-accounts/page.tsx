@@ -696,7 +696,7 @@ export default function ManageAccounts() {
                                     });
                                 }, 0);
                             }}
-                            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[#1677ff] text-white hover:bg-[#145fd4] shadow-sm'
+                            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
                         >
                             <PlusIcon className='h-4 w-4' />
                             <span className='text-sm'>New Account</span>
@@ -712,7 +712,7 @@ export default function ManageAccounts() {
                                 <MagnifyingGlassIcon className='h-4 w-4' />
                                 <span className='text-sm'>Search</span>
                                 {searchTerm && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-[#1677ff] ring-2 ring-sap-light-gray animate-pulse'></span>
+                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 ring-2 ring-slate-200 animate-pulse'></span>
                                 )}
                             </button>
                             <div
@@ -761,7 +761,7 @@ export default function ManageAccounts() {
                                 <ArrowsUpDownIcon className='h-4 w-4' />
                                 <span className='text-sm'>Sort</span>
                                 {(sortRules.length > 0 || !!sortColumn) && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-[#1677ff] animate-pulse'></span>
+                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
                                 )}
                             </button>
                             {sortOpen && (
@@ -966,7 +966,7 @@ export default function ManageAccounts() {
                                 <EyeSlashIcon className='h-4 w-4' />
                                 <span className='text-sm'>Hide</span>
                                 {visibleCols.length < allCols.length && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-[#1677ff] animate-pulse'></span>
+                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
                                 )}
                             </button>
                             {hideOpen && (
@@ -1084,7 +1084,7 @@ export default function ManageAccounts() {
                                 <RectangleStackIcon className='h-4 w-4' />
                                 <span className='text-sm'>Group by</span>
                                 {activeGroupLabel !== 'None' && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-[#1677ff] animate-pulse'></span>
+                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
                                 )}
                             </button>
                             {groupOpen && (

@@ -30,7 +30,7 @@ interface GlobalSetting {
 const STORAGE_KEY = 'global-settings';
 
 const DEFAULT_ACCOUNTS: {id: string; accountName: string}[] = [
-    {id: 'acc-1001', accountName: 'Acme Corp'},
+    {id: 'acc-1001', accountName: 'Systiva Corp'},
     {id: 'acc-1002', accountName: 'Globex Ltd'},
     {id: 'acc-1003', accountName: 'Initech'},
 ];
@@ -496,6 +496,15 @@ export default function GlobalSettingsPage() {
                                 title='Sort'
                                 onClick={() => setSortOpen((v) => !v)}
                             >
+                                <svg
+                                    className='h-4 w-4'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                    stroke='currentColor'
+                                >
+                                    <path d='M8 7v10M8 17l-2-2m2 2l2-2' />
+                                    <path d='M16 17V7m0 0l-2 2m2-2l2 2' />
+                                </svg>
                                 <span className='text-sm'>Sort</span>
                             </button>
                             {sortOpen && (
@@ -514,6 +523,16 @@ export default function GlobalSettingsPage() {
                                 className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
                                 onClick={() => setHideOpen((v) => !v)}
                             >
+                                <svg
+                                    className='h-4 w-4'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                    stroke='currentColor'
+                                >
+                                    <path d='M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z' />
+                                    <circle cx='12' cy='12' r='3' />
+                                    <path d='M2 2l20 20' />
+                                </svg>
                                 <span className='text-sm'>Hide</span>
                             </button>
                             {hideOpen && (
@@ -532,6 +551,34 @@ export default function GlobalSettingsPage() {
                                 className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
                                 onClick={() => setGroupOpen((v) => !v)}
                             >
+                                <svg
+                                    className='h-4 w-4'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                    stroke='currentColor'
+                                >
+                                    <rect
+                                        x='3'
+                                        y='3'
+                                        width='8'
+                                        height='8'
+                                        rx='2'
+                                    />
+                                    <rect
+                                        x='13'
+                                        y='3'
+                                        width='8'
+                                        height='8'
+                                        rx='2'
+                                    />
+                                    <rect
+                                        x='3'
+                                        y='13'
+                                        width='8'
+                                        height='8'
+                                        rx='2'
+                                    />
+                                </svg>
                                 <span className='text-sm'>Group by</span>
                             </button>
                             {groupOpen && (
@@ -1378,8 +1425,30 @@ function InlineEntities({
                                         setCopyTargets(targets);
                                         setCopyOpen(true);
                                     }}
-                                    className='inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-light hover:bg-slate-50 text-primary shadow-sm'
+                                    className='inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
                                 >
+                                    <svg
+                                        className='w-4 h-4'
+                                        viewBox='0 0 24 24'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        strokeWidth='1.8'
+                                    >
+                                        <rect
+                                            x='9'
+                                            y='9'
+                                            width='11'
+                                            height='11'
+                                            rx='2'
+                                        />
+                                        <rect
+                                            x='4'
+                                            y='4'
+                                            width='11'
+                                            height='11'
+                                            rx='2'
+                                        />
+                                    </svg>
                                     Copy settings
                                 </button>
                             </th>
@@ -1438,8 +1507,8 @@ function InlineEntities({
                 </table>
             </div>
             <div className='mx-6 mt-3 rounded-xl border border-slate-200 bg-gradient-to-r from-indigo-50 to-cyan-50 p-4 text-sm text-primary'>
-                Tip: Configure one entity, then click &quot;Copy settings&quot; to
-                replicate its selections to other entities.
+                Tip: Configure one entity, then click &quot;Copy settings&quot;
+                to replicate its selections to other entities.
             </div>
             {configureEntity && (
                 <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
@@ -1569,7 +1638,7 @@ function InlineEntities({
                                                         <td className='px-6 py-4 whitespace-nowrap text-right'>
                                                             <div className='inline-flex gap-2'>
                                                                 <button
-                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
                                                                     onClick={() => {
                                                                         options.forEach(
                                                                             (
@@ -1590,10 +1659,20 @@ function InlineEntities({
                                                                         );
                                                                     }}
                                                                 >
+                                                                    <svg
+                                                                        className='w-3.5 h-3.5'
+                                                                        viewBox='0 0 24 24'
+                                                                        fill='none'
+                                                                        stroke='currentColor'
+                                                                    >
+                                                                        <path d='M4 4h16v4H4z' />
+                                                                        <path d='M4 10h12v4H4z' />
+                                                                        <path d='M4 16h8v4H4z' />
+                                                                    </svg>
                                                                     Select All
                                                                 </button>
                                                                 <button
-                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
                                                                     onClick={() => {
                                                                         options.forEach(
                                                                             (
@@ -1614,6 +1693,17 @@ function InlineEntities({
                                                                         );
                                                                     }}
                                                                 >
+                                                                    <svg
+                                                                        className='w-3.5 h-3.5'
+                                                                        viewBox='0 0 24 24'
+                                                                        fill='none'
+                                                                        stroke='currentColor'
+                                                                    >
+                                                                        <path d='M3 6h18' />
+                                                                        <path d='M8 6l1-2h6l1 2' />
+                                                                        <path d='M6 10v7a2 2 0 002 2h8a2 2 0 002-2v-7' />
+                                                                        <path d='M10 12v5M14 12v5' />
+                                                                    </svg>
                                                                     Clear
                                                                 </button>
                                                             </div>
@@ -1629,7 +1719,7 @@ function InlineEntities({
                         <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
                             <button
                                 onClick={() => setConfigureEntity(null)}
-                                className='px-4 py-2 text-sm font-medium text-secondary bg-tertiary hover:bg-slate-200 rounded-lg'
+                                className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg transition-all duration-200'
                             >
                                 Done
                             </button>

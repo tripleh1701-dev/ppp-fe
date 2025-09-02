@@ -108,10 +108,11 @@ export default function NavigationSidebar({
     isMobile = false,
 }: NavigationSidebarProps) {
     const pathname = usePathname();
+    const currentPath = pathname ?? '/';
     const router = useRouter();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-    const [previousPathname, setPreviousPathname] = useState(pathname);
+    const [previousPathname, setPreviousPathname] = useState(currentPath);
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
 
     // Memoize navigation items to prevent unnecessary re-renders
@@ -119,7 +120,7 @@ export default function NavigationSidebar({
 
     // Prefetch routes for faster navigation
     useEffect(() => {
-        memoizedNavigationItems.forEach(item => {
+        memoizedNavigationItems.forEach((item) => {
             if (item.href !== '/') {
                 router.prefetch(item.href);
             }
@@ -128,41 +129,47 @@ export default function NavigationSidebar({
 
     // Close Account Settings panel when navigating to a different page
     useEffect(() => {
-        if (pathname !== previousPathname) {
+        if (currentPath !== previousPathname) {
             if (isAccountSettingsOpen) setIsAccountSettingsOpen(false);
             if (isAccessControlOpen) setIsAccessControlOpen(false);
         }
-        setPreviousPathname(pathname);
+        setPreviousPathname(currentPath);
     }, [
-        pathname,
+        currentPath,
         previousPathname,
         isAccountSettingsOpen,
         isAccessControlOpen,
     ]);
 
     // Handle mobile close on navigation
-    const handleNavigation = useCallback((href: string) => {
-        if (isMobile && onToggleCollapse) {
-            onToggleCollapse();
-        }
-        // Use router.push for faster navigation
-        router.push(href);
-    }, [isMobile, onToggleCollapse, router]);
+    const handleNavigation = useCallback(
+        (href: string) => {
+            if (isMobile && onToggleCollapse) {
+                onToggleCollapse();
+            }
+            // Use router.push for faster navigation
+            router.push(href);
+        },
+        [isMobile, onToggleCollapse, router],
+    );
 
     // Memoize the navigation item click handler
-    const handleItemClick = useCallback((item: NavigationItem) => {
-        if (item.id === 'account-settings') {
-            setIsAccountSettingsOpen(true);
-            if (isMobile && onToggleCollapse) onToggleCollapse();
-            return;
-        }
-        if (item.id === 'access-control') {
-            setIsAccessControlOpen(true);
-            if (isMobile && onToggleCollapse) onToggleCollapse();
-            return;
-        }
-        handleNavigation(item.href);
-    }, [isMobile, onToggleCollapse, handleNavigation]);
+    const handleItemClick = useCallback(
+        (item: NavigationItem) => {
+            if (item.id === 'account-settings') {
+                setIsAccountSettingsOpen(true);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            if (item.id === 'access-control') {
+                setIsAccessControlOpen(true);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            handleNavigation(item.href);
+        },
+        [isMobile, onToggleCollapse, handleNavigation],
+    );
 
     // Memoize the hover handlers
     const handleMouseEnter = useCallback((itemId: string) => {
@@ -179,28 +186,34 @@ export default function NavigationSidebar({
                 className={`h-full flex flex-col backdrop-blur-xl relative overflow-visible z-30 ${
                     isMobile ? 'fixed left-0 top-0 z-50 h-screen' : 'relative'
                 }`}
-                style={{                    
+                style={{
                     backgroundColor: '#0a1a2f',
-                    backgroundImage: 'url(/images/logos/systiva-sidebar.png)',
+                    backgroundImage: 'url(/images/logos/Systiva-sidebar.png)',
                     backgroundSize: 'contain',
                     backgroundPosition: 'center bottom',
                     backgroundRepeat: 'no-repeat',
                 }}
-                animate={{ width: isCollapsed ? 48 : 200 }}
+                animate={{width: isCollapsed ? 48 : 200}}
                 initial={false}
-                transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
+                transition={{type: 'tween', duration: 0.18, ease: 'easeOut'}}
             >
                 {/* Curved Right Edge / Boundary removed to eliminate white border */}
-                
+
                 {/* Minimal Collapse Handle (bottom, outside) */}
                 {!isMobile && (
                     <div className='absolute -right-4 bottom-7 z-40 pointer-events-auto group'>
                         <button
                             onClick={onToggleCollapse}
                             className={`relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl ${
-                                isCollapsed ? 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100' : 'opacity-100'
+                                isCollapsed
+                                    ? 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100'
+                                    : 'opacity-100'
                             }`}
-                            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                            aria-label={
+                                isCollapsed
+                                    ? 'Expand sidebar'
+                                    : 'Collapse sidebar'
+                            }
                             title={isCollapsed ? 'Expand' : 'Collapse'}
                         >
                             <svg
@@ -214,11 +227,24 @@ export default function NavigationSidebar({
                                 strokeLinecap='round'
                                 strokeLinejoin='round'
                             >
-                                <polyline className='arrow-shift' points='15 18 9 12 15 6'></polyline>
+                                <polyline
+                                    className='arrow-shift'
+                                    points='15 18 9 12 15 6'
+                                ></polyline>
                             </svg>
                             <style jsx>{`
-                                .group:hover .arrow-shift { animation: nudge 1.2s ease-in-out infinite; }
-                                @keyframes nudge { 0%,100%{ transform: translateX(0);} 50%{ transform: translateX(-1.5px);} }
+                                .group:hover .arrow-shift {
+                                    animation: nudge 1.2s ease-in-out infinite;
+                                }
+                                @keyframes nudge {
+                                    0%,
+                                    100% {
+                                        transform: translateX(0);
+                                    }
+                                    50% {
+                                        transform: translateX(-1.5px);
+                                    }
+                                }
                             `}</style>
                         </button>
                     </div>
@@ -227,11 +253,14 @@ export default function NavigationSidebar({
                 {/* Header */}
                 <div className='px-3 py-3 flex items-center justify-between'>
                     {!isCollapsed && (
-                        <Link href="/" className='flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200'>
+                        <Link
+                            href='/'
+                            className='flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200'
+                        >
                             <img
-                                src="/images/logos/systiva-logo.svg"
-                                alt="Systiva Logo"
-                                className="w-11 h-11 object-contain"
+                                src='/images/logos/Systiva-logo.svg'
+                                alt='Systiva Logo'
+                                className='w-11 h-11 object-contain'
                             />
                             <div className='min-w-0'>
                                 <h2 className='text-xl font-bold text-white truncate drop-shadow-lg'>
@@ -244,24 +273,37 @@ export default function NavigationSidebar({
                         </Link>
                     )}
                     {isCollapsed && (
-                        <Link href="/" className='flex justify-center w-full hover:opacity-80 transition-opacity duration-200'>
+                        <Link
+                            href='/'
+                            className='flex justify-center w-full hover:opacity-80 transition-opacity duration-200'
+                        >
                             <img
-                                src="/images/logos/systiva-logo.svg"
-                                alt="Systiva Logo"
-                                className="w-11 h-11 object-contain"
+                                src='/images/logos/Systiva-logo.svg'
+                                alt='Systiva Logo'
+                                className='w-11 h-11 object-contain'
                             />
                         </Link>
                     )}
-                    
+
                     {/* Mobile close button */}
                     {isMobile && (
                         <button
                             onClick={onToggleCollapse}
                             className='p-2 rounded-lg text-white hover:text-white hover:bg-white/20 transition-colors duration-200 backdrop-blur-sm'
-                            aria-label="Close sidebar"
+                            aria-label='Close sidebar'
                         >
-                            <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                            <svg
+                                className='w-5 h-5'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M6 18L18 6M6 6l12 12'
+                                />
                             </svg>
                         </button>
                     )}
@@ -271,56 +313,80 @@ export default function NavigationSidebar({
                 <nav className='flex-1 py-4 overflow-y-auto scrollbar-hide relative'>
                     {/* Semi-transparent overlay for better text readability */}
                     <div className='absolute inset-0 bg-black/20 pointer-events-none'></div>
-                    
-                    <div className='space-y-1 px-3 relative z-10'>
-                        {memoizedNavigationItems.slice(0, 3).map((item, index) => {
-                            const isActive =
-                                !isAccountSettingsOpen &&
-                                (pathname === item.href ||
-                                    (item.href !== '/' && pathname.startsWith(item.href)));
 
-                            return (
-                                <div key={item.id} className='relative'>
-                                    <button
-                                        onClick={() => handleItemClick(item)}
-                                        className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
-                                            isActive
-                                                ? 'bg-[#1e5297] text-white shadow-lg backdrop-blur-sm'
-                                                : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
-                                        }`}
-                                        onMouseEnter={() => handleMouseEnter(item.id)}
-                                        onMouseLeave={handleMouseLeave}
+                    <div className='space-y-1 px-3 relative z-10'>
+                        {memoizedNavigationItems
+                            .slice(0, 3)
+                            .map((item, index) => {
+                                const isActive =
+                                    !isAccountSettingsOpen &&
+                                    (currentPath === item.href ||
+                                        (item.href !== '/' &&
+                                            currentPath.startsWith(item.href)));
+
+                                return (
+                                    <div key={item.id} className='relative'>
+                                        <button
+                                            onClick={() =>
+                                                handleItemClick(item)
+                                            }
+                                            className={`flex ${
+                                                isCollapsed
+                                                    ? 'justify-center px-0'
+                                                    : 'items-center space-x-3 px-3'
+                                            } py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
+                                                isActive
+                                                    ? 'bg-primary-600 text-white shadow-lg backdrop-blur-sm'
+                                                    : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
+                                            }`}
+                                            onMouseEnter={() =>
+                                                handleMouseEnter(item.id)
+                                            }
+                                            onMouseLeave={handleMouseLeave}
                                         >
                                             <svg
-                                            className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
+                                                className={`w-5 h-5 ${
+                                                    isCollapsed
+                                                        ? ''
+                                                        : 'flex-shrink-0'
+                                                }`}
                                                 fill='none'
                                                 stroke='currentColor'
                                                 viewBox='0 0 24 24'
                                             >
-                                            <g dangerouslySetInnerHTML={{__html: getIconSvg(item.icon)}} />
+                                                <g
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: getIconSvg(
+                                                            item.icon,
+                                                        ),
+                                                    }}
+                                                />
                                             </svg>
-                                        {!isCollapsed && (
-                                            <span className='truncate drop-shadow-sm'>{item.label}</span>
-                                        )}
-                                    </button>
+                                            {!isCollapsed && (
+                                                <span className='truncate drop-shadow-sm'>
+                                                    {item.label}
+                                                </span>
+                                            )}
+                                        </button>
 
-                                    {/* Enhanced tooltips for collapsed sidebar */}
-                                    {isCollapsed && hoveredItem === item.id && (
-                                        <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
-                                            {item.label}
-                                            <div className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-600'></div>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Add separator after Dashboard section (index 1) */}
-                                    {index === 1 && (
-                                        <div className='my-3 px-3'>
-                                            <div className='h-px bg-white/20'></div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                        {/* Enhanced tooltips for collapsed sidebar */}
+                                        {isCollapsed &&
+                                            hoveredItem === item.id && (
+                                                <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
+                                                    {item.label}
+                                                    <div className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-600'></div>
+                                                </div>
+                                            )}
+
+                                        {/* Add separator after Dashboard section (index 1) */}
+                                        {index === 1 && (
+                                            <div className='my-3 px-3'>
+                                                <div className='h-px bg-white/20'></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                     </div>
 
                     {/* Secondary Navigation Items */}
@@ -328,31 +394,50 @@ export default function NavigationSidebar({
                         {memoizedNavigationItems.slice(3).map((item) => {
                             const isActive =
                                 !isAccountSettingsOpen &&
-                                (pathname === item.href ||
-                                    (item.href !== '/' && pathname.startsWith(item.href)));
+                                (currentPath === item.href ||
+                                    (item.href !== '/' &&
+                                        currentPath.startsWith(item.href)));
 
                             return (
                                 <div key={item.id} className='relative'>
                                     <button
                                         onClick={() => handleItemClick(item)}
-                                        className={`flex ${isCollapsed ? 'justify-center px-0' : 'items-center space-x-3 px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
+                                        className={`flex ${
+                                            isCollapsed
+                                                ? 'justify-center px-0'
+                                                : 'items-center space-x-3 px-3'
+                                        } py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
-                                                ? 'bg-[#1e5297] text-white shadow-lg backdrop-blur-sm'
+                                                ? 'bg-primary-600 text-white shadow-lg backdrop-blur-sm'
                                                 : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
                                         }`}
-                                        onMouseEnter={() => handleMouseEnter(item.id)}
+                                        onMouseEnter={() =>
+                                            handleMouseEnter(item.id)
+                                        }
                                         onMouseLeave={handleMouseLeave}
+                                    >
+                                        <svg
+                                            className={`w-5 h-5 ${
+                                                isCollapsed
+                                                    ? ''
+                                                    : 'flex-shrink-0'
+                                            }`}
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
                                         >
-                                            <svg
-                                            className={`w-5 h-5 ${isCollapsed ? '' : 'flex-shrink-0'}`}
-                                                fill='none'
-                                                stroke='currentColor'
-                                                viewBox='0 0 24 24'
-                                            >
-                                            <g dangerouslySetInnerHTML={{__html: getIconSvg(item.icon)}} />
-                                            </svg>
+                                            <g
+                                                dangerouslySetInnerHTML={{
+                                                    __html: getIconSvg(
+                                                        item.icon,
+                                                    ),
+                                                }}
+                                            />
+                                        </svg>
                                         {!isCollapsed && (
-                                            <span className='truncate drop-shadow-sm'>{item.label}</span>
+                                            <span className='truncate drop-shadow-sm'>
+                                                {item.label}
+                                            </span>
                                         )}
                                     </button>
 
@@ -363,7 +448,7 @@ export default function NavigationSidebar({
                                             <div className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1 w-2 h-2 bg-slate-800 transform rotate-45 border-l border-b border-slate-600'></div>
                                         </div>
                                     )}
-                                    
+
                                     {/* Add separator after Builds section */}
                                     {item.id === 'builds' && (
                                         <div className='my-3 px-3'>
@@ -404,8 +489,8 @@ export default function NavigationSidebar({
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
                                         Administrator
                                     </p>
-                    </div>
-                )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -413,20 +498,20 @@ export default function NavigationSidebar({
 
             {/* Account Settings Panel */}
             {isAccountSettingsOpen && (
-            <AccountSettingsPanel
-                isOpen={isAccountSettingsOpen}
-                onClose={() => setIsAccountSettingsOpen(false)}
-                sidebarWidth={isCollapsed ? 48 : 208}
-            />
+                <AccountSettingsPanel
+                    isOpen={isAccountSettingsOpen}
+                    onClose={() => setIsAccountSettingsOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
             )}
 
             {/* Access Control Panel */}
             {isAccessControlOpen && (
-            <AccessControlPanel
-                isOpen={isAccessControlOpen}
-                onClose={() => setIsAccessControlOpen(false)}
-                sidebarWidth={isCollapsed ? 48 : 208}
-            />
+                <AccessControlPanel
+                    isOpen={isAccessControlOpen}
+                    onClose={() => setIsAccessControlOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
             )}
         </>
     );

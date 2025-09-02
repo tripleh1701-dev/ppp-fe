@@ -3,7 +3,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import {api} from '@/utils/api';
 import DraggableSortableTable from './DraggableSortableTable';
-import APITest from './APITest';
 
 interface DashboardMetric {
     title: string;
@@ -193,7 +192,7 @@ export default function DashboardHome() {
                 <div className='flex items-center justify-between'>
                     <div>
                         <h1 className='text-lg font-bold text-slate-900'>
-                            SAP DevOps Dashboard
+                            Enterprise DevOps Dashboard
                         </h1>
                         <p className='text-xs text-slate-600 mt-0.5'>
                             Enterprise CI/CD management and monitoring center
@@ -315,7 +314,9 @@ export default function DashboardHome() {
                                 >
                                     <div
                                         className='w-3 rounded bg-gradient-to-b from-primary-600 to-primary-400 shadow-sm'
-                                        style={{height: `${6 + d.value * 2.5}px`}}
+                                        style={{
+                                            height: `${6 + d.value * 2.5}px`,
+                                        }}
                                     />
                                     <div className='text-xs text-slate-500 font-medium'>
                                         {d.label}
@@ -356,10 +357,7 @@ export default function DashboardHome() {
                     </div>
                 </div>
 
-                {/* API Test Component */}
-                <div className='mt-6'>
-                    <APITest />
-                </div>
+                {/* API Test Component removed */}
             </div>
         </div>
     );

@@ -13,7 +13,9 @@ interface GroupRecord {
 
 export default function UserGroupsPage() {
     const params = useParams<{username: string}>();
-    const username = decodeURIComponent(params.username || '');
+    const username = decodeURIComponent(
+        (params?.username as string | undefined) || '',
+    );
     const [groups, setGroups] = useState<GroupRecord[]>([]);
     const [search, setSearch] = useState('');
     const [showAssignModal, setShowAssignModal] = useState(false);

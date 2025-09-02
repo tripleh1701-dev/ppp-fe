@@ -6,7 +6,7 @@ import {Suspense} from 'react';
 
 function PipelineCanvasContent() {
     const searchParams = useSearchParams();
-    const template = searchParams.get('template');
+    const template = searchParams?.get('template') ?? null;
 
     return <WorkflowBuilder templateId={template} />;
 }

@@ -480,7 +480,7 @@ export default function BusinessUnitSettingsPage() {
                                             <span className='inline-flex items-center gap-1'>
                                                 Enterprise
                                                 <span className='inline-block ml-1 text-slate-400'>
-                                                    📌
+                                                    
                                                 </span>
                                             </span>
                                         </th>
@@ -490,7 +490,7 @@ export default function BusinessUnitSettingsPage() {
                                             <span className='inline-flex items-center gap-1'>
                                                 Account
                                                 <span className='inline-block ml-1 text-slate-400'>
-                                                    📌
+                                                    
                                                 </span>
                                             </span>
                                         </th>
@@ -500,7 +500,7 @@ export default function BusinessUnitSettingsPage() {
                                             <span className='inline-flex items-center gap-1'>
                                                 Entities
                                                 <span className='inline-block ml-1 text-slate-400'>
-                                                    📌
+                                                    
                                                 </span>
                                             </span>
                                         </th>

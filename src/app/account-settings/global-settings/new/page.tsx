@@ -702,9 +702,31 @@ export default function NewGlobalSettingsPage() {
                                 {entities.length > 1 && (
                                     <button
                                         onClick={() => setCopyOpen(true)}
-                                        className='text-sm px-3 py-2 rounded-lg bg-white border border-light hover:bg-slate-50 text-primary shadow-sm'
+                                        className='inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
                                     >
-                                        Copy Settings
+                                        <svg
+                                            className='w-4 h-4'
+                                            viewBox='0 0 24 24'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            strokeWidth='1.8'
+                                        >
+                                            <rect
+                                                x='9'
+                                                y='9'
+                                                width='11'
+                                                height='11'
+                                                rx='2'
+                                            />
+                                            <rect
+                                                x='4'
+                                                y='4'
+                                                width='11'
+                                                height='11'
+                                                rx='2'
+                                            />
+                                        </svg>
+                                        Copy settings
                                     </button>
                                 )}
                             </div>
@@ -1005,7 +1027,7 @@ export default function NewGlobalSettingsPage() {
                                                         <td className='px-6 py-4 whitespace-nowrap text-right'>
                                                             <div className='inline-flex gap-2'>
                                                                 <button
-                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
                                                                     onClick={() => {
                                                                         // Select all in category
                                                                         options.forEach(
@@ -1027,10 +1049,20 @@ export default function NewGlobalSettingsPage() {
                                                                         );
                                                                     }}
                                                                 >
+                                                                    <svg
+                                                                        className='w-3.5 h-3.5'
+                                                                        viewBox='0 0 24 24'
+                                                                        fill='none'
+                                                                        stroke='currentColor'
+                                                                    >
+                                                                        <path d='M4 4h16v4H4z' />
+                                                                        <path d='M4 10h12v4H4z' />
+                                                                        <path d='M4 16h8v4H4z' />
+                                                                    </svg>
                                                                     Select All
                                                                 </button>
                                                                 <button
-                                                                    className='px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
+                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
                                                                     onClick={() => {
                                                                         // Clear all in category
                                                                         options.forEach(
@@ -1052,6 +1084,17 @@ export default function NewGlobalSettingsPage() {
                                                                         );
                                                                     }}
                                                                 >
+                                                                    <svg
+                                                                        className='w-3.5 h-3.5'
+                                                                        viewBox='0 0 24 24'
+                                                                        fill='none'
+                                                                        stroke='currentColor'
+                                                                    >
+                                                                        <path d='M3 6h18' />
+                                                                        <path d='M8 6l1-2h6l1 2' />
+                                                                        <path d='M6 10v7a2 2 0 002 2h8a2 2 0 002-2v-7' />
+                                                                        <path d='M10 12v5M14 12v5' />
+                                                                    </svg>
                                                                     Clear
                                                                 </button>
                                                             </div>
@@ -1067,7 +1110,7 @@ export default function NewGlobalSettingsPage() {
                         <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
                             <button
                                 onClick={() => setConfigureEntity(null)}
-                                className='px-4 py-2 text-sm font-medium text-secondary bg-tertiary hover:bg-slate-200 rounded-lg'
+                                className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg transition-all duration-200'
                             >
                                 Done
                             </button>

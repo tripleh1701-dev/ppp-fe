@@ -182,7 +182,7 @@ export default function PipelineHeader({
                     <span>Copy from Template</span>
                 </button>
 
-                <button className='px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium'>
+                <button className='px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium'>
                     Publish
                 </button>
 

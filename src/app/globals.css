@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-    --brand-blue: #0171EC;
-    --brand-cyan: #05E9FE;
+    --brand-blue: #0171ec;
+    --brand-cyan: #05e9fe;
 
     --primary-600: var(--brand-blue);
     --primary-700: #005fca;
@@ -24,13 +24,48 @@
     --bg-secondary: #f8fafc;
 }
 
+@layer utilities {
+    /* Brand-aligned color utilities to unify buttons and surfaces */
+    .bg-primary {
+        background-color: var(--primary-600);
+    }
+    .bg-primary-dark {
+        background-color: var(--primary-700);
+    }
+    .hover\:bg-primary-dark:hover {
+        background-color: var(--primary-700);
+    }
+    .text-inverse {
+        color: var(--text-inverse);
+    }
+    .text-primary {
+        color: var(--text-primary);
+    }
+    .text-secondary {
+        color: var(--text-secondary);
+    }
+    .bg-card {
+        background-color: var(--bg-card);
+    }
+    .bg-secondary {
+        background-color: var(--bg-secondary);
+    }
+    .border-light {
+        border-color: var(--border-light);
+    }
+    .border-medium {
+        border-color: var(--border-medium);
+    }
+}
+
 /* ===== GLOBAL TYPOGRAPHY SYSTEM ===== */
 /* Professional, consistent typography across all screens */
 
 /* Base font settings for compact, data-dense layout */
-html { 
+html {
     font-size: 13px; /* Reduced from 14px for more compact layout */
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     line-height: 1.5;
@@ -104,7 +139,7 @@ body {
     @apply text-xs font-semibold text-slate-700 leading-relaxed uppercase tracking-wide;
 }
 
-.small-label { 
+.small-label {
     @apply text-xs font-medium text-slate-600 leading-relaxed;
 }
 
@@ -263,11 +298,11 @@ body {
     .container-dense {
         @apply px-4;
     }
-    
+
     .card-normal {
         @apply p-4;
     }
-    
+
     .spacing-normal {
         @apply gap-4;
     }
@@ -315,24 +350,32 @@ body {
 /* Maintain compatibility with existing components */
 
 /* Brand gradient helpers */
-.brand-gradient { 
-    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); 
+.brand-gradient {
+    background: linear-gradient(
+        135deg,
+        var(--brand-blue) 0%,
+        var(--brand-cyan) 100%
+    );
 }
 
-.text-brand-gradient { 
-    background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-cyan) 100%); 
-    -webkit-background-clip: text; 
-    background-clip: text; 
-    -webkit-text-fill-color: transparent; 
+.text-brand-gradient {
+    background: linear-gradient(
+        135deg,
+        var(--brand-blue) 0%,
+        var(--brand-cyan) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 /* Ensure page areas scroll when needed */
-.main-scroll { 
-    @apply overflow-auto; 
+.main-scroll {
+    @apply overflow-auto;
 }
 
 /* Links */
-a { 
+a {
     @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
 }
 

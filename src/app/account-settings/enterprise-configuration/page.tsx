@@ -188,7 +188,9 @@ export default function EnterpriseConfiguration() {
     >('None');
 
     // New state for enterprise_products_services table
-    const [enterpriseProductServices, setEnterpriseProductServices] = useState<EnterpriseProductService[]>([]);
+    const [enterpriseProductServices, setEnterpriseProductServices] = useState<
+        EnterpriseProductService[]
+    >([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -215,99 +217,160 @@ export default function EnterpriseConfiguration() {
     const loadEnterpriseProductServices = async () => {
         try {
             setIsLoading(true);
-            
+
             // Try to load from the new enterprise_products_services table first
             try {
                 // First, get all relationships from the main endpoint
-                const relationships = await api.get<Array<{id: number; enterpriseId: number; productId: number; serviceId: number}>>('/api/enterprise-products-services');
-                
+                const relationships = await api.get<
+                    Array<{
+                        id: number;
+                        enterpriseId: number;
+                        productId: number;
+                        serviceId: number;
+                    }>
+                >('/api/enterprise-products-services');
+
                 // Convert to EnterpriseProductService format for state
-                const convertedRelationships: EnterpriseProductService[] = relationships.map(r => ({
-                    id: r.id.toString(),
-                    enterpriseId: r.enterpriseId?.toString() || '',
-                    productId: r.productId?.toString() || '',
-                    serviceId: r.serviceId?.toString() || '',
-                    enterpriseName: '',
-                    productName: '',
-                    serviceName: ''
-                }));
+                const convertedRelationships: EnterpriseProductService[] =
+                    relationships.map((r) => ({
+                        id: r.id.toString(),
+                        enterpriseId: r.enterpriseId?.toString() || '',
+                        productId: r.productId?.toString() || '',
+                        serviceId: r.serviceId?.toString() || '',
+                        enterpriseName: '',
+                        productName: '',
+                        serviceName: '',
+                    }));
                 setEnterpriseProductServices(convertedRelationships || []);
-                
+
                 if (relationships && relationships.length > 0) {
                     // Get unique IDs for fetching names
-                    const enterpriseIds = Array.from(new Set(relationships.map(r => r.enterpriseId).filter(id => id !== null)));
-                    const productIds = Array.from(new Set(relationships.map(r => r.productId).filter(id => id !== null)));
-                    const serviceIds = Array.from(new Set(relationships.map(r => r.serviceId).filter(id => id !== null)));
-                    
+                    const enterpriseIds = Array.from(
+                        new Set(
+                            relationships
+                                .map((r) => r.enterpriseId)
+                                .filter((id) => id !== null),
+                        ),
+                    );
+                    const productIds = Array.from(
+                        new Set(
+                            relationships
+                                .map((r) => r.productId)
+                                .filter((id) => id !== null),
+                        ),
+                    );
+                    const serviceIds = Array.from(
+                        new Set(
+                            relationships
+                                .map((r) => r.serviceId)
+                                .filter((id) => id !== null),
+                        ),
+                    );
+
                     // Fetch names from respective tables
-                    const enterprises = await api.get<Array<{id: number; name: string}>>('/api/enterprises');
-                    const products = await api.get<Array<{id: number; name: string}>>('/api/products');
-                    const services = await api.get<Array<{id: number; name: string}>>('/api/services');
-                    
+                    const enterprises = await api.get<
+                        Array<{id: number; name: string}>
+                    >('/api/enterprises');
+                    const products = await api.get<
+                        Array<{id: number; name: string}>
+                    >('/api/products');
+                    const services = await api.get<
+                        Array<{id: number; name: string}>
+                    >('/api/services');
+
                     // Create lookup maps
-                    const enterpriseMap = new Map(enterprises.map(e => [e.id, e.name]));
-                    const productMap = new Map(products.map(p => [p.id, p.name]));
-                    const serviceMap = new Map(services.map(s => [s.id, s.name]));
-                    
+                    const enterpriseMap = new Map(
+                        enterprises.map((e) => [e.id, e.name]),
+                    );
+                    const productMap = new Map(
+                        products.map((p) => [p.id, p.name]),
+                    );
+                    const serviceMap = new Map(
+                        services.map((s) => [s.id, s.name]),
+                    );
+
                     // Convert to the format expected by the table
-                    const enterpriseProductMap = new Map<string, { name: string; products: Map<string, string[]> }>();
-                    
-                    relationships.forEach(item => {
-                        const enterpriseId = item.enterpriseId?.toString() || '';
+                    const enterpriseProductMap = new Map<
+                        string,
+                        {name: string; products: Map<string, string[]>}
+                    >();
+
+                    relationships.forEach((item) => {
+                        const enterpriseId =
+                            item.enterpriseId?.toString() || '';
                         const productId = item.productId?.toString() || '';
                         const serviceId = item.serviceId?.toString() || '';
-                        
+
                         if (enterpriseId && productId && serviceId) {
-                            const enterpriseName = enterpriseMap.get(item.enterpriseId) || '';
-                            const productName = productMap.get(item.productId) || '';
-                            const serviceName = serviceMap.get(item.serviceId) || '';
-                            
+                            const enterpriseName =
+                                enterpriseMap.get(item.enterpriseId) || '';
+                            const productName =
+                                productMap.get(item.productId) || '';
+                            const serviceName =
+                                serviceMap.get(item.serviceId) || '';
+
                             if (!enterpriseProductMap.has(enterpriseId)) {
                                 enterpriseProductMap.set(enterpriseId, {
                                     name: enterpriseName,
-                                    products: new Map()
+                                    products: new Map(),
                                 });
                             }
-                            
-                            const enterprise = enterpriseProductMap.get(enterpriseId)!;
+
+                            const enterprise =
+                                enterpriseProductMap.get(enterpriseId)!;
                             if (!enterprise.products.has(productId)) {
                                 enterprise.products.set(productId, []);
                             }
-                            
-                            const services = enterprise.products.get(productId)!;
-                            if (serviceName && !services.includes(serviceName)) {
+
+                            const services =
+                                enterprise.products.get(productId)!;
+                            if (
+                                serviceName &&
+                                !services.includes(serviceName)
+                            ) {
                                 services.push(serviceName);
                             }
                         }
                     });
-                    
+
                     // Convert to Enterprise[] format for compatibility
-                    const enterpriseArray: Enterprise[] = Array.from(enterpriseProductMap.entries()).map(([id, data]) => ({
+                    const enterpriseArray: Enterprise[] = Array.from(
+                        enterpriseProductMap.entries(),
+                    ).map(([id, data]) => ({
                         id,
                         name: data.name,
-                        services: Array.from(data.products.entries()).map(([productId, services]) => ({
-                            id: productId,
-                            name: productMap.get(parseInt(productId)) || '',
-                            categories: services
-                        }))
+                        services: Array.from(data.products.entries()).map(
+                            ([productId, services]) => ({
+                                id: productId,
+                                name: productMap.get(parseInt(productId)) || '',
+                                categories: services,
+                            }),
+                        ),
                     }));
-                    
+
                     setEnterprises(enterpriseArray);
-                    console.log('Loaded data from enterprise_products_services table with resolved names');
+                    console.log(
+                        'Loaded data from enterprise_products_services table with resolved names',
+                    );
                 } else {
                     setEnterprises([]);
                 }
             } catch (error) {
-                console.warn('New enterprise_products_services table not available, falling back to legacy enterprises:', error);
-                
+                console.warn(
+                    'New enterprise_products_services table not available, falling back to legacy enterprises:',
+                    error,
+                );
+
                 // Fallback: Load from the existing enterprises endpoint
-                const legacyData = await api.get<Enterprise[]>('/api/enterprises');
-        setEnterprises(
+                const legacyData = await api.get<Enterprise[]>(
+                    '/api/enterprises',
+                );
+                setEnterprises(
                     legacyData.map((e) => ({
-                ...e,
-                services: Array.isArray(e.services) ? e.services : [],
-            })),
-        );
+                        ...e,
+                        services: Array.isArray(e.services) ? e.services : [],
+                    })),
+                );
                 console.log('Loaded data from legacy enterprises endpoint');
             }
         } catch (error) {
@@ -463,7 +526,7 @@ export default function EnterpriseConfiguration() {
                                 setAddKey(Date.now());
                                 setShowCreateForm(false);
                             }}
-                            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[#1677ff] text-white hover:bg-[#145fd4] shadow-sm'
+                            className='inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
                         >
                             <PlusIcon className='h-4 w-4' />
                             <span className='text-sm'>
@@ -755,10 +818,14 @@ export default function EnterpriseConfiguration() {
                                     dropDelete;
                                 if (isProduct) {
                                     // Delete from enterprise_products_services table
-                                    await api.del(`/api/enterprise-products-services/${rowId}`);
+                                    await api.del(
+                                        `/api/enterprise-products-services/${rowId}`,
+                                    );
                                 } else {
                                     // Delete all records for this enterprise
-                                    await api.del(`/api/enterprise-products-services/enterprise/${enterpriseId}`);
+                                    await api.del(
+                                        `/api/enterprise-products-services/enterprise/${enterpriseId}`,
+                                    );
                                 }
                                 setDropDelete(null);
                                 setTrashBounce(true);
@@ -1076,9 +1143,12 @@ function CreateEnterpriseForm({onSave, onCancel}: CreateEnterpriseFormProps) {
                     categories: s.categories,
                 })),
             };
-            
+
             // Use the API utility instead of direct fetch
-            const created = await api.post<{id: string; name: string}>('/api/enterprises', payload);
+            const created = await api.post<{id: string; name: string}>(
+                '/api/enterprises',
+                payload,
+            );
 
             const newEnterprise: Enterprise = {
                 id: created?.id || Date.now().toString(),
@@ -1912,7 +1982,10 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
     // Handle click outside to close dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
                 setOpen(false);
                 setError(null);
             }
@@ -1930,10 +2003,10 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
     const handleCreateService = async () => {
         const nm = name.trim();
         if (!nm) return;
-        
+
         setIsLoading(true);
         setError(null);
-        
+
         try {
             const created = await api.post<{
                 id: string;
@@ -1946,7 +2019,11 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
             setTimeout(() => setPulse(false), 500);
         } catch (error) {
             console.error('Failed to create service:', error);
-            setError(error instanceof Error ? error.message : 'Failed to create service');
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to create service',
+            );
         } finally {
             setIsLoading(false);
         }
@@ -1994,13 +2071,13 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
                             className='w-full px-3 py-2 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
                             disabled={isLoading}
                         />
-                        
+
                         {error && (
                             <div className='text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200'>
                                 {error}
                             </div>
                         )}
-                        
+
                         <div className='flex items-center gap-2'>
                             <button
                                 onClick={handleCreateService}
@@ -2036,7 +2113,10 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
     // Handle click outside to close dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
                 setOpen(false);
                 setError(null);
             }
@@ -2054,10 +2134,10 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
     const handleCreateProduct = async () => {
         const nm = name.trim();
         if (!nm) return;
-        
+
         setIsLoading(true);
         setError(null);
-        
+
         try {
             const created = await api.post<{
                 id: string;
@@ -2070,7 +2150,11 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
             setTimeout(() => setPulse(false), 500);
         } catch (error) {
             console.error('Failed to create product:', error);
-            setError(error instanceof Error ? error.message : 'Failed to create product');
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to create product',
+            );
         } finally {
             setIsLoading(false);
         }
@@ -2118,13 +2202,13 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
                             className='w-full px-3 py-2 text-sm rounded-md border border-light focus:outline-none focus:ring-2 focus:ring-primary/20'
                             disabled={isLoading}
                         />
-                        
+
                         {error && (
                             <div className='text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200'>
                                 {error}
                             </div>
                         )}
-                        
+
                         <div className='flex items-center gap-2'>
                             <button
                                 onClick={handleCreateProduct}
