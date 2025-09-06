@@ -30,7 +30,7 @@ interface GlobalSetting {
 const STORAGE_KEY = 'global-settings';
 
 const DEFAULT_ACCOUNTS: {id: string; accountName: string}[] = [
-    {id: 'acc-1001', accountName: 'Systiva Corp'},
+    {id: 'acc-1001', accountName: 'acme Corp'},
     {id: 'acc-1002', accountName: 'Globex Ltd'},
     {id: 'acc-1003', accountName: 'Initech'},
 ];
@@ -110,6 +110,97 @@ export default function GlobalSettingsPage() {
                 }
             } catch {
                 setItems([]);
+            }
+        })();
+    }, []);
+
+    // Auto-hydrate Account/Enterprise from breadcrumb selections (stored in localStorage)
+    const [selectionResolving, setSelectionResolving] = useState(true);
+    useEffect(() => {
+        (async () => {
+            try {
+                const savedAccId =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountId') || ''
+                        : '';
+                const savedEntId =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedEnterpriseId') ||
+                          ''
+                        : '';
+                const savedAccName =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountName') ||
+                          ''
+                        : '';
+                const savedEntName =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem(
+                              'selectedEnterpriseName',
+                          ) || ''
+                        : '';
+
+                const [accs, ents] = await Promise.all([
+                    api
+                        .get<Array<{id: string; accountName: string}>>(
+                            '/api/accounts',
+                        )
+                        .catch(() => [] as any),
+                    api
+                        .get<Array<{id: string; name: string}>>(
+                            '/api/enterprises',
+                        )
+                        .catch(() => [] as any),
+                ]);
+
+                const accountsList = accs || [];
+                const enterprisesList = ents || [];
+
+                const resolvedAccId =
+                    savedAccId ||
+                    (savedAccName
+                        ? String(
+                              (
+                                  accountsList.find(
+                                      (a: any) =>
+                                          a.accountName === savedAccName,
+                                  ) || {id: ''}
+                              ).id,
+                          )
+                        : '') ||
+                    (accountsList.length === 1
+                        ? String(accountsList[0].id)
+                        : '');
+
+                const resolvedEntId =
+                    savedEntId ||
+                    (savedEntName
+                        ? String(
+                              (
+                                  enterprisesList.find(
+                                      (e: any) => e.name === savedEntName,
+                                  ) || {id: ''}
+                              ).id,
+                          )
+                        : '') ||
+                    (enterprisesList.length === 1
+                        ? String(enterprisesList[0].id)
+                        : '');
+
+                const acc = accountsList.find(
+                    (a: any) => String(a.id) === String(resolvedAccId),
+                );
+                const ent = enterprisesList.find(
+                    (e: any) => String(e.id) === String(resolvedEntId),
+                );
+
+                setAccountId(resolvedAccId);
+                setAccountName(acc?.accountName || savedAccName || '');
+                setEnterpriseId(resolvedEntId);
+                setEnterpriseName(ent?.name || savedEntName || '');
+            } catch {
+            } finally {
+                setSelectionResolving(false);
             }
         })();
     }, []);
@@ -370,6 +461,143 @@ export default function GlobalSettingsPage() {
                 .animate-row {
                     animation: row-enter 220ms ease-out both;
                 }
+                @keyframes curlFold {
+                    0% {
+                        opacity: 0;
+                        transform: translate(4px, -4px) rotate(45deg) scale(0.6);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translate(0, 0) rotate(45deg) scale(1);
+                    }
+                }
+                .gs-chip {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .gs-chip::after {
+                    content: '';
+                    position: absolute;
+                    inset: -30% auto auto -30%;
+                    right: -30%;
+                    bottom: auto;
+                    background: radial-gradient(
+                        ellipse at center,
+                        rgba(79, 70, 229, 0.16),
+                        rgba(79, 70, 229, 0) 60%
+                    );
+                    opacity: 0;
+                    transform: scale(0.2);
+                    transition: opacity 220ms ease, transform 220ms ease;
+                    pointer-events: none;
+                }
+                .gs-chip:hover::after {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                .gs-chip-selected {
+                    box-shadow: 0 14px 36px -16px rgba(79, 70, 229, 0.45),
+                        0 1px 3px rgba(2, 6, 23, 0.12);
+                }
+                /* Top-right corner tick ribbon */
+                .gs-corner-check {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    width: 24px;
+                    height: 24px;
+                    background: #1d4ed8; /* blue-700 */
+                    clip-path: polygon(100% 0, 100% 100%, 0 0);
+                    pointer-events: none;
+                    z-index: 2;
+                    overflow: hidden;
+                }
+                .gs-corner-check svg {
+                    position: absolute;
+                    top: 10px;
+                    right: 6px;
+                    width: 9px;
+                    height: 9px;
+                    color: #fff;
+                }
+                .gs-corner-check-svg {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    width: 24px;
+                    height: 24px;
+                    pointer-events: none;
+                    z-index: 2;
+                    display: block;
+                }
+                .gs-curl {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    width: 18px;
+                    height: 18px;
+                    background: linear-gradient(
+                        135deg,
+                        rgba(255, 255, 255, 0) 0%,
+                        rgba(99, 102, 241, 0.35) 55%,
+                        rgba(79, 70, 229, 0.7) 100%
+                    );
+                    clip-path: polygon(0 0, 100% 0, 100% 100%);
+                    border-top-right-radius: 10px;
+                    box-shadow: 0 1px 2px rgba(2, 6, 23, 0.18);
+                    border-left: 1px solid rgba(79, 70, 229, 0.2);
+                    border-top: 1px solid rgba(79, 70, 229, 0.2);
+                    animation: curlFold 420ms ease-out;
+                    pointer-events: none;
+                }
+                .gs-tilt {
+                    transform: translateY(-1px) scale(1.02) rotate(-0.6deg);
+                }
+                @keyframes rippleScale {
+                    from {
+                        opacity: 0.35;
+                        transform: translate(-50%, -50%) scale(0.2);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translate(-50%, -50%) scale(2.4);
+                    }
+                }
+                .gs-ripple {
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    width: 46px;
+                    height: 46px;
+                    border-radius: 9999px;
+                    background: radial-gradient(
+                        circle,
+                        rgba(99, 102, 241, 0.25) 0%,
+                        rgba(99, 102, 241, 0.15) 40%,
+                        rgba(99, 102, 241, 0) 60%
+                    );
+                    transform: translate(-50%, -50%) scale(0.2);
+                    animation: rippleScale 520ms ease-out forwards;
+                    pointer-events: none;
+                }
+            `}</style>
+            <style>{`
+                /* Compact table tweaks to mirror Accounts/Monday-like grid */
+                .compact-table table { border-spacing: 0; width: 100%; }
+                .compact-table thead th { background: #fff; }
+                .compact-table th, .compact-table td { border-right: 1px solid #e2e8f0; }
+                .compact-table th:last-child, .compact-table td:last-child { border-right: none; }
+                .header-cell { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+                .header-ellipsis { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:9999px; color:#64748B; }
+                .header-ellipsis:hover { background:#eef2ff; color:#4338ca; }
+                .add-inline-row { color:#64748B; }
+                .add-inline-row:hover { color:#0f172a; }
+            `}</style>
+            <style>{`
+                /* Row hover color without overlay so dropdown stays on top */
+                .row-hover-safe { position: relative; }
+                .row-hover-safe:hover { background-color: rgba(99,102,241,0.08); }
+                .row-hover-safe .actions-cell { position: relative; z-index: 20; }
             `}</style>
             <div className='bg-card border-b border-light px-6 py-4'>
                 <div className='flex items-center justify-between'>
@@ -388,57 +616,6 @@ export default function GlobalSettingsPage() {
             <div className='bg-card border-b border-light px-6 py-3'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-3'>
-                        <button
-                            className='shrink-0 inline-flex items-center px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
-                            onClick={async () => {
-                                setInlineOpen((v) => !v);
-                                if (!inlineOpen) {
-                                    try {
-                                        const [accs, ents] = await Promise.all([
-                                            api.get<
-                                                Array<{
-                                                    id: string;
-                                                    accountName: string;
-                                                }>
-                                            >('/api/accounts'),
-                                            api.get<
-                                                Array<{
-                                                    id: string;
-                                                    name: string;
-                                                }>
-                                            >('/api/enterprises'),
-                                        ]);
-                                        setAccounts(
-                                            (accs || []).map((a: any) => ({
-                                                id: String(
-                                                    a.id ||
-                                                        a.numericId ||
-                                                        a.accountId ||
-                                                        '',
-                                                ),
-                                                accountName: a.accountName,
-                                            })),
-                                        );
-                                        setEnterprises(
-                                            (ents || []).map((e: any) => ({
-                                                id: String(
-                                                    e.id ||
-                                                        e.numericId ||
-                                                        e.enterpriseId ||
-                                                        '',
-                                                ),
-                                                name: e.name,
-                                            })),
-                                        );
-                                    } catch {
-                                        setAccounts([]);
-                                        setEnterprises([]);
-                                    }
-                                }
-                            }}
-                        >
-                            Create Global Settings
-                        </button>
                         {/* Search chip + expandable input */}
                         <div
                             ref={searchContainerRef}
@@ -609,114 +786,40 @@ export default function GlobalSettingsPage() {
                 </div>
             </div>
 
-            {/* Inline Create Panel inside body */}
-            {inlineOpen && (
-                <div className='mt-6 mb-6 px-6'>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                        <div className='max-w-xl'>
-                            <label className='block text-sm font-semibold text-primary mb-2'>
-                                Account
-                            </label>
-                            <SearchSelect
-                                placeholder='Select account'
-                                value={
-                                    accountId
-                                        ? {id: accountId, name: accountName}
-                                        : null
-                                }
-                                onChange={(opt) => {
-                                    setAccountId(opt?.id || '');
-                                    setAccountName(opt?.name || '');
-                                }}
-                                fetchOptions={async (q) => {
-                                    const res = await api.get<
-                                        Array<{
-                                            id: string;
-                                            accountName: string;
-                                            numericId?: number;
-                                        }>
-                                    >('/api/accounts' + (q?.trim() ? '' : ''));
-                                    return (res || []).map((a: any) => ({
-                                        id: String(
-                                            a.numericId ??
-                                                a.id ??
-                                                a.accountId ??
-                                                '',
-                                        ),
-                                        name: a.accountName,
-                                    }));
-                                }}
-                            />
-                        </div>
-                        <div className='max-w-xl'>
-                            <label className='block text-sm font-semibold text-primary mb-2'>
-                                Enterprise
-                            </label>
-                            <SearchSelect
-                                placeholder='Select enterprise'
-                                value={
-                                    enterpriseId
-                                        ? {
-                                              id: enterpriseId,
-                                              name: enterpriseName,
-                                          }
-                                        : null
-                                }
-                                onChange={(opt) => {
-                                    setEnterpriseId(opt?.id || '');
-                                    setEnterpriseName(opt?.name || '');
-                                }}
-                                fetchOptions={async (q) => {
-                                    const url = q?.trim()
-                                        ? `/api/enterprises?search=${encodeURIComponent(
-                                              q.trim(),
-                                          )}`
-                                        : '/api/enterprises';
-                                    const res = await api.get<
-                                        Array<{
-                                            id: string;
-                                            name: string;
-                                            numericId?: number;
-                                        }>
-                                    >(url);
-                                    return (res || []).map((e: any) => ({
-                                        id: String(
-                                            e.numericId ??
-                                                e.id ??
-                                                e.enterpriseId ??
-                                                '',
-                                        ),
-                                        name: e.name,
-                                    }));
-                                }}
-                            />
-                        </div>
+            {/* Inline entity view uses account/enterprise from breadcrumb automatically */}
+            <div className='mt-6 mb-6 px-6'>
+                {selectionResolving ? (
+                    <div className='text-sm text-secondary'>
+                        Loading selection from breadcrumb…
                     </div>
-                    {accountId && enterpriseName && (
-                        <div className='mt-6 px-6'>
-                            <label className='block text-sm font-semibold text-primary mb-2'>
-                                Entities
-                            </label>
-                            <InlineEntities
-                                accountId={accountId}
-                                accountName={accountName}
-                                enterpriseId={enterpriseId}
-                                enterpriseName={enterpriseName}
-                                onCreated={async () => {
-                                    const data = await api.get<GlobalSetting[]>(
-                                        '/api/global-settings',
-                                    );
-                                    setItems(Array.isArray(data) ? data : []);
-                                    setInlineOpen(false);
-                                    setAccountId('');
-                                    setEnterpriseId('');
-                                    setEnterpriseName('');
-                                }}
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
+                ) : accountId && enterpriseName ? (
+                    <div>
+                        <label className='block text-sm font-semibold text-primary mb-2'>
+                            Entities
+                        </label>
+                        <InlineEntities
+                            accountId={accountId}
+                            accountName={accountName}
+                            enterpriseId={enterpriseId}
+                            enterpriseName={enterpriseName}
+                            onCreated={async () => {
+                                const data = await api.get<GlobalSetting[]>(
+                                    '/api/global-settings',
+                                );
+                                setItems(Array.isArray(data) ? data : []);
+                            }}
+                            onRequestDelete={(entity) =>
+                                setPendingDeleteId(entity)
+                            }
+                        />
+                    </div>
+                ) : (
+                    <div className='text-sm text-secondary'>
+                        Missing account/enterprise selection. Please pick them
+                        in the breadcrumb.
+                    </div>
+                )}
+            </div>
 
             <div className='flex-1 p-6'>
                 {filtered.length === 0 ? null : (
@@ -745,7 +848,7 @@ export default function GlobalSettingsPage() {
                                 {filtered.map((item) => (
                                     <tr
                                         key={item.id}
-                                        className='group transition-all duration-200 hover:bg-indigo-50/40 hover:shadow-[0_2px_12px_-6px_rgba(79,70,229,0.35)]'
+                                        className='group transition-all duration-200 row-hover-safe'
                                     >
                                         <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
                                             {item.enterpriseName}
@@ -798,15 +901,96 @@ export default function GlobalSettingsPage() {
             <ConfirmModal
                 open={pendingDeleteId !== null}
                 title='Confirm delete'
-                message={`Delete this global setting?\n\nThis action can’t be undone.`}
+                message={`Delete entity "${
+                    pendingDeleteId || ''
+                }"?\n\nThis action can't be undone.`}
                 onCancel={() => setPendingDeleteId(null)}
                 onConfirm={async () => {
                     if (!pendingDeleteId) return;
-                    await api.del(`/api/global-settings/${pendingDeleteId}`);
-                    const data = await api.get<GlobalSetting[]>(
-                        `/api/global-settings`,
-                    );
-                    setItems(Array.isArray(data) ? data : []);
+                    try {
+                        // Fetch existing BU rows, remove the entity, and update (PUT)
+                        const buUrl = `/api/business-units?accountId=${encodeURIComponent(
+                            accountId,
+                        )}&enterpriseId=${encodeURIComponent(enterpriseId)}`;
+                        const rows = await api.get<
+                            Array<{id: number; entities: string}>
+                        >(buUrl);
+                        if (Array.isArray(rows) && rows.length > 0) {
+                            const raw = String(rows[0].entities || '').trim();
+                            let current: string[] = [];
+                            if (raw.startsWith('{') && raw.endsWith('}')) {
+                                const inner = raw.slice(1, -1);
+                                current = inner
+                                    .split(',')
+                                    .map((s) => s.trim().replace(/^"|"$/g, ''))
+                                    .filter(Boolean);
+                            } else if (raw.startsWith('[')) {
+                                try {
+                                    const arr = JSON.parse(raw);
+                                    if (Array.isArray(arr))
+                                        current = arr.map((x: any) =>
+                                            String(x),
+                                        );
+                                } catch {}
+                            } else if (raw) {
+                                current = [raw];
+                            }
+                            const next = current.filter(
+                                (x) => x !== pendingDeleteId,
+                            );
+                            const formatEntities = (list: string[]) =>
+                                `{${list
+                                    .map((x) => `"${x.replace(/\"/g, '\\"')}"`)
+                                    .join(',')}}`;
+                            await api.put('/api/business-units', {
+                                id: rows[0].id,
+                                clientId: Number(accountId) || accountId,
+                                enterpriseId:
+                                    Number(enterpriseId) || enterpriseId,
+                                entities: formatEntities(next),
+                            } as any);
+                        }
+                        // refresh inline entities
+                        await (async () => {
+                            const buUrl2 = `/api/business-units?accountId=${encodeURIComponent(
+                                accountId,
+                            )}&enterpriseId=${encodeURIComponent(
+                                enterpriseId,
+                            )}`;
+                            const buRows = await api.get<
+                                Array<{entities: string}>
+                            >(buUrl2);
+                            const aggregated: string[] = [];
+                            const addFromRaw = (rawIn: string) => {
+                                const raw = String(rawIn || '').trim();
+                                if (!raw) return;
+                                if (raw.startsWith('{') && raw.endsWith('}')) {
+                                    const inner = raw.slice(1, -1);
+                                    inner
+                                        .split(',')
+                                        .map((s) =>
+                                            s.trim().replace(/^"|"$/g, ''),
+                                        )
+                                        .filter(Boolean)
+                                        .forEach((e) => aggregated.push(e));
+                                } else if (raw.startsWith('[')) {
+                                    try {
+                                        const arr = JSON.parse(raw);
+                                        if (Array.isArray(arr))
+                                            arr.forEach((e: any) =>
+                                                aggregated.push(String(e)),
+                                            );
+                                    } catch {}
+                                } else if (raw) aggregated.push(raw);
+                            };
+                            if (Array.isArray(buRows))
+                                buRows.forEach((r: any) =>
+                                    addFromRaw(r.entities),
+                                );
+                            const list = Array.from(new Set(aggregated));
+                            setOptions(list.length ? list : ['Default']);
+                        })();
+                    } catch {}
                     setPendingDeleteId(null);
                 }}
             />
@@ -815,12 +999,10 @@ export default function GlobalSettingsPage() {
 }
 
 function RowActions({
-    onView,
-    onEdit,
+    onConfigure,
     onDelete,
 }: {
-    onView: () => void;
-    onEdit: () => void;
+    onConfigure: () => void;
     onDelete: () => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -834,22 +1016,6 @@ function RowActions({
 
     useEffect(() => {
         if (!open) return;
-        const el = buttonRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const menuHeight = 128; // approx
-        const menuWidth = 160; // w-40
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const openUp = spaceBelow < menuHeight + 12;
-        const top = openUp
-            ? Math.max(8, rect.top - menuHeight - 8)
-            : rect.bottom + 8;
-        const left = Math.max(
-            8,
-            Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8),
-        );
-        setCoords({top, left, openUp});
-
         const handleGlobal = (e: MouseEvent) => {
             const target = e.target as Node;
             if (buttonRef.current && buttonRef.current.contains(target)) return;
@@ -868,88 +1034,53 @@ function RowActions({
     }, [open]);
 
     return (
-        <div className='relative inline-block text-left'>
+        <div
+            className={`relative inline-block text-left ${
+                open ? 'z-[9999]' : ''
+            }`}
+        >
             <button
                 ref={buttonRef}
                 onClick={() => setOpen((v) => !v)}
-                className='h-10 w-10 inline-flex items-center justify-center rounded-full border border-indigo-200 text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 shadow-sm'
-                aria-label='Actions'
+                className='h-9 w-9 inline-flex items-center justify-center rounded-full border border-indigo-200 text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 shadow-sm'
+                aria-label='Row actions'
             >
                 <svg
                     className='w-5 h-5'
+                    viewBox='0 0 24 24'
                     fill='none'
                     stroke='currentColor'
-                    viewBox='0 0 24 24'
                 >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z'
-                    />
+                    <circle cx='12' cy='5' r='1.6' />
+                    <circle cx='12' cy='12' r='1.6' />
+                    <circle cx='12' cy='19' r='1.6' />
                 </svg>
             </button>
-            {open && coords && (
+            {open && (
                 <div
                     ref={menuRef}
-                    style={{
-                        position: 'fixed',
-                        top: coords.top,
-                        left: coords.left,
-                        zIndex: 60,
-                    }}
-                    className='w-56 rounded-xl shadow-2xl bg-white border border-slate-200 ring-1 ring-black/5 focus:outline-none p-1'
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    className='absolute right-0 top-full mt-2 w-44 rounded-xl shadow-2xl bg-white border border-slate-200 ring-1 ring-black/5 focus:outline-none p-1 z-[100000] pointer-events-auto'
                 >
                     <div className='py-2'>
                         <button
                             onClick={() => {
                                 setOpen(false);
-                                onView();
+                                onConfigure();
                             }}
                             className='w-full px-4 py-2 text-left text-sm text-primary hover:bg-slate-50 flex items-center gap-3'
                         >
                             <svg
                                 className='w-5 h-5 text-slate-600'
+                                viewBox='0 0 24 24'
                                 fill='none'
                                 stroke='currentColor'
-                                viewBox='0 0 24 24'
                             >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-                                />
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
-                                />
+                                <path d='M4 13h16' strokeWidth='2' />
+                                <path d='M12 3v18' strokeWidth='2' />
                             </svg>
-                            View
-                        </button>
-                        <button
-                            onClick={() => {
-                                setOpen(false);
-                                onEdit();
-                            }}
-                            className='w-full px-4 py-2 text-left text-sm text-primary hover:bg-slate-50 flex items-center gap-3'
-                        >
-                            <svg
-                                className='w-5 h-5 text-slate-600'
-                                fill='none'
-                                stroke='currentColor'
-                                viewBox='0 0 24 24'
-                            >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z'
-                                />
-                            </svg>
-                            Edit
+                            Configure
                         </button>
                         <button
                             onClick={() => {
@@ -960,16 +1091,16 @@ function RowActions({
                         >
                             <svg
                                 className='w-5 h-5 text-red-600'
+                                viewBox='0 0 24 24'
                                 fill='none'
                                 stroke='currentColor'
-                                viewBox='0 0 24 24'
                             >
+                                <path d='M3 6h18' strokeWidth='2' />
                                 <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h10'
+                                    d='M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6'
+                                    strokeWidth='2'
                                 />
+                                <path d='M10 11v6M14 11v6' strokeWidth='2' />
                             </svg>
                             Delete
                         </button>
@@ -986,12 +1117,14 @@ function InlineEntities({
     enterpriseId,
     enterpriseName,
     onCreated,
+    onRequestDelete,
 }: {
     accountId: string;
     accountName: string;
     enterpriseId: string;
     enterpriseName: string;
     onCreated: () => void;
+    onRequestDelete: (entity: string) => void;
 }) {
     // Advanced configuration constants
     type CategorySelections = Record<string, string[]>;
@@ -1068,6 +1201,7 @@ function InlineEntities({
     const [options, setOptions] = useState<string[]>([]);
     const [picked, setPicked] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(false);
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
     // Advanced UI state
     const [configureEntity, setConfigureEntity] = useState<string | null>(null);
     const [selectionsByEntity, setSelectionsByEntity] = useState<
@@ -1076,10 +1210,63 @@ function InlineEntities({
     const [copyOpen, setCopyOpen] = useState(false);
     const [copyFrom, setCopyFrom] = useState<string>('');
     const [copyTargets, setCopyTargets] = useState<Record<string, boolean>>({});
-    useEffect(() => {
-        (async () => {
-            setLoading(true);
-            try {
+    const [newEntity, setNewEntity] = useState('');
+    const [savingEntity, setSavingEntity] = useState(false);
+    const defaultKey = `gs_virtual_default_${accountId}_${enterpriseId}`;
+    const [hasVirtualDefault, setHasVirtualDefault] = useState<boolean>(() => {
+        try {
+            return window.localStorage.getItem(defaultKey) === '1';
+        } catch {
+            return false;
+        }
+    });
+
+    const loadEntities = async () => {
+        setLoading(true);
+        try {
+            // First check if backend has BU settings via /api/business-units
+            const buUrl = `/api/business-units?accountId=${encodeURIComponent(
+                accountId,
+            )}&enterpriseId=${encodeURIComponent(enterpriseId)}`;
+            const buRows = await api.get<
+                Array<{
+                    id: number;
+                    clientId: number;
+                    enterpriseId: number;
+                    entities: string;
+                    creationDate: string;
+                }>
+            >(buUrl);
+            const parsedFromBU: string[] = [];
+            if (Array.isArray(buRows) && buRows.length > 0) {
+                const addFromRaw = (rawIn: string) => {
+                    const raw = String(rawIn || '').trim();
+                    if (!raw) return;
+                    if (raw.startsWith('{') && raw.endsWith('}')) {
+                        const inner = raw.slice(1, -1);
+                        inner
+                            .split(',')
+                            .map((s) => s.trim().replace(/^\"|\"$/g, ''))
+                            .filter(Boolean)
+                            .forEach((e) => parsedFromBU.push(e));
+                    } else if (raw.startsWith('[')) {
+                        try {
+                            const arr = JSON.parse(raw);
+                            if (Array.isArray(arr))
+                                arr.forEach((e) =>
+                                    parsedFromBU.push(String(e)),
+                                );
+                        } catch {}
+                    } else if (raw) {
+                        parsedFromBU.push(raw);
+                    }
+                };
+                buRows.forEach((row: any) => addFromRaw(row.entities));
+            }
+
+            let list: string[] = parsedFromBU;
+            if (list.length === 0) {
+                // Fallback to derived entities endpoint used elsewhere
                 const qs = new URLSearchParams(
                     Object.fromEntries(
                         Object.entries({
@@ -1092,18 +1279,46 @@ function InlineEntities({
                 const ents = await api.get<string[]>(
                     `/api/business-units/entities?${qs}`,
                 );
-                const list = Array.isArray(ents) ? ents : [];
-                setOptions(list);
-                const init: Record<string, boolean> = {};
-                list.forEach((e) => (init[e] = true));
-                setPicked(init);
-            } catch {
-                setOptions([]);
-                setPicked({});
-            } finally {
-                setLoading(false);
+                list = Array.isArray(ents) ? ents : [];
             }
-        })();
+
+            // If empty first-time, add virtual Default and remember it
+            if (list.length === 0) {
+                list = ['Default'];
+                const full: CategorySelections = {} as any;
+                Object.entries(CATEGORY_OPTIONS).forEach(([cat, opts]) => {
+                    (full as any)[cat] = [...opts];
+                });
+                setSelectionsByEntity({Default: full});
+                setPicked({Default: true});
+                setOptions(list);
+                setHasVirtualDefault(true);
+                try {
+                    window.localStorage.setItem(defaultKey, '1');
+                } catch {}
+                return;
+            }
+
+            // If we previously showed Default, keep it alongside new entities
+            if (hasVirtualDefault) {
+                list = Array.from(new Set([...list, 'Default']));
+            }
+
+            // Deduplicate and sort for stable UI
+            list = Array.from(new Set(list));
+            setOptions(list);
+            const init: Record<string, boolean> = {};
+            list.forEach((e) => (init[e] = true));
+            setPicked(init);
+        } catch {
+            setOptions([]);
+            setPicked({});
+        } finally {
+            setLoading(false);
+        }
+    };
+    useEffect(() => {
+        loadEntities().catch(() => {});
     }, [accountId, enterpriseId, enterpriseName]);
 
     const toggle = (name: string) =>
@@ -1394,84 +1609,201 @@ function InlineEntities({
 
     return (
         <>
-            <div className='rounded-2xl border border-slate-200 bg-white shadow-sm mx-6'>
-                <table className='min-w-full divide-y divide-slate-100'>
-                    <thead className='bg-tertiary/40'>
-                        <tr>
-                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+            <div className='mb-3 flex items-center gap-2'>
+                <input
+                    value={newEntity}
+                    onChange={(e) => setNewEntity(e.target.value)}
+                    placeholder='Add entity (comma-separated for multiple)'
+                    className='w-64 px-3 py-2 border border-light rounded-lg bg-card text-primary'
+                />
+                <button
+                    disabled={savingEntity || !newEntity.trim()}
+                    onClick={async () => {
+                        if (!newEntity.trim()) return;
+                        setSavingEntity(true);
+                        try {
+                            // Parse comma-separated list and normalize unique values
+                            const toAdd = Array.from(
+                                new Set(
+                                    newEntity
+                                        .split(',')
+                                        .map((s) => s.trim())
+                                        .filter(Boolean),
+                                ),
+                            );
+                            if (toAdd.length === 0) return;
+
+                            // Check existing BU row for this account & enterprise
+                            const buUrl = `/api/business-units?accountId=${encodeURIComponent(
+                                accountId,
+                            )}&enterpriseId=${encodeURIComponent(
+                                enterpriseId,
+                            )}`;
+                            const existing = await api.get<
+                                Array<{
+                                    id: number;
+                                    entities: string;
+                                }>
+                            >(buUrl);
+
+                            const formatEntities = (list: string[]) =>
+                                `{${list
+                                    .map((x) => `"${x.replace(/"/g, '\\"')}"`)
+                                    .join(',')}}`;
+
+                            if (
+                                Array.isArray(existing) &&
+                                existing.length > 0
+                            ) {
+                                const raw = String(
+                                    existing[0].entities || '',
+                                ).trim();
+                                let current: string[] = [];
+                                if (raw.startsWith('{') && raw.endsWith('}')) {
+                                    const inner = raw.slice(1, -1);
+                                    current = inner
+                                        .split(',')
+                                        .map((s) =>
+                                            s.trim().replace(/^"|"$/g, ''),
+                                        )
+                                        .filter(Boolean);
+                                } else if (raw.startsWith('[')) {
+                                    try {
+                                        const arr = JSON.parse(raw);
+                                        if (Array.isArray(arr))
+                                            current = arr.map((x) => String(x));
+                                    } catch {}
+                                } else if (raw) {
+                                    current = [raw];
+                                }
+                                const merged = Array.from(
+                                    new Set([...current, ...toAdd]),
+                                );
+                                const payload = {
+                                    id: existing[0].id,
+                                    clientId: Number(accountId) || accountId,
+                                    enterpriseId:
+                                        Number(enterpriseId) || enterpriseId,
+                                    entities: formatEntities(merged),
+                                } as any;
+                                await api.put('/api/business-units', payload);
+                            } else {
+                                const payload = {
+                                    clientId: Number(accountId) || accountId,
+                                    enterpriseId:
+                                        Number(enterpriseId) || enterpriseId,
+                                    entities: formatEntities(toAdd),
+                                } as any;
+                                await api.post('/api/business-units', payload);
+                            }
+                            setNewEntity('');
+                            await loadEntities();
+                        } catch {
+                        } finally {
+                            setSavingEntity(false);
+                        }
+                    }}
+                    className='inline-flex items-center px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark disabled:opacity-50'
+                >
+                    + Add Entity
+                </button>
+                {options.length > 1 && (
+                    <button
+                        onClick={() => {
+                            if (options.length <= 1) return;
+                            setCopyFrom(options[0]);
+                            const targets: Record<string, boolean> = {};
+                            (options || [])
+                                .filter((x) => x !== options[0])
+                                .forEach((x) => (targets[x] = true));
+                            setCopyTargets(targets);
+                            setCopyOpen(true);
+                        }}
+                        className='inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
+                    >
+                        <svg
+                            className='w-4 h-4'
+                            viewBox='0 0 24 24'
+                            fill='none'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                        >
+                            <rect x='9' y='9' width='11' height='11' rx='2' />
+                            <rect x='4' y='4' width='11' height='11' rx='2' />
+                        </svg>
+                        Copy settings
+                    </button>
+                )}
+            </div>
+            <div className='rounded-md border border-slate-200 bg-white shadow-sm compact-table safari-tight'>
+                <table className='min-w-full'>
+                    <thead>
+                        <tr className='bg-white'>
+                            <th className='px-3 py-2 text-left text-[12px] font-semibold text-slate-700 border-b border-slate-200 hover:bg-slate-50'>
                                 Account
                             </th>
-                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                            <th className='px-3 py-2 text-left text-[12px] font-semibold text-slate-700 border-b border-slate-200 hover:bg-slate-50'>
                                 Enterprise
                             </th>
-                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                            <th className='px-3 py-2 text-left text-[12px] font-semibold text-slate-700 border-b border-slate-200 hover:bg-slate-50'>
                                 Entity
                             </th>
-                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                            <th className='px-3 py-2 text-left text-[12px] font-semibold text-slate-700 border-b border-slate-200 hover:bg-slate-50'>
                                 Configuration
                             </th>
-                            <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                <button
-                                    onClick={() => {
-                                        if (options.length <= 1) return;
-                                        setCopyFrom(options[0]);
-                                        const targets: Record<string, boolean> =
-                                            {};
-                                        (options || [])
-                                            .filter((x) => x !== options[0])
-                                            .forEach(
-                                                (x) => (targets[x] = true),
-                                            );
-                                        setCopyTargets(targets);
-                                        setCopyOpen(true);
-                                    }}
-                                    className='inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
-                                >
-                                    <svg
-                                        className='w-4 h-4'
-                                        viewBox='0 0 24 24'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        strokeWidth='1.8'
-                                    >
-                                        <rect
-                                            x='9'
-                                            y='9'
-                                            width='11'
-                                            height='11'
-                                            rx='2'
-                                        />
-                                        <rect
-                                            x='4'
-                                            y='4'
-                                            width='11'
-                                            height='11'
-                                            rx='2'
-                                        />
-                                    </svg>
-                                    Copy settings
-                                </button>
+                            <th className='px-3 py-2 text-right text-[12px] font-semibold text-slate-700 border-b border-slate-200 hover:bg-slate-50'>
+                                Actions
                             </th>
                         </tr>
                     </thead>
-                    <tbody className='divide-y divide-slate-100'>
+                    <tbody className='divide-y divide-slate-200 text-[12px] text-slate-800'>
                         {options.map((e, idx) => (
                             <tr
                                 key={e}
-                                className={`transition-all duration-200 hover:bg-indigo-50/40 animate-row`}
-                                style={{animationDelay: `${idx * 40}ms`}}
+                                draggable
+                                onDragStart={(ev) => {
+                                    setDragIndex(idx);
+                                    try {
+                                        ev.dataTransfer.setData(
+                                            'text/plain',
+                                            String(idx),
+                                        );
+                                    } catch {}
+                                    ev.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragOver={(ev) => ev.preventDefault()}
+                                onDrop={(ev) => {
+                                    ev.preventDefault();
+                                    const from = dragIndex;
+                                    const to = idx;
+                                    if (from === null || from === to) return;
+                                    setOptions((prev) => {
+                                        const next = prev.slice();
+                                        const [moved] = next.splice(from, 1);
+                                        next.splice(to, 0, moved);
+                                        return next;
+                                    });
+                                    setDragIndex(null);
+                                }}
+                                className={`transition-all duration-200 row-hover-safe animate-row ${
+                                    dragIndex === idx ? 'opacity-70' : ''
+                                }`}
+                                style={{
+                                    animationDelay: `${idx * 40}ms`,
+                                    cursor: 'move',
+                                }}
                             >
-                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                <td className='px-3 py-2 whitespace-nowrap text-[12px] text-slate-800 border-r border-slate-200'>
                                     <span className='inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700'>
                                         {accountName}
                                     </span>
                                 </td>
-                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                <td className='px-3 py-2 whitespace-nowrap text-[12px] text-slate-800 border-r border-slate-200'>
                                     <span className='inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700'>
                                         {enterpriseName}
                                     </span>
                                 </td>
-                                <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
+                                <td className='px-3 py-2 whitespace-nowrap text-[12px] text-slate-800 border-r border-slate-200'>
                                     <span
                                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${getEntityChipClasses(
                                             e,
@@ -1480,12 +1812,12 @@ function InlineEntities({
                                         {e}
                                     </span>
                                 </td>
-                                <td className='px-6 py-4 whitespace-nowrap text-sm'>
+                                <td className='px-3 py-2 whitespace-nowrap text-[12px] border-r border-slate-200'>
                                     <SelectionPill entity={e} />
                                 </td>
-                                <td className='px-6 py-4 whitespace-nowrap text-right text-sm'>
-                                    <button
-                                        onClick={() => {
+                                <td className='px-3 py-2 whitespace-nowrap text-right text-[12px] actions-cell'>
+                                    <RowActions
+                                        onConfigure={() => {
                                             setPicked((p) => ({
                                                 ...p,
                                                 [e]: true,
@@ -1496,17 +1828,35 @@ function InlineEntities({
                                             }));
                                             setConfigureEntity(e);
                                         }}
-                                        className='inline-flex items-center px-3 py-2 rounded-lg bg-primary text-inverse hover:bg-primary-dark shadow-sm'
-                                    >
-                                        Configure
-                                    </button>
+                                        onDelete={() => onRequestDelete(e)}
+                                    />
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                <div
+                    className='col-span-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-500 border-t border-dashed border-slate-300 cursor-pointer hover:text-slate-700'
+                    onClick={() => {
+                        const input = document.querySelector<HTMLInputElement>(
+                            'input[placeholder="Add entity (comma-separated for multiple)"]',
+                        );
+                        input?.focus();
+                    }}
+                    title='Add new row'
+                >
+                    <svg
+                        className='w-3.5 h-3.5'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                    >
+                        <path d='M4 12h16M12 4v16' strokeWidth='2' />
+                    </svg>
+                    <span>Add new row</span>
+                </div>
             </div>
-            <div className='mx-6 mt-3 rounded-xl border border-slate-200 bg-gradient-to-r from-indigo-50 to-cyan-50 p-4 text-sm text-primary'>
+            <div className='mx-6 mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-[12px] text-slate-700'>
                 Tip: Configure one entity, then click &quot;Copy settings&quot;
                 to replicate its selections to other entities.
             </div>
@@ -1591,17 +1941,40 @@ function InlineEntities({
                                                                                     opt
                                                                                 }
                                                                                 type='button'
-                                                                                onClick={() =>
+                                                                                onClick={(
+                                                                                    e,
+                                                                                ) => {
+                                                                                    const btn =
+                                                                                        e.currentTarget;
+                                                                                    const ripple =
+                                                                                        document.createElement(
+                                                                                            'span',
+                                                                                        );
+                                                                                    ripple.className =
+                                                                                        'gs-ripple';
+                                                                                    btn.appendChild(
+                                                                                        ripple,
+                                                                                    );
+                                                                                    setTimeout(
+                                                                                        () => {
+                                                                                            try {
+                                                                                                btn.removeChild(
+                                                                                                    ripple,
+                                                                                                );
+                                                                                            } catch {}
+                                                                                        },
+                                                                                        560,
+                                                                                    );
                                                                                     toggleEntitySelection(
                                                                                         configureEntity as string,
                                                                                         category,
                                                                                         opt,
-                                                                                    )
-                                                                                }
-                                                                                className={`relative inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm transition-transform duration-200 ${
+                                                                                    );
+                                                                                }}
+                                                                                className={`relative inline-flex items-center gap-2 rounded-none border px-3 py-2 text-sm transition-colors duration-150 ${
                                                                                     active
-                                                                                        ? 'bg-white text-primary border-indigo-500 shadow-xl scale-[1.01] ring-2 ring-indigo-200/60'
-                                                                                        : 'bg-white text-primary border-slate-200 hover:border-slate-300 hover:shadow-xl hover:scale-[1.02]'
+                                                                                        ? 'bg-blue-50 text-primary border-blue-500'
+                                                                                        : 'bg-white text-primary border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
                                                                                 }`}
                                                                             >
                                                                                 <div className='h-6 w-6 flex items-center justify-center'>
@@ -1625,9 +1998,24 @@ function InlineEntities({
                                                                                     }
                                                                                 </span>
                                                                                 {active && (
-                                                                                    <span className='pointer-events-none absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-gradient-to-br from-indigo-500 to-emerald-500 text-white flex items-center justify-center text-[11px] shadow-md ring-2 ring-white'>
-                                                                                        ✓
-                                                                                    </span>
+                                                                                    <svg
+                                                                                        className='gs-corner-check-svg'
+                                                                                        viewBox='0 0 24 24'
+                                                                                        aria-hidden='true'
+                                                                                    >
+                                                                                        <polygon
+                                                                                            points='24,0 24,24 8,0'
+                                                                                            fill='#1d4ed8'
+                                                                                        />
+                                                                                        <path
+                                                                                            d='M10 11 L13 14 L19 8'
+                                                                                            fill='none'
+                                                                                            stroke='white'
+                                                                                            strokeWidth='2.6'
+                                                                                            strokeLinecap='round'
+                                                                                            strokeLinejoin='round'
+                                                                                        />
+                                                                                    </svg>
                                                                                 )}
                                                                             </button>
                                                                         );

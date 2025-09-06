@@ -26,7 +26,10 @@ interface AISuggestionsPanelProps {
     isTablet?: boolean;
 }
 
-export default function AISuggestionsPanel({ isMobile = false, isTablet = false }: AISuggestionsPanelProps) {
+export default function AISuggestionsPanel({
+    isMobile = false,
+    isTablet = false,
+}: AISuggestionsPanelProps) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const pathname = usePathname();
     const [query, setQuery] = useState('');
@@ -288,23 +291,36 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
         return (
             <div className='bg-white border-b border-slate-200 px-4 py-3 lg:hidden'>
                 <div className='flex items-center justify-between mb-3'>
-                    <h3 className='text-sm font-medium text-slate-900'>AI Insights</h3>
+                    <h3 className='text-sm font-medium text-slate-900'>
+                        AI Insights
+                    </h3>
                     <button
                         onClick={() => setIsCollapsed(!isCollapsed)}
                         className='p-1.5 rounded-lg text-white bg-brand-gradient hover:opacity-90 transition-colors duration-200'
-                        aria-label={isCollapsed ? 'Expand insights' : 'Collapse insights'}
+                        aria-label={
+                            isCollapsed
+                                ? 'Expand insights'
+                                : 'Collapse insights'
+                        }
                     >
                         <svg
-                            className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`}
+                            className={`w-4 h-4 transition-transform duration-200 ${
+                                isCollapsed ? 'rotate-180' : ''
+                            }`}
                             fill='none'
                             stroke='currentColor'
                             viewBox='0 0 24 24'
                         >
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M19 9l-7 7-7-7'
+                            />
                         </svg>
                     </button>
                 </div>
-                
+
                 {!isCollapsed && (
                     <div className='space-y-3'>
                         {/* Search Bar */}
@@ -316,17 +332,45 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                                 onChange={(e) => setQuery(e.target.value)}
                                 className='w-full px-3 py-2 pl-9 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors duration-200'
                             />
-                            <svg className='absolute left-3 top-2.5 w-4 h-4 text-slate-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                            <svg
+                                className='absolute left-3 top-2.5 w-4 h-4 text-slate-400'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                />
                             </svg>
                         </div>
 
                         {/* Tab Navigation */}
                         <div className='flex space-x-1 bg-slate-100 rounded-lg p-1'>
                             {[
-                                { key: 'suggestion', label: 'Suggestions', count: allItems.filter(i => i.type === 'suggestion').length },
-                                { key: 'action', label: 'Actions', count: allItems.filter(i => i.type === 'action').length },
-                                { key: 'insight', label: 'Insights', count: allItems.filter(i => i.type === 'insight').length }
+                                {
+                                    key: 'suggestion',
+                                    label: 'Suggestions',
+                                    count: allItems.filter(
+                                        (i) => i.type === 'suggestion',
+                                    ).length,
+                                },
+                                {
+                                    key: 'action',
+                                    label: 'Actions',
+                                    count: allItems.filter(
+                                        (i) => i.type === 'action',
+                                    ).length,
+                                },
+                                {
+                                    key: 'insight',
+                                    label: 'Insights',
+                                    count: allItems.filter(
+                                        (i) => i.type === 'insight',
+                                    ).length,
+                                },
                             ].map((tab) => (
                                 <button
                                     key={tab.key}
@@ -338,7 +382,9 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                                     }`}
                                 >
                                     {tab.label}
-                                    <span className='ml-1 text-xs text-slate-400'>({tab.count})</span>
+                                    <span className='ml-1 text-xs text-slate-400'>
+                                        ({tab.count})
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -346,16 +392,28 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                         {/* Content Cards */}
                         <div className='space-y-3 max-h-64 overflow-y-auto'>
                             {filtered.map((item) => (
-                                <div key={item.id} className='bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200'>
+                                <div
+                                    key={item.id}
+                                    className='bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow duration-200'
+                                >
                                     <div className='flex items-start space-x-3'>
-                                        <div className='flex-shrink-0 mt-0.5'>{renderIcon(item.icon)}</div>
+                                        <div className='flex-shrink-0 mt-0.5'>
+                                            {renderIcon(item.icon)}
+                                        </div>
                                         <div className='flex-1 min-w-0'>
-                                            <h4 className='text-sm font-medium text-slate-900 mb-1'>{item.title}</h4>
-                                            <p className='text-xs text-slate-600 mb-2 leading-relaxed'>{item.description}</p>
+                                            <h4 className='text-sm font-medium text-slate-900 mb-1'>
+                                                {item.title}
+                                            </h4>
+                                            <p className='text-xs text-slate-600 mb-2 leading-relaxed'>
+                                                {item.description}
+                                            </p>
                                             {item.tags && (
                                                 <div className='flex flex-wrap gap-1 mb-2'>
                                                     {item.tags.map((tag) => (
-                                                        <span key={tag} className='px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded-md'>
+                                                        <span
+                                                            key={tag}
+                                                            className='px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded-md'
+                                                        >
                                                             {tag}
                                                         </span>
                                                     ))}
@@ -380,33 +438,53 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
     // Desktop view with improved design
     return (
         <motion.div
-            className={`bg-white shadow-lg transition-all duration-300 ease-in-out ${
-                isCollapsed ? 'w-16' : 'w-[280px]'
+            className={`bg-white shadow-lg transition-all duration-300 ease-in-out h-full flex flex-col ${
+                isCollapsed ? 'w-16' : 'w-[300px]'
             }`}
             initial={false}
-            animate={{ width: isCollapsed ? 64 : 280 }}
+            animate={{width: isCollapsed ? 64 : 300}}
         >
             {/* Header */}
             <div className='flex items-center justify-between p-3 border-b border-slate-200'>
-                <h3 className='text-base font-semibold text-slate-900'>AI Insights</h3>
+                <div className='flex items-center gap-2'>
+                    <img
+                        src='/images/logos/ai-insights-icon.svg'
+                        alt='AI'
+                        className='w-5 h-5'
+                    />
+                    {!isCollapsed && (
+                        <h3 className='text-base font-semibold text-slate-900'>
+                            AI Insights
+                        </h3>
+                    )}
+                </div>
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className='p-1.5 rounded-md text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-all duration-200 ease-in-out'
-                    aria-label={isCollapsed ? 'Expand insights' : 'Collapse insights'}
+                    aria-label={
+                        isCollapsed ? 'Expand insights' : 'Collapse insights'
+                    }
                 >
                     <svg
-                        className={`w-4 h-4 transition-transform duration-300 ease-in-out ${isCollapsed ? 'rotate-180' : ''}`}
+                        className={`w-4 h-4 transition-transform duration-300 ease-in-out ${
+                            isCollapsed ? 'rotate-180' : ''
+                        }`}
                         fill='none'
                         stroke='currentColor'
                         viewBox='0 0 24 24'
                     >
-                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+                        <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2}
+                            d='M19 9l-7 7-7-7'
+                        />
                     </svg>
                 </button>
             </div>
 
             {!isCollapsed && (
-                <div className='p-3 space-y-3'>
+                <div className='p-3 space-y-3 flex-1 flex flex-col min-h-0'>
                     {/* Search Bar */}
                     <div className='relative'>
                         <input
@@ -416,17 +494,45 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                             onChange={(e) => setQuery(e.target.value)}
                             className='w-full px-3 py-2 pl-8 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 ease-in-out'
                         />
-                        <svg className='absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                        <svg
+                            className='absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                            />
                         </svg>
                     </div>
 
                     {/* Tab Navigation */}
                     <div className='flex space-x-1 bg-slate-100 rounded-md p-1'>
                         {[
-                            { key: 'suggestion', label: 'Suggestions', count: allItems.filter(i => i.type === 'suggestion').length },
-                            { key: 'action', label: 'Actions', count: allItems.filter(i => i.type === 'action').length },
-                            { key: 'insight', label: 'Insights', count: allItems.filter(i => i.type === 'insight').length }
+                            {
+                                key: 'suggestion',
+                                label: 'Suggestions',
+                                count: allItems.filter(
+                                    (i) => i.type === 'suggestion',
+                                ).length,
+                            },
+                            {
+                                key: 'action',
+                                label: 'Actions',
+                                count: allItems.filter(
+                                    (i) => i.type === 'action',
+                                ).length,
+                            },
+                            {
+                                key: 'insight',
+                                label: 'Insights',
+                                count: allItems.filter(
+                                    (i) => i.type === 'insight',
+                                ).length,
+                            },
                         ].map((tab) => (
                             <button
                                 key={tab.key}
@@ -438,24 +544,38 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                                 }`}
                             >
                                 {tab.label}
-                                <span className='ml-1 text-xs text-slate-400'>({tab.count})</span>
+                                <span className='ml-1 text-xs text-slate-400'>
+                                    ({tab.count})
+                                </span>
                             </button>
                         ))}
                     </div>
 
-                    {/* Content Cards */}
-                    <div className='space-y-3 max-h-80 overflow-y-auto'>
+                    {/* Content Cards - fill height and scroll */}
+                    <div className='space-y-3 flex-1 min-h-0 overflow-y-auto'>
                         {filtered.map((item) => (
-                            <div key={item.id} className='bg-white border border-slate-200 rounded-md p-3 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 ease-in-out'>
+                            <div
+                                key={item.id}
+                                className='bg-white border border-slate-200 rounded-md p-3 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 ease-in-out'
+                            >
                                 <div className='flex items-start space-x-2'>
-                                    <div className='flex-shrink-0 mt-0.5'>{renderIcon(item.icon)}</div>
+                                    <div className='flex-shrink-0 mt-0.5'>
+                                        {renderIcon(item.icon)}
+                                    </div>
                                     <div className='flex-1 min-w-0'>
-                                        <h4 className='text-sm font-semibold text-slate-900 mb-1'>{item.title}</h4>
-                                        <p className='text-xs text-slate-600 mb-2 leading-relaxed'>{item.description}</p>
+                                        <h4 className='text-sm font-semibold text-slate-900 mb-1'>
+                                            {item.title}
+                                        </h4>
+                                        <p className='text-xs text-slate-600 mb-2 leading-relaxed'>
+                                            {item.description}
+                                        </p>
                                         {item.tags && (
                                             <div className='flex flex-wrap gap-1 mb-2'>
                                                 {item.tags.map((tag) => (
-                                                    <span key={tag} className='px-1.5 py-0.5 text-xs bg-slate-100 text-slate-600 rounded font-medium'>
+                                                    <span
+                                                        key={tag}
+                                                        className='px-1.5 py-0.5 text-xs bg-slate-100 text-slate-600 rounded font-medium'
+                                                    >
                                                         {tag}
                                                     </span>
                                                 ))}
@@ -463,19 +583,36 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                                         )}
                                         {item.details && (
                                             <div className='mb-2 space-y-0.5'>
-                                                {item.details.map((detail, idx) => (
-                                                    <div key={idx} className='flex items-center space-x-1.5 text-xs text-slate-500'>
-                                                        <div className='w-1 h-1 bg-slate-400 rounded-full'></div>
-                                                        <span>{detail}</span>
-                                                    </div>
-                                                ))}
+                                                {item.details.map(
+                                                    (detail, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className='flex items-center space-x-1.5 text-xs text-slate-500'
+                                                        >
+                                                            <div className='w-1 h-1 bg-slate-400 rounded-full'></div>
+                                                            <span>
+                                                                {detail}
+                                                            </span>
+                                                        </div>
+                                                    ),
+                                                )}
                                             </div>
                                         )}
                                         {item.actionLabel && (
                                             <button className='inline-flex items-center text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 ease-in-out hover:underline'>
                                                 {item.actionLabel}
-                                                <svg className='ml-1 w-3 h-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                                                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
+                                                <svg
+                                                    className='ml-1 w-3 h-3'
+                                                    fill='none'
+                                                    stroke='currentColor'
+                                                    viewBox='0 0 24 24'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M9 5l7 7-7 7'
+                                                    />
                                                 </svg>
                                             </button>
                                         )}
@@ -487,30 +624,20 @@ export default function AISuggestionsPanel({ isMobile = false, isTablet = false 
                 </div>
             )}
 
-            {/* Collapsed state - Show expand button and AI badge */}
+            {/* Collapsed state - icon only */}
             {isCollapsed && (
-                <div className='flex flex-col items-center space-y-3 py-3'>
-                    {/* Expand button - clearly visible */}
+                <div className='flex flex-col items-center justify-center py-3 h-full'>
                     <button
                         onClick={() => setIsCollapsed(false)}
-                        className='w-8 h-8 bg-primary-600 rounded-md flex items-center justify-center hover:bg-primary-700 transition-colors duration-200 ease-in-out shadow-sm'
+                        className='w-10 h-10 rounded-full hover:ring-2 hover:ring-primary/30 transition'
                         aria-label='Expand AI Insights'
                     >
-                        <svg className='w-4 h-4 text-white' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
-                        </svg>
+                        <img
+                            src='/images/logos/ai-insights-icon.svg'
+                            alt='AI Insights'
+                            className='w-8 h-8 mx-auto'
+                        />
                     </button>
-                    
-                    {/* AI badge */}
-                    <div className='w-8 h-8 bg-slate-100 rounded-md flex items-center justify-center'>
-                        <svg className='w-4 h-4 text-slate-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 3l1.5 3L10 7l-3.5 1L5 11l-1.5-3L0 7l3.5-1L5 3zm9 1l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zm-3 7l2 4 4 2-4 2-2 4-2-4-4-2 4-2 2-4z' />
-                        </svg>
-                    </div>
-                    
-                    <div className='text-xs text-slate-500 text-center px-1 leading-tight'>
-                        AI<br/>Insights
-                    </div>
                 </div>
             )}
         </motion.div>

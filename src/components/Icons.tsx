@@ -758,35 +758,171 @@ export const CodePipelineIcon = ({className = '', size = 24}: IconProps) => (
 
 // Sparkles Icon
 export const SparklesIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
-        <path d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' fill='currentColor' />
-        <path d='M7 14l-2 2 2 2' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
-        <path d='M17 14l2 2-2 2' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <path
+            d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'
+            fill='currentColor'
+        />
+        <path
+            d='M7 14l-2 2 2 2'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <path
+            d='M17 14l2 2-2 2'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
     </svg>
 );
 
 // Chart Bar Icon
 export const ChartBarIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
-        <path d='M3 3v18h18' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
-        <path d='M18 17V9' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
-        <path d='M13 17V5' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
-        <path d='M8 17v-3' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <path
+            d='M3 3v18h18'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <path
+            d='M18 17V9'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <path
+            d='M13 17V5'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <path
+            d='M8 17v-3'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
     </svg>
 );
 
 // Wrench Icon
 export const WrenchIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
-        <path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <path
+            d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+    </svg>
+);
+
+// Account/User Icon
+export const AccountIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <circle
+            cx='12'
+            cy='8'
+            r='3.2'
+            stroke='currentColor'
+            strokeWidth='2.4'
+        />
+        <path
+            d='M5 19.2c0-3.2 3.134-5.2 7-5.2s7 2 7 5.2'
+            stroke='currentColor'
+            strokeWidth='2.4'
+            strokeLinecap='round'
+        />
+    </svg>
+);
+
+// Enterprise/Building Icon
+export const EnterpriseIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <rect
+            x='3'
+            y='6'
+            width='8'
+            height='14'
+            rx='1.5'
+            stroke='currentColor'
+            strokeWidth='2.4'
+        />
+        <rect
+            x='13'
+            y='3'
+            width='8'
+            height='17'
+            rx='1.5'
+            stroke='currentColor'
+            strokeWidth='2.4'
+        />
+        <path
+            d='M5.5 9h3M5.5 12h3M5.5 15h3M15.5 6h3M15.5 9h3M15.5 12h3M15.5 15h3'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+        />
     </svg>
 );
 
 // Search Icon
 export const SearchIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' className={className}>
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
         <circle cx='11' cy='11' r='8' stroke='currentColor' strokeWidth='2' />
-        <path d='m21 21-4.35-4.35' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
+        <path
+            d='m21 21-4.35-4.35'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
     </svg>
 );
 
@@ -832,6 +968,8 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         chartbar: ChartBarIcon,
         wrench: WrenchIcon,
         search: SearchIcon,
+        account: AccountIcon,
+        enterprise: EnterpriseIcon,
         // Shell icons
         grid: GridIcon,
         mail: MailIcon,

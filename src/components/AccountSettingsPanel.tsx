@@ -133,22 +133,10 @@ const settingsCards = [
         bgIllustration: <BgUserGear />,
     },
     {
-        id: 'business-unit-settings',
-        title: 'Business Unit Settings',
-        description: 'Configure business unit specific settings',
-        icon: (
-            <svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
-                <path d='M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10z' />
-            </svg>
-        ),
-        bgColor: 'bg-pink-50',
-        iconColor: 'text-pink-600',
-        bgIllustration: <BgPiggy />,
-    },
-    {
         id: 'global-settings',
         title: 'Global Settings',
-        description: 'System-wide configuration for enterprise tools, services, and organizational preferences',
+        description:
+            'System-wide configuration for enterprise tools, services, and organizational preferences',
         icon: (
             <svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
                 <path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z' />
@@ -181,10 +169,6 @@ export default function AccountSettingsPanel({
                 router.push('/account-settings/manage-accounts');
                 onClose(); // Close the panel after navigation
                 break;
-            case 'business-unit-settings':
-                router.push('/account-settings/business-unit-settings');
-                onClose();
-                break;
             case 'global-settings':
                 router.push('/account-settings/global-settings');
                 onClose();
@@ -192,7 +176,7 @@ export default function AccountSettingsPanel({
             default:
                 console.log(`Navigate to ${cardId}`);
         }
-    }
+    };
 
     return (
         <>
@@ -251,7 +235,10 @@ export default function AccountSettingsPanel({
                 </div>
 
                 {/* Settings Content */}
-                <div className='p-3 space-y-2 overflow-auto' style={{ height: 'calc(100% - 60px)' }}>
+                <div
+                    className='p-3 space-y-2 overflow-auto'
+                    style={{height: 'calc(100% - 60px)'}}
+                >
                     {settingsCards.map((card, index) => (
                         <div
                             key={card.id}
