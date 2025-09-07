@@ -1,0 +1,8 @@
+#!/bin/bash
+# Pre-push hook to validate user credentials
+
+# Run user validation
+"$(dirname "$0")/validate-user.sh"
+
+# If validation passes, allow push
+exit $?
