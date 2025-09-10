@@ -23,6 +23,8 @@ import {
     InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import {api} from '@/utils/api';
+import {getActiveUserGroups} from '@/utils/dynamicData';
+import {UserGroup} from '@/constants/formOptions';
 
 interface UserRecord {
     id: string;
@@ -39,7 +41,7 @@ interface UserRecord {
     locked?: boolean;
 }
 
-const DEFAULT_GROUPS = ['Admins', 'Developers', 'QA', 'Ops'];
+// Dynamic user groups - will be loaded from database
 
 export default function ManageUsers() {
     const [users, setUsers] = useState<UserRecord[]>([]);
@@ -51,6 +53,9 @@ export default function ManageUsers() {
     const [showSearchBar, setShowSearchBar] = useState(false);
     const [showCreateInline, setShowCreateInline] = useState(false);
     const [showUserTable, setShowUserTable] = useState(false);
+    const [tableData, setTableData] = useState<any[]>([]);
+    const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
+    const [loading, setLoading] = useState(false);
 
     type NewUserDraft = {
         firstName: string;
@@ -113,8 +118,9 @@ export default function ManageUsers() {
     });
     const [confirmPassword, setConfirmPassword] = useState('');
     const assignableGroups = useMemo(
-        () => DEFAULT_GROUPS.filter((g) => !newUser.assignedGroups.includes(g)),
-        [newUser.assignedGroups],
+        () =>
+            userGroups.filter((g) => !newUser.assignedGroups.includes(g.name)),
+        [userGroups, newUser.assignedGroups],
     );
     const allPasswordValid = useMemo(() => {
         const pwd = newUser.password || '';
@@ -153,8 +159,21 @@ export default function ManageUsers() {
         setUsers(data);
     };
 
+    const loadUserGroups = async () => {
+        setLoading(true);
+        try {
+            const groups = await getActiveUserGroups();
+            setUserGroups(groups);
+        } catch (error) {
+            console.error('Failed to load user groups:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         loadUsers().catch(() => {});
+        loadUserGroups().catch(() => {});
     }, []);
 
     const filtered = useMemo(() => {
@@ -234,7 +253,8 @@ export default function ManageUsers() {
                     email: d.email.trim(),
                     startDate: d.startDate,
                     endDate: d.endDate || undefined,
-                    groupName: d.assignedGroups[0] || DEFAULT_GROUPS[0],
+                    groupName:
+                        d.assignedGroups[0] || userGroups[0]?.name || 'Default',
                 } as Omit<UserRecord, 'id' | 'updatedAt'>;
                 await api.post<UserRecord>('/api/users', payload);
                 await loadUsers();
@@ -250,6 +270,35 @@ export default function ManageUsers() {
     };
 
     const handleCreateClick = () => {
+        // Create a blank user row with default values
+        const newUserId = `user-${Date.now()}`;
+        const blankUser = {
+            id: newUserId,
+            firstName: '',
+            middleName: '',
+            lastName: '',
+            emailAddress: '',
+            status: 'ACTIVE',
+            locked: false,
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: '',
+            password: '',
+            assignedUserGroup: [],
+        };
+
+        // Add the new user at the top of the existing users
+        setTableData((prevData) => [blankUser, ...prevData]);
+
+        // Show a brief success animation on the button
+        const button = document.querySelector(
+            '.inline-flex.items-center.px-4.py-2\\.5',
+        );
+        if (button) {
+            button.classList.add('animate-pulse', 'bg-green-600');
+            setTimeout(() => {
+                button.classList.remove('animate-pulse', 'bg-green-600');
+            }, 1000);
+        }
         setShowUserTable(true);
         setShowCreateInline(false);
         setOpenDatePopover(null);
@@ -359,6 +408,28 @@ export default function ManageUsers() {
 
             {/* ReusableTableComponent for Creating New Users */}
             {showUserTable && (
+                <div className='bg-card border-b border-light px-6 py-4'>
+                    <div className='flex items-center justify-between mb-4'>
+                        <div>
+                            <h2 className='text-lg font-semibold text-primary'>
+                                Create New User
+                            </h2>
+                            <p className='text-sm text-secondary'>
+                                Fill in the user details below. All fields with
+                                (*) are required.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowUserTable(false)}
+                            className='inline-flex items-center px-3 py-2 border border-light rounded-lg text-sm text-secondary bg-tertiary hover:bg-slate-200 transition'
+                            title='Close'
+                        >
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showUserTable && (
                 <div
                     className='bg-card w-full overflow-x-auto overflow-y-visible table-container'
                     style={
@@ -371,6 +442,7 @@ export default function ManageUsers() {
                             margin: '0',
                             overflowX: 'auto',
                             overflowY: 'visible',
+                            whiteSpace: 'nowrap',
                         } as React.CSSProperties
                     }
                 >
@@ -612,14 +684,34 @@ export default function ManageUsers() {
                     <div
                         className='min-w-max'
                         style={{
-                            minWidth: '1500px',
+                            minWidth: '1200px',
                             width: 'max-content',
                             margin: 0,
                             padding: 0,
+                            overflowX: 'visible',
                         }}
                     >
                         <ReusableTableComponent
-                            config={ManageUsers_tableConfig as any}
+                            config={
+                                {
+                                    ...ManageUsers_tableConfig,
+                                    initialData: tableData,
+                                    actions: {
+                                        ...ManageUsers_tableConfig.actions,
+                                        onSave: (data: any) => {
+                                            console.log(
+                                                'Saving user data:',
+                                                data,
+                                            );
+                                            // Here you would call the API to save the user
+                                            // upsertUser(data);
+                                        },
+                                        onDataChange: (newData: any[]) => {
+                                            setTableData(newData);
+                                        },
+                                    },
+                                } as any
+                            }
                         />
                     </div>
                 </div>
@@ -1236,9 +1328,24 @@ function CreateOrEditUserModal({
     const [email, setEmail] = useState(initialValue?.email || '');
     const [startDate, setStartDate] = useState(initialValue?.startDate || '');
     const [endDate, setEndDate] = useState(initialValue?.endDate || '');
-    const [groupName, setGroupName] = useState(
-        initialValue?.groupName || DEFAULT_GROUPS[0],
-    );
+    const [modalUserGroups, setModalUserGroups] = useState<UserGroup[]>([]);
+    const [groupName, setGroupName] = useState(initialValue?.groupName || '');
+
+    // Load user groups for the modal
+    useEffect(() => {
+        const loadGroups = async () => {
+            try {
+                const groups = await getActiveUserGroups();
+                setModalUserGroups(groups);
+                if (!groupName && groups.length > 0) {
+                    setGroupName(groups[0].name);
+                }
+            } catch (error) {
+                console.error('Failed to load user groups for modal:', error);
+            }
+        };
+        loadGroups();
+    }, [groupName]);
 
     const canSave =
         username.trim() &&
@@ -1358,9 +1465,9 @@ function CreateOrEditUserModal({
                                 onChange={(e) => setGroupName(e.target.value)}
                                 className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary'
                             >
-                                {DEFAULT_GROUPS.map((g) => (
-                                    <option key={g} value={g}>
-                                        {g}
+                                {modalUserGroups.map((g) => (
+                                    <option key={g.id} value={g.name}>
+                                        {g.name}
                                     </option>
                                 ))}
                             </select>

@@ -37,6 +37,8 @@ import {
     InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import {api} from '@/utils/api';
+import {getActiveUserGroups} from '@/utils/dynamicData';
+import {UserGroup} from '@/constants/formOptions';
 
 interface UserRecord {
     id: string;
@@ -53,7 +55,7 @@ interface UserRecord {
     locked?: boolean;
 }
 
-const DEFAULT_GROUPS = ['Admins', 'Developers', 'QA', 'Ops'];
+// Dynamic user groups - replaced with database calls
 
 export default function ManageUsers() {
     const [users, setUsers] = useState<UserRecord[]>([]);
@@ -64,6 +66,54 @@ export default function ManageUsers() {
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [showSearchBar, setShowSearchBar] = useState(false);
     const [showCreateInline, setShowCreateInline] = useState(false);
+    const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    // Load user groups on component mount
+    useEffect(() => {
+        const loadUserGroups = async () => {
+            try {
+                setLoading(true);
+                const groups = await getActiveUserGroups();
+                setUserGroups(groups);
+            } catch (error) {
+                console.error('Failed to load user groups:', error);
+                // Fallback to default groups
+                setUserGroups([
+                    {
+                        id: 1,
+                        name: 'Admin',
+                        description: 'Administrator',
+                        group_code: 'ADMIN',
+                        status: 'active',
+                        account_id: 1,
+                        enterprise_id: 1,
+                    },
+                    {
+                        id: 2,
+                        name: 'User',
+                        description: 'Regular User',
+                        group_code: 'USER',
+                        status: 'active',
+                        account_id: 1,
+                        enterprise_id: 1,
+                    },
+                    {
+                        id: 3,
+                        name: 'Manager',
+                        description: 'Manager',
+                        group_code: 'MANAGER',
+                        status: 'active',
+                        account_id: 1,
+                        enterprise_id: 1,
+                    },
+                ]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadUserGroups();
+    }, []);
 
     const [modernDatePicker, setModernDatePicker] = useState<{
         isOpen: boolean;
@@ -149,8 +199,9 @@ export default function ManageUsers() {
     });
     const [confirmPassword, setConfirmPassword] = useState('');
     const assignableGroups = useMemo(
-        () => DEFAULT_GROUPS.filter((g) => !newUser.assignedGroups.includes(g)),
-        [newUser.assignedGroups],
+        () =>
+            userGroups.filter((g) => !newUser.assignedGroups.includes(g.name)),
+        [userGroups, newUser.assignedGroups],
     );
     const allPasswordValid = useMemo(() => {
         const pwd = newUser.password || '';
@@ -270,7 +321,8 @@ export default function ManageUsers() {
                     email: d.email.trim(),
                     startDate: d.startDate,
                     endDate: d.endDate || undefined,
-                    groupName: d.assignedGroups[0] || DEFAULT_GROUPS[0],
+                    groupName:
+                        d.assignedGroups[0] || userGroups[0]?.name || 'User',
                 } as Omit<UserRecord, 'id' | 'updatedAt'>;
                 await api.post<UserRecord>('/api/users', payload);
                 await loadUsers();
@@ -290,7 +342,7 @@ export default function ManageUsers() {
         setOpenDatePopover(null);
         setOpenPasswordPopover(false);
         setGroupsHoverOpen(false);
-        setDraftRows((prev) => (prev.length === 0 ? [makeBlankDraft()] : prev));
+        setDraftRows((prev) => [makeBlankDraft(), ...prev]);
     };
     const [confirmByKey, setConfirmByKey] = useState<Record<string, string>>(
         {},
@@ -918,8 +970,8 @@ export default function ManageUsers() {
                             className='col-span-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-500 border-t border-dashed border-slate-300 cursor-pointer hover:text-slate-700'
                             onClick={() => {
                                 setDraftRows((prev) => [
-                                    ...prev,
                                     makeBlankDraft(),
+                                    ...prev,
                                 ]);
                             }}
                             title='Add new row'
@@ -1061,6 +1113,7 @@ export default function ManageUsers() {
                         setEditing(null);
                     }}
                     onSave={(data) => upsertUser(data, editing?.id)}
+                    userGroups={userGroups}
                 />
             )}
 
@@ -1275,12 +1328,14 @@ interface CreateOrEditUserModalProps {
     initialValue?: UserRecord;
     onCancel: () => void;
     onSave: (data: Omit<UserRecord, 'id' | 'updatedAt'>) => void;
+    userGroups: UserGroup[];
 }
 
 function CreateOrEditUserModal({
     initialValue,
     onCancel,
     onSave,
+    userGroups,
 }: CreateOrEditUserModalProps) {
     const [username, setUsername] = useState(initialValue?.username || '');
     const [firstName, setFirstName] = useState(initialValue?.firstName || '');
@@ -1289,7 +1344,7 @@ function CreateOrEditUserModal({
     const [startDate, setStartDate] = useState(initialValue?.startDate || '');
     const [endDate, setEndDate] = useState(initialValue?.endDate || '');
     const [groupName, setGroupName] = useState(
-        initialValue?.groupName || DEFAULT_GROUPS[0],
+        initialValue?.groupName || userGroups[0]?.name || 'User',
     );
 
     const canSave =
@@ -1410,9 +1465,9 @@ function CreateOrEditUserModal({
                                 onChange={(e) => setGroupName(e.target.value)}
                                 className='block w-full px-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary'
                             >
-                                {DEFAULT_GROUPS.map((g) => (
-                                    <option key={g} value={g}>
-                                        {g}
+                                {userGroups.map((g) => (
+                                    <option key={g.id} value={g.name}>
+                                        {g.name}
                                     </option>
                                 ))}
                             </select>

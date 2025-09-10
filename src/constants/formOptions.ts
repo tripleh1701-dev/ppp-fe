@@ -12,7 +12,49 @@ export const ENTERPRISES = [
     'Azure',
 ] as const;
 
-export const ENTITIES = [
+// Dynamic entities - to be loaded from database
+export interface Entity {
+    id: number;
+    name: string;
+    description?: string;
+    entity_type: string;
+    status: string;
+}
+
+// Dynamic services - to be loaded from database
+export interface Service {
+    id: number;
+    name: string;
+    description?: string;
+    service_code: string;
+    category: string;
+    status: string;
+}
+
+// Dynamic roles - to be loaded from database
+export interface Role {
+    id: number;
+    name: string;
+    description?: string;
+    role_code: string;
+    role_level: number;
+    permissions: string[];
+    status: string;
+}
+
+// Dynamic user groups - to be loaded from database
+export interface UserGroup {
+    id: number;
+    name: string;
+    description?: string;
+    group_code: string;
+    status: string;
+    account_id: number;
+    enterprise_id: number;
+}
+
+// Fallback entities (used only if database is unavailable)
+export const FALLBACK_ENTITIES = [
     'Finance',
     'Payroll',
     'People',

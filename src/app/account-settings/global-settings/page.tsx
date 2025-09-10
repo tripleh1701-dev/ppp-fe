@@ -876,14 +876,9 @@ export default function GlobalSettingsPage() {
                                         </td>
                                         <td className='px-6 py-4 whitespace-nowrap text-right text-sm'>
                                             <RowActions
-                                                onView={() =>
+                                                onConfigure={() =>
                                                     router.push(
                                                         `/account-settings/global-settings/${item.id}`,
-                                                    )
-                                                }
-                                                onEdit={() =>
-                                                    router.push(
-                                                        `/account-settings/global-settings/${item.id}?edit=1`,
                                                     )
                                                 }
                                                 onDelete={() =>
@@ -987,8 +982,7 @@ export default function GlobalSettingsPage() {
                                 buRows.forEach((r: any) =>
                                     addFromRaw(r.entities),
                                 );
-                            const list = Array.from(new Set(aggregated));
-                            setOptions(list.length ? list : ['Default']);
+                            // Note: Options refresh happens through component re-render
                         })();
                     } catch {}
                     setPendingDeleteId(null);

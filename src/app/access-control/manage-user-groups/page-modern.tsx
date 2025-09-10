@@ -37,7 +37,7 @@ interface UserGroupRecord {
     updated_at: string;
 }
 
-export default function ManageUserGroups() {
+export default function ModernManageUserGroups() {
     const [userGroups] = useState<UserGroupRecord[]>([
         {
             id: '1',

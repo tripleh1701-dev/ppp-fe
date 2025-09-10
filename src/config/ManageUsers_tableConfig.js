@@ -28,7 +28,7 @@ const ManageUsers_tableConfig = {
             id: 'firstName',
             title: 'First Name',
             type: 'text',
-            width: 150,
+            width: 100,
             resizable: true,
             order: 1,
             pinned: false,
@@ -46,7 +46,7 @@ const ManageUsers_tableConfig = {
             id: 'middleName',
             title: 'Middle Name',
             type: 'text',
-            width: 150,
+            width: 90,
             resizable: true,
             order: 2,
             pinned: false,
@@ -64,7 +64,7 @@ const ManageUsers_tableConfig = {
             id: 'lastName',
             title: 'Last Name',
             type: 'text',
-            width: 150,
+            width: 100,
             resizable: true,
             order: 3,
             pinned: false,
@@ -82,7 +82,7 @@ const ManageUsers_tableConfig = {
             id: 'emailAddress',
             title: 'Email Address',
             type: 'email',
-            width: 200,
+            width: 140,
             resizable: true,
             order: 4,
             pinned: false,
@@ -99,7 +99,7 @@ const ManageUsers_tableConfig = {
             id: 'status',
             title: 'Status',
             type: 'select',
-            width: 120,
+            width: 80,
             resizable: true,
             order: 5,
             pinned: false,
@@ -170,7 +170,7 @@ const ManageUsers_tableConfig = {
             id: 'startDate',
             title: 'Start Date',
             type: 'datetime',
-            width: 180,
+            width: 110,
             resizable: true,
             order: 6,
             pinned: false,
@@ -217,7 +217,7 @@ const ManageUsers_tableConfig = {
             id: 'endDate',
             title: 'End Date',
             type: 'datetime',
-            width: 180,
+            width: 110,
             resizable: true,
             order: 7,
             pinned: false,
@@ -263,7 +263,7 @@ const ManageUsers_tableConfig = {
             id: 'password',
             title: 'Password',
             type: 'password',
-            width: 120,
+            width: 90,
             resizable: true,
             order: 8,
             pinned: false,
@@ -317,12 +317,45 @@ const ManageUsers_tableConfig = {
             },
         },
         {
+            id: 'locked',
+            title: 'Lock/Unlock',
+            type: 'toggle',
+            width: 90,
+            resizable: true,
+            order: 9,
+            pinned: false,
+            required: false,
+            defaultValue: false, // Default to unlocked
+            toggleConfig: {
+                onText: 'Unlocked',
+                offText: 'Locked',
+                onColor: '#22c55e', // Green for unlocked
+                offColor: '#ef4444', // Red for locked
+                showIcons: true,
+                onIcon: 'unlock', // Unlock icon
+                offIcon: 'lock', // Lock icon
+                animationDuration: 300,
+                size: 'medium',
+                style: 'modern',
+                hoverEffect: true,
+                showTooltip: true,
+                tooltipText: {
+                    on: 'Click to lock user account',
+                    off: 'Click to unlock user account',
+                },
+            },
+            validation: {
+                required: false,
+                errorMessage: 'Invalid lock status',
+            },
+        },
+        {
             id: 'assignedUserGroup',
             title: 'Assigned User Group',
             type: 'userGroup',
-            width: 200,
+            width: 130,
             resizable: true,
-            order: 9,
+            order: 10,
             pinned: false,
             required: false,
             userGroupConfig: {
@@ -358,6 +391,13 @@ const ManageUsers_tableConfig = {
         showSaveButtons: false, // Disable manual save buttons for auto-save
         showAutoSaveIndicator: true, // Show auto-save status
         autoSaveIndicatorPosition: 'top-right',
+
+        // Horizontal scroll configuration
+        enableHorizontalScroll: true,
+        horizontalScrollMode: 'auto', // 'auto', 'always', 'never'
+        tableWidth: 'auto', // Let table expand naturally
+        minTableWidth: '100%',
+        maxTableWidth: 'none',
 
         // Row configuration
         defaultRowHeight: 20,
@@ -465,12 +505,16 @@ const ManageUsers_tableConfig = {
             lastName: '',
             emailAddress: '',
             status: 'ACTIVE', // Default to Active status
+            locked: false, // Default to unlocked
             startDate: new Date().toISOString().split('T')[0],
             endDate: '',
             password: '',
             assignedUserGroup: [{name: 'Administrators'}, {name: 'HR Team'}],
         },
     },
+
+    // Initial data - will be populated when create button is clicked
+    initialData: [],
 
     // Table actions configuration
     actions: {

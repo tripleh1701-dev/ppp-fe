@@ -24,7 +24,9 @@ interface Props {
     onDeleteImmediate?: (row: EnterpriseConfigRow) => void;
     onQuickAddRow?: () => void;
     onCreated?: () => void;
-    visibleColumns?: Array<'enterpriseName' | 'productName' | 'services'>;
+    visibleColumns?: Array<
+        'enterpriseName' | 'productName' | 'services' | 'actions'
+    >;
     externalAddKey?: number;
 }
 
@@ -97,21 +99,27 @@ export default function EnterpriseConfigTable({
     );
 
     const [serviceOptions, setServiceOptions] = React.useState<string[]>([]);
-    
-    // Load services from backend API
+
+    // Load services from enterprise-specific API (separate from User Groups)
     React.useEffect(() => {
         const loadServices = async () => {
             try {
-                const services = await api.get<Array<{id: string; name: string}>>('/api/services');
-                setServiceOptions(services?.map(s => s.name) || []);
+                const services = await api.get<
+                    Array<{id: string; name: string}>
+                >('/api/services');
+                setServiceOptions(services?.map((s) => s.name) || []);
+                console.log(
+                    '✅ Loaded enterprise services:',
+                    services?.length || 0,
+                );
             } catch (error) {
-                console.error('Failed to load services:', error);
+                console.error('Failed to load enterprise services:', error);
                 setServiceOptions([]);
             }
         };
         loadServices();
     }, []);
-    
+
     type DraftRow = {
         key: string;
         entName: string;
@@ -157,107 +165,155 @@ export default function EnterpriseConfigTable({
         try {
             if (savingKeysRef.current.has(draftKey)) return;
             savingKeysRef.current.add(draftKey);
-            
-            console.log('Creating new enterprise product service relationship:', {
-                enterprise_name: name,
-                product_name: prod,
-                services: draft.services,
-            });
-            
+
+            console.log(
+                'Creating new enterprise product service relationship:',
+                {
+                    enterprise_name: name,
+                    product_name: prod,
+                    services: draft.services,
+                },
+            );
+
             // First, ensure enterprise exists (check first, then create if needed)
             let enterpriseId: string;
-            const enterprises = await api.get<Array<{id: string; name: string}>>('/api/enterprises');
-            const existingEnterprise = enterprises.find(e => e.name.toLowerCase() === name.toLowerCase());
+            const enterprises = await api.get<
+                Array<{id: string; name: string}>
+            >('/api/enterprises');
+            const existingEnterprise = enterprises.find(
+                (e) => e.name.toLowerCase() === name.toLowerCase(),
+            );
             if (existingEnterprise) {
                 enterpriseId = existingEnterprise.id;
             } else {
                 try {
-                    const enterpriseResponse = await api.post<{id: string}>('/api/enterprises', {
-                        name: name,
-                        services: []
-                    });
+                    const enterpriseResponse = await api.post<{id: string}>(
+                        '/api/enterprises',
+                        {
+                            name: name,
+                            services: [],
+                        },
+                    );
                     enterpriseId = enterpriseResponse.id;
                 } catch (error) {
                     throw new Error('Failed to create enterprise');
                 }
             }
-            
+
             // Ensure product exists (check first, then create if needed)
             let productId: string;
-            const products = await api.get<Array<{id: string; name: string}>>('/api/products');
-            const existingProduct = products.find(p => p.name.toLowerCase() === prod.toLowerCase());
+            const products = await api.get<Array<{id: string; name: string}>>(
+                '/api/products',
+            );
+            const existingProduct = products.find(
+                (p) => p.name.toLowerCase() === prod.toLowerCase(),
+            );
             if (existingProduct) {
                 productId = existingProduct.id;
             } else {
                 try {
-                    const productResponse = await api.post<{id: string}>('/api/products', {
-                        name: prod
-                    });
+                    const productResponse = await api.post<{id: string}>(
+                        '/api/products',
+                        {
+                            name: prod,
+                        },
+                    );
                     productId = productResponse.id;
                 } catch (error) {
                     throw new Error('Failed to create product');
                 }
             }
-            
+
             // Try to create relationships in enterprise_products_services table first
             try {
+                // Collect all service IDs first
+                const serviceIds: number[] = [];
+
                 for (const serviceName of draft.services) {
-                    let serviceId: string;
-                    const services = await api.get<Array<{id: string; name: string}>>('/api/services');
-                    const existingService = services.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
+                    let serviceId: number;
+                    const services = await api.get<
+                        Array<{id: number; name: string}>
+                    >('/api/services');
+                    const existingService = services.find(
+                        (s) =>
+                            s.name.toLowerCase() === serviceName.toLowerCase(),
+                    );
                     if (existingService) {
                         serviceId = existingService.id;
                     } else {
                         try {
-                            const serviceResponse = await api.post<{id: string}>('/api/services', {
-                                name: serviceName
+                            const serviceResponse = await api.post<{
+                                id: number;
+                            }>('/api/services', {
+                                name: serviceName,
                             });
                             serviceId = serviceResponse.id;
                         } catch (error) {
-                            throw new Error(`Failed to create service: ${serviceName}`);
+                            throw new Error(
+                                `Failed to create service: ${serviceName}`,
+                            );
                         }
                     }
-                    
-                    // Create the relationship in enterprise_products_services table
-                    await api.post('/api/enterprise-products-services', {
-                        enterpriseId: enterpriseId,
-                        productId: productId,
-                        serviceId: serviceId
-                    });
+                    serviceIds.push(serviceId);
                 }
-                console.log('Enterprise product service relationship created successfully in new table');
+
+                // Create or update single row with array of service IDs
+                await api.post('/api/enterprise-products-services', {
+                    enterpriseId: parseInt(enterpriseId),
+                    productId: parseInt(productId),
+                    serviceId: serviceIds, // Send array as 'service_id' (singular, matching DB column)
+                });
+                console.log(
+                    'Enterprise product service relationship created successfully in new table',
+                );
             } catch (error) {
-                console.warn('New enterprise_products_services table not available, falling back to legacy structure:', error);
-                
+                console.warn(
+                    'New enterprise_products_services table not available, falling back to legacy structure:',
+                    error,
+                );
+
                 // Fallback: Update enterprise with the new product and services
                 try {
-                    const existingEnterprise = await api.get<{id: string; name: string; services: any[]}>(`/api/enterprises/${enterpriseId}`);
+                    const existingEnterprise = await api.get<{
+                        id: string;
+                        name: string;
+                        services: any[];
+                    }>(`/api/enterprises/${enterpriseId}`);
                     const updatedServices = [
                         ...(existingEnterprise.services || []),
                         {
                             id: productId,
                             name: prod,
-                            categories: draft.services
-                        }
+                            categories: draft.services,
+                        },
                     ];
-                    
+
                     await api.put(`/api/enterprises/${enterpriseId}`, {
                         name: name,
-                        services: updatedServices
+                        services: updatedServices,
                     });
-                    console.log('Enterprise updated with new product and services using legacy structure');
+                    console.log(
+                        'Enterprise updated with new product and services using legacy structure',
+                    );
                 } catch (fallbackError) {
-                    console.error('Failed to update enterprise with fallback method:', fallbackError);
+                    console.error(
+                        'Failed to update enterprise with fallback method:',
+                        fallbackError,
+                    );
                     throw fallbackError;
                 }
             }
-            
-            setAddingRows((prev) => prev.filter((d) => d.key !== draftKey));
-            // Keep the flow going: append a fresh blank row so the list doesn't feel like it vanished
-            addBlankRow();
+
+            // Keep the row after auto-save - don't remove it
+            console.log(
+                '✅ Auto-save successful - keeping row for further editing',
+            );
             onCreated && onCreated();
         } catch (error) {
-            console.error('Failed to create enterprise product service relationship:', error);
+            console.error(
+                'Failed to create enterprise product service relationship:',
+                error,
+            );
         } finally {
             savingKeysRef.current.delete(draftKey);
             const t = saveTimersRef.current[draftKey];
@@ -274,6 +330,22 @@ export default function EnterpriseConfigTable({
             addBlankRow();
         }
     }, [externalAddKey]);
+
+    // Debounced save for collecting all service changes before API call
+    const draftSaveTimers = React.useRef<Record<string, NodeJS.Timeout>>({});
+    const debouncedSaveDraft = React.useCallback((draftKey: string) => {
+        // Clear existing timer for this draft
+        if (draftSaveTimers.current[draftKey]) {
+            clearTimeout(draftSaveTimers.current[draftKey]);
+        }
+
+        // Set new timer to save after 500ms of inactivity
+        draftSaveTimers.current[draftKey] = setTimeout(() => {
+            console.log('⏰ Debounced save triggered for:', draftKey);
+            saveDraft(draftKey);
+            delete draftSaveTimers.current[draftKey];
+        }, 500);
+    }, []);
 
     // Autosave drafts when both Enterprise and Product are filled; debounce
     React.useEffect(() => {
@@ -339,9 +411,17 @@ export default function EnterpriseConfigTable({
     const saveTimersByEnterprise = React.useRef<Record<string, any>>({});
     const scheduleSaveForEnterprise = React.useCallback(
         (enterpriseId: string) => {
+            console.log(
+                '🚀 scheduleSaveForEnterprise called for enterprise:',
+                enterpriseId,
+            );
             const timers = saveTimersByEnterprise.current;
             if (timers[enterpriseId]) clearTimeout(timers[enterpriseId]);
             timers[enterpriseId] = setTimeout(async () => {
+                console.log(
+                    '⏰ Auto-save timer triggered for enterprise:',
+                    enterpriseId,
+                );
                 try {
                     // Aggregate current values for this enterprise
                     const allRowIds = Object.keys(
@@ -352,7 +432,7 @@ export default function EnterpriseConfigTable({
                             enterpriseId,
                     );
                     if (allRowIds.length === 0) return;
-                    
+
                     // Build relationships for enterprise_products_services table
                     for (const rid of allRowIds) {
                         const v = rowValues[rid];
@@ -370,135 +450,197 @@ export default function EnterpriseConfigTable({
                             propRow?.services ??
                             []
                         ).filter(Boolean);
-                        
-                        if (!entName.trim() || !prodName || prodName === '—') continue;
-                        
+
+                        if (!entName.trim() || !prodName || prodName === '—')
+                            continue;
+
                         // Ensure enterprise exists (check first, then create if needed)
                         let enterpriseId: string;
-                        const enterprises = await api.get<Array<{id: string; name: string}>>('/api/enterprises');
-                        const existingEnterprise = enterprises.find(e => e.name.toLowerCase() === entName.toLowerCase());
+                        const enterprises = await api.get<
+                            Array<{id: string; name: string}>
+                        >('/api/enterprises');
+                        const existingEnterprise = enterprises.find(
+                            (e) =>
+                                e.name.toLowerCase() === entName.toLowerCase(),
+                        );
                         if (existingEnterprise) {
                             enterpriseId = existingEnterprise.id;
                         } else {
                             try {
-                                const enterpriseResponse = await api.post<{id: string}>('/api/enterprises', {
+                                const enterpriseResponse = await api.post<{
+                                    id: string;
+                                }>('/api/enterprises', {
                                     name: entName.trim(),
-                                    services: []
+                                    services: [],
                                 });
                                 enterpriseId = enterpriseResponse.id;
                             } catch (error) {
-                                console.error('Failed to create enterprise:', entName);
+                                console.error(
+                                    'Failed to create enterprise:',
+                                    entName,
+                                );
                                 continue;
                             }
                         }
-                        
+
                         // Ensure product exists (check first, then create if needed)
                         let productId: string;
-                        const products = await api.get<Array<{id: string; name: string}>>('/api/products');
-                        const existingProduct = products.find(p => p.name.toLowerCase() === prodName.toLowerCase());
+                        const products = await api.get<
+                            Array<{id: string; name: string}>
+                        >('/api/products');
+                        const existingProduct = products.find(
+                            (p) =>
+                                p.name.toLowerCase() === prodName.toLowerCase(),
+                        );
                         if (existingProduct) {
                             productId = existingProduct.id;
                         } else {
                             try {
-                                const productResponse = await api.post<{id: string}>('/api/products', {
-                                    name: prodName
+                                const productResponse = await api.post<{
+                                    id: string;
+                                }>('/api/products', {
+                                    name: prodName,
                                 });
                                 productId = productResponse.id;
                             } catch (error) {
-                                console.error('Failed to create product:', prodName);
+                                console.error(
+                                    'Failed to create product:',
+                                    prodName,
+                                );
                                 continue;
                             }
                         }
-                        
+
                         // Try to use the new enterprise_products_services table first
                         try {
-                            // Delete existing relationships for this enterprise-product combination
-                            try {
-                                await api.del(`/api/enterprise-products-services/enterprise-product/${enterpriseId}/${productId}`);
-                            } catch (error) {
-                                // Ignore errors if no existing relationships
-                            }
-                            
-                            // Create new relationships for each service
+                            // Collect all service IDs for this enterprise+product combination
+                            const serviceIds: number[] = [];
+
                             for (const serviceName of services) {
-                                let serviceId: string;
-                                const services = await api.get<Array<{id: string; name: string}>>('/api/services');
-                                const existingService = services.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
+                                let serviceId: number;
+                                const servicesList = await api.get<
+                                    Array<{id: number; name: string}>
+                                >('/api/services');
+                                const existingService = servicesList.find(
+                                    (s) =>
+                                        s.name.toLowerCase() ===
+                                        serviceName.toLowerCase(),
+                                );
                                 if (existingService) {
                                     serviceId = existingService.id;
                                 } else {
                                     try {
-                                        const serviceResponse = await api.post<{id: string}>('/api/services', {
-                                            name: serviceName
+                                        const serviceResponse = await api.post<{
+                                            id: number;
+                                        }>('/api/services', {
+                                            name: serviceName,
                                         });
                                         serviceId = serviceResponse.id;
                                     } catch (error) {
-                                        console.error('Failed to create service:', serviceName);
+                                        console.error(
+                                            'Failed to create service:',
+                                            serviceName,
+                                        );
                                         continue;
                                     }
                                 }
-                                
-                                // Create the relationship in enterprise_products_services table
-                                await api.post('/api/enterprise-products-services', {
-                                    enterpriseId: enterpriseId,
-                                    productId: productId,
-                                    serviceId: serviceId
-                                });
+                                serviceIds.push(serviceId);
                             }
+
+                            // Create or update single row with array of service IDs
+                            console.log(
+                                '💾 Saving to enterprise-products-services:',
+                                {
+                                    enterpriseId: parseInt(enterpriseId),
+                                    productId: parseInt(productId),
+                                    serviceId: serviceIds,
+                                },
+                            );
+                            await api.post(
+                                '/api/enterprise-products-services',
+                                {
+                                    enterpriseId: parseInt(enterpriseId),
+                                    productId: parseInt(productId),
+                                    serviceId: serviceIds, // Send array as 'service_id' (singular, matching DB column)
+                                },
+                            );
+                            console.log(
+                                '✅ Successfully saved enterprise-products-services for:',
+                                entName,
+                                prodName,
+                            );
                         } catch (error) {
-                            console.warn('New enterprise_products_services table not available, falling back to legacy structure:', error);
-                            
+                            console.warn(
+                                'New enterprise_products_services table not available, falling back to legacy structure:',
+                                error,
+                            );
+
                             // Fallback: Update enterprise with the new product and services
                             try {
-                                const existingEnterprise = await api.get<{id: string; name: string; services: any[]}>(`/api/enterprises/${enterpriseId}`);
-                                
+                                const existingEnterprise = await api.get<{
+                                    id: string;
+                                    name: string;
+                                    services: any[];
+                                }>(`/api/enterprises/${enterpriseId}`);
+
                                 // Remove existing product if it exists
-                                const filteredServices = (existingEnterprise.services || []).filter(s => s.name !== prodName);
-                                
+                                const filteredServices = (
+                                    existingEnterprise.services || []
+                                ).filter((s) => s.name !== prodName);
+
                                 // Add new product with services
                                 const updatedServices = [
                                     ...filteredServices,
                                     {
                                         id: productId,
                                         name: prodName,
-                                        categories: services
-                                    }
+                                        categories: services,
+                                    },
                                 ];
-                                
-                                await api.put(`/api/enterprises/${enterpriseId}`, {
-                                    name: entName.trim(),
-                                    services: updatedServices
-                                });
-                                console.log('Enterprise updated with new product and services using legacy structure');
+
+                                await api.put(
+                                    `/api/enterprises/${enterpriseId}`,
+                                    {
+                                        name: entName.trim(),
+                                        services: updatedServices,
+                                    },
+                                );
+                                console.log(
+                                    'Enterprise updated with new product and services using legacy structure',
+                                );
                             } catch (fallbackError) {
-                                console.error('Failed to update enterprise with fallback method:', fallbackError);
+                                console.error(
+                                    'Failed to update enterprise with fallback method:',
+                                    fallbackError,
+                                );
                             }
                         }
                     }
-                    
-                    console.log('Enterprise relationships saved successfully', { enterpriseId, rowValues });
+
+                    console.log('Enterprise relationships saved successfully', {
+                        enterpriseId,
+                        rowValues,
+                    });
                     // Add a more visible log to confirm when data is saved
-                    console.log('%c Enterprise data saved! ', 'background: #4CAF50; color: white; font-weight: bold;');
+                    console.log(
+                        '%c Enterprise data saved! ',
+                        'background: #4CAF50; color: white; font-weight: bold;',
+                    );
                     onCreated && onCreated();
                 } catch (error) {
-                    console.error('Failed to save enterprise relationships:', enterpriseId, error);
+                    console.error(
+                        'Failed to save enterprise relationships:',
+                        enterpriseId,
+                        error,
+                    );
                 }
             }, 300); // Reduced debounce time for faster saving
         },
         [rowValues, rows, onCreated],
     );
 
-    React.useEffect(() => {
-        // For every edited row, schedule a save for its enterprise
-        const byEnterprise: Record<string, boolean> = {};
-        for (const rid of Object.keys(rowValues)) {
-            const eid = rowIdToEnterpriseIdRef.current[rid];
-            if (eid) byEnterprise[eid] = true;
-        }
-        for (const eid of Object.keys(byEnterprise))
-            scheduleSaveForEnterprise(eid);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(rowValues)]);
+    // Removed problematic useEffect that was causing infinite re-renders
+    // Auto-save is now handled directly in the onChange handlers
 
     React.useEffect(() => {
         setRowValues((prev) => {
@@ -1293,46 +1435,60 @@ export default function EnterpriseConfigTable({
                                                                     ?.enterpriseName
                                                             }
                                                             onChange={(v) =>
-                                                            setRowValues(
-                                                                (prev) => {
-                                                                    const newValues = {
-                                                                        ...prev,
-                                                                        [r.id]:
+                                                                setRowValues(
+                                                                    (prev) => {
+                                                                        const newValues =
                                                                             {
-                                                                                ...(prev[
-                                                                                    r
-                                                                                        .id
-                                                                                ] || {
-                                                                                    enterpriseName:
-                                                                                        '',
-                                                                                    productName:
-                                                                                        '',
-                                                                                    services:
-                                                                                        [],
-                                                                                }),
-                                                                                enterpriseName:
-                                                                                    v ||
-                                                                                    '',
-                                                                            },
-                                                                    };
-                                                                    
-                                                                    // Immediately schedule save for this enterprise to prevent data loss
-                                                                    const eid = rowIdToEnterpriseIdRef.current[r.id];
-                                                                    if (eid) {
-                                                                        // Use setTimeout to ensure this runs after state update
-                                                                        setTimeout(() => scheduleSaveForEnterprise(eid), 0);
-                                                                    }
-                                                                    
-                                                                    return newValues;
-                                                                }
-                                                            )
+                                                                                ...prev,
+                                                                                [r.id]:
+                                                                                    {
+                                                                                        ...(prev[
+                                                                                            r
+                                                                                                .id
+                                                                                        ] || {
+                                                                                            enterpriseName:
+                                                                                                '',
+                                                                                            productName:
+                                                                                                '',
+                                                                                            services:
+                                                                                                [],
+                                                                                        }),
+                                                                                        enterpriseName:
+                                                                                            v ||
+                                                                                            '',
+                                                                                    },
+                                                                            };
+
+                                                                        // Immediately schedule save for this enterprise to prevent data loss
+                                                                        const eid =
+                                                                            rowIdToEnterpriseIdRef
+                                                                                .current[
+                                                                                r
+                                                                                    .id
+                                                                            ];
+                                                                        if (
+                                                                            eid
+                                                                        ) {
+                                                                            // Use setTimeout to ensure this runs after state update
+                                                                            setTimeout(
+                                                                                () =>
+                                                                                    scheduleSaveForEnterprise(
+                                                                                        eid,
+                                                                                    ),
+                                                                                0,
+                                                                            );
+                                                                        }
+
+                                                                        return newValues;
+                                                                    },
+                                                                )
                                                             }
                                                             placeholder='Select Enterprise'
                                                         />
                                                     </div>
                                                 </div>
                                             )}
-                                                                                        {cols.includes('productName') && (
+                                            {cols.includes('productName') && (
                                                 <div className='text-slate-700 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-2'>
                                                     <ECAsyncChipSelect
                                                         type='product'
@@ -1343,38 +1499,55 @@ export default function EnterpriseConfigTable({
                                                         onChange={(v) => {
                                                             setRowValues(
                                                                 (prev) => {
-                                                                    const newValues = {
-                                                                        ...prev,
-                                                                        [r.id]: {
-                                                                            ...(prev[
-                                                                                r.id
-                                                                            ] || {
-                                                                                enterpriseName:
-                                                                                    '',
-                                                                                productName:
-                                                                                    '',
-                                                                                products:
-                                                                                    [],
-                                                                                services:
-                                                                                    [],
-                                                                            }),
-                                                                            productName:
-                                                                                v ||
-                                                                                '',
-                                                                            products:
-                                                                                v ? [v] : [],
-                                                                        },
-                                                                    };
-                                                                    
+                                                                    const newValues =
+                                                                        {
+                                                                            ...prev,
+                                                                            [r.id]:
+                                                                                {
+                                                                                    ...(prev[
+                                                                                        r
+                                                                                            .id
+                                                                                    ] || {
+                                                                                        enterpriseName:
+                                                                                            '',
+                                                                                        productName:
+                                                                                            '',
+                                                                                        products:
+                                                                                            [],
+                                                                                        services:
+                                                                                            [],
+                                                                                    }),
+                                                                                    productName:
+                                                                                        v ||
+                                                                                        '',
+                                                                                    products:
+                                                                                        v
+                                                                                            ? [
+                                                                                                  v,
+                                                                                              ]
+                                                                                            : [],
+                                                                                },
+                                                                        };
+
                                                                     // Immediately schedule save for this enterprise to prevent data loss
-                                                                    const eid = rowIdToEnterpriseIdRef.current[r.id];
+                                                                    const eid =
+                                                                        rowIdToEnterpriseIdRef
+                                                                            .current[
+                                                                            r.id
+                                                                        ];
                                                                     if (eid) {
                                                                         // Use setTimeout to ensure this runs after state update
-                                                                        setTimeout(() => scheduleSaveForEnterprise(eid), 0);
+                                                                        setTimeout(
+                                                                            () =>
+                                                                                scheduleSaveForEnterprise(
+                                                                                    eid,
+                                                                                ),
+                                                                            0,
+                                                                        );
                                                                     }
-                                                                    
+
                                                                     return newValues;
-                                                                }
+                                                                },
                                                             );
                                                         }}
                                                         placeholder='Select Product'
@@ -1393,6 +1566,80 @@ export default function EnterpriseConfigTable({
                                                                 <ServiceChip
                                                                     key={`${r.id}-svc-${i}`}
                                                                     text={s}
+                                                                    onRemove={() => {
+                                                                        setRowValues(
+                                                                            (
+                                                                                prev,
+                                                                            ) => {
+                                                                                const curr =
+                                                                                    prev[
+                                                                                        r
+                                                                                            .id
+                                                                                    ] || {
+                                                                                        enterpriseName:
+                                                                                            '',
+                                                                                        productName:
+                                                                                            '',
+                                                                                        services:
+                                                                                            [],
+                                                                                    };
+                                                                                const nextServices =
+                                                                                    curr.services.filter(
+                                                                                        (
+                                                                                            x,
+                                                                                        ) =>
+                                                                                            x !==
+                                                                                            s,
+                                                                                    );
+
+                                                                                // Auto-save when service is removed
+                                                                                const eid =
+                                                                                    rowIdToEnterpriseIdRef
+                                                                                        .current[
+                                                                                        r
+                                                                                            .id
+                                                                                    ];
+                                                                                console.log(
+                                                                                    '🗑️ Service removed:',
+                                                                                    s,
+                                                                                    'for row:',
+                                                                                    r.id,
+                                                                                    'enterprise ID:',
+                                                                                    eid,
+                                                                                );
+                                                                                if (
+                                                                                    eid
+                                                                                ) {
+                                                                                    console.log(
+                                                                                        '⏰ Scheduling auto-save for enterprise:',
+                                                                                        eid,
+                                                                                    );
+                                                                                    setTimeout(
+                                                                                        () =>
+                                                                                            scheduleSaveForEnterprise(
+                                                                                                eid,
+                                                                                            ),
+                                                                                        100,
+                                                                                    );
+                                                                                } else {
+                                                                                    console.warn(
+                                                                                        '⚠️ No enterprise ID found for row:',
+                                                                                        r.id,
+                                                                                    );
+                                                                                }
+
+                                                                                return {
+                                                                                    ...prev,
+                                                                                    [r.id]:
+                                                                                        {
+                                                                                            ...curr,
+                                                                                            services:
+                                                                                                nextServices,
+                                                                                        },
+                                                                                };
+                                                                            },
+                                                                        );
+                                                                    }}
                                                                 />
                                                             ))}
                                                         </div>
@@ -1454,14 +1701,46 @@ export default function EnterpriseConfigTable({
                                                                                   ...curr.services,
                                                                                   name,
                                                                               ];
-                                                                    
+
                                                                     // Immediately schedule save for this enterprise to prevent data loss
-                                                                    const eid = rowIdToEnterpriseIdRef.current[r.id];
+                                                                    const eid =
+                                                                        rowIdToEnterpriseIdRef
+                                                                            .current[
+                                                                            r.id
+                                                                        ];
+                                                                    const action =
+                                                                        exists
+                                                                            ? 'removed'
+                                                                            : 'added';
+                                                                    console.log(
+                                                                        `🔄 Service ${action}:`,
+                                                                        name,
+                                                                        'for row:',
+                                                                        r.id,
+                                                                        'enterprise ID:',
+                                                                        eid,
+                                                                    );
                                                                     if (eid) {
+                                                                        console.log(
+                                                                            '⏰ Scheduling auto-save for enterprise:',
+                                                                            eid,
+                                                                        );
                                                                         // Use setTimeout to ensure this runs after state update
-                                                                        setTimeout(() => scheduleSaveForEnterprise(eid), 0);
+                                                                        setTimeout(
+                                                                            () =>
+                                                                                scheduleSaveForEnterprise(
+                                                                                    eid,
+                                                                                ),
+                                                                            100,
+                                                                        );
+                                                                    } else {
+                                                                        console.warn(
+                                                                            '⚠️ No enterprise ID found for row:',
+                                                                            r.id,
+                                                                            'in rowIdToEnterpriseIdRef',
+                                                                        );
                                                                     }
-                                                                    
+
                                                                     return {
                                                                         ...prev,
                                                                         [r.id]:
@@ -1486,7 +1765,11 @@ export default function EnterpriseConfigTable({
                                     layout
                                     initial={{opacity: 0, y: -4}}
                                     animate={{opacity: 1, y: 0}}
-                                    className='w-full grid items-center gap-0 rounded-md overflow-visible border-0 bg-slate-50'
+                                    className={`relative w-full grid items-center gap-0 rounded-md overflow-visible border-0 ${
+                                        savingKeysRef.current.has(d.key)
+                                            ? 'bg-green-50 border border-green-200'
+                                            : 'bg-slate-50'
+                                    }`}
                                     style={{gridTemplateColumns: cssTemplate}}
                                 >
                                     <div className='sticky left-0 z-10 bg-slate-50 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] px-2 py-2 border-r border-slate-200'>
@@ -1505,14 +1788,15 @@ export default function EnterpriseConfigTable({
                                                             : r,
                                                     ),
                                                 );
-                                                
-                                                // If we have both enterprise and product, try to save immediately
-                                                const currentRow = addingRows.find(r => r.key === d.key);
-                                                if (currentRow && currentRow.productName && v) {
-                                                    saveDraft(d.key);
+
+                                                // Auto-save when both enterprise and product are selected
+                                                if (d.productName && v) {
+                                                    console.log(
+                                                        '🔄 Debouncing save: Enterprise + Product both selected',
+                                                    );
+                                                    debouncedSaveDraft(d.key);
                                                 }
-                                            }
-                                            }
+                                            }}
                                             placeholder='Select Enterprise'
                                         />
                                     </div>
@@ -1532,14 +1816,15 @@ export default function EnterpriseConfigTable({
                                                             : r,
                                                     ),
                                                 );
-                                                
-                                                // If we have both enterprise and product, try to save immediately
-                                                const currentRow = addingRows.find(r => r.key === d.key);
-                                                if (currentRow && currentRow.entName && v) {
-                                                    saveDraft(d.key);
+
+                                                // Auto-save when both enterprise and product are selected
+                                                if (d.entName && v) {
+                                                    console.log(
+                                                        '🔄 Debouncing save: Product + Enterprise both selected',
+                                                    );
+                                                    debouncedSaveDraft(d.key);
                                                 }
-                                            }
-                                            }
+                                            }}
                                             placeholder='Select Product(s)'
                                         />
                                     </div>
@@ -1550,7 +1835,7 @@ export default function EnterpriseConfigTable({
                                                     <ServiceChip
                                                         key={s}
                                                         text={s}
-                                                        onRemove={() =>
+                                                        onRemove={() => {
                                                             setAddingRows(
                                                                 (prev) =>
                                                                     prev.map(
@@ -1570,8 +1855,22 @@ export default function EnterpriseConfigTable({
                                                                                   }
                                                                                 : r,
                                                                     ),
-                                                            )
-                                                        }
+                                                            );
+
+                                                            // Auto-save when service is removed (if enterprise and product exist)
+                                                            if (
+                                                                d.entName &&
+                                                                d.productName
+                                                            ) {
+                                                                console.log(
+                                                                    '🔄 Debouncing save: Service removed',
+                                                                );
+                                                                // Use debounced save to collect all service changes
+                                                                debouncedSaveDraft(
+                                                                    d.key,
+                                                                );
+                                                            }
+                                                        }}
                                                     />
                                                 ))}
                                             </div>
@@ -1594,7 +1893,7 @@ export default function EnterpriseConfigTable({
                                             externalOpenKey={
                                                 draftSvcOpenSignals[d.key]
                                             }
-                                            onToggle={(name) =>
+                                            onToggle={(name) => {
                                                 setAddingRows((prev) =>
                                                     prev.map((r) =>
                                                         r.key === d.key
@@ -1618,10 +1917,28 @@ export default function EnterpriseConfigTable({
                                                               }
                                                             : r,
                                                     ),
-                                                )
-                                            }
+                                                );
+
+                                                // Auto-save when services are modified (if enterprise and product exist)
+                                                if (
+                                                    d.entName &&
+                                                    d.productName
+                                                ) {
+                                                    console.log(
+                                                        '🔄 Debouncing save: Service modified',
+                                                    );
+                                                    // Use debounced save to collect all service changes
+                                                    debouncedSaveDraft(d.key);
+                                                }
+                                            }}
                                         />
                                     </div>
+                                    {savingKeysRef.current.has(d.key) && (
+                                        <div className='absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1'>
+                                            <div className='w-2 h-2 bg-white rounded-full animate-pulse'></div>
+                                            Auto-saving...
+                                        </div>
+                                    )}
                                 </motion.div>
                             ))}
                             <motion.div

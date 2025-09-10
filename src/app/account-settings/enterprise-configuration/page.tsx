@@ -152,6 +152,7 @@ function ToolbarTrashButton({
 }
 
 export default function EnterpriseConfiguration() {
+    console.log('🏗️ EnterpriseConfiguration component mounting...');
     const [enterprises, setEnterprises] = useState<Enterprise[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -191,6 +192,18 @@ export default function EnterpriseConfiguration() {
     const [enterpriseProductServices, setEnterpriseProductServices] = useState<
         EnterpriseProductService[]
     >([]);
+
+    // Debug: Log when state changes
+    useEffect(() => {
+        console.log(
+            '🔄 enterpriseProductServices state changed:',
+            enterpriseProductServices.length,
+            'items',
+        );
+        if (enterpriseProductServices.length > 0) {
+            console.log('📋 First item:', enterpriseProductServices[0]);
+        }
+    }, [enterpriseProductServices]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -215,33 +228,62 @@ export default function EnterpriseConfiguration() {
 
     // Load data from the enterprise_products_services table
     const loadEnterpriseProductServices = async () => {
+        console.log('🚀 loadEnterpriseProductServices function called!');
         try {
             setIsLoading(true);
 
             // Try to load from the new enterprise_products_services table first
             try {
-                // First, get all relationships from the main endpoint
+                // First, get all relationships from the main endpoint (actual API response format)
+                console.log(
+                    '🌐 About to call API:',
+                    '/api/enterprise-products-services',
+                );
                 const relationships = await api.get<
                     Array<{
                         id: number;
-                        enterpriseId: number;
-                        productId: number;
-                        serviceId: number;
+                        enterpriseId: number; // CamelCase from actual API
+                        productId: number; // CamelCase from actual API
+                        serviceId: number[]; // CamelCase from actual API
                     }>
                 >('/api/enterprise-products-services');
 
-                // Convert to EnterpriseProductService format for state
-                const convertedRelationships: EnterpriseProductService[] =
-                    relationships.map((r) => ({
-                        id: r.id.toString(),
-                        enterpriseId: r.enterpriseId?.toString() || '',
-                        productId: r.productId?.toString() || '',
-                        serviceId: r.serviceId?.toString() || '',
-                        enterpriseName: '',
-                        productName: '',
-                        serviceName: '',
-                    }));
+                console.log('🔍 Raw API response:', relationships);
+
+                console.log(
+                    '🔄 Loaded enterprise-product-services from API:',
+                    relationships,
+                );
+
+                // Convert array format to individual service relationships for backward compatibility
+                const convertedRelationships: EnterpriseProductService[] = [];
+
+                relationships?.forEach((r) => {
+                    // Create one relationship entry for each service in the array
+                    r.serviceId?.forEach((serviceId, index) => {
+                        convertedRelationships.push({
+                            id: `${r.id}-${index}`, // Unique ID for each service
+                            enterpriseId: r.enterpriseId?.toString() || '',
+                            productId: r.productId?.toString() || '',
+                            serviceId: serviceId?.toString() || '',
+                            enterpriseName: '',
+                            productName: '',
+                            serviceName: '',
+                        });
+                    });
+                });
+
+                console.log(
+                    '✅ Converted to individual service relationships:',
+                    convertedRelationships,
+                );
+                console.log(
+                    '📝 About to set enterpriseProductServices state with:',
+                    convertedRelationships?.length || 0,
+                    'items',
+                );
                 setEnterpriseProductServices(convertedRelationships || []);
+                console.log('✅ State set successfully!');
 
                 if (relationships && relationships.length > 0) {
                     // Get unique IDs for fetching names
@@ -259,24 +301,31 @@ export default function EnterpriseConfiguration() {
                                 .filter((id) => id !== null),
                         ),
                     );
+                    // Flatten service IDs from arrays
                     const serviceIds = Array.from(
                         new Set(
                             relationships
-                                .map((r) => r.serviceId)
+                                .flatMap((r) => r.serviceId || [])
                                 .filter((id) => id !== null),
                         ),
                     );
 
                     // Fetch names from respective tables
+                    console.log('🌐 About to call supporting APIs...');
                     const enterprises = await api.get<
                         Array<{id: number; name: string}>
                     >('/api/enterprises');
+                    console.log('🏢 Enterprises API response:', enterprises);
+
                     const products = await api.get<
                         Array<{id: number; name: string}>
                     >('/api/products');
+                    console.log('📦 Products API response:', products);
+
                     const services = await api.get<
                         Array<{id: number; name: string}>
                     >('/api/services');
+                    console.log('🔧 Services API response:', services);
 
                     // Create lookup maps
                     const enterpriseMap = new Map(
@@ -295,19 +344,50 @@ export default function EnterpriseConfiguration() {
                         {name: string; products: Map<string, string[]>}
                     >();
 
-                    relationships.forEach((item) => {
-                        const enterpriseId =
-                            item.enterpriseId?.toString() || '';
-                        const productId = item.productId?.toString() || '';
-                        const serviceId = item.serviceId?.toString() || '';
+                    // Note: Using convertedRelationships since we already converted from array format
+                    console.log(
+                        '🔍 About to resolve names for',
+                        convertedRelationships.length,
+                        'items',
+                    );
+                    console.log(
+                        '🗂️ Enterprise map:',
+                        Array.from(enterpriseMap.entries()),
+                    );
+                    console.log(
+                        '📦 Product map:',
+                        Array.from(productMap.entries()),
+                    );
+                    console.log(
+                        '🔧 Service map:',
+                        Array.from(serviceMap.entries()),
+                    );
+
+                    convertedRelationships.forEach((item, index) => {
+                        const enterpriseId = item.enterpriseId || '';
+                        const productId = item.productId || '';
+                        const serviceId = item.serviceId || '';
+
+                        console.log(
+                            `🔍 Item ${index}: enterpriseId=${enterpriseId}, productId=${productId}, serviceId=${serviceId}`,
+                        );
 
                         if (enterpriseId && productId && serviceId) {
                             const enterpriseName =
-                                enterpriseMap.get(item.enterpriseId) || '';
+                                enterpriseMap.get(parseInt(enterpriseId)) || '';
                             const productName =
-                                productMap.get(item.productId) || '';
+                                productMap.get(parseInt(productId)) || '';
                             const serviceName =
-                                serviceMap.get(item.serviceId) || '';
+                                serviceMap.get(parseInt(serviceId)) || '';
+
+                            console.log(
+                                `✅ Resolved names: ${enterpriseName} / ${productName} / ${serviceName}`,
+                            );
+
+                            // Update the actual state item with resolved names
+                            item.enterpriseName = enterpriseName;
+                            item.productName = productName;
+                            item.serviceName = serviceName;
 
                             if (!enterpriseProductMap.has(enterpriseId)) {
                                 enterpriseProductMap.set(enterpriseId, {
@@ -349,6 +429,13 @@ export default function EnterpriseConfiguration() {
                     }));
 
                     setEnterprises(enterpriseArray);
+
+                    // Update the state with resolved names
+                    console.log(
+                        '🔄 Updating enterpriseProductServices state with resolved names...',
+                    );
+                    setEnterpriseProductServices([...convertedRelationships]);
+
                     console.log(
                         'Loaded data from enterprise_products_services table with resolved names',
                     );
@@ -356,6 +443,7 @@ export default function EnterpriseConfiguration() {
                     setEnterprises([]);
                 }
             } catch (error) {
+                console.error('❌ Error in main data loading:', error);
                 console.warn(
                     'New enterprise_products_services table not available, falling back to legacy enterprises:',
                     error,
@@ -374,11 +462,15 @@ export default function EnterpriseConfiguration() {
                 console.log('Loaded data from legacy enterprises endpoint');
             }
         } catch (error) {
-            console.error('Failed to load enterprise data:', error);
+            console.error(
+                '💥 FATAL ERROR in loadEnterpriseProductServices:',
+                error,
+            );
             setEnterpriseProductServices([]);
             setEnterprises([]);
         } finally {
             setIsLoading(false);
+            console.log('🏁 loadEnterpriseProductServices completed');
         }
     };
 
@@ -435,7 +527,17 @@ export default function EnterpriseConfiguration() {
     };
 
     useEffect(() => {
-        loadEnterpriseProductServices().catch(() => {});
+        console.log('🔄 Page loaded - starting data load...');
+        console.log(
+            '🎯 Current enterpriseProductServices length:',
+            enterpriseProductServices.length,
+        );
+        loadEnterpriseProductServices().catch((error) => {
+            console.error(
+                '❌ Failed to load enterprise product services:',
+                error,
+            );
+        });
         loadAccounts().catch(() => {});
     }, []);
 
@@ -838,26 +940,90 @@ export default function EnterpriseConfiguration() {
                     />
                     <EnterpriseConfigTable
                         title='Enterprise Configuration'
-                        rows={filteredEnterprises.flatMap<EnterpriseConfigRow>(
-                            (e) => {
-                                if (!e.services || e.services.length === 0) {
-                                    return [
-                                        {
-                                            id: e.id,
-                                            enterpriseName: e.name,
-                                            productName: '—',
-                                            services: [],
-                                        },
-                                    ];
+                        rows={(() => {
+                            // Group enterprise-product-services data by enterprise+product combination
+                            console.log(
+                                '🎯 RENDER: enterpriseProductServices state:',
+                                enterpriseProductServices,
+                            );
+                            const enterpriseProductMap = new Map<
+                                string,
+                                {
+                                    enterpriseName: string;
+                                    productName: string;
+                                    services: string[];
                                 }
-                                return e.services.map((s) => ({
-                                    id: `${e.id}-${s.id}`,
-                                    enterpriseName: e.name,
-                                    productName: s.name,
-                                    services: s.categories || [],
-                                }));
-                            },
-                        )}
+                            >();
+
+                            enterpriseProductServices.forEach((eps) => {
+                                // Ensure we have valid names, skip if missing
+                                if (!eps.enterpriseName || !eps.productName)
+                                    return;
+
+                                const key = `${eps.enterpriseName}-${eps.productName}`;
+
+                                if (!enterpriseProductMap.has(key)) {
+                                    enterpriseProductMap.set(key, {
+                                        enterpriseName: eps.enterpriseName,
+                                        productName: eps.productName,
+                                        services: [],
+                                    });
+                                }
+
+                                const existing = enterpriseProductMap.get(key)!;
+                                if (
+                                    eps.serviceName &&
+                                    !existing.services.includes(eps.serviceName)
+                                ) {
+                                    existing.services.push(eps.serviceName);
+                                }
+                            });
+
+                            // Convert to EnterpriseConfigRow format
+                            console.log(
+                                '🗺️ Enterprise Product Map before conversion:',
+                                Array.from(enterpriseProductMap.entries()),
+                            );
+                            const rows: EnterpriseConfigRow[] = Array.from(
+                                enterpriseProductMap.entries(),
+                            ).map(([key, data]) => ({
+                                id: key,
+                                enterpriseName: data.enterpriseName,
+                                productName: data.productName,
+                                services: data.services,
+                            }));
+
+                            console.log(
+                                '🔄 Generated rows from database data:',
+                                rows,
+                            );
+                            console.log(
+                                '📊 enterpriseProductServices state:',
+                                enterpriseProductServices,
+                            );
+                            console.log('🔍 Search term:', searchTerm);
+
+                            // Apply search filter
+                            const searchLower = searchTerm.toLowerCase();
+                            const filteredRows = rows.filter(
+                                (row) =>
+                                    row.enterpriseName
+                                        .toLowerCase()
+                                        .includes(searchLower) ||
+                                    row.productName
+                                        .toLowerCase()
+                                        .includes(searchLower) ||
+                                    row.services.some((s) =>
+                                        s.toLowerCase().includes(searchLower),
+                                    ),
+                            );
+
+                            console.log(
+                                '✅ Final filtered rows for table:',
+                                filteredRows,
+                            );
+                            return filteredRows;
+                        })()}
                         onView={(row) => {
                             const ent = enterprises.find(
                                 (x) => x.name === row.enterpriseName,
