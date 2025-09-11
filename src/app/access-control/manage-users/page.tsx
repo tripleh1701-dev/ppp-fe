@@ -40,6 +40,7 @@ interface UserRecord {
     updatedAt: string; // ISO timestamp
     status?: 'Active' | 'Inactive';
     locked?: boolean;
+    assignedUserGroup?: Array<{id: string; name: string}>;
 }
 
 // Dynamic user groups - will be loaded from database
@@ -64,7 +65,141 @@ export default function ManageUsers() {
         Record<string, NodeJS.Timeout>
     >({});
 
+    // New state for animated buttons
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [selectedGroupBy, setSelectedGroupBy] = useState('');
+    const [sortVisible, setSortVisible] = useState(false);
+    const [hideColumnsVisible, setHideColumnsVisible] = useState(false);
+    const [groupByVisible, setGroupByVisible] = useState(false);
+
+    // State for sorting
+    const [sortConfig, setSortConfig] = useState<{
+        column: string;
+        direction: 'asc' | 'desc';
+    } | null>(null);
+
+    // State for filtering
+    const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+
+    // State for column visibility
+    const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+
+    // State for sliding pane backdrop
+    const [slidingPaneOpen, setSlidingPaneOpen] = useState(false);
+
+    // Set up global callback for sliding pane state
+    useEffect(() => {
+        // Set up global callback for sliding pane visibility
+        (window as any).setSlidingPaneOpen = setSlidingPaneOpen;
+
+        // Cleanup on unmount
+        return () => {
+            delete (window as any).setSlidingPaneOpen;
+        };
+    }, []);
+
     // Load users from backend on component mount
+    // Function to fetch group names from IDs
+    const fetchGroupNames = async (groupIds: number[]): Promise<any[]> => {
+        if (!groupIds || groupIds.length === 0) return [];
+
+        try {
+            console.log('🔄 Fetching group names for IDs:', groupIds);
+            const response = await fetch(
+                'http://localhost:4000/api/user-groups',
+            );
+
+            if (!response.ok) {
+                console.error('❌ Failed to fetch user groups');
+                return [];
+            }
+
+            const allGroups = await response.json();
+            console.log('📋 All available groups:', allGroups);
+
+            // Filter groups that match the provided IDs
+            const matchingGroups = allGroups.filter((group: any) =>
+                groupIds.includes(parseInt(group.id, 10)),
+            );
+
+            console.log('✅ Matching groups found:', matchingGroups);
+            return matchingGroups;
+        } catch (error) {
+            console.error('❌ Error fetching group names:', error);
+            return [];
+        }
+    };
+
+    // Function to remove a group from user
+    const removeGroupFromUser = async (
+        userId: string,
+        groupId: number,
+        groupName: string,
+    ): Promise<boolean> => {
+        try {
+            console.log(
+                `🔄 Removing group ${groupName} (ID: ${groupId}) from user ${userId}`,
+            );
+
+            const response = await fetch(
+                `http://localhost:4000/api/users/${userId}/remove-group/${groupId}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                },
+            );
+
+            if (response.ok) {
+                console.log(
+                    `✅ Successfully removed group ${groupName} from user`,
+                );
+
+                // Update UI - remove the group from both tableData and users state
+                setTableData((prevData) =>
+                    prevData.map((user) =>
+                        user.id === userId
+                            ? {
+                                  ...user,
+                                  assignedUserGroup:
+                                      user.assignedUserGroup.filter(
+                                          (group: any) => group.id !== groupId,
+                                      ),
+                                  assignedGroupIds:
+                                      user.assignedGroupIds.filter(
+                                          (id: number) => id !== groupId,
+                                      ),
+                              }
+                            : user,
+                    ),
+                );
+
+                setUsers((prevUsers) =>
+                    prevUsers.map((user) =>
+                        user.id === userId
+                            ? {
+                                  ...user,
+                                  assignedUserGroup:
+                                      user.assignedUserGroup?.filter(
+                                          (group: any) => group.id !== groupId,
+                                      ) || [],
+                              }
+                            : user,
+                    ),
+                );
+
+                return true;
+            } else {
+                console.error('❌ Failed to remove group from user');
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Error removing group from user:', error);
+            return false;
+        }
+    };
+
     useEffect(() => {
         const loadUsers = async () => {
             try {
@@ -93,38 +228,69 @@ export default function ManageUsers() {
 
                 // Handle direct array response from your API
                 if (Array.isArray(usersData) && usersData.length >= 0) {
+                    console.log('🔄 Processing users with assigned groups...');
+
                     // Transform backend data to match advanced table column structure exactly
-                    const transformedUsers = usersData.map((user, index) => ({
-                        // Required for table functionality
-                        id: user.id
-                            ? user.id.toString()
-                            : `temp-${Date.now()}-${index}`,
+                    const transformedUsers = await Promise.all(
+                        usersData.map(async (user, index) => {
+                            // Get assigned group IDs from the database column
+                            const assignedGroupIds =
+                                user.assigned_user_group || [];
+                            console.log(
+                                `👤 User ${user.firstName} ${user.lastName} has assigned groups:`,
+                                assignedGroupIds,
+                            );
 
-                        // Main table columns (matching ManageUsers_tableConfig.js)
-                        firstName: user.firstName || '',
-                        middleName: user.middleName || '',
-                        lastName: user.lastName || '',
-                        emailAddress: user.emailAddress || '',
-                        status: user.status || 'ACTIVE',
-                        startDate: user.startDate
-                            ? user.startDate.split('T')[0]
-                            : '', // Convert to YYYY-MM-DD
-                        endDate: user.endDate ? user.endDate.split('T')[0] : '',
-                        password: '••••••••', // Placeholder for security
-                        technicalUser: user.technicalUser || false,
-                        assignedUserGroup: [], // Will be loaded separately if needed
+                            // Fetch group names for assigned group IDs
+                            let assignedGroups: any[] = [];
+                            if (
+                                assignedGroupIds &&
+                                assignedGroupIds.length > 0
+                            ) {
+                                assignedGroups = await fetchGroupNames(
+                                    assignedGroupIds,
+                                );
+                            }
 
-                        // Additional metadata for table functionality
-                        createdAt: user.createdAt || '',
-                        updatedAt: user.updatedAt || '',
+                            return {
+                                // Required for table functionality
+                                id: user.id
+                                    ? user.id.toString()
+                                    : `temp-${Date.now()}-${index}`,
 
-                        // Table interaction properties
-                        selected: false,
-                        expanded: false,
-                        editing: false,
-                    }));
+                                // Main table columns (matching ManageUsers_tableConfig.js)
+                                firstName: user.firstName || '',
+                                middleName: user.middleName || '',
+                                lastName: user.lastName || '',
+                                emailAddress: user.emailAddress || '',
+                                status: user.status || 'ACTIVE',
+                                startDate: user.startDate
+                                    ? user.startDate.split('T')[0]
+                                    : '', // Convert to YYYY-MM-DD
+                                endDate: user.endDate
+                                    ? user.endDate.split('T')[0]
+                                    : '',
+                                password: '••••••••', // Placeholder for security
+                                technicalUser: user.technicalUser || false,
+                                assignedUserGroup: assignedGroups, // Loaded with group names
+                                assignedGroupIds: assignedGroupIds, // Keep IDs for reference
 
-                    console.log('🔄 Transformed users:', transformedUsers);
+                                // Additional metadata for table functionality
+                                createdAt: user.createdAt || '',
+                                updatedAt: user.updatedAt || '',
+
+                                // Table interaction properties
+                                selected: false,
+                                expanded: false,
+                                editing: false,
+                            };
+                        }),
+                    );
+
+                    console.log(
+                        '🔄 Transformed users with assigned groups:',
+                        transformedUsers,
+                    );
                     setTableData(transformedUsers);
 
                     // Also update the main users state for compatibility
@@ -168,6 +334,179 @@ export default function ManageUsers() {
         };
 
         loadUsers();
+
+        // Set up callback for user group assignment updates
+        (window as any).userGroupAssignmentCallback = (
+            userId: string,
+            groupsData: any[],
+            groupIds: number[],
+        ) => {
+            console.log('📋 Updating table data with group assignment:', {
+                userId,
+                groupsData,
+                groupIds,
+            });
+
+            // Update table data with the assigned groups (mark as saved)
+            setTableData((prevData) =>
+                prevData.map((row) =>
+                    row.id == userId || row.id === userId.toString()
+                        ? {
+                              ...row,
+                              assignedUserGroup: groupsData,
+                              assignedGroupIds: groupIds,
+                              pendingGroupAssignments: null, // Clear pending state on save
+                              // Add group count for UI display
+                              groupCount: groupIds.length,
+                          }
+                        : row,
+                ),
+            );
+
+            // Also update the main users state for consistency
+            setUsers((prevUsers) =>
+                prevUsers.map((user) =>
+                    user.id == userId || user.id === userId.toString()
+                        ? {
+                              ...user,
+                              assignedUserGroup: groupsData,
+                              assignedGroupIds: groupIds,
+                              pendingGroupAssignments: null,
+                              groupCount: groupIds.length,
+                          }
+                        : user,
+                ),
+            );
+
+            console.log(
+                `✅ Updated UI with ${groupIds.length} assigned groups for user ${userId}`,
+            );
+        };
+
+        // Set up callback for pending group selections (not yet saved)
+        (window as any).setPendingGroupAssignments = (
+            userId: string,
+            pendingGroups: any[],
+        ) => {
+            console.log('⏳ Setting pending group assignments:', {
+                userId,
+                pendingGroups,
+            });
+
+            setTableData((prevData) =>
+                prevData.map((row) =>
+                    row.id == userId || row.id === userId.toString()
+                        ? {
+                              ...row,
+                              pendingGroupAssignments: pendingGroups,
+                          }
+                        : row,
+                ),
+            );
+        };
+
+        // Set up callback for removing groups from users
+        (window as any).removeGroupFromUserCallback = removeGroupFromUser;
+
+        // Cleanup callback on unmount
+        return () => {
+            delete (window as any).userGroupAssignmentCallback;
+            delete (window as any).setPendingGroupAssignments;
+            delete (window as any).removeGroupFromUserCallback;
+        };
+    }, []);
+
+    // Handler functions for action buttons
+    const handleSort = (column: string) => {
+        setSortConfig((prev) => {
+            if (prev?.column === column) {
+                // Toggle direction
+                return {
+                    column,
+                    direction: prev.direction === 'asc' ? 'desc' : 'asc',
+                };
+            }
+            return {column, direction: 'asc'};
+        });
+        setSortVisible(false);
+    };
+
+    const handleFilter = (column: string, value: any) => {
+        setActiveFilters((prev) => ({
+            ...prev,
+            [column]: value,
+        }));
+    };
+
+    const clearFilters = () => {
+        setActiveFilters({});
+    };
+
+    const toggleColumnVisibility = (columnId: string) => {
+        setHiddenColumns((prev) => {
+            if (prev.includes(columnId)) {
+                return prev.filter((id) => id !== columnId);
+            } else {
+                return [...prev, columnId];
+            }
+        });
+    };
+
+    const handleGroupBy = (groupByColumn: string) => {
+        setSelectedGroupBy((prev) =>
+            prev === groupByColumn ? '' : groupByColumn,
+        );
+    };
+
+    // Filter and sort data based on current settings
+    const processedTableData = useMemo(() => {
+        let processed = [...tableData];
+
+        // Apply filters
+        Object.entries(activeFilters).forEach(([column, value]) => {
+            if (value) {
+                processed = processed.filter((row) => {
+                    const cellValue = row[column];
+                    if (typeof cellValue === 'string') {
+                        return cellValue
+                            .toLowerCase()
+                            .includes(value.toLowerCase());
+                    }
+                    return cellValue === value;
+                });
+            }
+        });
+
+        // Apply sorting
+        if (sortConfig) {
+            processed.sort((a, b) => {
+                const aVal = a[sortConfig.column];
+                const bVal = b[sortConfig.column];
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return processed;
+    }, [tableData, activeFilters, sortConfig]);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.relative')) {
+                setSortVisible(false);
+                setFilterVisible(false);
+                setGroupByVisible(false);
+                setHideColumnsVisible(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     // Auto-save function with debouncing
@@ -1066,7 +1405,7 @@ export default function ManageUsers() {
                 endDate: data.endDate || null,
                 password: 'TempPassword123!', // Should be handled differently in real app
                 technicalUser: (data as any).technicalUser || false,
-                assignedUserGroups: [], // Will be set separately
+                assignedUserGroups: (data as any).assignedGroupIds || [], // Include assigned group IDs
             };
 
             if (id) {
@@ -1124,7 +1463,15 @@ export default function ManageUsers() {
     };
 
     return (
-        <div className='h-full bg-secondary flex flex-col'>
+        <div className='h-full bg-secondary flex flex-col relative'>
+            {/* Backdrop for sliding pane */}
+            {slidingPaneOpen && (
+                <div
+                    className='fixed inset-0 bg-black bg-opacity-20 z-40 transition-all duration-300'
+                    style={{left: '0', top: '0', right: '0', bottom: '0'}}
+                />
+            )}
+
             <div className='bg-card border-b border-light px-6 py-4'>
                 <div className='flex items-center justify-between'>
                     <div>
@@ -1133,12 +1480,9 @@ export default function ManageUsers() {
                         </h1>
                         {/* DEBUG: Test Auto-Save Button */}
                         <p className='text-sm text-secondary mt-1'>
-                            Create, configure, and manage user accounts with
-                            comprehensive profile management. Set user status,
-                            assign roles and permissions, define access levels,
-                            manage user groups, configure start and end dates
-                            for account validity, and maintain secure password
-                            policies.
+                            Create and manage user accounts with roles,
+                            permissions, groups, access levels, and secure
+                            password policies.
                         </p>
                     </div>
                 </div>
@@ -1154,50 +1498,449 @@ export default function ManageUsers() {
                         Create New user
                     </button>
 
-                    <button
-                        onClick={() => setShowSearchBar((v) => !v)}
-                        className='inline-flex items-center px-3 py-2 border border-light rounded-lg text-sm text-primary bg-tertiary hover:bg-slate-200 transition'
-                        title='Toggle search'
-                    >
-                        <MagnifyingGlassIcon className='h-5 w-5 mr-2' />
-                        Search
-                    </button>
-                    <div
-                        className={`overflow-hidden transition-all duration-300 ${
-                            showSearchBar ? 'w-72 opacity-100' : 'w-0 opacity-0'
-                        }`}
-                    >
-                        <div className='relative w-72'>
-                            <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                    {/* Search Button */}
+                    <div className='flex items-center'>
+                        {showSearchBar && (
+                            <div className='relative w-72 mr-3'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                                </div>
+                                <input
+                                    type='text'
+                                    placeholder='Search users...'
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className='block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-400'
+                                    autoFocus
+                                />
                             </div>
-                            <input
-                                type='text'
-                                placeholder='Search users...'
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className='block w-full pl-10 pr-3 py-2.5 border border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-brand bg-card text-primary placeholder-secondary'
-                            />
-                        </div>
+                        )}
+                        <button
+                            onClick={() => setShowSearchBar((v) => !v)}
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                showSearchBar
+                                    ? 'border-blue-300 bg-blue-50 text-blue-600 shadow-blue-200 shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-lg'
+                            }`}
+                        >
+                            <svg
+                                className={`w-4 h-4 transition-transform duration-300 ${
+                                    showSearchBar
+                                        ? 'rotate-90'
+                                        : 'group-hover:scale-110'
+                                }`}
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                />
+                            </svg>
+                            <span className='text-sm'>Search</span>
+                            {showSearchBar && (
+                                <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-blue-500 rounded-full animate-pulse'></div>
+                            )}
+                        </button>
                     </div>
-                    <button
-                        className='inline-flex items-center px-3 py-2 border border-light rounded-lg text-sm text-primary bg-tertiary hover:bg-slate-200 transition'
-                        title='Filter'
-                    >
-                        <FunnelIcon className='h-5 w-5 mr-2' /> Filter
-                    </button>
-                    <button
-                        className='inline-flex items-center px-3 py-2 border border-light rounded-lg text-sm text-primary bg-tertiary hover:bg-slate-200 transition'
-                        title='Sort'
-                    >
-                        <ArrowsUpDownIcon className='h-5 w-5 mr-2' /> Sort
-                    </button>
-                    <button
-                        className='inline-flex items-center px-3 py-2 border border-light rounded-lg text-sm text-primary bg-tertiary hover:bg-slate-200 transition'
-                        title='Group by'
-                    >
-                        <Squares2X2Icon className='h-5 w-5 mr-2' /> Group by
-                    </button>
+
+                    {/* Filter Button */}
+                    <div className='relative'>
+                        <button
+                            onClick={() => setFilterVisible(!filterVisible)}
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                filterVisible ||
+                                Object.keys(activeFilters).length > 0
+                                    ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
+                            }`}
+                        >
+                            <svg
+                                className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z'
+                                />
+                            </svg>
+                            <span className='text-sm'>Filter</span>
+                            {Object.keys(activeFilters).length > 0 && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-bounce'></div>
+                            )}
+                            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                        </button>
+
+                        {/* Filter Dropdown */}
+                        {filterVisible && (
+                            <div className='absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-80'>
+                                <div className='p-4'>
+                                    <div className='text-sm font-medium text-gray-700 mb-3'>
+                                        Apply Filters:
+                                    </div>
+
+                                    {/* Status Filter */}
+                                    <div className='mb-3'>
+                                        <label className='block text-xs font-medium text-gray-600 mb-1'>
+                                            Status:
+                                        </label>
+                                        <select
+                                            value={activeFilters.status || ''}
+                                            onChange={(e) =>
+                                                handleFilter(
+                                                    'status',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                        >
+                                            <option value=''>
+                                                All Statuses
+                                            </option>
+                                            <option value='Active'>
+                                                Active
+                                            </option>
+                                            <option value='Inactive'>
+                                                Inactive
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    {/* First Name Filter */}
+                                    <div className='mb-3'>
+                                        <label className='block text-xs font-medium text-gray-600 mb-1'>
+                                            First Name:
+                                        </label>
+                                        <input
+                                            type='text'
+                                            value={
+                                                activeFilters.firstName || ''
+                                            }
+                                            onChange={(e) =>
+                                                handleFilter(
+                                                    'firstName',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder='Search by first name...'
+                                            className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                        />
+                                    </div>
+
+                                    {/* Email Filter */}
+                                    <div className='mb-4'>
+                                        <label className='block text-xs font-medium text-gray-600 mb-1'>
+                                            Email:
+                                        </label>
+                                        <input
+                                            type='text'
+                                            value={
+                                                activeFilters.emailAddress || ''
+                                            }
+                                            onChange={(e) =>
+                                                handleFilter(
+                                                    'emailAddress',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder='Search by email...'
+                                            className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                        />
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className='flex gap-2'>
+                                        <button
+                                            onClick={clearFilters}
+                                            className='px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded border border-red-200'
+                                        >
+                                            Clear All
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                setFilterVisible(false)
+                                            }
+                                            className='px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded border border-purple-200'
+                                        >
+                                            Apply
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Sort Button */}
+                    <div className='relative'>
+                        <button
+                            onClick={() => setSortVisible(!sortVisible)}
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                sortVisible || sortConfig
+                                    ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                            }`}
+                        >
+                            <svg
+                                className={`w-4 h-4 transition-transform duration-300 ${
+                                    sortVisible
+                                        ? 'rotate-180'
+                                        : 'group-hover:rotate-180'
+                                }`}
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12'
+                                />
+                            </svg>
+                            <span className='text-sm'>Sort</span>
+                            {sortConfig && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
+                            )}
+                            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                        </button>
+
+                        {/* Sort Dropdown */}
+                        {sortVisible && (
+                            <div className='absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-48'>
+                                <div className='p-2'>
+                                    <div className='text-xs font-medium text-gray-500 px-2 py-1 mb-1'>
+                                        Sort by:
+                                    </div>
+                                    {[
+                                        'firstName',
+                                        'lastName',
+                                        'emailAddress',
+                                        'status',
+                                        'startDate',
+                                    ].map((column) => (
+                                        <button
+                                            key={column}
+                                            onClick={() => handleSort(column)}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 flex items-center justify-between ${
+                                                sortConfig?.column === column
+                                                    ? 'bg-green-50 text-green-600'
+                                                    : 'text-gray-700'
+                                            }`}
+                                        >
+                                            <span className='capitalize'>
+                                                {column
+                                                    .replace(/([A-Z])/g, ' $1')
+                                                    .trim()}
+                                            </span>
+                                            {sortConfig?.column === column && (
+                                                <span className='text-xs'>
+                                                    {sortConfig.direction ===
+                                                    'asc'
+                                                        ? '↑'
+                                                        : '↓'}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                    {sortConfig && (
+                                        <div className='border-t border-gray-100 mt-1 pt-1'>
+                                            <button
+                                                onClick={() => {
+                                                    setSortConfig(null);
+                                                    setSortVisible(false);
+                                                }}
+                                                className='w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded'
+                                            >
+                                                Clear sorting
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Group By Button */}
+                    <div className='relative'>
+                        <button
+                            onClick={() => setGroupByVisible(!groupByVisible)}
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                selectedGroupBy
+                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                            }`}
+                        >
+                            <svg
+                                className={`w-4 h-4 transition-transform duration-300 ${
+                                    selectedGroupBy
+                                        ? 'rotate-45'
+                                        : 'group-hover:scale-110'
+                                }`}
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M19 11H5m14-7H5m14 14H5'
+                                />
+                            </svg>
+                            <span className='text-sm'>Group by</span>
+                            {selectedGroupBy && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
+                            )}
+                            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                        </button>
+
+                        {/* Group By Dropdown */}
+                        {groupByVisible && (
+                            <div className='absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-48'>
+                                <div className='p-2'>
+                                    <div className='text-xs font-medium text-gray-500 px-2 py-1 mb-1'>
+                                        Group by:
+                                    </div>
+                                    {[
+                                        {id: 'status', label: 'Status'},
+                                        {id: 'groupName', label: 'Group Name'},
+                                        {id: 'startDate', label: 'Start Date'},
+                                        {id: 'department', label: 'Department'},
+                                    ].map((option) => (
+                                        <button
+                                            key={option.id}
+                                            onClick={() => {
+                                                handleGroupBy(option.id);
+                                                setGroupByVisible(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 ${
+                                                selectedGroupBy === option.id
+                                                    ? 'bg-orange-50 text-orange-600'
+                                                    : 'text-gray-700'
+                                            }`}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                    {selectedGroupBy && (
+                                        <div className='border-t border-gray-100 mt-1 pt-1'>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedGroupBy('');
+                                                    setGroupByVisible(false);
+                                                }}
+                                                className='w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded'
+                                            >
+                                                Clear grouping
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Hide Columns Button */}
+                    <div className='relative'>
+                        <button
+                            onClick={() =>
+                                setHideColumnsVisible(!hideColumnsVisible)
+                            }
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                hiddenColumns.length > 0
+                                    ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                            }`}
+                        >
+                            <svg
+                                className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                />
+                            </svg>
+                            <span className='text-sm'>Hide</span>
+                            {hiddenColumns.length > 0 && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
+                            )}
+                            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-red-400 to-orange-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                        </button>
+
+                        {/* Hide Columns Dropdown */}
+                        {hideColumnsVisible && (
+                            <div className='absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-64'>
+                                <div className='p-3'>
+                                    <div className='text-sm font-medium text-gray-700 mb-3'>
+                                        Show/Hide Columns:
+                                    </div>
+                                    {[
+                                        {id: 'firstName', label: 'First Name'},
+                                        {id: 'lastName', label: 'Last Name'},
+                                        {id: 'emailAddress', label: 'Email'},
+                                        {id: 'startDate', label: 'Start Date'},
+                                        {id: 'endDate', label: 'End Date'},
+                                        {id: 'status', label: 'Status'},
+                                        {
+                                            id: 'assignedUserGroup',
+                                            label: 'User Groups',
+                                        },
+                                        {id: 'password', label: 'Password'},
+                                    ].map((column) => (
+                                        <label
+                                            key={column.id}
+                                            className='flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded cursor-pointer'
+                                        >
+                                            <span className='text-sm text-gray-700'>
+                                                {column.label}
+                                            </span>
+                                            <input
+                                                type='checkbox'
+                                                checked={
+                                                    !hiddenColumns.includes(
+                                                        column.id,
+                                                    )
+                                                }
+                                                onChange={() =>
+                                                    toggleColumnVisibility(
+                                                        column.id,
+                                                    )
+                                                }
+                                                className='w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500'
+                                            />
+                                        </label>
+                                    ))}
+                                    {hiddenColumns.length > 0 && (
+                                        <div className='border-t border-gray-100 mt-2 pt-2'>
+                                            <button
+                                                onClick={() => {
+                                                    setHiddenColumns([]);
+                                                    setHideColumnsVisible(
+                                                        false,
+                                                    );
+                                                }}
+                                                className='w-full text-left px-2 py-1 text-sm text-green-600 hover:bg-green-50 rounded'
+                                            >
+                                                Show All Columns
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* inline expanding search input is above; no dropdown */}
@@ -1266,7 +2009,7 @@ export default function ManageUsers() {
                                     config={
                                         {
                                             ...ManageUsers_tableConfig,
-                                            initialData: tableData,
+                                            initialData: processedTableData,
                                             savingStates: savingStates,
                                             customHeaderRenderer:
                                                 renderColumnHeader,
@@ -2243,7 +2986,7 @@ export default function ManageUsers() {
                                 config={
                                     {
                                         ...ManageUsers_tableConfig,
-                                        initialData: tableData,
+                                        initialData: processedTableData,
                                         savingStates: savingStates,
                                         customHeaderRenderer:
                                             renderColumnHeader,

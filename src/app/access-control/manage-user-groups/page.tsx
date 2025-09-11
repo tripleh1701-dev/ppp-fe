@@ -1,915 +1,925 @@
 'use client';
 
-import {useState, useEffect, useMemo} from 'react';
-import {motion, AnimatePresence} from 'framer-motion';
-import {
-    UserGroupIcon,
-    PlusIcon,
-    MagnifyingGlassIcon,
-    FunnelIcon,
-    EyeIcon,
-    PencilSquareIcon,
-    EllipsisVerticalIcon,
-    XMarkIcon,
-    CheckCircleIcon,
-    ChevronRightIcon,
-    SparklesIcon,
-    CogIcon,
-    UsersIcon,
-} from '@heroicons/react/24/outline';
-import {
-    UserGroupIcon as UserGroupSolidIcon,
-    CheckCircleIcon as CheckCircleSolidIcon,
-    StarIcon as StarSolidIcon,
-} from '@heroicons/react/24/solid';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import ReusableTableComponent from '@/components/reusable/ReusableTableComponent';
+import ManageUserGroups_tableConfig from '@/config/ManageUserGroups_tableConfig';
+import RolesCountCell from '@/components/RolesCountCell';
 
-interface UserGroupRecord {
+// Define types for better TypeScript support
+interface UserGroup {
     id: string;
-    name: string;
+    groupName: string;
     description: string;
-    group_code: string;
-    status: 'Active' | 'Inactive';
-    account_id: number;
-    enterprise_id: number;
-    entity_name: string;
+    entity: string;
+    service: string;
+    roles: string[];
+    status: string;
+    createdDate: string;
+    lastModified: string;
     memberCount: number;
-    created_at: string;
-    updated_at: string;
+    isNew?: boolean;
+}
+
+interface DropdownOption {
+    value: string;
+    label: string;
+    id?: string;
 }
 
 export default function ManageUserGroups() {
-    const [userGroups] = useState<UserGroupRecord[]>([
-        {
-            id: '1',
-            name: 'Finance Team',
-            description:
-                'Finance department users with budget management access',
-            group_code: 'FIN001',
-            status: 'Active',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'Finance',
-            memberCount: 12,
-            created_at: '2024-01-15T10:00:00Z',
-            updated_at: '2024-01-20T14:30:00Z',
-        },
-        {
-            id: '2',
-            name: 'HR Administrators',
-            description: 'Human Resources management and employee relations',
-            group_code: 'HR001',
-            status: 'Active',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'HR',
-            memberCount: 8,
-            created_at: '2024-01-16T09:00:00Z',
-            updated_at: '2024-01-22T11:15:00Z',
-        },
-        {
-            id: '3',
-            name: 'IT Support',
-            description:
-                'Technical support team for infrastructure maintenance',
-            group_code: 'IT001',
-            status: 'Active',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'IT Operations',
-            memberCount: 15,
-            created_at: '2024-01-17T13:00:00Z',
-            updated_at: '2024-01-23T16:45:00Z',
-        },
-        {
-            id: '4',
-            name: 'Sales Directors',
-            description: 'Sales leadership and strategy management',
-            group_code: 'SAL001',
-            status: 'Inactive',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'Sales',
-            memberCount: 5,
-            created_at: '2024-01-18T08:00:00Z',
-            updated_at: '2024-01-24T12:00:00Z',
-        },
-        {
-            id: '5',
-            name: 'Marketing Team',
-            description: 'Marketing and communications specialists',
-            group_code: 'MKT001',
-            status: 'Active',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'Marketing',
-            memberCount: 7,
-            created_at: '2024-01-19T11:00:00Z',
-            updated_at: '2024-01-25T09:30:00Z',
-        },
-        {
-            id: '6',
-            name: 'Quality Assurance',
-            description: 'Software testing and quality control',
-            group_code: 'QA001',
-            status: 'Active',
-            account_id: 1,
-            enterprise_id: 1,
-            entity_name: 'Engineering',
-            memberCount: 10,
-            created_at: '2024-01-20T11:00:00Z',
-            updated_at: '2024-01-26T15:30:00Z',
-        },
-    ]);
-
-    const [assignedGroups, setAssignedGroups] = useState<string[]>([
-        '1',
-        '3',
-        '5',
-    ]);
-    const [showAssignmentPanel, setShowAssignmentPanel] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<any>(null);
+    // State management
+    const [tableData, setTableData] = useState<UserGroup[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [searchVisible, setSearchVisible] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [assignmentProgress, setAssignmentProgress] = useState(0);
+    const [selectedGroupBy, setSelectedGroupBy] = useState('');
 
-    // Calculate progress
+    // State for action buttons
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [sortVisible, setSortVisible] = useState(false);
+    const [groupByVisible, setGroupByVisible] = useState(false);
+    const [hideColumnsVisible, setHideColumnsVisible] = useState(false);
+
+    // State for sorting, filtering, and column visibility
+    const [sortConfig, setSortConfig] = useState<{
+        column: string;
+        direction: 'asc' | 'desc';
+    } | null>(null);
+    const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+    const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+
+    // State for dropdown options
+    const [entities, setEntities] = useState<DropdownOption[]>([]);
+    const [services, setServices] = useState<DropdownOption[]>([]);
+    const [entitiesLoading, setEntitiesLoading] = useState(false);
+    const [servicesLoading, setServicesLoading] = useState(false);
+
+    // Fetch entities from backend API
+    const fetchEntities = useCallback(async () => {
+        setEntitiesLoading(true);
+        try {
+            const response = await fetch(
+                'http://localhost:4000/api/business-units/entities',
+            );
+            if (response.ok) {
+                const data = await response.json();
+                console.log('📦 Entities fetched:', data);
+
+                // Transform entities data to dropdown options format
+                const entityOptions = data.map((entity: any) => ({
+                    value: entity.name || entity.entityName || entity.id,
+                    label: entity.name || entity.entityName || entity.id,
+                    id: entity.id,
+                }));
+
+                setEntities(entityOptions);
+            } else {
+                console.warn('⚠️ Entities API returned:', response.status);
+                // Fallback to default entities
+                setEntities([
+                    {value: 'Finance', label: 'Finance'},
+                    {value: 'HR', label: 'HR'},
+                    {value: 'IT Operations', label: 'IT Operations'},
+                    {value: 'Sales', label: 'Sales'},
+                    {value: 'Marketing', label: 'Marketing'},
+                    {value: 'Engineering', label: 'Engineering'},
+                ]);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching entities:', error);
+            // Fallback to default entities
+            setEntities([
+                {value: 'Finance', label: 'Finance'},
+                {value: 'HR', label: 'HR'},
+                {value: 'IT Operations', label: 'IT Operations'},
+                {value: 'Sales', label: 'Sales'},
+                {value: 'Marketing', label: 'Marketing'},
+                {value: 'Engineering', label: 'Engineering'},
+            ]);
+        } finally {
+            setEntitiesLoading(false);
+        }
+    }, []);
+
+    // Fetch services from backend API
+    const fetchServices = useCallback(async () => {
+        setServicesLoading(true);
+        try {
+            const response = await fetch(
+                'http://localhost:4000/api/business-units/services',
+            );
+            if (response.ok) {
+                const data = await response.json();
+                console.log('📦 Services fetched:', data);
+
+                // Transform services data to dropdown options format
+                const serviceOptions = data.map((service: any) => ({
+                    value: service.name || service.serviceName || service.id,
+                    label: service.name || service.serviceName || service.id,
+                    id: service.id,
+                }));
+
+                setServices(serviceOptions);
+            } else {
+                console.warn('⚠️ Services API returned:', response.status);
+                // Fallback to default services
+                setServices([
+                    {value: 'Budget Management', label: 'Budget Management'},
+                    {value: 'Employee Relations', label: 'Employee Relations'},
+                    {value: 'Infrastructure', label: 'Infrastructure'},
+                    {
+                        value: 'Strategy Management',
+                        label: 'Strategy Management',
+                    },
+                    {value: 'Communications', label: 'Communications'},
+                    {value: 'Quality Control', label: 'Quality Control'},
+                ]);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching services:', error);
+            // Fallback to default services
+            setServices([
+                {value: 'Budget Management', label: 'Budget Management'},
+                {value: 'Employee Relations', label: 'Employee Relations'},
+                {value: 'Infrastructure', label: 'Infrastructure'},
+                {value: 'Strategy Management', label: 'Strategy Management'},
+                {value: 'Communications', label: 'Communications'},
+                {value: 'Quality Control', label: 'Quality Control'},
+            ]);
+        } finally {
+            setServicesLoading(false);
+        }
+    }, []);
+
+    // Load user groups data
+    const loadUserGroups = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Mock data for demonstration - replace with actual API call
+            const mockUserGroups = [
+                {
+                    id: '1',
+                    groupName: 'Finance Team',
+                    description:
+                        'Finance department users with budget management access',
+                    entity: 'Finance',
+                    service: 'Budget Management',
+                    roles: ['Financial Analyst', 'Budget Manager'],
+                    status: 'active',
+                    createdDate: '2024-01-15',
+                    lastModified: '2024-01-20T14:30:00Z',
+                    memberCount: 12,
+                },
+                {
+                    id: '2',
+                    groupName: 'HR Administrators',
+                    description:
+                        'Human Resources management and employee relations',
+                    entity: 'HR',
+                    service: 'Employee Relations',
+                    roles: ['HR Manager', 'Recruiter'],
+                    status: 'active',
+                    createdDate: '2024-01-16',
+                    lastModified: '2024-01-22T11:15:00Z',
+                    memberCount: 8,
+                },
+                {
+                    id: '3',
+                    groupName: 'IT Support',
+                    description:
+                        'Technical support team for infrastructure maintenance',
+                    entity: 'IT Operations',
+                    service: 'Infrastructure',
+                    roles: [
+                        'System Administrator',
+                        'Network Engineer',
+                        'Support Specialist',
+                    ],
+                    status: 'active',
+                    createdDate: '2024-01-17',
+                    lastModified: '2024-01-23T16:45:00Z',
+                    memberCount: 15,
+                },
+                {
+                    id: '4',
+                    groupName: 'Sales Directors',
+                    description: 'Sales leadership and strategy management',
+                    entity: 'Sales',
+                    service: 'Strategy Management',
+                    roles: ['Sales Director'],
+                    status: 'inactive',
+                    createdDate: '2024-01-18',
+                    lastModified: '2024-01-24T12:00:00Z',
+                    memberCount: 5,
+                },
+                {
+                    id: '5',
+                    groupName: 'Marketing Team',
+                    description: 'Marketing and communications specialists',
+                    entity: 'Marketing',
+                    service: 'Communications',
+                    roles: ['Marketing Manager', 'Content Specialist'],
+                    status: 'active',
+                    createdDate: '2024-01-19',
+                    lastModified: '2024-01-25T09:30:00Z',
+                    memberCount: 7,
+                },
+                {
+                    id: '6',
+                    groupName: 'Quality Assurance',
+                    description: 'Software testing and quality control',
+                    entity: 'Engineering',
+                    service: 'Quality Control',
+                    roles: ['QA Engineer', 'Test Manager'],
+                    status: 'active',
+                    createdDate: '2024-01-20',
+                    lastModified: '2024-01-26T15:30:00Z',
+                    memberCount: 10,
+                },
+            ];
+
+            setTableData(mockUserGroups);
+        } catch (error) {
+            console.error('Error loading user groups:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
-        setAssignmentProgress(
-            Math.floor((assignedGroups.length / userGroups.length) * 100),
-        );
-    }, [assignedGroups, userGroups]);
+        loadUserGroups();
+        fetchEntities();
+        fetchServices();
+    }, [loadUserGroups, fetchEntities, fetchServices]);
 
-    // Handle assignment toggle
-    const handleToggleAssignment = (groupId: string) => {
-        setAssignedGroups((prev) => {
-            return prev.includes(groupId)
-                ? prev.filter((id) => id !== groupId)
-                : [...prev, groupId];
+    // Handler functions for action buttons
+    const handleSort = (column: string) => {
+        setSortConfig((prev) => {
+            if (prev?.column === column) {
+                return {
+                    column,
+                    direction: prev.direction === 'asc' ? 'desc' : 'asc',
+                };
+            }
+            return {column, direction: 'asc'};
+        });
+        setSortVisible(false);
+    };
+
+    const handleFilter = (column: string, value: any) => {
+        setActiveFilters((prev) => ({
+            ...prev,
+            [column]: value,
+        }));
+    };
+
+    const clearFilters = () => {
+        setActiveFilters({});
+    };
+
+    const toggleColumnVisibility = (columnId: string) => {
+        setHiddenColumns((prev) => {
+            if (prev.includes(columnId)) {
+                return prev.filter((id) => id !== columnId);
+            } else {
+                return [...prev, columnId];
+            }
         });
     };
 
-    // Filter groups based on search
-    const filteredGroups = useMemo(() => {
-        if (!searchTerm) return userGroups;
-        return userGroups.filter(
-            (group) =>
-                group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                group.description
-                    .toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
-                group.entity_name
-                    .toLowerCase()
-                    .includes(searchTerm.toLowerCase()),
+    const handleGroupByAction = (groupByColumn: string) => {
+        setSelectedGroupBy((prev) =>
+            prev === groupByColumn ? '' : groupByColumn,
         );
-    }, [userGroups, searchTerm]);
+    };
 
-    const handleShowAssignments = (user: any) => {
-        setSelectedUser(user);
-        setShowAssignmentPanel(true);
+    // Process data with filters and sorting
+    const processedTableData = useMemo(() => {
+        let processed = [...tableData];
+
+        // Apply filters
+        Object.entries(activeFilters).forEach(([column, value]) => {
+            if (value) {
+                processed = processed.filter((row) => {
+                    const cellValue = row[column as keyof UserGroup];
+                    if (typeof cellValue === 'string') {
+                        return cellValue
+                            .toLowerCase()
+                            .includes(value.toLowerCase());
+                    }
+                    return cellValue === value;
+                });
+            }
+        });
+
+        // Apply sorting
+        if (sortConfig) {
+            processed.sort((a, b) => {
+                const aVal = a[sortConfig.column as keyof UserGroup];
+                const bVal = b[sortConfig.column as keyof UserGroup];
+
+                if (!aVal && !bVal) return 0;
+                if (!aVal) return 1;
+                if (!bVal) return -1;
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return processed;
+    }, [tableData, activeFilters, sortConfig]);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.relative')) {
+                setSortVisible(false);
+                setFilterVisible(false);
+                setGroupByVisible(false);
+                setHideColumnsVisible(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle user group creation
+    const handleCreateUserGroup = () => {
+        // Create a new blank row with unique ID
+        const newUserGroup = {
+            id: `new-${Date.now()}`, // Temporary ID for new rows
+            groupName: '',
+            description: '',
+            entity: '',
+            service: '',
+            roles: [],
+            status: 'active',
+            createdDate: new Date().toISOString().split('T')[0],
+            lastModified: new Date().toISOString(),
+            memberCount: 0,
+            isNew: true, // Flag to identify new rows
+        };
+
+        // Add the new row at the top of the table
+        setTableData((prevData) => [newUserGroup, ...prevData]);
+        console.log('✅ Added new blank row at top of table');
+    };
+
+    // Handle role management for a user group
+    const handleManageRoles = (groupData: UserGroup) => {
+        console.log('Manage roles for group:', groupData);
+        // This could open a roles assignment modal or navigate to a roles page
+    };
+
+    // Create dynamic table configuration with API-fetched options
+    const dynamicTableConfig = useMemo(() => {
+        // Clone the base configuration
+        const config = JSON.parse(JSON.stringify(ManageUserGroups_tableConfig));
+
+        // Update Entity column options
+        const entityColumn = config.mainTableColumns.find(
+            (col: any) => col.id === 'entity',
+        );
+        if (entityColumn && entities.length > 0) {
+            entityColumn.options = entities;
+        }
+
+        // Update Service column options
+        const serviceColumn = config.mainTableColumns.find(
+            (col: any) => col.id === 'service',
+        );
+        if (serviceColumn && services.length > 0) {
+            serviceColumn.options = services;
+        }
+
+        // Note: Conditionally editable functionality will be handled
+        // through custom renderers in the ReusableTableComponent config
+
+        return config;
+    }, [entities, services]);
+
+    // Handle user group actions
+    const handleGroupAction = (
+        action: string,
+        groupId: string,
+        groupData: UserGroup,
+    ) => {
+        console.log('Group action:', action, groupId, groupData);
+        switch (action) {
+            case 'save':
+                // Handle saving new or edited groups
+                if (groupData.isNew) {
+                    // Generate a real ID for the new group
+                    const savedGroup = {
+                        ...groupData,
+                        id: `group-${Date.now()}`,
+                        isNew: false,
+                        lastModified: new Date().toISOString(),
+                    };
+
+                    setTableData((prev) =>
+                        prev.map((group) =>
+                            group.id === groupId ? savedGroup : group,
+                        ),
+                    );
+                    console.log('✅ Saved new group:', savedGroup);
+                } else {
+                    // Update existing group
+                    setTableData((prev) =>
+                        prev.map((group) =>
+                            group.id === groupId
+                                ? {
+                                      ...groupData,
+                                      lastModified: new Date().toISOString(),
+                                  }
+                                : group,
+                        ),
+                    );
+                    console.log('✅ Updated existing group:', groupData);
+                }
+                break;
+            case 'edit':
+                // Open edit modal
+                console.log('Edit group:', groupId);
+                break;
+            case 'duplicate':
+                // Duplicate group
+                const duplicatedGroup = {
+                    ...groupData,
+                    id: `new-${Date.now()}`,
+                    groupName: `${groupData.groupName} (Copy)`,
+                    isNew: true,
+                    createdDate: new Date().toISOString().split('T')[0],
+                    lastModified: new Date().toISOString(),
+                };
+                setTableData((prev) => [duplicatedGroup, ...prev]);
+                console.log('✅ Duplicated group:', duplicatedGroup);
+                break;
+            case 'delete':
+                // Implement delete logic
+                setTableData((prev) =>
+                    prev.filter((group) => group.id !== groupId),
+                );
+                console.log('✅ Deleted group:', groupId);
+                break;
+            case 'cancel':
+                // Cancel editing new row
+                if (groupData.isNew) {
+                    setTableData((prev) =>
+                        prev.filter((group) => group.id !== groupId),
+                    );
+                    console.log('✅ Cancelled new group creation');
+                }
+                break;
+            default:
+                console.log('Unknown action:', action);
+        }
+    };
+
+    // Toggle search visibility
+    const toggleSearch = () => {
+        setSearchVisible(!searchVisible);
+        if (searchVisible) {
+            setSearchTerm('');
+        }
+    };
+
+    // Handle group by selection
+    const handleGroupByChange = (groupBy: string) => {
+        setSelectedGroupBy(groupBy);
+    };
+
+    // Enhanced Column Header Renderer with Icons
+    const renderColumnHeader = (column: any) => {
+        const getColumnIcon = (columnId: string) => {
+            const icons = {
+                groupName: (
+                    <svg
+                        width='14'
+                        height='14'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        className='cell-icon'
+                    >
+                        {/* Users/Group icon */}
+                        <path
+                            d='M17 21V19C17 15.1340 14.8660 12 11 12C7.13401 12 5 15.1340 5 19V21'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                        <circle
+                            cx='11'
+                            cy='7'
+                            r='4'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                        />
+                        <path
+                            d='M22 21V19C22 15.1340 19.8660 12 16 12C17.5 12 19 13.5 19 15.5'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                    </svg>
+                ),
+                description: (
+                    <svg
+                        width='14'
+                        height='14'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        className='cell-icon'
+                    >
+                        {/* Text/Description icon */}
+                        <path
+                            d='M4 7H20'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                        <path
+                            d='M4 12H16'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                        <path
+                            d='M4 17H12'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                    </svg>
+                ),
+                entity: (
+                    <svg
+                        width='14'
+                        height='14'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        className='cell-icon'
+                    >
+                        {/* Building/Organization icon */}
+                        <path
+                            d='M3 21H21M5 21V7L12 3L19 7V21'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                        <path
+                            d='M9 9H11M9 12H11M9 15H11M13 9H15M13 12H15M13 15H15'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                    </svg>
+                ),
+                service: (
+                    <svg
+                        width='14'
+                        height='14'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        className='cell-icon'
+                    >
+                        {/* Gear/Settings icon */}
+                        <circle
+                            cx='12'
+                            cy='12'
+                            r='3'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                        />
+                        <path
+                            d='M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                    </svg>
+                ),
+                roles: (
+                    <svg
+                        width='14'
+                        height='14'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        className='cell-icon'
+                    >
+                        {/* Document/Roles icon */}
+                        <path
+                            d='M4 4H16L20 8V20C20 20.5304 19.7893 21.0391 19.4142 21.4142C19.0391 21.7893 18.5304 22 18 22H6C5.46957 22 4.96086 21.7893 4.58579 21.4142C4.21071 21.0391 4 20.5304 4 20V4Z'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                        <path
+                            d='M8 12H12M8 16H16'
+                            stroke='currentColor'
+                            strokeWidth='1.8'
+                            strokeLinecap='round'
+                        />
+                        <circle
+                            cx='16'
+                            cy='18'
+                            r='2'
+                            stroke='currentColor'
+                            strokeWidth='1.5'
+                        />
+                    </svg>
+                ),
+            };
+
+            return icons[columnId as keyof typeof icons] || null;
+        };
+
+        if (column.id === 'checkbox') {
+            return null; // No icon for checkbox column
+        }
+
+        return (
+            <div className='header-content modern-header'>
+                <div className='header-text-with-icon'>
+                    {getColumnIcon(column.id)}
+                    <span>{column.title}</span>
+                </div>
+            </div>
+        );
     };
 
     return (
-        <div className='min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'>
-            {/* Modern Header */}
-            <div className='bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm sticky top-0 z-30'>
-                <div className='max-w-7xl mx-auto px-6 py-6'>
-                    <div className='flex items-center justify-between'>
-                        <div className='flex items-center gap-4'>
-                            <motion.div
-                                initial={{scale: 0, rotate: -180}}
-                                animate={{scale: 1, rotate: 0}}
-                                transition={{duration: 0.6, type: 'spring'}}
-                                className='p-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg'
-                            >
-                                <UserGroupSolidIcon className='h-8 w-8 text-white' />
-                            </motion.div>
-                            <div>
-                                <motion.h1
-                                    initial={{opacity: 0, x: -20}}
-                                    animate={{opacity: 1, x: 0}}
-                                    className='text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent'
-                                >
-                                    User Groups Management
-                                </motion.h1>
-                                <motion.p
-                                    initial={{opacity: 0, x: -20}}
-                                    animate={{opacity: 1, x: 0}}
-                                    transition={{delay: 0.1}}
-                                    className='text-sm text-slate-500 mt-1 flex items-center gap-4'
-                                >
-                                    <span className='inline-flex items-center gap-1'>
-                                        <CogIcon className='h-4 w-4' />
-                                        ACME Corporation
-                                    </span>
-                                    <span className='w-1 h-1 bg-slate-300 rounded-full'></span>
-                                    <span className='inline-flex items-center gap-1'>
-                                        <SparklesIcon className='h-4 w-4' />
-                                        Enterprise Solutions
-                                    </span>
-                                </motion.p>
-                            </div>
-                        </div>
-
-                        {/* Beautiful Assignment Status Button */}
-                        <motion.button
-                            initial={{opacity: 0, scale: 0.8}}
-                            animate={{opacity: 1, scale: 1}}
-                            transition={{delay: 0.3, type: 'spring'}}
-                            whileHover={{scale: 1.02, y: -2}}
-                            whileTap={{scale: 0.98}}
-                            onClick={() =>
-                                handleShowAssignments({
-                                    name: 'Administrator',
-                                    role: 'System Admin',
-                                })
-                            }
-                            className='group relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-2xl font-medium shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center gap-4 overflow-hidden'
-                        >
-                            {/* Animated background */}
-                            <div className='absolute inset-0 bg-gradient-to-r from-blue-400/20 via-indigo-400/20 to-purple-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
-
-                            <div className='relative flex items-center gap-4'>
-                                <div className='p-2 bg-white/20 backdrop-blur-sm rounded-xl'>
-                                    <UserGroupSolidIcon className='h-6 w-6' />
-                                </div>
-                                <div className='text-left'>
-                                    <div className='text-lg font-bold'>
-                                        User Assignments
-                                    </div>
-                                    <div className='text-sm text-blue-100'>
-                                        {assignedGroups.length} of{' '}
-                                        {userGroups.length} groups assigned
-                                    </div>
-                                </div>
-
-                                {/* Circular Progress Ring */}
-                                <div className='relative'>
-                                    <svg
-                                        className='w-16 h-16 transform -rotate-90'
-                                        viewBox='0 0 64 64'
-                                    >
-                                        <circle
-                                            cx='32'
-                                            cy='32'
-                                            r='28'
-                                            fill='none'
-                                            stroke='rgba(255,255,255,0.2)'
-                                            strokeWidth='4'
-                                        />
-                                        <motion.circle
-                                            cx='32'
-                                            cy='32'
-                                            r='28'
-                                            fill='none'
-                                            stroke='white'
-                                            strokeWidth='4'
-                                            strokeLinecap='round'
-                                            initial={{
-                                                strokeDasharray: '0 175.9',
-                                            }}
-                                            animate={{
-                                                strokeDasharray: `${
-                                                    (assignmentProgress / 100) *
-                                                    175.9
-                                                } 175.9`,
-                                            }}
-                                            transition={{
-                                                duration: 1,
-                                                ease: 'easeOut',
-                                            }}
-                                        />
-                                    </svg>
-                                    <div className='absolute inset-0 flex items-center justify-center'>
-                                        <div className='text-center'>
-                                            <div className='text-lg font-bold text-white'>
-                                                {assignmentProgress}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.button>
+        <div className='min-h-screen bg-gray-50'>
+            {/* Page Header */}
+            <div className='bg-white border-b border-gray-200'>
+                <div className='px-6 py-4'>
+                    <div>
+                        <h1 className='text-2xl font-bold text-gray-900'>
+                            Manage User Groups
+                        </h1>
+                        <p className='mt-1 text-sm text-gray-500'>
+                            Create, edit, and manage user groups and their role
+                            assignments
+                        </p>
                     </div>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className='max-w-7xl mx-auto p-6'>
-                {/* Search and Actions Bar */}
-                <motion.div
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{delay: 0.2}}
-                    className='bg-white/60 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 p-6 mb-8'
-                >
-                    <div className='flex items-center justify-between gap-6'>
-                        <div className='flex-1 max-w-lg'>
-                            <div className='relative'>
-                                <MagnifyingGlassIcon className='absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400' />
+            {/* Actions Bar */}
+            <div className='bg-white border-b border-gray-200'>
+                <div className='px-6 py-4'>
+                    <div className='flex items-center space-x-4'>
+                        {/* Create button */}
+                        <button
+                            onClick={handleCreateUserGroup}
+                            className='inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                        >
+                            <svg
+                                className='w-4 h-4 mr-2'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M12 4v16m8-8H4'
+                                />
+                            </svg>
+                            Create New User Group
+                        </button>
+
+                        {/* Search Input - appears when search is active */}
+                        {searchVisible && (
+                            <div className='flex items-center'>
                                 <input
                                     type='text'
-                                    placeholder='Search user groups, descriptions, entities...'
+                                    placeholder='Search user groups...'
                                     value={searchTerm}
                                     onChange={(e) =>
                                         setSearchTerm(e.target.value)
                                     }
-                                    className='w-full pl-12 pr-6 py-4 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 placeholder-slate-400'
+                                    className='w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                                    autoFocus
                                 />
                             </div>
-                        </div>
-                        <div className='flex items-center gap-4'>
-                            <motion.button
-                                whileHover={{scale: 1.05, rotate: 5}}
-                                whileTap={{scale: 0.95}}
-                                className='p-4 bg-white/80 backdrop-blur-sm hover:bg-slate-100/80 rounded-2xl transition-all duration-300 shadow-md hover:shadow-lg'
+                        )}
+
+                        {/* Action Buttons - left-aligned after Create button */}
+                        <div className='flex items-center space-x-3'>
+                            {/* Search Button */}
+                            <button
+                                onClick={toggleSearch}
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    searchVisible
+                                        ? 'border-blue-300 bg-blue-50 text-blue-600 shadow-blue-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-lg'
+                                }`}
                             >
-                                <FunnelIcon className='h-5 w-5 text-slate-600' />
-                            </motion.button>
-                            <motion.button
-                                whileHover={{scale: 1.02, y: -1}}
-                                whileTap={{scale: 0.98}}
-                                className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3'
+                                <svg
+                                    className={`w-4 h-4 transition-transform duration-300 ${
+                                        searchVisible
+                                            ? 'rotate-90'
+                                            : 'group-hover:scale-110'
+                                    }`}
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                    />
+                                </svg>
+                                <span className='text-sm'>Search</span>
+                                {searchVisible && (
+                                    <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-blue-500 rounded-full animate-pulse'></div>
+                                )}
+                            </button>
+
+                            {/* Filter Button */}
+                            <button
+                                onClick={() => setFilterVisible(!filterVisible)}
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    Object.keys(activeFilters).length > 0
+                                        ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
+                                }`}
                             >
-                                <PlusIcon className='h-5 w-5' />
-                                Add New Group
-                            </motion.button>
+                                <svg
+                                    className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z'
+                                    />
+                                </svg>
+                                <span className='text-sm'>Filter</span>
+                                {Object.keys(activeFilters).length > 0 && (
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-bounce'></div>
+                                )}
+                                <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                            </button>
+
+                            {/* Sort Button */}
+                            <button
+                                onClick={() => handleSort('groupName')}
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    sortConfig
+                                        ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                                }`}
+                            >
+                                <svg
+                                    className={`w-4 h-4 transition-transform duration-300 ${
+                                        sortConfig
+                                            ? 'rotate-180'
+                                            : 'group-hover:rotate-180'
+                                    }`}
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12'
+                                    />
+                                </svg>
+                                <span className='text-sm'>
+                                    Sort{' '}
+                                    {sortConfig && `(${sortConfig.direction})`}
+                                </span>
+                                {sortConfig && (
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
+                                )}
+                                <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                            </button>
+
+                            {/* Group By Button */}
+                            <button
+                                onClick={() => handleGroupByAction('entity')}
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    selectedGroupBy
+                                        ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                                }`}
+                            >
+                                <svg
+                                    className={`w-4 h-4 transition-transform duration-300 ${
+                                        selectedGroupBy
+                                            ? 'rotate-45'
+                                            : 'group-hover:scale-110'
+                                    }`}
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M19 11H5m14-7H5m14 14H5'
+                                    />
+                                </svg>
+                                <span className='text-sm'>Group by</span>
+                                {selectedGroupBy && (
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
+                                )}
+                                <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                            </button>
                         </div>
                     </div>
-                </motion.div>
-
-                {/* Modern User Groups Grid */}
-                <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8'>
-                    <AnimatePresence mode='wait'>
-                        {filteredGroups.map((group, index) => {
-                            const isAssigned = assignedGroups.includes(
-                                group.id,
-                            );
-                            return (
-                                <motion.div
-                                    key={group.id}
-                                    layout
-                                    initial={{opacity: 0, y: 20, scale: 0.9}}
-                                    animate={{opacity: 1, y: 0, scale: 1}}
-                                    exit={{opacity: 0, y: -20, scale: 0.9}}
-                                    transition={{
-                                        delay: index * 0.1,
-                                        type: 'spring',
-                                        stiffness: 300,
-                                        damping: 30,
-                                    }}
-                                    whileHover={{y: -8, scale: 1.02}}
-                                    className={`
-                                        group relative bg-white/80 backdrop-blur-xl rounded-3xl border-2 transition-all duration-500 cursor-pointer overflow-hidden
-                                        ${
-                                            isAssigned
-                                                ? 'border-blue-200 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 shadow-blue-100/50 shadow-xl'
-                                                : 'border-slate-200/60 hover:border-blue-300/60 hover:shadow-xl hover:shadow-slate-200/50'
-                                        }
-                                    `}
-                                    onClick={() =>
-                                        handleToggleAssignment(group.id)
-                                    }
-                                >
-                                    {/* Gradient overlay for assigned items */}
-                                    {isAssigned && (
-                                        <motion.div
-                                            initial={{opacity: 0}}
-                                            animate={{opacity: 1}}
-                                            className='absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-purple-500/5 pointer-events-none'
-                                        />
-                                    )}
-
-                                    {/* Card Content */}
-                                    <div className='relative p-8'>
-                                        {/* Header */}
-                                        <div className='flex items-start justify-between mb-6'>
-                                            <motion.div
-                                                whileHover={{
-                                                    scale: 1.1,
-                                                    rotate: 5,
-                                                }}
-                                                className={`
-                                                    p-4 rounded-2xl transition-all duration-300 shadow-lg
-                                                    ${
-                                                        isAssigned
-                                                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/25'
-                                                            : 'bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-600 group-hover:shadow-blue-200/50'
-                                                    }
-                                                `}
-                                            >
-                                                {isAssigned ? (
-                                                    <CheckCircleSolidIcon className='h-7 w-7' />
-                                                ) : (
-                                                    <UserGroupIcon className='h-7 w-7' />
-                                                )}
-                                            </motion.div>
-
-                                            <div className='flex items-center gap-2'>
-                                                <span
-                                                    className={`
-                                                    px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm
-                                                    ${
-                                                        group.status ===
-                                                        'Active'
-                                                            ? 'bg-emerald-100 text-emerald-700 shadow-emerald-200/50'
-                                                            : 'bg-red-100 text-red-700 shadow-red-200/50'
-                                                    }
-                                                `}
-                                                >
-                                                    {group.status}
-                                                </span>
-                                                <motion.button
-                                                    whileHover={{scale: 1.1}}
-                                                    whileTap={{scale: 0.9}}
-                                                    className='p-2 hover:bg-slate-100 rounded-xl transition-colors'
-                                                    onClick={(e) =>
-                                                        e.stopPropagation()
-                                                    }
-                                                >
-                                                    <EllipsisVerticalIcon className='h-4 w-4 text-slate-400' />
-                                                </motion.button>
-                                            </div>
-                                        </div>
-
-                                        {/* Group Details */}
-                                        <div className='mb-6'>
-                                            <h3
-                                                className={`text-xl font-bold mb-3 transition-colors duration-300 ${
-                                                    isAssigned
-                                                        ? 'text-blue-900'
-                                                        : 'text-slate-900 group-hover:text-blue-600'
-                                                }`}
-                                            >
-                                                {group.name}
-                                            </h3>
-                                            <p className='text-sm text-slate-600 leading-relaxed line-clamp-2'>
-                                                {group.description}
-                                            </p>
-                                        </div>
-
-                                        {/* Group Info Grid */}
-                                        <div className='space-y-3 mb-6'>
-                                            <div className='flex items-center justify-between'>
-                                                <span className='text-sm text-slate-500 font-medium'>
-                                                    Entity
-                                                </span>
-                                                <span className='text-sm font-semibold text-slate-700 bg-slate-100/80 backdrop-blur-sm px-3 py-1.5 rounded-xl'>
-                                                    {group.entity_name}
-                                                </span>
-                                            </div>
-                                            <div className='flex items-center justify-between'>
-                                                <span className='text-sm text-slate-500 font-medium'>
-                                                    Members
-                                                </span>
-                                                <span className='text-sm font-semibold text-slate-700 flex items-center gap-2'>
-                                                    <UsersIcon className='h-4 w-4 text-blue-500' />
-                                                    {group.memberCount}
-                                                </span>
-                                            </div>
-                                            <div className='flex items-center justify-between'>
-                                                <span className='text-sm text-slate-500 font-medium'>
-                                                    Code
-                                                </span>
-                                                <span className='text-xs font-mono bg-slate-100/80 backdrop-blur-sm px-3 py-1.5 rounded-xl text-slate-600 font-semibold'>
-                                                    {group.group_code}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className='flex items-center gap-3'>
-                                            <motion.button
-                                                whileHover={{scale: 1.05}}
-                                                whileTap={{scale: 0.95}}
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                                className='flex-1 p-3 bg-slate-100/80 hover:bg-slate-200/80 rounded-xl transition-all duration-300 flex items-center justify-center gap-2'
-                                            >
-                                                <EyeIcon className='h-4 w-4 text-slate-600' />
-                                                <span className='text-sm font-medium text-slate-700'>
-                                                    View
-                                                </span>
-                                            </motion.button>
-                                            <motion.button
-                                                whileHover={{scale: 1.05}}
-                                                whileTap={{scale: 0.95}}
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                                className='flex-1 p-3 bg-blue-100/80 hover:bg-blue-200/80 rounded-xl transition-all duration-300 flex items-center justify-center gap-2'
-                                            >
-                                                <PencilSquareIcon className='h-4 w-4 text-blue-600' />
-                                                <span className='text-sm font-medium text-blue-700'>
-                                                    Edit
-                                                </span>
-                                            </motion.button>
-                                        </div>
-                                    </div>
-
-                                    {/* Assignment Status Indicator */}
-                                    {isAssigned && (
-                                        <motion.div
-                                            initial={{scaleX: 0}}
-                                            animate={{scaleX: 1}}
-                                            className='absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600'
-                                        />
-                                    )}
-                                </motion.div>
-                            );
-                        })}
-                    </AnimatePresence>
                 </div>
-
-                {/* Empty State */}
-                {filteredGroups.length === 0 && (
-                    <motion.div
-                        initial={{opacity: 0, scale: 0.9}}
-                        animate={{opacity: 1, scale: 1}}
-                        className='text-center py-20 bg-white/60 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20'
-                    >
-                        <motion.div
-                            initial={{scale: 0}}
-                            animate={{scale: 1}}
-                            transition={{delay: 0.2, type: 'spring'}}
-                            className='p-6 bg-gradient-to-r from-slate-100 to-blue-100 rounded-3xl w-24 h-24 mx-auto mb-6 flex items-center justify-center'
-                        >
-                            <UserGroupIcon className='h-12 w-12 text-slate-400' />
-                        </motion.div>
-                        <h3 className='text-2xl font-bold text-slate-900 mb-4'>
-                            No user groups found
-                        </h3>
-                        <p className='text-slate-500 mb-8 max-w-md mx-auto leading-relaxed'>
-                            {searchTerm
-                                ? "Try adjusting your search terms to find what you're looking for"
-                                : 'Create your first user group to get started with access management'}
-                        </p>
-                        <motion.button
-                            whileHover={{scale: 1.05, y: -2}}
-                            whileTap={{scale: 0.95}}
-                            className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-xl hover:shadow-2xl transition-all duration-300'
-                        >
-                            Create User Group
-                        </motion.button>
-                    </motion.div>
-                )}
             </div>
 
-            {/* Ultra-Modern Sliding Assignment Panel */}
-            <AnimatePresence>
-                {showAssignmentPanel && (
-                    <>
-                        {/* Enhanced Backdrop */}
-                        <motion.div
-                            initial={{opacity: 0}}
-                            animate={{opacity: 1}}
-                            exit={{opacity: 0}}
-                            transition={{duration: 0.3}}
-                            className='fixed inset-0 bg-black/40 backdrop-blur-md z-40'
-                            onClick={() => setShowAssignmentPanel(false)}
-                        />
-
-                        {/* Ultra-Modern Sliding Panel */}
-                        <motion.div
-                            initial={{x: '100%', opacity: 0}}
-                            animate={{x: 0, opacity: 1}}
-                            exit={{x: '100%', opacity: 0}}
-                            transition={{
-                                type: 'spring',
-                                stiffness: 300,
-                                damping: 30,
-                                duration: 0.6,
-                            }}
-                            className='fixed right-0 top-0 h-full w-[480px] bg-white/95 backdrop-blur-2xl shadow-2xl z-50 flex flex-col border-l border-white/20'
-                        >
-                            {/* Panel Header with Animated Gradient */}
-                            <div className='relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-8 overflow-hidden'>
-                                {/* Animated background particles */}
-                                <div className='absolute inset-0 opacity-20'>
-                                    {[...Array(6)].map((_, i) => (
-                                        <motion.div
-                                            key={i}
-                                            className='absolute w-2 h-2 bg-white rounded-full'
-                                            animate={{
-                                                x: [0, 100, 0],
-                                                y: [0, -50, 0],
-                                                opacity: [0, 1, 0],
-                                            }}
-                                            transition={{
-                                                duration: 3,
-                                                repeat: Infinity,
-                                                delay: i * 0.5,
-                                            }}
-                                            style={{
-                                                left: `${20 + i * 15}%`,
-                                                top: `${30 + i * 10}%`,
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-
-                                <div className='relative'>
-                                    <div className='flex items-center justify-between mb-8'>
-                                        <div className='flex items-center gap-4'>
-                                            <motion.div
-                                                initial={{
-                                                    scale: 0,
-                                                    rotate: -180,
-                                                }}
-                                                animate={{scale: 1, rotate: 0}}
-                                                transition={{
-                                                    duration: 0.6,
-                                                    type: 'spring',
-                                                }}
-                                                className='p-4 bg-white/20 backdrop-blur-sm rounded-2xl'
-                                            >
-                                                <UserGroupSolidIcon className='h-8 w-8' />
-                                            </motion.div>
-                                            <div>
-                                                <motion.h3
-                                                    initial={{
-                                                        opacity: 0,
-                                                        x: -20,
-                                                    }}
-                                                    animate={{opacity: 1, x: 0}}
-                                                    className='text-2xl font-bold'
-                                                >
-                                                    Assignment Manager
-                                                </motion.h3>
-                                                <motion.p
-                                                    initial={{
-                                                        opacity: 0,
-                                                        x: -20,
-                                                    }}
-                                                    animate={{opacity: 1, x: 0}}
-                                                    transition={{delay: 0.1}}
-                                                    className='text-blue-100 text-sm'
-                                                >
-                                                    {selectedUser?.name ||
-                                                        'Administrator'}{' '}
-                                                    •{' '}
-                                                    {selectedUser?.role ||
-                                                        'System Management'}
-                                                </motion.p>
-                                            </div>
-                                        </div>
-                                        <motion.button
-                                            whileHover={{
-                                                scale: 1.1,
-                                                rotate: 90,
-                                            }}
-                                            whileTap={{scale: 0.9}}
-                                            onClick={() =>
-                                                setShowAssignmentPanel(false)
-                                            }
-                                            className='p-3 hover:bg-white/20 rounded-2xl transition-all duration-300'
-                                        >
-                                            <XMarkIcon className='h-6 w-6' />
-                                        </motion.button>
-                                    </div>
-
-                                    {/* Ultra-Modern Progress Display */}
-                                    <motion.div
-                                        initial={{opacity: 0, y: 20}}
-                                        animate={{opacity: 1, y: 0}}
-                                        transition={{delay: 0.3}}
-                                        className='bg-white/10 backdrop-blur-sm rounded-3xl p-6 border border-white/20'
-                                    >
-                                        <div className='flex items-center justify-between mb-4'>
-                                            <span className='text-lg font-semibold'>
-                                                Assignment Progress
-                                            </span>
-                                            <div className='flex items-center gap-2'>
-                                                <StarSolidIcon className='h-5 w-5 text-yellow-300' />
-                                                <span className='text-sm text-blue-100 font-medium'>
-                                                    {assignedGroups.length > 3
-                                                        ? 'Excellent Coverage!'
-                                                        : 'Good Progress'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className='flex items-center gap-4 mb-4'>
-                                            <span className='text-sm text-blue-100'>
-                                                {assignedGroups.length} of{' '}
-                                                {userGroups.length} groups
-                                                assigned
-                                            </span>
-                                            <div className='flex-1 relative h-4 bg-white/20 rounded-full overflow-hidden'>
-                                                <motion.div
-                                                    initial={{width: 0}}
-                                                    animate={{
-                                                        width: `${assignmentProgress}%`,
-                                                    }}
-                                                    transition={{
-                                                        duration: 1.5,
-                                                        ease: 'easeOut',
-                                                    }}
-                                                    className='absolute left-0 top-0 h-full bg-gradient-to-r from-white via-blue-200 to-indigo-200 rounded-full'
-                                                />
-                                                <motion.div
-                                                    animate={{
-                                                        x: ['0%', '100%', '0%'],
-                                                    }}
-                                                    transition={{
-                                                        duration: 2,
-                                                        repeat: Infinity,
-                                                        ease: 'easeInOut',
-                                                    }}
-                                                    className='absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent'
-                                                />
-                                            </div>
-                                            <span className='text-lg font-bold text-white min-w-[3rem]'>
-                                                {assignmentProgress}%
-                                            </span>
-                                        </div>
-                                    </motion.div>
-                                </div>
-                            </div>
-
-                            {/* Panel Content with Enhanced Cards */}
-                            <div className='flex-1 overflow-y-auto p-6'>
-                                <div className='space-y-4'>
-                                    {userGroups.map((group, index) => {
-                                        const isAssigned =
-                                            assignedGroups.includes(group.id);
-                                        return (
-                                            <motion.div
-                                                key={group.id}
-                                                initial={{
-                                                    opacity: 0,
-                                                    x: 30,
-                                                    scale: 0.95,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    x: 0,
-                                                    scale: 1,
-                                                }}
-                                                transition={{
-                                                    delay: index * 0.08,
-                                                    type: 'spring',
-                                                    stiffness: 300,
-                                                    damping: 30,
-                                                }}
-                                                whileHover={{
-                                                    scale: 1.02,
-                                                    y: -2,
-                                                }}
-                                                className={`
-                                                    group relative p-6 rounded-3xl border-2 transition-all duration-500 cursor-pointer backdrop-blur-xl
-                                                    ${
-                                                        isAssigned
-                                                            ? 'border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 shadow-lg shadow-blue-100/50'
-                                                            : 'border-slate-200/60 bg-white/60 hover:border-blue-300/60 hover:shadow-lg hover:shadow-slate-200/50'
-                                                    }
-                                                `}
-                                                onClick={() =>
-                                                    handleToggleAssignment(
-                                                        group.id,
-                                                    )
+            {/* Table Container */}
+            <div className='p-6'>
+                <div className='bg-white rounded-lg shadow'>
+                    <div className='max-w-[calc(100vw-450px)] overflow-x-auto'>
+                        <div className='w-full max-w-full'>
+                            <ReusableTableComponent
+                                config={{
+                                    ...dynamicTableConfig,
+                                    initialData: processedTableData,
+                                    customHeaderRenderer: renderColumnHeader,
+                                    customRenderers: {
+                                        rolesCount: (
+                                            value: any,
+                                            rowData: UserGroup,
+                                        ) => (
+                                            <RolesCountCell
+                                                groupData={rowData}
+                                                onManageRoles={
+                                                    handleManageRoles
                                                 }
-                                            >
-                                                <div className='flex items-center gap-5'>
-                                                    <motion.div
-                                                        whileHover={{
-                                                            scale: 1.15,
-                                                            rotate: 10,
-                                                        }}
-                                                        whileTap={{scale: 0.9}}
-                                                        className={`
-                                                            p-4 rounded-2xl transition-all duration-300 shadow-lg
-                                                            ${
-                                                                isAssigned
-                                                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/30'
-                                                                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-600 group-hover:shadow-blue-200/50'
-                                                            }
-                                                        `}
-                                                    >
-                                                        {isAssigned ? (
-                                                            <CheckCircleSolidIcon className='h-7 w-7' />
-                                                        ) : (
-                                                            <UserGroupIcon className='h-7 w-7' />
-                                                        )}
-                                                    </motion.div>
-
-                                                    <div className='flex-1 min-w-0'>
-                                                        <h4
-                                                            className={`text-lg font-bold mb-2 transition-colors duration-300 ${
-                                                                isAssigned
-                                                                    ? 'text-blue-900'
-                                                                    : 'text-slate-900 group-hover:text-blue-600'
-                                                            }`}
-                                                        >
-                                                            {group.name}
-                                                        </h4>
-                                                        <p className='text-sm text-slate-600 mb-3 line-clamp-1'>
-                                                            {group.description}
-                                                        </p>
-                                                        <div className='flex items-center gap-3'>
-                                                            <span className='text-xs bg-slate-100/80 backdrop-blur-sm text-slate-600 px-3 py-1.5 rounded-xl font-medium'>
-                                                                {
-                                                                    group.entity_name
-                                                                }
-                                                            </span>
-                                                            <span
-                                                                className={`
-                                                                text-xs px-3 py-1.5 rounded-xl font-semibold
-                                                                ${
-                                                                    group.status ===
-                                                                    'Active'
-                                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                                        : 'bg-red-100 text-red-700'
-                                                                }
-                                                            `}
-                                                            >
-                                                                {group.status}
-                                                            </span>
-                                                            <span className='text-xs text-slate-500 flex items-center gap-1'>
-                                                                <UsersIcon className='h-3 w-3' />
-                                                                {
-                                                                    group.memberCount
-                                                                }
-                                                            </span>
-                                                        </div>
+                                                roleCount={
+                                                    rowData.roles?.length || 0
+                                                }
+                                            />
+                                        ),
+                                        entity: (
+                                            value: any,
+                                            rowData: UserGroup,
+                                        ) => {
+                                            // For existing records, show as non-editable chip
+                                            if (!rowData.isNew) {
+                                                return (
+                                                    <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200'>
+                                                        {value}
                                                     </div>
-
-                                                    <motion.div
-                                                        animate={{
-                                                            rotate: isAssigned
-                                                                ? 90
-                                                                : 0,
-                                                        }}
-                                                        transition={{
-                                                            duration: 0.3,
-                                                        }}
-                                                        className={`transition-colors duration-300 ${
-                                                            isAssigned
-                                                                ? 'text-blue-600'
-                                                                : 'text-slate-400'
-                                                        }`}
-                                                    >
-                                                        <ChevronRightIcon className='h-6 w-6' />
-                                                    </motion.div>
-                                                </div>
-
-                                                {/* Enhanced Assignment Indicator */}
-                                                {isAssigned && (
-                                                    <motion.div
-                                                        initial={{
-                                                            scaleX: 0,
-                                                            opacity: 0,
-                                                        }}
-                                                        animate={{
-                                                            scaleX: 1,
-                                                            opacity: 1,
-                                                        }}
-                                                        transition={{
-                                                            duration: 0.5,
-                                                            ease: 'easeOut',
-                                                        }}
-                                                        className='absolute bottom-0 left-6 right-6 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-full'
-                                                    />
-                                                )}
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Enhanced Panel Footer */}
-                            <motion.div
-                                initial={{opacity: 0, y: 20}}
-                                animate={{opacity: 1, y: 0}}
-                                transition={{delay: 0.5}}
-                                className='border-t border-slate-200/60 p-6 bg-gradient-to-r from-slate-50/80 to-blue-50/80 backdrop-blur-xl'
-                            >
-                                <div className='flex gap-4'>
-                                    <motion.button
-                                        whileHover={{scale: 1.02, y: -1}}
-                                        whileTap={{scale: 0.98}}
-                                        onClick={() =>
-                                            setShowAssignmentPanel(false)
-                                        }
-                                        className='flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300'
-                                    >
-                                        Save Changes
-                                    </motion.button>
-                                    <motion.button
-                                        whileHover={{scale: 1.02, y: -1}}
-                                        whileTap={{scale: 0.98}}
-                                        onClick={() =>
-                                            setShowAssignmentPanel(false)
-                                        }
-                                        className='px-8 bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 py-4 rounded-2xl font-semibold transition-all duration-300'
-                                    >
-                                        Cancel
-                                    </motion.button>
-                                </div>
-                            </motion.div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+                                                );
+                                            }
+                                            // For new records, return null to use default dropdown
+                                            return null;
+                                        },
+                                        service: (
+                                            value: any,
+                                            rowData: UserGroup,
+                                        ) => {
+                                            // For existing records, show as non-editable chip
+                                            if (!rowData.isNew) {
+                                                return (
+                                                    <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200'>
+                                                        {value}
+                                                    </div>
+                                                );
+                                            }
+                                            // For new records, return null to use default dropdown
+                                            return null;
+                                        },
+                                    },
+                                    onAction: handleGroupAction,
+                                    loading:
+                                        loading ||
+                                        entitiesLoading ||
+                                        servicesLoading,
+                                    searchTerm: searchTerm,
+                                    groupBy: selectedGroupBy,
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

@@ -580,6 +580,34 @@ const renderMainTableColumnCell = (
 
         case 'userGroup':
             const userGroups = value ? (Array.isArray(value) ? value : []) : [];
+
+            // Determine button state based on saved vs pending groups AND password
+            const hasSavedGroups = userGroups.length > 0;
+            const hasPendingGroups =
+                item.pendingGroupAssignments &&
+                item.pendingGroupAssignments.length > 0;
+
+            // Check if user has an actual password set (not just placeholder)
+            const hasPassword =
+                item.password &&
+                item.password !== '••••••••' &&
+                item.password.trim() !== '';
+
+            // Button state logic:
+            // - grey (default): no groups and no pending
+            // - grey with count: has pending assignments but not saved, OR groups saved but no password
+            // - green with count: has saved groups AND password is set
+            const buttonState =
+                hasSavedGroups && hasPassword
+                    ? 'saved'
+                    : hasPendingGroups || hasSavedGroups
+                    ? 'pending'
+                    : 'default';
+            const displayCount = hasSavedGroups
+                ? userGroups.length
+                : hasPendingGroups
+                ? item.pendingGroupAssignments.length
+                : 0;
             return (
                 <div
                     className='usergroup-wrapper'
@@ -595,7 +623,7 @@ const renderMainTableColumnCell = (
                                     viewBox='0 0 24 24'
                                     fill='none'
                                     xmlns='http://www.w3.org/2000/svg'
-                                    className='usergroup-icon'
+                                    className={`usergroup-icon ${buttonState}`}
                                 >
                                     <path
                                         d='M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21'
@@ -626,15 +654,17 @@ const renderMainTableColumnCell = (
                                         strokeLinejoin='round'
                                     />
                                 </svg>
-                                {userGroups.length > 0 && (
-                                    <span className='usergroup-count-notification'>
-                                        {userGroups.length}
+                                {displayCount > 0 && (
+                                    <span
+                                        className={`usergroup-count-notification ${buttonState}`}
+                                    >
+                                        {displayCount}
                                     </span>
                                 )}
                             </div>
                         </div>
                         <button
-                            className='usergroup-add-button'
+                            className={`usergroup-add-button ${buttonState}`}
                             onClick={(e) => {
                                 console.log('🔥 User group button clicked!', {
                                     itemId: item.id,
@@ -650,7 +680,15 @@ const renderMainTableColumnCell = (
                             }}
                             onMouseDown={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
-                            title='Add user group'
+                            title={
+                                buttonState === 'saved'
+                                    ? `${displayCount} group(s) assigned & password set`
+                                    : buttonState === 'pending'
+                                    ? hasSavedGroups && !hasPassword
+                                        ? `${displayCount} group(s) assigned (password required)`
+                                        : `${displayCount} group(s) pending assignment`
+                                    : 'Assign user groups'
+                            }
                         >
                             +
                         </button>
@@ -912,6 +950,34 @@ const renderSubitemColumnCell = (
 
         case 'userGroup':
             const userGroups = value ? (Array.isArray(value) ? value : []) : [];
+
+            // Determine button state based on saved vs pending groups AND password
+            const hasSavedGroups = userGroups.length > 0;
+            const hasPendingGroups =
+                item.pendingGroupAssignments &&
+                item.pendingGroupAssignments.length > 0;
+
+            // Check if user has an actual password set (not just placeholder)
+            const hasPassword =
+                item.password &&
+                item.password !== '••••••••' &&
+                item.password.trim() !== '';
+
+            // Button state logic:
+            // - grey (default): no groups and no pending
+            // - grey with count: has pending assignments but not saved, OR groups saved but no password
+            // - green with count: has saved groups AND password is set
+            const buttonState =
+                hasSavedGroups && hasPassword
+                    ? 'saved'
+                    : hasPendingGroups || hasSavedGroups
+                    ? 'pending'
+                    : 'default';
+            const displayCount = hasSavedGroups
+                ? userGroups.length
+                : hasPendingGroups
+                ? item.pendingGroupAssignments.length
+                : 0;
             return (
                 <div
                     className='usergroup-wrapper'
@@ -927,7 +993,7 @@ const renderSubitemColumnCell = (
                                     viewBox='0 0 24 24'
                                     fill='none'
                                     xmlns='http://www.w3.org/2000/svg'
-                                    className='usergroup-icon'
+                                    className={`usergroup-icon ${buttonState}`}
                                 >
                                     <path
                                         d='M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21'
@@ -958,15 +1024,17 @@ const renderSubitemColumnCell = (
                                         strokeLinejoin='round'
                                     />
                                 </svg>
-                                {userGroups.length > 0 && (
-                                    <span className='usergroup-count-notification'>
-                                        {userGroups.length}
+                                {displayCount > 0 && (
+                                    <span
+                                        className={`usergroup-count-notification ${buttonState}`}
+                                    >
+                                        {displayCount}
                                     </span>
                                 )}
                             </div>
                         </div>
                         <button
-                            className='usergroup-add-button'
+                            className={`usergroup-add-button ${buttonState}`}
                             onClick={(e) => {
                                 console.log('🔥 User group button clicked!', {
                                     itemId: item.id,
@@ -982,7 +1050,15 @@ const renderSubitemColumnCell = (
                             }}
                             onMouseDown={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
-                            title='Add user group'
+                            title={
+                                buttonState === 'saved'
+                                    ? `${displayCount} group(s) assigned & password set`
+                                    : buttonState === 'pending'
+                                    ? hasSavedGroups && !hasPassword
+                                        ? `${displayCount} group(s) assigned (password required)`
+                                        : `${displayCount} group(s) pending assignment`
+                                    : 'Assign user groups'
+                            }
                         >
                             +
                         </button>
@@ -1900,33 +1976,97 @@ const ReusableTableComponent = ({config = null}) => {
     }, []);
 
     // 🎯 User Assignment Functions
-    const assignUserToGroups = useCallback(async (userId, groupIds) => {
-        try {
-            console.log('🔄 Assigning user to groups:', {userId, groupIds});
+    const assignUserToGroups = useCallback(
+        async (userId, groupsData) => {
+            try {
+                // Extract group IDs from group data objects and ensure they're integers
+                const groupIds = Array.isArray(groupsData)
+                    ? groupsData
+                          .map((group) => {
+                              const id = group.id || group.groupId || group;
+                              return parseInt(id, 10);
+                          })
+                          .filter((id) => !isNaN(id)) // Filter out invalid IDs
+                    : [
+                          parseInt(
+                              groupsData.id || groupsData.groupId || groupsData,
+                              10,
+                          ),
+                      ].filter((id) => !isNaN(id));
 
-            const response = await fetch(
-                `http://localhost:4000/api/users/${userId}/assign-groups`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                console.log('🔄 Assigning user to groups:', {
+                    userId,
+                    groupIds,
+                    groupsData,
+                    userIdType: typeof userId,
+                    groupIdsTypes: groupIds.map((id) => typeof id),
+                });
+
+                // Ensure userId is an integer
+                const userIdInt = parseInt(userId, 10);
+                if (isNaN(userIdInt)) {
+                    throw new Error(`Invalid user ID: ${userId}`);
+                }
+
+                if (groupIds.length === 0) {
+                    throw new Error('No valid group IDs provided');
+                }
+
+                const response = await fetch(
+                    `http://localhost:4000/api/users/${userIdInt}/assign-groups`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            groupIds: groupIds, // This will be stored as integer[] in acme.fnd_users.assigned_user_group
+                            userId: userIdInt,
+                        }),
                     },
-                    body: JSON.stringify({groupIds}),
-                },
-            );
+                );
 
-            if (response.ok) {
-                console.log('✅ User assigned to groups successfully');
-                return true;
-            } else {
-                console.error('❌ Failed to assign user to groups');
+                if (response.ok) {
+                    const responseData = await response.json();
+                    console.log(
+                        '✅ User assigned to groups successfully:',
+                        responseData,
+                    );
+
+                    // Update current user data if it matches
+                    if (currentUser && currentUser.id == userId) {
+                        setCurrentUser((prev) => ({
+                            ...prev,
+                            assignedUserGroup: groupsData,
+                            assignedGroupIds: groupIds,
+                        }));
+                    }
+
+                    // Trigger a callback to notify parent component of the assignment
+                    if (window.userGroupAssignmentCallback) {
+                        window.userGroupAssignmentCallback(
+                            userId,
+                            groupsData,
+                            groupIds,
+                        );
+                    }
+
+                    return true;
+                } else {
+                    const errorData = await response.text();
+                    console.error(
+                        '❌ Failed to assign user to groups:',
+                        errorData,
+                    );
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error assigning user to groups:', error);
                 return false;
             }
-        } catch (error) {
-            console.error('❌ Error assigning user to groups:', error);
-            return false;
-        }
-    }, []);
+        },
+        [currentUser],
+    );
 
     const removeUserFromGroup = useCallback(async (userId, groupId) => {
         try {
@@ -4267,72 +4407,133 @@ const ReusableTableComponent = ({config = null}) => {
                 </>
             )}
 
-            {/* Dynamic User Group Tooltip */}
-            {tooltipPosition.visible && (
-                <div
-                    className='usergroup-tooltip'
-                    style={{
-                        position: 'fixed',
-                        top: `${tooltipPosition.top}px`,
-                        left: `${tooltipPosition.left}px`,
-                        transform: 'translateY(-50%)',
-                        zIndex: 99999,
-                    }}
-                >
-                    <div className='usergroup-tooltip-title'>
-                        Assigned User Groups
-                    </div>
-                    {(() => {
-                        const currentItem = items.find(
-                            (item) => item.id === tooltipPosition.itemId,
-                        );
-                        const userGroups =
-                            currentItem?.[tooltipPosition.columnId] || [];
-                        const groupsArray = Array.isArray(userGroups)
-                            ? userGroups
-                            : [];
+            {/* Enhanced User Group Tooltip with Remove Functionality */}
+            {tooltipPosition.visible &&
+                tooltipPosition.columnId === 'assignedUserGroup' && (
+                    <div
+                        className='usergroup-tooltip'
+                        style={{
+                            position: 'fixed',
+                            top: `${tooltipPosition.top}px`,
+                            left: `${tooltipPosition.left}px`,
+                            transform: 'translateY(-50%)',
+                            zIndex: 99999,
+                        }}
+                    >
+                        <div className='usergroup-tooltip-title'>
+                            Assigned User Groups
+                        </div>
+                        {(() => {
+                            const currentItem = items.find(
+                                (item) => item.id === tooltipPosition.itemId,
+                            );
+                            const userGroups =
+                                currentItem?.[tooltipPosition.columnId] || [];
+                            const groupsArray = Array.isArray(userGroups)
+                                ? userGroups
+                                : [];
 
-                        return groupsArray.length > 0 ? (
-                            groupsArray.map((group, index) => (
-                                <div key={index} className='usergroup-item'>
-                                    <span className='usergroup-name'>
-                                        {group.name || group}
-                                    </span>
-                                    <button
-                                        className='usergroup-remove'
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const updatedGroups =
-                                                groupsArray.filter(
-                                                    (_, i) => i !== index,
-                                                );
-                                            setItems((prev) =>
-                                                prev.map((item) =>
-                                                    item.id ===
-                                                    tooltipPosition.itemId
-                                                        ? {
-                                                              ...item,
-                                                              [tooltipPosition.columnId]:
-                                                                  updatedGroups,
-                                                          }
-                                                        : item,
-                                                ),
-                                            );
-                                        }}
-                                        title='Remove user group'
+                            return groupsArray.length > 0 ? (
+                                groupsArray.map((group, index) => (
+                                    <div
+                                        key={group.id || index}
+                                        className='usergroup-item'
                                     >
-                                        ×
-                                    </button>
+                                        <span className='usergroup-name'>
+                                            {group.name ||
+                                                group.group ||
+                                                `Group ${group.id}`}
+                                        </span>
+                                        <button
+                                            className='usergroup-remove'
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+
+                                                // Use the global remove function if available
+                                                if (
+                                                    window.removeGroupFromUserCallback
+                                                ) {
+                                                    const groupId =
+                                                        group.id ||
+                                                        group.groupId;
+                                                    const groupName =
+                                                        group.name ||
+                                                        group.group ||
+                                                        `Group ${groupId}`;
+
+                                                    if (groupId) {
+                                                        console.log(
+                                                            '🔄 Removing group via API:',
+                                                            {
+                                                                userId: tooltipPosition.itemId,
+                                                                groupId,
+                                                                groupName,
+                                                            },
+                                                        );
+
+                                                        const success =
+                                                            await window.removeGroupFromUserCallback(
+                                                                tooltipPosition.itemId,
+                                                                parseInt(
+                                                                    groupId,
+                                                                    10,
+                                                                ),
+                                                                groupName,
+                                                            );
+
+                                                        if (success) {
+                                                            console.log(
+                                                                '✅ Group removed successfully via API',
+                                                            );
+                                                            // The callback will update the UI, so we don't need to do it here
+                                                        } else {
+                                                            console.error(
+                                                                '❌ Failed to remove group via API',
+                                                            );
+                                                        }
+                                                    } else {
+                                                        console.error(
+                                                            '❌ No group ID found for removal',
+                                                        );
+                                                    }
+                                                } else {
+                                                    console.warn(
+                                                        '⚠️ No remove callback available, falling back to local removal',
+                                                    );
+                                                    // Fallback to local removal
+                                                    const updatedGroups =
+                                                        groupsArray.filter(
+                                                            (_, i) =>
+                                                                i !== index,
+                                                        );
+                                                    setItems((prev) =>
+                                                        prev.map((item) =>
+                                                            item.id ===
+                                                            tooltipPosition.itemId
+                                                                ? {
+                                                                      ...item,
+                                                                      [tooltipPosition.columnId]:
+                                                                          updatedGroups,
+                                                                  }
+                                                                : item,
+                                                        ),
+                                                    );
+                                                }
+                                            }}
+                                            title='Remove user group'
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className='usergroup-empty'>
+                                    No user groups assigned
                                 </div>
-                            ))
-                        ) : (
-                            <div className='usergroup-empty'>
-                                No user groups assigned
-                            </div>
-                        );
-                    })()}
-                </div>
-            )}
+                            );
+                        })()}
+                    </div>
+                )}
 
             {/* 🌊 Ultra-Modern Floating Workspace */}
             {modernUI.isOpen && (

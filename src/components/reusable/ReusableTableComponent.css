@@ -234,24 +234,27 @@
     /* Modern grid layout */
     display: -ms-grid;
     display: grid;
-    background: linear-gradient(135deg, #f8faff 0%, #f0f8ff 100%);
-    border-bottom: 2px solid #e1ecf7;
-    border-left: 4px solid #4ba3ff; /* Consistent with row thickness */
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 3px solid #1e40af;
     overflow: visible; /* allow floating sort controls above */
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    min-height: 48px;
+    align-items: center;
 }
 
 .column-header {
-    padding: 6px 10px;
+    padding: 16px 20px;
     font-weight: 600;
-    font-size: 12px;
-    color: #1e40af;
-    border-right: 1px solid #d1e7ff;
+    font-size: 14px;
+    color: #374151;
+    border-right: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     position: relative; /* allow overlaying sort controls */
     overflow: visible;
+    min-height: 48px;
     transition: all 0.2s ease;
 }
 
@@ -301,13 +304,32 @@
     color: #374151;
 }
 
+/* Header with icon styling */
+.header-text-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.header-text-with-icon .cell-icon {
+    color: #6b7280;
+    flex-shrink: 0;
+}
+
+.header-text-with-icon span {
+    font-weight: 600;
+    color: #374151;
+}
+
 /* Sort button container with sliding animation */
 .sort-button-container {
     position: relative;
     display: flex;
     align-items: center;
-    height: 20px;
-    overflow: hidden;
+    min-height: 60px;
+    height: auto;
+    overflow: visible;
 }
 
 /* Main sort button */
@@ -587,18 +609,26 @@
     /* Modern grid layout */
     display: -ms-grid;
     display: grid;
-    border-bottom: 1px solid #e6e9ef;
+    border-bottom: 1px solid #e2e8f0;
     position: relative;
     background: white;
+    min-height: 60px;
+    align-items: center;
+    font-size: 14px;
+    color: #374151;
+}
+
+.task-row:nth-child(even) {
+    background: #f8fafc;
 }
 
 .task-row:hover {
-    background: #f0f8ff;
-    cursor: grab;
+    background: #f1f5f9 !important;
+    cursor: default;
 }
 
 .task-row:active {
-    cursor: grabbing;
+    cursor: default;
 }
 
 /* Enhanced dragging animations */
@@ -1500,9 +1530,13 @@
     }
 
     .task-cell {
-        padding: 2px 4px;
-        min-height: 20px;
-        min-width: 60px;
+        padding: 16px 20px;
+        min-height: 60px;
+        min-width: 100px;
+        font-size: 14px;
+        color: #374151;
+        font-weight: 400;
+        line-height: 1.5;
     }
 
     .checkbox-column,
@@ -1692,6 +1726,23 @@
 .custom-cell {
     background: #f8f9fa;
     border-left: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Center alignment for all task cells with custom content */
+.task-cell {
+    position: relative;
+}
+
+/* Specific centering for custom renderer cells */
+.task-cell[data-column-type='custom'] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .custom-text {

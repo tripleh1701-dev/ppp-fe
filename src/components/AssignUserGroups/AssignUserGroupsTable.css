@@ -77,6 +77,25 @@
     transform: scale(1.05);
 }
 
+/* Embedded Content Area */
+.embedded-content-area {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 45vw;
+    min-width: 600px;
+    max-width: 900px;
+    height: 100vh;
+    background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 50%, #e6f2ff 100%);
+    border-left: 1px solid #bfdbfe;
+    box-shadow: -12px 0 48px rgba(59, 130, 246, 0.15),
+        -4px 0 16px rgba(59, 130, 246, 0.1);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    animation: slideInFromRight 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Panel Container */
 .assign-usergroups-panel {
     position: fixed;
@@ -90,7 +109,7 @@
     border-left: 1px solid #bfdbfe;
     box-shadow: -12px 0 48px rgba(59, 130, 246, 0.15),
         -4px 0 16px rgba(59, 130, 246, 0.1);
-    z-index: 10001;
+    z-index: 50;
     display: flex;
     flex-direction: column;
     animation: slideInFromRight 0.7s cubic-bezier(0.16, 1, 0.3, 1);
@@ -890,18 +909,20 @@
     border-left: 4px solid #4ba3ff;
     overflow: visible;
     box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
+    height: 28px; /* Match main table height */
 }
 
 .advanced-table thead th {
     background: transparent;
     border-right: 2px solid #4ba3ff;
-    padding: 6px 10px;
-    font-weight: 600;
+    padding: 4px 8px; /* Reduced padding to match main table */
+    font-weight: 700;
     font-size: 12px;
-    color: #1e40af;
+    color: #000000;
     text-align: left;
     vertical-align: middle;
     position: relative;
+    height: 28px; /* Match main table height */
 }
 
 .advanced-table thead th:last-child {
@@ -924,15 +945,36 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    min-height: 32px;
+    min-height: 20px; /* Match main table height */
+}
+
+.header-content.modern-header {
+    gap: 6px;
+}
+
+.header-text-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .header-text {
-    font-weight: 600;
-    color: #1e40af;
+    font-weight: 700;
+    color: #000000;
     font-size: 12px;
     text-transform: none;
     letter-spacing: 0.5px;
+}
+
+/* Modern header icon styling to match main table */
+.header-content .cell-icon {
+    color: #4ba3ff;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.header-content:hover .cell-icon {
+    color: #2563eb;
 }
 
 .sort-controls {
@@ -1480,4 +1522,172 @@ div.embedded-content-area div.table-container table.advanced-table tbody tr {
 
 .attributes-btn:hover svg {
     transform: rotate(90deg);
+}
+
+/* Search and Actions Container */
+.search-and-actions-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+/* Action Icons Container */
+.action-icons-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+}
+
+.action-icons-container.search-expanded {
+    transform: translateX(0px);
+}
+
+/* Action Icon Buttons */
+.action-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+.action-icon:hover:not(:disabled) {
+    background: #3b82f6;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.action-icon:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Assign Icon Specific */
+.action-icon.assign-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+}
+
+.action-icon.assign-icon:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    transform: translateY(-1px) scale(1.05);
+}
+
+.action-icon.assign-icon:disabled {
+    background: #9ca3af;
+    color: #f3f4f6;
+}
+
+/* Roles Icon Specific */
+.action-icon.roles-icon {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.action-icon.roles-icon:hover {
+    background: #10b981;
+    color: white;
+}
+
+/* Assign Roles Icon Specific */
+.action-icon.assign-roles-icon {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.action-icon.assign-roles-icon:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px) scale(1.05);
+}
+
+/* Back Icon Specific */
+.action-icon.back-icon {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+}
+
+.action-icon.back-icon:hover {
+    background: #6b7280;
+    color: white;
+}
+
+/* Badge for count */
+.action-icon .badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    transition: all 0.2s ease;
+}
+
+/* Pulse animation for badge */
+.action-icon .badge.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Active state for assign button */
+.action-icon.assign-icon.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.action-icon.assign-icon.active:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* Disabled state for assign button */
+.action-icon.assign-icon.disabled {
+    background: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.action-icon.assign-icon.disabled:hover {
+    background: #d1d5db;
+    color: #9ca3af;
+    transform: none;
+    box-shadow: none;
 }

@@ -1,18 +1,10 @@
 /**
- * Manage User Groups Table Configuration
- *
- * Configuration for the user groups management table with comprehensive
- * field definitions, validations, and interActive features.
+ * Configuration file for Manage User Groups table using ReusableTableComponent
+ * Defines columns, features, and behavior for user group management
  */
 
 const ManageUserGroups_tableConfig = {
-    // Main table configuration
-    tableName: 'User Groups',
-
-    // Number of subitem tables per row (0 for this use case)
-    subitemTableCount: 0,
-
-    // Main table columns configuration
+    // Main table column definitions
     mainTableColumns: [
         {
             id: 'checkbox',
@@ -25,10 +17,10 @@ const ManageUserGroups_tableConfig = {
             selectAll: true, // Enable select all functionality
         },
         {
-            id: 'name',
+            id: 'groupName',
             title: 'Group Name',
             type: 'text',
-            width: 140,
+            width: 180,
             resizable: true,
             order: 1,
             pinned: false,
@@ -37,447 +29,359 @@ const ManageUserGroups_tableConfig = {
             validation: {
                 required: true,
                 maxLength: 100,
-                pattern: /^[a-zA-Z0-9\s\-_]+$/,
+                pattern: /^[a-zA-Z0-9\s_-]+$/,
                 errorMessage:
-                    'Group name is required and must be alphanumeric characters, spaces, hyphens, or underscores only (max 100 characters)',
+                    'Group name is required and must contain only alphanumeric characters, spaces, hyphens, or underscores (max 100 characters)',
             },
         },
         {
             id: 'description',
             title: 'Description',
             type: 'textarea',
-            width: 200,
+            width: 250,
             resizable: true,
             order: 2,
             pinned: false,
             required: false,
             maxLength: 500,
             validation: {
+                required: false,
                 maxLength: 500,
                 errorMessage: 'Description must be less than 500 characters',
             },
         },
         {
-            id: 'group_code',
-            title: 'Group Code',
-            type: 'text',
-            width: 100,
+            id: 'entity',
+            title: 'Entity',
+            type: 'select',
+            width: 150,
             resizable: true,
             order: 3,
             pinned: false,
             required: true,
-            maxLength: 20,
+            options: [
+                {value: 'Finance', label: 'Finance'},
+                {value: 'HR', label: 'HR'},
+                {value: 'IT Operations', label: 'IT Operations'},
+                {value: 'Sales', label: 'Sales'},
+                {value: 'Marketing', label: 'Marketing'},
+                {value: 'Engineering', label: 'Engineering'},
+                {value: 'Operations', label: 'Operations'},
+                {value: 'Legal', label: 'Legal'},
+            ],
             validation: {
                 required: true,
-                maxLength: 20,
-                pattern: /^[A-Z0-9_]+$/,
-                errorMessage:
-                    'Group code is required and must be uppercase letters, numbers, or underscores only (max 20 characters)',
+                errorMessage: 'Entity is required',
             },
         },
         {
-            id: 'entity_name',
-            title: 'Entity',
+            id: 'service',
+            title: 'Service',
             type: 'select',
-            width: 120,
+            width: 150,
             resizable: true,
             order: 4,
             pinned: false,
             required: false,
-            options: [], // Will be populated dynamically
+            options: [
+                {value: 'Budget Management', label: 'Budget Management'},
+                {value: 'Employee Relations', label: 'Employee Relations'},
+                {value: 'Infrastructure', label: 'Infrastructure'},
+                {value: 'Strategy Management', label: 'Strategy Management'},
+                {value: 'Communications', label: 'Communications'},
+                {value: 'Quality Control', label: 'Quality Control'},
+                {value: 'Process Improvement', label: 'Process Improvement'},
+                {value: 'Compliance', label: 'Compliance'},
+            ],
             validation: {
-                errorMessage: 'Please select a valid entity',
+                required: false,
+                errorMessage: 'Please select a valid service',
             },
         },
         {
-            id: 'status',
-            title: 'Status',
-            type: 'select',
-            width: 90,
+            id: 'roles',
+            title: 'Roles',
+            type: 'custom',
+            width: 180,
             resizable: true,
             order: 5,
             pinned: false,
-            required: true,
+            required: false,
+            customRenderer: 'rolesCount',
+        },
+    ],
+
+    // Default values for new items
+    defaults: {
+        mainItem: {
+            groupName: '',
+            description: '',
+            entity: '',
+            service: '',
+            roles: [],
+            status: 'active',
+            createdDate: new Date().toISOString().split('T')[0],
+            lastModified: new Date().toISOString(),
+        },
+        subitem: {
+            name: '',
+            status: 'pending',
+        },
+    },
+
+    // Features configuration
+    features: {
+        // Table Capabilities
+        search: true,
+        filter: true,
+        sort: true,
+        groupBy: true,
+        export: true,
+        import: false,
+        bulk: true,
+        pagination: true,
+
+        // CRUD Operations
+        create: true,
+        read: true,
+        update: true,
+        delete: true,
+
+        // Advanced Features
+        columnReorder: true,
+        columnResize: true,
+        columnVisibility: true,
+        rowSelection: true,
+        rowExpansion: false, // User groups don't need sub-items
+        inlineEdit: true,
+        bulkEdit: true,
+        customActions: true,
+        templates: false,
+        validation: true,
+        autoSave: false,
+        newRowEditing: true, // Enable editing for new rows
+        versionHistory: false,
+        comments: false,
+        attachments: false,
+        workflow: false,
+        permissions: true,
+        audit: true,
+        notifications: true,
+    },
+
+    // Search configuration
+    search: {
+        placeholder: 'Search user groups...',
+        fields: ['groupName', 'description', 'entity', 'service'],
+        highlight: true,
+        caseSensitive: false,
+        wholeWord: false,
+        regex: false,
+    },
+
+    // Filter options
+    filters: [
+        {
+            id: 'entity',
+            label: 'Entity',
+            type: 'select',
             options: [
-                {value: 'Active', label: 'Active'},
-                {value: 'Inactive', label: 'Inactive'},
+                {value: 'Finance', label: 'Finance'},
+                {value: 'HR', label: 'HR'},
+                {value: 'IT Operations', label: 'IT Operations'},
+                {value: 'Sales', label: 'Sales'},
+                {value: 'Marketing', label: 'Marketing'},
+                {value: 'Engineering', label: 'Engineering'},
+                {value: 'Operations', label: 'Operations'},
+                {value: 'Legal', label: 'Legal'},
             ],
-            validation: {
-                required: true,
-                errorMessage: 'Status is required',
-            },
         },
         {
-            id: 'memberCount',
-            title: 'Members',
-            type: 'number',
-            width: 80,
-            resizable: true,
-            order: 6,
-            pinned: false,
-            required: false,
-            readonly: true, // Calculated field
+            id: 'service',
+            label: 'Service',
+            type: 'select',
+            options: [
+                {value: 'Budget Management', label: 'Budget Management'},
+                {value: 'Employee Relations', label: 'Employee Relations'},
+                {value: 'Infrastructure', label: 'Infrastructure'},
+                {value: 'Strategy Management', label: 'Strategy Management'},
+                {value: 'Communications', label: 'Communications'},
+                {value: 'Quality Control', label: 'Quality Control'},
+                {value: 'Process Improvement', label: 'Process Improvement'},
+                {value: 'Compliance', label: 'Compliance'},
+            ],
         },
         {
-            id: 'created_at',
-            title: 'Created',
-            type: 'date',
-            width: 100,
-            resizable: true,
-            order: 7,
-            pinned: false,
-            required: false,
-            readonly: true,
-        },
-        {
-            id: 'updated_at',
-            title: 'Updated',
-            type: 'date',
-            width: 100,
-            resizable: true,
-            order: 8,
-            pinned: false,
-            required: false,
-            readonly: true,
-        },
-        {
-            id: 'actions',
-            title: 'Actions',
-            type: 'actions',
-            width: 80,
-            resizable: false,
-            order: 9,
-            pinned: false,
-            actions: [
-                {
-                    id: 'edit',
-                    label: 'Edit',
-                    icon: 'pencil',
-                    variant: 'primary',
-                },
-                {
-                    id: 'members',
-                    label: 'Manage Members',
-                    icon: 'users',
-                    variant: 'secondary',
-                },
-                {
-                    id: 'permissions',
-                    label: 'Permissions',
-                    icon: 'shield',
-                    variant: 'secondary',
-                },
-                {
-                    id: 'delete',
-                    label: 'Delete',
-                    icon: 'trash',
-                    variant: 'danger',
-                    confirmation: {
-                        title: 'Delete User Group',
-                        message:
-                            'Are you sure you want to delete this user group? This action cannot be undone.',
-                        confirmText: 'Delete',
-                        cancelText: 'Cancel',
-                    },
-                },
+            id: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+                {value: 'active', label: 'Active'},
+                {value: 'inactive', label: 'Inactive'},
+                {value: 'draft', label: 'Draft'},
             ],
         },
     ],
 
-    // Table features configuration
-    features: {
-        search: {
-            enabled: true,
-            placeholder: 'Search user groups...',
-            columns: ['name', 'description', 'group_code', 'entity_name'], // Searchable columns
+    // Grouping options
+    grouping: [
+        {
+            id: 'entity',
+            label: 'Group by Entity',
+            field: 'entity',
         },
-        pagination: {
-            enabled: true,
-            pageSize: 25,
-            pageSizeOptions: [10, 25, 50, 100],
-            showPageInfo: true,
+        {
+            id: 'service',
+            label: 'Group by Service',
+            field: 'service',
         },
-        sorting: {
-            enabled: true,
-            defaultSort: {
-                column: 'name',
-                direction: 'asc',
-            },
-            multiSort: true,
+        {
+            id: 'status',
+            label: 'Group by Status',
+            field: 'status',
         },
-        filtering: {
-            enabled: true,
-            filters: [
-                {
-                    id: 'status',
-                    label: 'Status',
-                    type: 'select',
-                    options: [
-                        {value: 'Active', label: 'Active'},
-                        {value: 'Inactive', label: 'Inactive'},
-                    ],
-                },
-                {
-                    id: 'entity_name',
-                    label: 'Entity',
-                    type: 'select',
-                    options: [], // Will be populated dynamically
-                },
-            ],
-        },
-        grouping: {
-            enabled: true,
-            options: [
-                {value: 'entity_name', label: 'By Entity'},
-                {value: 'status', label: 'By Status'},
-                {value: 'created_at', label: 'By Creation Date'},
-            ],
-        },
-        bulkActions: {
-            enabled: true,
-            actions: [
-                {
-                    id: 'activate',
-                    label: 'Activate Selected',
-                    icon: 'check',
-                    variant: 'success',
-                    confirmation: {
-                        title: 'Activate User Groups',
-                        message:
-                            'Are you sure you want to activate the selected user groups?',
-                    },
-                },
-                {
-                    id: 'deactivate',
-                    label: 'Deactivate Selected',
-                    icon: 'x',
-                    variant: 'warning',
-                    confirmation: {
-                        title: 'Deactivate User Groups',
-                        message:
-                            'Are you sure you want to deactivate the selected user groups?',
-                    },
-                },
-                {
-                    id: 'delete',
-                    label: 'Delete Selected',
-                    icon: 'trash',
-                    variant: 'danger',
-                    confirmation: {
-                        title: 'Delete User Groups',
-                        message:
-                            'Are you sure you want to delete the selected user groups? This action cannot be undone.',
-                    },
-                },
-            ],
-        },
-        export: {
-            enabled: true,
-            formats: ['csv', 'xlsx', 'pdf'],
-            filename: 'user_groups',
-        },
-        import: {
-            enabled: true,
-            formats: ['csv', 'xlsx'],
-            template: {
-                enabled: true,
-                filename: 'user_groups_template',
-            },
-        },
-        columnVisibility: {
-            enabled: true,
-            defaultVisible: [
-                'checkbox',
-                'name',
-                'description',
-                'group_code',
-                'entity_name',
-                'status',
-                'memberCount',
-                'actions',
-            ],
-        },
-        rowActions: {
-            enabled: true,
-            quickActions: ['edit', 'members'],
-            contextMenu: true,
-        },
-        inlineEditing: {
-            enabled: true,
-            doubleClickToEdit: true,
-            editableColumns: [
-                'name',
-                'description',
-                'group_code',
-                'entity_name',
-                'status',
-            ],
-            autoSave: true,
-            autoSaveDelay: 1000,
-        },
-        dragAndDrop: {
-            enabled: true,
-            reorderRows: true,
-            reorderColumns: false,
-        },
-        virtualScrolling: {
-            enabled: true,
-            rowHeight: 48, // Compact row height
-            bufferSize: 10,
-        },
-    },
+    ],
 
-    // Visual customization
-    styling: {
-        compact: true,
-        alternatingRows: true,
-        hoverEffects: true,
-        borderless: false,
-        roundedCorners: true,
-        shadows: true,
-        verticalIndicator: {
-            enabled: true,
-            color: '#3b82f6', // Blue color for vertical line indicator
-            width: 3,
-        },
-        rowHeight: 48, // Compact row height
-        headerHeight: 40,
-        fontSize: 'sm',
-        spacing: 'compact',
-    },
-
-    // Accessibility
-    accessibility: {
-        enabled: true,
-        ariaLabels: {
-            table: 'User Groups Management Table',
-            search: 'Search user groups',
-            filter: 'Filter user groups',
-            sort: 'Sort user groups',
-            pagination: 'User groups pagination',
-        },
-        keyboardNavigation: true,
-        focusManagement: true,
-        screenReader: true,
-    },
-
-    // Performance
-    performance: {
-        virtualScrolling: true,
-        lazyLoading: true,
-        debounceSearch: 300,
-        debounceFilter: 500,
-        memoization: true,
-    },
-
-    // Data validation
-    validation: {
-        realTime: true,
-        showErrors: true,
-        errorPosition: 'tooltip',
-        validateOnSubmit: true,
-    },
-
-    // API integration
-    api: {
-        endpoints: {
-            list: '/api/user-groups',
-            create: '/api/user-groups',
-            update: '/api/user-groups/{id}',
-            delete: '/api/user-groups/{id}',
-            bulkUpdate: '/api/user-groups/bulk',
-            bulkDelete: '/api/user-groups/bulk',
-            export: '/api/user-groups/export',
-        },
-        methods: {
-            list: 'GET',
-            create: 'POST',
-            update: 'PUT',
-            delete: 'DELETE',
-            bulkUpdate: 'PUT',
-            bulkDelete: 'DELETE',
-            export: 'GET',
-        },
-        responseFormat: {
-            data: 'data',
-            total: 'total',
-            page: 'page',
-            pageSize: 'pageSize',
-            message: 'message',
-            errors: 'errors',
-        },
-    },
-
-    // Actions configuration (required by ReusableTableComponent)
+    // Actions configuration
     actions: {
-        create: {
-            enabled: true,
-            label: 'Add User Group',
-            icon: 'plus',
-            color: 'primary',
-        },
-        edit: {
-            enabled: true,
-            label: 'Edit',
-            icon: 'pencil',
-            color: 'primary',
-        },
-        delete: {
-            enabled: true,
-            label: 'Delete',
-            icon: 'trash',
-            color: 'error',
-            confirmRequired: true,
-        },
-        bulkDelete: {
-            enabled: true,
-            label: 'Delete Selected',
-            icon: 'trash',
-            color: 'error',
-            confirmRequired: true,
-        },
+        // Row-level actions
+        row: [
+            {
+                id: 'save',
+                label: 'Save Group',
+                icon: 'save',
+                type: 'success',
+                permission: 'create',
+                showOnNew: true, // Only show for new rows
+            },
+            {
+                id: 'cancel',
+                label: 'Cancel',
+                icon: 'cancel',
+                type: 'secondary',
+                permission: 'create',
+                showOnNew: true, // Only show for new rows
+            },
+            {
+                id: 'edit',
+                label: 'Edit Group',
+                icon: 'edit',
+                type: 'primary',
+                permission: 'edit',
+                hideOnNew: true, // Hide for new rows
+            },
+            {
+                id: 'duplicate',
+                label: 'Duplicate Group',
+                icon: 'copy',
+                type: 'secondary',
+                permission: 'create',
+                hideOnNew: true, // Hide for new rows
+            },
+            {
+                id: 'delete',
+                label: 'Delete Group',
+                icon: 'delete',
+                type: 'danger',
+                permission: 'delete',
+                confirm: true,
+                confirmMessage:
+                    'Are you sure you want to delete this user group?',
+                hideOnNew: true, // Hide for new rows
+            },
+        ],
+
+        // Bulk actions
+        bulk: [
+            {
+                id: 'bulkEdit',
+                label: 'Edit Selected',
+                icon: 'edit',
+                type: 'primary',
+                permission: 'edit',
+            },
+            {
+                id: 'bulkDelete',
+                label: 'Delete Selected',
+                icon: 'delete',
+                type: 'danger',
+                permission: 'delete',
+                confirm: true,
+                confirmMessage:
+                    'Are you sure you want to delete the selected user groups?',
+            },
+            {
+                id: 'bulkExport',
+                label: 'Export Selected',
+                icon: 'export',
+                type: 'secondary',
+                permission: 'read',
+            },
+        ],
     },
 
-    // API Configuration for auto-save
-    api: {
-        baseUrl: '/api/user-groups',
-        endpoints: {
-            create: '/api/user-groups',
-            update: '/api/user-groups/{id}',
-            delete: '/api/user-groups/{id}',
-            bulkCreate: '/api/user-groups/bulk',
-            bulkUpdate: '/api/user-groups/bulk',
-            bulkDelete: '/api/user-groups/bulk',
-        },
-        autoSave: {
-            enabled: true,
-            debounceMs: 1000,
-            batchSize: 10,
-            retryAttempts: 3,
-            retryDelay: 2000,
-        },
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    },
-
-    // Validation configuration
+    // Validation rules
     validation: {
-        validateOnChange: true,
-        validateOnBlur: true,
-        showValidationIcons: true,
-        validationDelay: 500, // ms
-        highlightInvalidFields: true,
+        rules: {
+            groupName: {
+                required: true,
+                minLength: 2,
+                maxLength: 100,
+                pattern: /^[a-zA-Z0-9\s_-]+$/,
+                unique: true,
+            },
+            description: {
+                maxLength: 500,
+            },
+            entity: {
+                required: true,
+            },
+        },
+        messages: {
+            required: 'This field is required',
+            minLength: 'Minimum length is {min} characters',
+            maxLength: 'Maximum length is {max} characters',
+            pattern: 'Invalid format',
+            unique: 'This value already exists',
+        },
     },
 
-    // Export configuration
+    // Pagination settings
+    pagination: {
+        pageSize: 25,
+        pageSizeOptions: [10, 25, 50, 100],
+        showSizeChanger: true,
+        showQuickJumper: true,
+        showTotal: true,
+    },
+
+    // Export settings
     export: {
-        enableCSV: true,
-        enableExcel: true,
-        enablePDF: true,
-        filename: 'user_groups_export',
-        includeHeaders: true,
-        excludeColumns: [], // No sensitive columns to exclude
+        filename: 'user-groups',
+        formats: ['csv', 'excel', 'pdf'],
+        includeFilters: true,
+        includeColumns: [
+            'groupName',
+            'description',
+            'entity',
+            'service',
+            'roles',
+        ],
+    },
+
+    // UI Configuration
+    ui: {
+        theme: 'modern',
+        density: 'comfortable',
+        striped: true,
+        bordered: true,
+        hover: true,
+        loading: true,
+        emptyState: {
+            title: 'No User Groups Found',
+            description: 'Create your first user group to get started',
+            action: 'Create User Group',
+        },
     },
 };
 

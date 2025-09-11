@@ -1057,7 +1057,7 @@ function WorkflowBuilderContent({
                             position='bottom-left'
                             showZoom={true}
                             showFitView={true}
-                            showInterActive={true}
+                            showInteractive={true}
                             className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
                         />
                         <MiniMap

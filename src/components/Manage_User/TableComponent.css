@@ -374,7 +374,7 @@
     font-weight: 700 !important;
     font-size: 12px;
     line-height: 1.2;
-    color: #1f2937 !important;
+    color: #000000 !important;
     border-right: 1px solid #d1e7ff;
     display: flex;
     align-items: center;
@@ -1102,8 +1102,8 @@
 }
 
 .column-header {
-    font-weight: 600;
-    color: #374151;
+    font-weight: 700 !important;
+    color: #000000 !important;
     position: relative;
 }
 
@@ -1147,7 +1147,8 @@
 .advanced-table-container.compact-mode .column-header {
     padding: 4px 6px !important;
     font-size: 11px !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
 }
 
 /* Enhanced visual feedback for advanced features */
@@ -2208,6 +2209,7 @@ textarea::placeholder {
 
     .column-header {
         color: #60a5fa;
+        font-weight: 700 !important;
         border-right-color: #404040;
     }
 
@@ -5089,16 +5091,42 @@ textarea::placeholder {
 }
 
 .usergroup-icon {
-    color: #0284c7;
     transition: all 0.3s ease;
     flex-shrink: 0;
+}
+
+/* Icon states */
+.usergroup-icon.default {
+    color: #9ca3af;
+}
+
+.usergroup-icon.pending {
+    color: #6b7280;
+    position: relative;
+}
+
+/* Add warning indicator for pending icons */
+.usergroup-icon.pending:after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #f59e0b;
+    border: 1px solid white;
+    z-index: 5;
+}
+
+.usergroup-icon.saved {
+    color: #10b981;
 }
 
 .usergroup-count-notification {
     position: absolute;
     top: -8px;
     right: -8px;
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     color: white;
     font-size: 10px;
     font-weight: 700;
@@ -5109,9 +5137,39 @@ textarea::placeholder {
     align-items: center;
     justify-content: center;
     border: 2px solid white;
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
     animation: notificationPulse 2s infinite;
     z-index: 10;
+    transition: all 0.2s ease;
+}
+
+/* Count notification states */
+.usergroup-count-notification.default {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    box-shadow: 0 2px 8px rgba(156, 163, 175, 0.4);
+}
+
+.usergroup-count-notification.pending {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.4);
+    position: relative;
+}
+
+/* Add warning indicator for pending notifications */
+.usergroup-count-notification.pending:after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #f59e0b;
+    border: 1px solid white;
+}
+
+.usergroup-count-notification.saved {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
 }
 
 @keyframes notificationPulse {
@@ -5141,7 +5199,6 @@ textarea::placeholder {
 .usergroup-add-button {
     background: none;
     border: none;
-    color: #3b82f6;
     font-size: 18px;
     font-weight: 600;
     width: 24px;
@@ -5157,9 +5214,54 @@ textarea::placeholder {
     line-height: 1;
 }
 
-.usergroup-add-button:hover {
-    background: rgba(59, 130, 246, 0.1);
-    color: #1d4ed8;
+/* Default state - grey */
+.usergroup-add-button.default {
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.1);
+}
+
+.usergroup-add-button.default:hover {
+    background: rgba(156, 163, 175, 0.2);
+    color: #6b7280;
+    transform: scale(1.1);
+}
+
+/* Pending state - grey with stronger color */
+.usergroup-add-button.pending {
+    color: #6b7280;
+    background: rgba(107, 114, 128, 0.1);
+    position: relative;
+}
+
+.usergroup-add-button.pending:hover {
+    background: rgba(107, 114, 128, 0.2);
+    color: #4b5563;
+    transform: scale(1.1);
+}
+
+/* Add subtle warning indicator for pending state due to missing password */
+.usergroup-add-button.pending:after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f59e0b;
+    border: 1px solid white;
+    opacity: 0.8;
+}
+
+/* Saved state - green */
+.usergroup-add-button.saved {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.usergroup-add-button.saved:hover {
+    background: rgba(16, 185, 129, 0.2);
+    color: #059669;
     transform: scale(1.1);
 }
 

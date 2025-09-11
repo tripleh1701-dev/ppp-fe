@@ -19,7 +19,7 @@ import {
 import {CSS} from '@dnd-kit/utilities';
 import {toast} from 'react-toastify';
 import './ReusableTableComponent.css';
-import tableConfig from '../config/tableConfig';
+import tableConfig from '../../config/tableConfig';
 
 // Column type definitions for the add column modal
 const COLUMN_TYPES = [
@@ -262,8 +262,18 @@ const renderMainTableColumnCell = (
     setEditing,
     isExpanded,
     onToggleExpand,
+    customRenderers = {},
 ) => {
     const value = item[column.id] || '';
+
+    // Check for custom renderer first
+    if (
+        column.type === 'custom' &&
+        column.customRenderer &&
+        customRenderers[column.customRenderer]
+    ) {
+        return customRenderers[column.customRenderer](value, item, column);
+    }
 
     switch (column.type) {
         case 'checkbox':
@@ -1030,6 +1040,7 @@ function ItemRow({
     handleItemSelect,
     gridTemplate,
     subitemTableCount,
+    customRenderers,
 }) {
     const {
         attributes,
@@ -1093,6 +1104,7 @@ function ItemRow({
                     <div
                         key={column.id}
                         className={`task-cell ${column.id}-cell`}
+                        data-column-type={column.type}
                     >
                         {renderMainTableColumnCell(
                             column,
@@ -1102,6 +1114,7 @@ function ItemRow({
                             setEditing,
                             isExpanded,
                             onToggleExpand,
+                            customRenderers,
                         )}
                         {/* Show subitem count only for name column */}
                         {column.id === 'name' &&
@@ -1145,6 +1158,13 @@ const ReusableTableComponent = ({config = null}) => {
         mainTableColumns,
         defaults,
         ui,
+        customRenderers,
+        initialData,
+        onAction,
+        loading,
+        searchTerm,
+        groupBy,
+        customHeaderRenderer,
     } = configToUse;
 
     // Get subitem columns for a specific table
@@ -1160,12 +1180,24 @@ const ReusableTableComponent = ({config = null}) => {
             subitemTables[tableKey]?.title || `Subitems Table ${tableNumber}`
         );
     };
-    const [items, setItems] = useState([]);
+    const [items, setItems] = useState(initialData || []);
 
     const [expanded, setExpanded] = useState(new Set());
     const [newSubitemNameByItem, setNewSubitemNameByItem] = useState({});
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [selectAll, setSelectAll] = useState(false);
+
+    // Effect to update items when initialData changes
+    useEffect(() => {
+        if (initialData) {
+            console.log(
+                '🔄 Updating items with new data:',
+                initialData.length,
+                'items',
+            );
+            setItems(initialData);
+        }
+    }, [initialData]);
 
     // Debug effect to monitor selection changes
     useEffect(() => {
@@ -1952,11 +1984,15 @@ const ReusableTableComponent = ({config = null}) => {
                                 draggedColumn={draggedColumn}
                                 setDraggedColumn={setDraggedColumn}
                             >
-                                <div className='header-content'>
-                                    <span className='header-title'>
-                                        {column.title}
-                                    </span>
-                                </div>
+                                {customHeaderRenderer ? (
+                                    customHeaderRenderer(column)
+                                ) : (
+                                    <div className='header-content'>
+                                        <span className='header-title'>
+                                            {column.title}
+                                        </span>
+                                    </div>
+                                )}
                             </ResizableHeader>
                         );
                     })}
@@ -1987,6 +2023,7 @@ const ReusableTableComponent = ({config = null}) => {
                                     handleItemSelect={handleItemSelect}
                                     gridTemplate={getGridTemplate()}
                                     subitemTableCount={subitemTableCount}
+                                    customRenderers={customRenderers}
                                     onFieldChange={(field, value) => {
                                         setItems((prev) =>
                                             prev.map((it) =>

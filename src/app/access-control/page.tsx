@@ -479,12 +479,12 @@ export default function ManageUsers() {
                                 <DndContext
                                     sensors={sensors}
                                     collisionDetection={closestCenter}
-                                    onDragEnd={({Active, over}) => {
-                                        if (!over || Active.id === over.id)
+                                    onDragEnd={({active, over}) => {
+                                        if (!over || active.id === over.id)
                                             return;
                                         setDraftRows((prev) => {
                                             const from = prev.findIndex(
-                                                (r) => r.key === Active.id,
+                                                (r) => r.key === active.id,
                                             );
                                             const to = prev.findIndex(
                                                 (r) => r.key === over.id,

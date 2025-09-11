@@ -28,7 +28,7 @@ const ManageUsers_tableConfig = {
             id: 'firstName',
             title: 'First Name',
             type: 'text',
-            width: 100,
+            width: 140,
             resizable: true,
             order: 1,
             pinned: false,
@@ -46,7 +46,7 @@ const ManageUsers_tableConfig = {
             id: 'middleName',
             title: 'Middle Name',
             type: 'text',
-            width: 90,
+            width: 130,
             resizable: true,
             order: 2,
             pinned: false,
@@ -64,7 +64,7 @@ const ManageUsers_tableConfig = {
             id: 'lastName',
             title: 'Last Name',
             type: 'text',
-            width: 100,
+            width: 140,
             resizable: true,
             order: 3,
             pinned: false,
@@ -82,7 +82,7 @@ const ManageUsers_tableConfig = {
             id: 'emailAddress',
             title: 'Email Address',
             type: 'email',
-            width: 160,
+            width: 200,
             resizable: true,
             order: 4,
             pinned: false,
@@ -99,7 +99,7 @@ const ManageUsers_tableConfig = {
             id: 'status',
             title: 'Status',
             type: 'toggle',
-            width: 70,
+            width: 100,
             resizable: true,
             order: 5,
             pinned: false,
@@ -144,7 +144,7 @@ const ManageUsers_tableConfig = {
             id: 'startDate',
             title: 'Start Date',
             type: 'datetime',
-            width: 110,
+            width: 140,
             resizable: true,
             order: 6,
             pinned: false,
@@ -191,7 +191,7 @@ const ManageUsers_tableConfig = {
             id: 'endDate',
             title: 'End Date',
             type: 'datetime',
-            width: 110,
+            width: 140,
             resizable: true,
             order: 7,
             pinned: false,
@@ -237,7 +237,7 @@ const ManageUsers_tableConfig = {
             id: 'password',
             title: 'Password',
             type: 'password',
-            width: 80,
+            width: 110,
             resizable: true,
             order: 8,
             pinned: false,
@@ -338,7 +338,7 @@ const ManageUsers_tableConfig = {
             id: 'assignedUserGroup',
             title: 'Assigned User Group',
             type: 'userGroup',
-            width: 130,
+            width: 160,
             resizable: true,
             order: 10,
             pinned: false,
@@ -355,6 +355,7 @@ const ManageUsers_tableConfig = {
                 maxGroups: 10,
                 searchable: true,
                 multiSelect: true,
+                customHoverTooltip: true, // Enable custom tooltip functionality
             },
             validation: {
                 required: false,
@@ -395,10 +396,10 @@ const ManageUsers_tableConfig = {
         maxTableWidth: 'none',
 
         // Row configuration
-        defaultRowHeight: 20,
+        defaultRowHeight: 60,
         compactMode: true,
         alternatingRowColors: true,
-        headerHeight: 25,
+        headerHeight: 45,
 
         // Border configuration
         showCellBorders: true,
@@ -518,27 +519,27 @@ const ManageUsers_tableConfig = {
         parentChildRelationship: false,
 
         // Drag and drop functionality
-        dragAndDrop: true,
-        dragToReorder: true,
+        dragAndDrop: false,
+        dragToReorder: false,
         dragToNest: false, // Set to true for tree nesting
-        dragWithinGroups: true,
+        dragWithinGroups: false,
 
         // Hover controls and micro-interactions
         hoverControls: true,
         showHoverButtons: true,
-        hoverButtonTypes: ['edit', 'delete', 'duplicate', 'view'],
+        hoverButtonTypes: ['view', 'delete'],
 
         // Inline editing capabilities
-        inlineEditing: true,
-        doubleClickToEdit: true,
+        inlineEditing: false,
+        doubleClickToEdit: false,
         instantEdit: false, // true for immediate edit mode
 
         // Row and UI features
-        compactRows: true,
+        compactRows: false,
         modernMicroInteractions: true,
         animatedTransitions: true,
-        contextMenus: true,
-        showDragHandles: true,
+        contextMenus: false,
+        showDragHandles: false,
         enableHoverEffects: true,
         showSortIndicators: true,
 
@@ -549,10 +550,12 @@ const ManageUsers_tableConfig = {
         clearSortOption: true,
 
         // Visual features
-        zebraStriping: false,
+        zebraStriping: true,
         rowHoverEffect: true,
         selectionHighlight: true,
         focusIndicators: true,
+        readOnlyMode: true,
+        preventEditing: true,
 
         // Performance features
         virtualScrolling: false, // Enable for large datasets
@@ -562,34 +565,41 @@ const ManageUsers_tableConfig = {
 
     // UI Theme and styling
     theme: {
-        // Color scheme
-        primaryColor: '#4ba3ff',
-        secondaryColor: '#64748b',
-        successColor: '#10b981',
-        warningColor: '#f59e0b',
-        errorColor: '#ef4444',
+        // Color scheme - Professional palette
+        primaryColor: '#1e40af',
+        secondaryColor: '#475569',
+        successColor: '#059669',
+        warningColor: '#d97706',
+        errorColor: '#dc2626',
+        backgroundColor: '#ffffff',
+        headerBackground: '#f8fafc',
+        borderColor: '#e2e8f0',
 
-        // Typography
-        fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: '13px',
+        // Typography - Professional and readable
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+        fontSize: '14px',
         fontWeight: '400',
+        headerFontWeight: '600',
 
-        // Spacing
-        rowHeight: 'compact', // 'compact', 'normal', 'comfortable'
-        cellPadding: '4px 8px',
-        headerPadding: '6px 8px',
+        // Spacing - More generous for readability
+        rowHeight: 'comfortable', // 'compact', 'normal', 'comfortable'
+        cellPadding: '16px 20px',
+        headerPadding: '16px 20px',
 
-        // Borders and visual elements
-        borderStyle: 'subtle',
-        borderRadius: '4px',
-        boxShadow: 'none',
+        // Borders and visual elements - Clean and professional
+        borderStyle: 'clean',
+        borderRadius: '6px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
 
-        // Advanced visual features
+        // Advanced visual features - Professional appearance
         modernIcons: true,
         svgIcons: true,
-        iconSize: '16px',
+        iconSize: '18px',
         glowEffects: false,
-        gradients: true,
+        gradients: false,
+        hoverEffect: 'subtle',
+        stripedRows: true,
+        rowHoverColor: '#f1f5f9',
     },
 
     // Table actions configuration
@@ -602,11 +612,11 @@ const ManageUsers_tableConfig = {
         autoSaveDelay: 1000, // Auto-save after 1 second of inactivity
 
         // Hover edit configuration
-        enableHoverEdit: true,
-        hoverEditMode: 'immediate', // 'immediate', 'delayed'
-        editTrigger: 'hover', // 'hover', 'click', 'doubleClick'
-        inlineEditing: true,
-        quickEdit: true,
+        enableHoverEdit: false,
+        hoverEditMode: 'disabled', // 'immediate', 'delayed'
+        editTrigger: 'none', // 'hover', 'click', 'doubleClick'
+        inlineEditing: false,
+        quickEdit: false,
         bulkActions: [
             {
                 id: 'activate',
