@@ -28,7 +28,7 @@ interface UserGroupRecord {
     name: string;
     description: string;
     group_code: string;
-    status: 'active' | 'inactive';
+    status: 'Active' | 'Inactive';
     account_id: number;
     enterprise_id: number;
     entity_name: string;
@@ -45,7 +45,7 @@ export default function ModernManageUserGroups() {
             description:
                 'Finance department users with budget management access',
             group_code: 'FIN001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Finance',
@@ -58,7 +58,7 @@ export default function ModernManageUserGroups() {
             name: 'HR Administrators',
             description: 'Human Resources management and employee relations',
             group_code: 'HR001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'HR',
@@ -72,7 +72,7 @@ export default function ModernManageUserGroups() {
             description:
                 'Technical support team for infrastructure maintenance',
             group_code: 'IT001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -85,7 +85,7 @@ export default function ModernManageUserGroups() {
             name: 'Sales Directors',
             description: 'Sales leadership and strategy management',
             group_code: 'SAL001',
-            status: 'inactive',
+            status: 'Inactive',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Sales',
@@ -98,7 +98,7 @@ export default function ModernManageUserGroups() {
             name: 'Marketing Team',
             description: 'Marketing and communications specialists',
             group_code: 'MKT001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Marketing',
@@ -111,7 +111,7 @@ export default function ModernManageUserGroups() {
             name: 'Quality Assurance',
             description: 'Software testing and quality control',
             group_code: 'QA001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Engineering',
@@ -409,7 +409,7 @@ export default function ModernManageUserGroups() {
                                                     px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm
                                                     ${
                                                         group.status ===
-                                                        'active'
+                                                        'Active'
                                                             ? 'bg-emerald-100 text-emerald-700 shadow-emerald-200/50'
                                                             : 'bg-red-100 text-red-700 shadow-red-200/50'
                                                     }
@@ -816,7 +816,7 @@ export default function ModernManageUserGroups() {
                                                                 text-xs px-3 py-1.5 rounded-xl font-semibold
                                                                 ${
                                                                     group.status ===
-                                                                    'active'
+                                                                    'Active'
                                                                         ? 'bg-emerald-100 text-emerald-700'
                                                                         : 'bg-red-100 text-red-700'
                                                                 }

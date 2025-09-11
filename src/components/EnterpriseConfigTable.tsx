@@ -734,7 +734,7 @@ export default function EnterpriseConfigTable({
             width: number;
         } | null>(null);
         const [limit, setLimit] = React.useState(20);
-        const [activeIndex, setActiveIndex] = React.useState<number>(-1);
+        const [ActiveIndex, setActiveIndex] = React.useState<number>(-1);
         const inputRef = React.useRef<HTMLInputElement>(null);
 
         const loadOptions = React.useCallback(async () => {
@@ -934,7 +934,7 @@ export default function EnterpriseConfigTable({
                                                 0,
                                                 limit,
                                             );
-                                            const pick = list[activeIndex];
+                                            const pick = list[ActiveIndex];
                                             if (pick) {
                                                 setCurrent(pick.name);
                                                 onChange(pick.name);
@@ -983,7 +983,7 @@ export default function EnterpriseConfigTable({
                                                 setOpen(false);
                                             }}
                                             className={`w-full rounded-md px-2.5 py-1 text-[12px] transition-colors ${
-                                                activeIndex === idx
+                                                ActiveIndex === idx
                                                     ? 'ring-2 ring-violet-300'
                                                     : ''
                                             } ${(() => {
@@ -1104,7 +1104,7 @@ export default function EnterpriseConfigTable({
             width: number;
         } | null>(null);
         const [limit, setLimit] = React.useState(20);
-        const [activeIndex, setActiveIndex] = React.useState<number>(-1);
+        const [ActiveIndex, setActiveIndex] = React.useState<number>(-1);
         const inputRef = React.useRef<HTMLInputElement>(null);
         const [showAdder, setShowAdder] = React.useState(false);
         const [addingLocal, setAddingLocal] = React.useState('');
@@ -1222,7 +1222,7 @@ export default function EnterpriseConfigTable({
                                                 0,
                                                 limit,
                                             );
-                                            const pick = list[activeIndex];
+                                            const pick = list[ActiveIndex];
                                             if (pick) onToggle(pick);
                                         } else if (e.key === 'Escape') {
                                             setOpen(false);

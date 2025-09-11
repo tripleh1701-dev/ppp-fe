@@ -108,7 +108,7 @@ export default function CircularArcToggle({
                     top: toggleButtonY - toggleHeight / 2,
                     width: toggleWidth,
                     height: toggleHeight,
-                    backgroundColor: isActive ? '#10B981' : '#6B7280', // Green when active, gray when inactive
+                    backgroundColor: isActive ? '#10B981' : '#6B7280', // Green when Active, gray when Inactive
                     borderRadius: `${toggleHeight / 2}px`,
                     border: `2px solid ${isActive ? '#059669' : '#4B5563'}`,
                     boxShadow: isActive

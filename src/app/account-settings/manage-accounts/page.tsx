@@ -156,7 +156,7 @@ interface Account {
     lastName: string;
     email: string;
     phone: string;
-    status?: 'active' | 'inactive' | '';
+    status?: 'Active' | 'Inactive' | '';
     addressLine1: string;
     addressLine2: string;
     city: string;
@@ -263,10 +263,10 @@ function HideColumnsButton() {
 }
 
 function GroupByButton({
-    active,
+    Active,
     onSelect,
 }: {
-    active: 'None' | 'Enterprise' | 'Product' | 'Service';
+    Active: 'None' | 'Enterprise' | 'Product' | 'Service';
     onSelect: (g: 'None' | 'Enterprise' | 'Product' | 'Service') => void;
 }) {
     return (
@@ -296,7 +296,7 @@ export default function ManageAccounts() {
     const [editingData, setEditingData] = useState<Partial<Account> | null>(
         null,
     );
-    const [activeGroupLabel, setActiveGroupLabel] = useState(
+    const [ActiveGroupLabel, setActiveGroupLabel] = useState(
         'None' as 'None' | 'Enterprise' | 'Product' | 'Service',
     );
     const [sortOpen, setSortOpen] = useState(false);
@@ -316,7 +316,7 @@ export default function ManageAccounts() {
         {column: typeof sortColumn; dir: 'asc' | 'desc'}[]
     >([]);
     const [viewsOpen, setViewsOpen] = useState(false);
-    const [activeViewId, setActiveViewId] = useState<string | null>(null);
+    const [ActiveViewId, setActiveViewId] = useState<string | null>(null);
     const [hideOpen, setHideOpen] = useState(false);
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
@@ -373,11 +373,11 @@ export default function ManageAccounts() {
         setActiveGroupLabel(l);
     };
     const groupByProp =
-        activeGroupLabel === 'Enterprise'
+        ActiveGroupLabel === 'Enterprise'
             ? 'enterpriseName'
-            : activeGroupLabel === 'Product'
+            : ActiveGroupLabel === 'Product'
             ? 'productName'
-            : activeGroupLabel === 'Service'
+            : ActiveGroupLabel === 'Service'
             ? 'serviceName'
             : 'none';
 
@@ -481,9 +481,9 @@ export default function ManageAccounts() {
     const currentUserId = 'demo-user';
     const screenKey = 'manage-accounts';
     const isCustomViewActive = useMemo(() => {
-        const v = views.find((x) => x.id === activeViewId);
+        const v = views.find((x) => x.id === ActiveViewId);
         return !!v && !v.isDefault;
-    }, [views, activeViewId]);
+    }, [views, ActiveViewId]);
     useEffect(() => {
         (async () => {
             try {
@@ -520,7 +520,7 @@ export default function ManageAccounts() {
         const config = {
             sort: {column: sortColumn, dir: sortDirection},
             sortRules,
-            group: activeGroupLabel,
+            group: ActiveGroupLabel,
             columns: visibleCols,
         };
         await api.post('/api/views', {
@@ -536,7 +536,7 @@ export default function ManageAccounts() {
             )}&screen=${encodeURIComponent(screenKey)}`,
         );
         setViews(v || []);
-        // try set active view id by name
+        // try set Active view id by name
         const found = (v || []).find((x) => x.name === name);
         setActiveViewId(found?.id || null);
     };
@@ -1083,7 +1083,7 @@ export default function ManageAccounts() {
                             >
                                 <RectangleStackIcon className='h-4 w-4' />
                                 <span className='text-sm'>Group by</span>
-                                {activeGroupLabel !== 'None' && (
+                                {ActiveGroupLabel !== 'None' && (
                                     <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
                                 )}
                             </button>
@@ -1104,7 +1104,7 @@ export default function ManageAccounts() {
                                     </div>
                                     <div className='p-3 space-y-2'>
                                         <select
-                                            value={activeGroupLabel}
+                                            value={ActiveGroupLabel}
                                             onChange={(e) =>
                                                 setGroupByFromLabel(
                                                     e.target.value,
@@ -1147,7 +1147,7 @@ export default function ManageAccounts() {
                                         <button
                                             key={v.id}
                                             className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
-                                                activeViewId === v.id
+                                                ActiveViewId === v.id
                                                     ? 'text-brand'
                                                     : ''
                                             }`}
@@ -1292,7 +1292,7 @@ export default function ManageAccounts() {
                                             lastName: a.lastName || '',
                                             email: a.email || '',
                                             phone: a.phone || '',
-                                            status: a.status || 'active',
+                                            status: a.status || 'Active',
                                             servicesCount:
                                                 a.services?.length || 0,
                                             enterpriseName:
@@ -1811,7 +1811,7 @@ export default function ManageAccounts() {
                             </div>
                             <div className='p-3 space-y-2'>
                                 <select
-                                    value={activeGroupLabel}
+                                    value={ActiveGroupLabel}
                                     onChange={(e) =>
                                         setGroupByFromLabel(e.target.value)
                                     }
@@ -1858,7 +1858,7 @@ function CreateAccountForm({
         lastName: initialData?.lastName || '',
         email: initialData?.email || '',
         phone: initialData?.phone || '',
-        status: (initialData?.status as 'active' | 'inactive' | '') || '',
+        status: (initialData?.status as 'Active' | 'Inactive' | '') || '',
         addressLine1: initialData?.addressLine1 || '',
         addressLine2: initialData?.addressLine2 || '',
         city: initialData?.city || '',
@@ -1930,7 +1930,7 @@ function CreateAccountForm({
             lastName: accountData.lastName!,
             email: accountData.email!,
             phone: accountData.phone!,
-            status: (accountData.status as 'active' | 'inactive' | '') || '',
+            status: (accountData.status as 'Active' | 'Inactive' | '') || '',
             addressLine1: accountData.addressLine1!,
             addressLine2: accountData.addressLine2 || '',
             city: accountData.city!,
@@ -2324,14 +2324,14 @@ function AccountDetailsTab({
                                 <input
                                     type='radio'
                                     name='status'
-                                    value='active'
-                                    checked={data.status === 'active'}
+                                    value='Active'
+                                    checked={data.status === 'Active'}
                                     onChange={(e) =>
                                         updateField(
                                             'status',
                                             e.target.value as
-                                                | 'active'
-                                                | 'inactive',
+                                                | 'Active'
+                                                | 'Inactive',
                                         )
                                     }
                                     className='mr-2'
@@ -2344,14 +2344,14 @@ function AccountDetailsTab({
                                 <input
                                     type='radio'
                                     name='status'
-                                    value='inactive'
-                                    checked={data.status === 'inactive'}
+                                    value='Inactive'
+                                    checked={data.status === 'Inactive'}
                                     onChange={(e) =>
                                         updateField(
                                             'status',
                                             e.target.value as
-                                                | 'active'
-                                                | 'inactive',
+                                                | 'Active'
+                                                | 'Inactive',
                                         )
                                     }
                                     className='mr-2'
@@ -3266,7 +3266,7 @@ function AccountCard({account, onEdit, onDelete}: AccountCardProps) {
                 <div className='flex items-center space-x-2'>
                     <div
                         className={`h-2.5 w-2.5 rounded-full shadow-sm ${
-                            account.status === 'active'
+                            account.status === 'Active'
                                 ? 'bg-emerald-400 animate-pulse'
                                 : 'bg-slate-400'
                         }`}

@@ -40,7 +40,7 @@ interface UserGroupRecord {
     name: string;
     description: string;
     group_code: string;
-    status: 'active' | 'inactive';
+    status: 'Active' | 'Inactive';
     account_id: number;
     enterprise_id: number;
     entity_id?: string;
@@ -68,7 +68,7 @@ export default function ManageUserGroups() {
             name: 'Finance Team',
             description: 'Finance department users',
             group_code: 'FIN001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Finance',
@@ -81,7 +81,7 @@ export default function ManageUserGroups() {
             name: 'HR Administrators',
             description: 'Human Resources management',
             group_code: 'HR001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'HR',
@@ -94,7 +94,7 @@ export default function ManageUserGroups() {
             name: 'IT Support',
             description: 'Technical support team',
             group_code: 'IT001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -107,7 +107,7 @@ export default function ManageUserGroups() {
             name: 'Sales Directors',
             description: 'Sales leadership group',
             group_code: 'SAL001',
-            status: 'inactive',
+            status: 'Inactive',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Sales',
@@ -120,7 +120,7 @@ export default function ManageUserGroups() {
             name: 'Marketing Team',
             description: 'Marketing and communications',
             group_code: 'MKT001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Sales',
@@ -133,7 +133,7 @@ export default function ManageUserGroups() {
             name: 'Security Team',
             description: 'Information security specialists',
             group_code: 'SEC001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -146,7 +146,7 @@ export default function ManageUserGroups() {
             name: 'Data Analytics',
             description: 'Business intelligence and analytics',
             group_code: 'ANL001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Finance',
@@ -159,7 +159,7 @@ export default function ManageUserGroups() {
             name: 'Customer Support',
             description: 'Customer service representatives',
             group_code: 'SUP001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Sales',
@@ -172,7 +172,7 @@ export default function ManageUserGroups() {
             name: 'Product Management',
             description: 'Product strategy and roadmap',
             group_code: 'PRD001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'Sales',
@@ -185,7 +185,7 @@ export default function ManageUserGroups() {
             name: 'Legal Compliance',
             description: 'Legal and regulatory compliance',
             group_code: 'LEG001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'HR',
@@ -198,7 +198,7 @@ export default function ManageUserGroups() {
             name: 'Operations Team',
             description: 'Daily operations management',
             group_code: 'OPS001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -211,7 +211,7 @@ export default function ManageUserGroups() {
             name: 'Quality Assurance',
             description: 'Software testing and QA',
             group_code: 'QA001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -224,7 +224,7 @@ export default function ManageUserGroups() {
             name: 'Training Team',
             description: 'Employee training and development',
             group_code: 'TRN001',
-            status: 'inactive',
+            status: 'Inactive',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'HR',
@@ -237,7 +237,7 @@ export default function ManageUserGroups() {
             name: 'Executive Team',
             description: 'Senior leadership and executives',
             group_code: 'EXE001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'HR',
@@ -250,7 +250,7 @@ export default function ManageUserGroups() {
             name: 'Project Managers',
             description: 'Project coordination and management',
             group_code: 'PM001',
-            status: 'active',
+            status: 'Active',
             account_id: 1,
             enterprise_id: 1,
             entity_name: 'IT Operations',
@@ -446,10 +446,10 @@ export default function ManageUserGroups() {
     const handleBulkAction = async (action: string, selectedIds: string[]) => {
         switch (action) {
             case 'activate':
-                await handleBulkStatusUpdate(selectedIds, 'active');
+                await handleBulkStatusUpdate(selectedIds, 'Active');
                 break;
             case 'deactivate':
-                await handleBulkStatusUpdate(selectedIds, 'inactive');
+                await handleBulkStatusUpdate(selectedIds, 'Inactive');
                 break;
             case 'delete':
                 await handleBulkDelete(selectedIds);
@@ -461,7 +461,7 @@ export default function ManageUserGroups() {
 
     const handleBulkStatusUpdate = async (
         groupIds: string[],
-        status: 'active' | 'inactive',
+        status: 'Active' | 'Inactive',
     ) => {
         try {
             await api.put('/api/user-groups/bulk', {
@@ -782,7 +782,7 @@ export default function ManageUserGroups() {
                                         resizable: true,
                                         sortable: true,
                                         filterable: true,
-                                        options: ['active', 'inactive'],
+                                        options: ['Active', 'Inactive'],
                                     },
                                     {
                                         id: 'memberCount',
@@ -1019,7 +1019,7 @@ export default function ManageUserGroups() {
                                                                     text-xs px-2 py-1 rounded
                                                                     ${
                                                                         group.status ===
-                                                                        'active'
+                                                                        'Active'
                                                                             ? 'bg-green-100 text-green-600'
                                                                             : 'bg-red-100 text-red-600'
                                                                     }

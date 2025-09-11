@@ -24,7 +24,7 @@ export interface AccountRow {
     lastName: string;
     email: string;
     phone: string;
-    status?: 'active' | 'inactive' | '';
+    status?: 'Active' | 'Inactive' | '';
     servicesCount: number;
     enterpriseName?: string;
     productName?: string;
@@ -857,7 +857,7 @@ function SortableAccountRow({
                 } catch {}
             }}
             onDragOverCapture={(e: React.DragEvent<HTMLDivElement>) => {
-                // Keep HTML5 DnD active so the outer trash target accepts the drop
+                // Keep HTML5 DnD Active so the outer trash target accepts the drop
                 e.preventDefault();
             }}
             initial={
@@ -880,7 +880,9 @@ function SortableAccountRow({
             } ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} ${
                 isSelected ? 'ring-2 ring-primary-300/60 bg-primary-50/60' : ''
             } ${inFillRange ? 'bg-primary-50/40' : ''} ${
-                isExpanded ? 'bg-primary-50 border-l-4 border-l-primary-400' : ''
+                isExpanded
+                    ? 'bg-primary-50 border-l-4 border-l-primary-400'
+                    : ''
             }`}
             style={{
                 gridTemplateColumns: cssTemplate,
@@ -889,7 +891,7 @@ function SortableAccountRow({
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
                 onSelect(row.id);
-                // If pointerdown starts on non-draggable interactive elements, don't begin HTML5 drag
+                // If pointerdown starts on non-draggable interActive elements, don't begin HTML5 drag
                 const target = e.target as HTMLElement;
                 if (
                     target.closest(
@@ -921,7 +923,7 @@ function SortableAccountRow({
                 >
                     {/* Drag handle for HTML5 DnD to toolbar trash */}
                     <span
-                        className='mr-1 inline-flex h-5 w-3 items-center justify-center cursor-grab active:cursor-grabbing select-none text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150'
+                        className='mr-1 inline-flex h-5 w-3 items-center justify-center cursor-grab Active:cursor-grabbing select-none text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150'
                         title='Drag row to trash'
                         draggable
                         onMouseDown={(e: React.MouseEvent) => {
@@ -1200,9 +1202,9 @@ function SortableAccountRow({
                     <div
                         id={`status-${row.id}`}
                         className={`group relative w-full h-full min-h-[32px] flex items-center justify-center px-3 cursor-pointer select-none rounded-md overflow-hidden shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition-colors ${
-                            row.status === 'active'
+                            row.status === 'Active'
                                 ? 'bg-emerald-500'
-                                : row.status === 'inactive'
+                                : row.status === 'Inactive'
                                 ? 'bg-rose-500'
                                 : 'bg-slate-200'
                         }`}
@@ -1223,11 +1225,11 @@ function SortableAccountRow({
                             menu.style.opacity = '0';
                             menu.innerHTML = `
                                 <div class="py-1">
-                                    <button data-val="active" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-emerald-700 hover:bg-emerald-50">
+                                    <button data-val="Active" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-emerald-700 hover:bg-emerald-50">
                                         <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
                                         Active
                                     </button>
-                                    <button data-val="inactive" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-rose-700 hover:bg-rose-50">
+                                    <button data-val="Inactive" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-rose-700 hover:bg-rose-50">
                                         <span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
                                         Inactive
                                     </button>
@@ -1241,7 +1243,7 @@ function SortableAccountRow({
                                     onUpdateField(
                                         row.id,
                                         'status',
-                                        val as 'active' | 'inactive',
+                                        val as 'Active' | 'Inactive',
                                     );
                                     document.body.removeChild(menu);
                                     document.removeEventListener(
@@ -1278,7 +1280,7 @@ function SortableAccountRow({
                             }`}
                         >
                             {row.status
-                                ? row.status === 'active'
+                                ? row.status === 'Active'
                                     ? 'Active'
                                     : 'Inactive'
                                 : 'Set status'}

@@ -968,7 +968,7 @@ export default function NewGlobalSettingsPage() {
                                                             <div className='flex flex-wrap gap-2'>
                                                                 {options.map(
                                                                     (opt) => {
-                                                                        const active =
+                                                                        const Active =
                                                                             isSelected(
                                                                                 opt,
                                                                             );
@@ -986,7 +986,7 @@ export default function NewGlobalSettingsPage() {
                                                                                     )
                                                                                 }
                                                                                 className={`relative inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-transform duration-200 ${
-                                                                                    active
+                                                                                    Active
                                                                                         ? 'bg-white text-primary border-indigo-500 shadow-md scale-[1.01] ring-2 ring-indigo-200/60'
                                                                                         : 'bg-white text-primary border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.01]'
                                                                                 }`}
@@ -1013,7 +1013,7 @@ export default function NewGlobalSettingsPage() {
                                                                                         opt
                                                                                     }
                                                                                 </span>
-                                                                                {active && (
+                                                                                {Active && (
                                                                                     <span className='pointer-events-none absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-gradient-to-br from-indigo-500 to-emerald-500 text-white flex items-center justify-center text-[9px] shadow-md ring-2 ring-white'>
                                                                                         ✓
                                                                                     </span>

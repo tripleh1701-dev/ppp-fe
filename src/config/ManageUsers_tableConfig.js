@@ -2,7 +2,7 @@
  * Manage Users Table Configuration
  *
  * Configuration for the user management table with comprehensive
- * field definitions, validations, and interactive features.
+ * field definitions, validations, and interActive features.
  */
 
 const ManageUsers_tableConfig = {
@@ -82,7 +82,7 @@ const ManageUsers_tableConfig = {
             id: 'emailAddress',
             title: 'Email Address',
             type: 'email',
-            width: 140,
+            width: 160,
             resizable: true,
             order: 4,
             pinned: false,
@@ -98,68 +98,42 @@ const ManageUsers_tableConfig = {
         {
             id: 'status',
             title: 'Status',
-            type: 'select',
-            width: 80,
+            type: 'toggle',
+            width: 70,
             resizable: true,
             order: 5,
             pinned: false,
             required: true,
-            options: ['ACTIVE', 'INACTIVE'],
-            optionLabels: {
-                ACTIVE: 'Active',
-                INACTIVE: 'Inactive',
-            },
-            optionStyles: {
-                ACTIVE: {
-                    color: '#ffffff',
-                    backgroundColor: '#22c55e',
-                    borderColor: 'transparent',
-                    borderRadius: '0px',
-                },
-                INACTIVE: {
-                    color: '#ffffff',
-                    backgroundColor: '#ef4444',
-                    borderColor: 'transparent',
-                    borderRadius: '0px',
-                },
-            },
-            defaultValue: 'ACTIVE', // Default to Active
-            placeholder: 'Select Status',
-            selectConfig: {
-                showIcons: false,
-                showColors: true,
-                modernStyle: true,
-                dropdownAnimation: 'slideDown',
-                animationDuration: 300,
-                hoverEffect: true,
-                searchable: false,
-                clearable: false,
-                badgeStyle: false,
-                compactMode: true,
-                fitCellSize: true,
-                rectangularShape: true,
-                inlineDisplay: true,
+            defaultValue: 'Active', // Default to Active
+            toggleConfig: {
+                ActiveValue: 'Active',
+                InactiveValue: 'Inactive',
+                ActiveLabel: 'Active',
+                InactiveLabel: 'Inactive',
+                ActiveColor: '#22c55e', // Green for Active
+                InactiveColor: '#ef4444', // Light red for Inactive
+                textColor: '#ffffff', // White text
+                borderRadius: '3px',
                 fillCell: true,
-                noBorder: true,
-                noPadding: true,
-                noRoundedCorners: true,
-                dropdownStyle: 'simple',
-                showSearchBar: false,
-                enableSearch: false,
-                containWithinCell: true,
-                preventOverflow: true,
-                autoResize: true,
                 fullWidth: true,
                 fullHeight: true,
+                compactMode: true,
+                clickableArea: 'full', // Entire cell is clickable
+                animationDuration: 200,
+                hoverEffect: true,
+                showLabel: true,
+                fontWeight: '600',
+                fontSize: '10px',
             },
             ui: {
                 displayStyle: 'fill-cell',
-                borderRadius: '0px',
+                borderRadius: '4px',
                 padding: '0px',
                 margin: '0px',
                 border: 'none',
                 fullWidth: true,
                 fullHeight: true,
+                overflow: 'hidden',
             },
             validation: {
                 required: true,
@@ -263,7 +237,7 @@ const ManageUsers_tableConfig = {
             id: 'password',
             title: 'Password',
             type: 'password',
-            width: 90,
+            width: 80,
             resizable: true,
             order: 8,
             pinned: false,
@@ -317,36 +291,47 @@ const ManageUsers_tableConfig = {
             },
         },
         {
-            id: 'locked',
-            title: 'Lock/Unlock',
-            type: 'toggle',
-            width: 90,
+            id: 'technicalUser',
+            title: 'Technical User',
+            type: 'checkbox',
+            width: 80,
             resizable: true,
             order: 9,
             pinned: false,
             required: false,
-            defaultValue: false, // Default to unlocked
-            toggleConfig: {
-                onText: 'Unlocked',
-                offText: 'Locked',
-                onColor: '#22c55e', // Green for unlocked
-                offColor: '#ef4444', // Red for locked
-                showIcons: true,
-                onIcon: 'unlock', // Unlock icon
-                offIcon: 'lock', // Lock icon
-                animationDuration: 300,
+            defaultValue: false, // Default to unchecked
+            checkboxConfig: {
+                checkedText: 'Technical',
+                uncheckedText: 'Regular',
+                checkedColor: '#3b82f6', // Blue for technical user
+                uncheckedColor: '#6b7280', // Gray for regular user
+                showLabel: true,
+                labelPosition: 'right',
                 size: 'medium',
                 style: 'modern',
                 hoverEffect: true,
+                animationDuration: 200,
                 showTooltip: true,
                 tooltipText: {
-                    on: 'Click to lock user account',
-                    off: 'Click to unlock user account',
+                    checked: 'This is a technical/system user account',
+                    unchecked: 'This is a regular user account',
                 },
+                fillCell: false,
+                centerAlign: true,
+            },
+            ui: {
+                displayStyle: 'checkbox',
+                alignment: 'center',
+                padding: '4px',
+                margin: '0px',
+                borderRadius: '4px',
+                fullWidth: false,
+                fullHeight: false,
+                showBorder: false,
             },
             validation: {
                 required: false,
-                errorMessage: 'Invalid lock status',
+                errorMessage: 'Technical user flag is invalid',
             },
         },
         {
@@ -391,6 +376,16 @@ const ManageUsers_tableConfig = {
         showSaveButtons: false, // Disable manual save buttons for auto-save
         showAutoSaveIndicator: true, // Show auto-save status
         autoSaveIndicatorPosition: 'top-right',
+
+        // Advanced UI Features
+        enableAdvancedFeatures: true,
+        showDragHandles: true,
+        enableHoverControls: true,
+        enableSortableHeaders: true,
+        enableCompactMode: true,
+        showModernIcons: true,
+        enableMicroInteractions: true,
+        modernTableStyling: true,
 
         // Horizontal scroll configuration
         enableHorizontalScroll: true,
@@ -504,7 +499,7 @@ const ManageUsers_tableConfig = {
             middleName: '',
             lastName: '',
             emailAddress: '',
-            status: 'ACTIVE', // Default to Active status
+            status: 'Active', // Default to Active status
             locked: false, // Default to unlocked
             startDate: new Date().toISOString().split('T')[0],
             endDate: '',
@@ -515,6 +510,87 @@ const ManageUsers_tableConfig = {
 
     // Initial data - will be populated when create button is clicked
     initialData: [],
+
+    // Advanced table features configuration
+    features: {
+        // Tree table functionality
+        treeTable: false, // Set to true if hierarchical data needed
+        parentChildRelationship: false,
+
+        // Drag and drop functionality
+        dragAndDrop: true,
+        dragToReorder: true,
+        dragToNest: false, // Set to true for tree nesting
+        dragWithinGroups: true,
+
+        // Hover controls and micro-interactions
+        hoverControls: true,
+        showHoverButtons: true,
+        hoverButtonTypes: ['edit', 'delete', 'duplicate', 'view'],
+
+        // Inline editing capabilities
+        inlineEditing: true,
+        doubleClickToEdit: true,
+        instantEdit: false, // true for immediate edit mode
+
+        // Row and UI features
+        compactRows: true,
+        modernMicroInteractions: true,
+        animatedTransitions: true,
+        contextMenus: true,
+        showDragHandles: true,
+        enableHoverEffects: true,
+        showSortIndicators: true,
+
+        // Sorting features
+        sortableColumns: true,
+        multiColumnSort: true,
+        sortIndicators: true,
+        clearSortOption: true,
+
+        // Visual features
+        zebraStriping: false,
+        rowHoverEffect: true,
+        selectionHighlight: true,
+        focusIndicators: true,
+
+        // Performance features
+        virtualScrolling: false, // Enable for large datasets
+        lazyLoading: false,
+        optimizedRendering: true,
+    },
+
+    // UI Theme and styling
+    theme: {
+        // Color scheme
+        primaryColor: '#4ba3ff',
+        secondaryColor: '#64748b',
+        successColor: '#10b981',
+        warningColor: '#f59e0b',
+        errorColor: '#ef4444',
+
+        // Typography
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '13px',
+        fontWeight: '400',
+
+        // Spacing
+        rowHeight: 'compact', // 'compact', 'normal', 'comfortable'
+        cellPadding: '4px 8px',
+        headerPadding: '6px 8px',
+
+        // Borders and visual elements
+        borderStyle: 'subtle',
+        borderRadius: '4px',
+        boxShadow: 'none',
+
+        // Advanced visual features
+        modernIcons: true,
+        svgIcons: true,
+        iconSize: '16px',
+        glowEffects: false,
+        gradients: true,
+    },
 
     // Table actions configuration
     actions: {

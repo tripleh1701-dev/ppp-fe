@@ -51,7 +51,7 @@ interface UserRecord {
     endDate?: string; // ISO yyyy-mm-dd
     groupName: string; // assigned to
     updatedAt: string; // ISO timestamp
-    status?: 'ACTIVE' | 'INACTIVE';
+    status?: 'Active' | 'Inactive';
     locked?: boolean;
 }
 
@@ -85,7 +85,7 @@ export default function ManageUsers() {
                         name: 'Admin',
                         description: 'Administrator',
                         group_code: 'ADMIN',
-                        status: 'active',
+                        status: 'Active',
                         account_id: 1,
                         enterprise_id: 1,
                     },
@@ -94,7 +94,7 @@ export default function ManageUsers() {
                         name: 'User',
                         description: 'Regular User',
                         group_code: 'USER',
-                        status: 'active',
+                        status: 'Active',
                         account_id: 1,
                         enterprise_id: 1,
                     },
@@ -103,7 +103,7 @@ export default function ManageUsers() {
                         name: 'Manager',
                         description: 'Manager',
                         group_code: 'MANAGER',
-                        status: 'active',
+                        status: 'Active',
                         account_id: 1,
                         enterprise_id: 1,
                     },
@@ -143,7 +143,7 @@ export default function ManageUsers() {
         middleName: string;
         lastName: string;
         email: string;
-        status: 'ACTIVE' | 'INACTIVE';
+        status: 'Active' | 'Inactive';
         locked: boolean;
         startDate: string; // yyyy-mm-dd
         startTime?: string; // HH:mm
@@ -168,7 +168,7 @@ export default function ManageUsers() {
         middleName: '',
         lastName: '',
         email: '',
-        status: 'ACTIVE',
+        status: 'Active',
         locked: false,
         startDate: todayIso,
         startTime: undefined,
@@ -185,7 +185,7 @@ export default function ManageUsers() {
         middleName: '',
         lastName: '',
         email: '',
-        status: 'ACTIVE',
+        status: 'Active',
         locked: false,
         startDate: todayIso,
         startTime: undefined,
@@ -265,7 +265,7 @@ export default function ManageUsers() {
             'Last updated': new Date(u.updatedAt).toLocaleString(),
             'End date': u.endDate || '-',
             'Assigned to': u.groupName,
-            Status: u.status ?? 'ACTIVE',
+            Status: u.status ?? 'Active',
             Locked: u.locked ? 'Yes' : 'No',
         }));
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -479,12 +479,12 @@ export default function ManageUsers() {
                                 <DndContext
                                     sensors={sensors}
                                     collisionDetection={closestCenter}
-                                    onDragEnd={({active, over}) => {
-                                        if (!over || active.id === over.id)
+                                    onDragEnd={({Active, over}) => {
+                                        if (!over || Active.id === over.id)
                                             return;
                                         setDraftRows((prev) => {
                                             const from = prev.findIndex(
-                                                (r) => r.key === active.id,
+                                                (r) => r.key === Active.id,
                                             );
                                             const to = prev.findIndex(
                                                 (r) => r.key === over.id,
@@ -671,9 +671,9 @@ export default function ManageUsers() {
                                                                                       ...r,
                                                                                       status:
                                                                                           r.status ===
-                                                                                          'ACTIVE'
-                                                                                              ? 'INACTIVE'
-                                                                                              : 'ACTIVE',
+                                                                                          'Active'
+                                                                                              ? 'Inactive'
+                                                                                              : 'Active',
                                                                                   }
                                                                                 : r,
                                                                     ),
@@ -684,7 +684,7 @@ export default function ManageUsers() {
                                                         }}
                                                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition ${
                                                             row.status ===
-                                                            'ACTIVE'
+                                                            'Active'
                                                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                                 : 'bg-slate-100 text-slate-600 border-slate-200'
                                                         }`}

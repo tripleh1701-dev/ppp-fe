@@ -870,6 +870,25 @@ export const AccountIcon = ({className = '', size = 24}: IconProps) => (
     </svg>
 );
 
+// Users/People Icon
+export const UsersIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <circle cx='12' cy='7' r='4' stroke='currentColor' strokeWidth='1.5' />
+        <path
+            d='M6 21V19C6 16.7909 7.79086 15 10 15H14C16.2091 15 18 16.7909 18 19V21'
+            stroke='currentColor'
+            strokeWidth='1.5'
+            strokeLinecap='round'
+        />
+    </svg>
+);
+
 // Enterprise/Building Icon
 export const EnterpriseIcon = ({className = '', size = 24}: IconProps) => (
     <svg
@@ -969,6 +988,7 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         wrench: WrenchIcon,
         search: SearchIcon,
         account: AccountIcon,
+        users: UsersIcon,
         enterprise: EnterpriseIcon,
         // Shell icons
         grid: GridIcon,

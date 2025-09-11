@@ -173,7 +173,7 @@ const SortableRow: React.FC<{
             return (
                 <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        value === 'active'
+                        value === 'Active'
                             ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
                     }`}
@@ -528,11 +528,11 @@ const AdvancedTable: React.FC<AdvancedTableProps> = ({
     // Handle drag end for row reordering
     const handleDragEnd = useCallback(
         (event: any) => {
-            const {active, over} = event;
+            const {Active, over} = event;
 
-            if (active.id !== over?.id) {
+            if (Active.id !== over?.id) {
                 const oldIndex = filteredData.findIndex(
-                    (item) => item.id === active.id,
+                    (item) => item.id === Active.id,
                 );
                 const newIndex = filteredData.findIndex(
                     (item) => item.id === over.id,

@@ -80,7 +80,7 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
     onSave,
     position = {x: 0, y: 0},
 }) => {
-    const [activeSegment, setActiveSegment] = useState<
+    const [ActiveSegment, setActiveSegment] = useState<
         'success' | 'warning' | 'failure' | null
     >(null);
     const [localConfig, setLocalConfig] =
@@ -236,7 +236,7 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
 
             {/* Configuration Panel */}
             <AnimatePresence>
-                {activeSegment && (
+                {ActiveSegment && (
                     <motion.div
                         initial={{opacity: 0, x: -40, scale: 0.9}}
                         animate={{opacity: 1, x: 0, scale: 1}}
@@ -272,14 +272,14 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
                             <h3 className='text-xs font-medium text-gray-800 capitalize flex items-center gap-1'>
                                 <span
                                     className={`w-2 h-2 rounded-full ${
-                                        activeSegment === 'success'
+                                        ActiveSegment === 'success'
                                             ? 'bg-green-500'
-                                            : activeSegment === 'warning'
+                                            : ActiveSegment === 'warning'
                                             ? 'bg-yellow-500'
                                             : 'bg-red-500'
                                     }`}
                                 ></span>
-                                {activeSegment} Config
+                                {ActiveSegment} Config
                             </h3>
                             <motion.button
                                 onClick={() => setActiveSegment(null)}
@@ -296,7 +296,7 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
                         </div>
 
                         {/* Success Configuration */}
-                        {activeSegment === 'success' && (
+                        {ActiveSegment === 'success' && (
                             <div className='space-y-3'>
                                 <div>
                                     <label className='block text-xs font-medium text-gray-700 mb-1.5'>
@@ -404,7 +404,7 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
                         )}
 
                         {/* Warning Configuration */}
-                        {activeSegment === 'warning' && (
+                        {ActiveSegment === 'warning' && (
                             <div className='space-y-3'>
                                 <div>
                                     <label className='block text-xs font-medium text-gray-700 mb-1.5'>
@@ -568,7 +568,7 @@ const CircularToggle: React.FC<CircularToggleProps> = ({
                         )}
 
                         {/* Failure Configuration */}
-                        {activeSegment === 'failure' && (
+                        {ActiveSegment === 'failure' && (
                             <div className='space-y-3'>
                                 <div>
                                     <label className='block text-xs font-medium text-gray-700 mb-1.5'>

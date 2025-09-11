@@ -12,7 +12,7 @@ export default function PipelinePanels({
     config,
     onConfigChange,
 }: PipelinePanelsProps) {
-    const [activeTab, setActiveTab] = useState<
+    const [ActiveTab, setActiveTab] = useState<
         'variables' | 'notifications' | 'triggers'
     >('variables');
     const [newVariable, setNewVariable] = useState<Partial<PipelineVariable>>({
@@ -76,7 +76,7 @@ export default function PipelinePanels({
                     <button
                         onClick={() => setActiveTab('variables')}
                         className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
-                            activeTab === 'variables'
+                            ActiveTab === 'variables'
                                 ? 'bg-card text-brand shadow-md'
                                 : 'text-secondary hover:text-primary'
                         }`}
@@ -86,7 +86,7 @@ export default function PipelinePanels({
                     <button
                         onClick={() => setActiveTab('notifications')}
                         className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
-                            activeTab === 'notifications'
+                            ActiveTab === 'notifications'
                                 ? 'bg-card text-brand shadow-md'
                                 : 'text-secondary hover:text-primary'
                         }`}
@@ -96,7 +96,7 @@ export default function PipelinePanels({
                     <button
                         onClick={() => setActiveTab('triggers')}
                         className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
-                            activeTab === 'triggers'
+                            ActiveTab === 'triggers'
                                 ? 'bg-card text-brand shadow-md'
                                 : 'text-secondary hover:text-primary'
                         }`}
@@ -109,7 +109,7 @@ export default function PipelinePanels({
             {/* Panel Content */}
             <div className='p-4'>
                 {/* Variables Tab */}
-                {activeTab === 'variables' && (
+                {ActiveTab === 'variables' && (
                     <div className='space-y-4'>
                         <div>
                             <h4 className='text-sm font-semibold text-primary mb-3'>
@@ -226,7 +226,7 @@ export default function PipelinePanels({
                 )}
 
                 {/* Notifications Tab */}
-                {activeTab === 'notifications' && (
+                {ActiveTab === 'notifications' && (
                     <div className='space-y-4'>
                         <div>
                             <h4 className='text-sm font-medium text-gray-900 mb-3'>
@@ -312,7 +312,7 @@ export default function PipelinePanels({
                 )}
 
                 {/* Triggers Tab */}
-                {activeTab === 'triggers' && (
+                {ActiveTab === 'triggers' && (
                     <div className='space-y-4'>
                         <div>
                             <h4 className='text-sm font-medium text-gray-900 mb-3'>

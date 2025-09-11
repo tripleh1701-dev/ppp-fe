@@ -161,23 +161,23 @@ export const getRoles = (groupId?: string) =>
 export const getUserGroups = (accountId?: string, enterpriseId?: string) =>
     dynamicDataCache.getUserGroups(accountId, enterpriseId);
 
-// Helper functions for filtering active items
+// Helper functions for filtering Active items
 export const getActiveEntities = async (
     accountId?: string,
     enterpriseId?: string,
 ) => {
     const entities = await getEntities(accountId, enterpriseId);
-    return entities.filter((e) => e.status === 'active');
+    return entities.filter((e) => e.status === 'Active');
 };
 
 export const getActiveServices = async () => {
     const services = await getServices();
-    return services.filter((s) => s.status === 'active');
+    return services.filter((s) => s.status === 'Active');
 };
 
 export const getActiveRoles = async (groupId?: string) => {
     const roles = await getRoles(groupId);
-    return roles.filter((r) => r.status === 'active');
+    return roles.filter((r) => r.status === 'Active');
 };
 
 export const getActiveUserGroups = async (
@@ -185,5 +185,5 @@ export const getActiveUserGroups = async (
     enterpriseId?: string,
 ) => {
     const userGroups = await getUserGroups(accountId, enterpriseId);
-    return userGroups.filter((ug) => ug.status === 'active');
+    return userGroups.filter((ug) => ug.status === 'Active');
 };

@@ -50,7 +50,7 @@ const tableConfig = {
             resizable: true,
             order: 3,
             pinned: false,
-            options: ['active', 'inactive'],
+            options: ['Active', 'Inactive'],
         },
         {
             id: 'dueDate',
@@ -274,7 +274,7 @@ const tableConfig = {
         mainItem: {
             name: '',
             account: 'Unassigned',
-            status: 'active',
+            status: 'Active',
             statusColor: '#FDAB3D',
             dueDate: '',
             overdue: false,

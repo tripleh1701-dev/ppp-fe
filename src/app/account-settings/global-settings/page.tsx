@@ -79,7 +79,7 @@ export default function GlobalSettingsPage() {
     const searchRef = useRef<HTMLInputElement>(null);
     const searchContainerRef = useRef<HTMLDivElement>(null);
     const [hideQuery, setHideQuery] = useState('');
-    const [activeGroup, setActiveGroup] = useState<
+    const [ActiveGroup, setActiveGroup] = useState<
         'None' | 'Enterprise' | 'Account'
     >('None');
     // Inline create panel state
@@ -765,7 +765,7 @@ export default function GlobalSettingsPage() {
                                     </div>
                                     <div className='p-3'>
                                         <select
-                                            value={activeGroup}
+                                            value={ActiveGroup}
                                             onChange={(e) =>
                                                 setActiveGroup(
                                                     e.target.value as any,
@@ -1925,7 +1925,7 @@ function InlineEntities({
                                                             <div className='flex flex-wrap gap-3'>
                                                                 {options.map(
                                                                     (opt) => {
-                                                                        const active =
+                                                                        const Active =
                                                                             isSelected(
                                                                                 opt,
                                                                             );
@@ -1966,7 +1966,7 @@ function InlineEntities({
                                                                                     );
                                                                                 }}
                                                                                 className={`relative inline-flex items-center gap-2 rounded-none border px-3 py-2 text-sm transition-colors duration-150 ${
-                                                                                    active
+                                                                                    Active
                                                                                         ? 'bg-blue-50 text-primary border-blue-500'
                                                                                         : 'bg-white text-primary border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
                                                                                 }`}
@@ -1991,7 +1991,7 @@ function InlineEntities({
                                                                                         opt
                                                                                     }
                                                                                 </span>
-                                                                                {active && (
+                                                                                {Active && (
                                                                                     <svg
                                                                                         className='gs-corner-check-svg'
                                                                                         viewBox='0 0 24 24'

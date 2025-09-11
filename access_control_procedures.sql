@@ -43,7 +43,7 @@ BEGIN
     )
     VALUES (
         p_account_id, p_enterprise_id, p_name, p_description, v_generated_code,
-        'active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        'Active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
     RETURNING fnd_user_groups.id INTO v_group_id;
 
@@ -62,7 +62,7 @@ BEGIN
     -- Log the action
     INSERT INTO acme.fnd_audit_log (table_name, record_id, action, changed_by, changed_at, changes)
     VALUES ('fnd_user_groups', v_group_id, 'CREATE', p_created_by, CURRENT_TIMESTAMP,
-            jsonb_build_object('name', p_name, 'status', 'active'));
+            jsonb_build_object('name', p_name, 'status', 'Active'));
 END;
 $$ LANGUAGE plpgsql;
 
@@ -70,7 +70,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION acme.get_fnd_user_groups(
     p_account_id INTEGER,
     p_enterprise_id INTEGER DEFAULT NULL,
-    p_status VARCHAR(20) DEFAULT 'active'
+    p_status VARCHAR(20) DEFAULT 'Active'
 )
 RETURNS TABLE(
     id INTEGER,
@@ -180,10 +180,10 @@ CREATE OR REPLACE FUNCTION acme.delete_fnd_user_group(
 )
 RETURNS BOOLEAN AS $$
 BEGIN
-    -- Soft delete by setting status to inactive
+    -- Soft delete by setting status to Inactive
     UPDATE acme.fnd_user_groups
     SET
-        status = 'inactive',
+        status = 'Inactive',
         updated_by = p_deleted_by,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = p_group_id;
@@ -192,7 +192,7 @@ BEGIN
         -- Log the deletion
         INSERT INTO acme.fnd_audit_log (table_name, record_id, action, changed_by, changed_at, changes)
         VALUES ('fnd_user_groups', p_group_id, 'DELETE', p_deleted_by, CURRENT_TIMESTAMP,
-                jsonb_build_object('status', jsonb_build_object('old', 'active', 'new', 'inactive')));
+                jsonb_build_object('status', jsonb_build_object('old', 'Active', 'new', 'Inactive')));
         RETURN TRUE;
     END IF;
 
@@ -291,7 +291,7 @@ BEGIN
     FROM acme.fnd_user_group_entities uge
     JOIN acme.fnd_entities e ON uge.entity_id = e.id
     WHERE uge.user_group_id = p_group_id
-    AND e.status = 'active'
+    AND e.status = 'Active'
     ORDER BY e.name;
 END;
 $$ LANGUAGE plpgsql;
@@ -389,7 +389,7 @@ BEGIN
     FROM acme.fnd_user_group_services ugs
     JOIN acme.fnd_services s ON ugs.service_id = s.id
     WHERE ugs.user_group_id = p_group_id
-    AND s.status = 'active'
+    AND s.status = 'Active'
     ORDER BY s.name;
 END;
 $$ LANGUAGE plpgsql;
@@ -434,7 +434,7 @@ BEGIN
     )
     VALUES (
         p_name, p_description, v_generated_code, p_role_level, p_permissions,
-        'active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        'Active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
     RETURNING fnd_roles.id INTO v_role_id;
 
@@ -454,13 +454,13 @@ BEGIN
     -- Log the action
     INSERT INTO acme.fnd_audit_log (table_name, record_id, action, changed_by, changed_at, changes)
     VALUES ('fnd_roles', v_role_id, 'CREATE', p_created_by, CURRENT_TIMESTAMP,
-            jsonb_build_object('name', p_name, 'role_level', p_role_level, 'status', 'active'));
+            jsonb_build_object('name', p_name, 'role_level', p_role_level, 'status', 'Active'));
 END;
 $$ LANGUAGE plpgsql;
 
 -- Get all roles
 CREATE OR REPLACE FUNCTION acme.get_fnd_roles(
-    p_status VARCHAR(20) DEFAULT 'active',
+    p_status VARCHAR(20) DEFAULT 'Active',
     p_role_level INTEGER DEFAULT NULL
 )
 RETURNS TABLE(
@@ -657,7 +657,7 @@ BEGIN
     FROM acme.fnd_user_group_roles ugr
     JOIN acme.fnd_roles r ON ugr.role_id = r.id
     WHERE ugr.user_group_id = p_group_id
-    AND r.status = 'active'
+    AND r.status = 'Active'
     ORDER BY r.role_level, r.name;
 END;
 $$ LANGUAGE plpgsql;
@@ -704,7 +704,7 @@ BEGIN
     )
     VALUES (
         p_name, p_description, v_generated_code, p_attribute_type, p_category,
-        p_default_value, p_validation_rules, 'active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        p_default_value, p_validation_rules, 'Active', p_created_by, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
     RETURNING fnd_attributes.id INTO v_attribute_id;
 
@@ -732,7 +732,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION acme.get_fnd_attributes(
     p_category VARCHAR(100) DEFAULT NULL,
     p_attribute_type VARCHAR(50) DEFAULT NULL,
-    p_status VARCHAR(20) DEFAULT 'active'
+    p_status VARCHAR(20) DEFAULT 'Active'
 )
 RETURNS TABLE(
     id INTEGER,
@@ -893,7 +893,7 @@ BEGIN
     JOIN acme.fnd_attributes a ON ra.attribute_id = a.id
     WHERE ra.role_id = p_role_id
     AND (NOT p_enabled_only OR ra.is_enabled = true)
-    AND a.status = 'active'
+    AND a.status = 'Active'
     ORDER BY a.category, a.name;
 END;
 $$ LANGUAGE plpgsql;
@@ -944,7 +944,7 @@ BEGIN
             )
             FROM acme.fnd_user_group_entities uge
             JOIN acme.fnd_entities e ON uge.entity_id = e.id
-            WHERE uge.user_group_id = ug.id AND e.status = 'active'),
+            WHERE uge.user_group_id = ug.id AND e.status = 'Active'),
             '[]'::jsonb
         ) as entities,
         -- Aggregate services
@@ -961,7 +961,7 @@ BEGIN
             )
             FROM acme.fnd_user_group_services ugs
             JOIN acme.fnd_services s ON ugs.service_id = s.id
-            WHERE ugs.user_group_id = ug.id AND s.status = 'active'),
+            WHERE ugs.user_group_id = ug.id AND s.status = 'Active'),
             '[]'::jsonb
         ) as services,
         -- Aggregate roles with their attributes
@@ -995,10 +995,10 @@ BEGIN
                     ) as attributes
                 FROM acme.fnd_role_attributes ra
                 JOIN acme.fnd_attributes a ON ra.attribute_id = a.id
-                WHERE ra.is_enabled = true AND a.status = 'active'
+                WHERE ra.is_enabled = true AND a.status = 'Active'
                 GROUP BY ra.role_id
             ) role_attrs ON r.id = role_attrs.role_id
-            WHERE ugr.user_group_id = ug.id AND r.status = 'active'),
+            WHERE ugr.user_group_id = ug.id AND r.status = 'Active'),
             '[]'::jsonb
         ) as roles,
         ug.created_at,
@@ -1077,7 +1077,7 @@ BEGIN
     LEFT JOIN acme.fnd_entities pe ON e.parent_entity_id = pe.id
     WHERE e.account_id = p_account_id
     AND (p_enterprise_id IS NULL OR e.enterprise_id = p_enterprise_id)
-    AND e.status = 'active'
+    AND e.status = 'Active'
     ORDER BY e.entity_type, e.name;
 END;
 $$ LANGUAGE plpgsql;
@@ -1105,7 +1105,7 @@ BEGIN
         s.endpoint_url
     FROM acme.fnd_services s
     WHERE (p_category IS NULL OR s.category = p_category)
-    AND s.status = 'active'
+    AND s.status = 'Active'
     ORDER BY s.category, s.name;
 END;
 $$ LANGUAGE plpgsql;

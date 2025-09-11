@@ -339,7 +339,7 @@ export const useAdvancedTable = ({
                 case 'create':
                     handleAddRow({
                         name: 'New Item',
-                        status: 'active',
+                        status: 'Active',
                     });
                     break;
                 default:
@@ -366,7 +366,7 @@ export const useAdvancedTable = ({
                         if (selectedRows.includes(row.id)) {
                             return {
                                 ...row,
-                                status: 'active',
+                                status: 'Active',
                                 updated_at: new Date().toISOString(),
                             };
                         }
@@ -379,7 +379,7 @@ export const useAdvancedTable = ({
                         if (selectedRows.includes(row.id)) {
                             return {
                                 ...row,
-                                status: 'inactive',
+                                status: 'Inactive',
                                 updated_at: new Date().toISOString(),
                             };
                         }

@@ -33,7 +33,7 @@ export default function AISuggestionsPanel({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const pathname = usePathname();
     const [query, setQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<
+    const [ActiveTab, setActiveTab] = useState<
         'suggestion' | 'action' | 'insight'
     >('suggestion');
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -181,7 +181,7 @@ export default function AISuggestionsPanel({
                     icon: 'users',
                     title: 'Entity alignment',
                     description:
-                        'Ensure BU entities map to active enterprises to prevent orphaned configs and access drift.',
+                        'Ensure BU entities map to Active enterprises to prevent orphaned configs and access drift.',
                     confidence: 84,
                     type: 'insight',
                     tags: ['entities', 'alignment'],
@@ -213,7 +213,7 @@ export default function AISuggestionsPanel({
                 icon: 'users',
                 title: 'Access management',
                 description:
-                    'Align user roles and groups with active pipelines to tighten governance.',
+                    'Align user roles and groups with Active pipelines to tighten governance.',
                 confidence: 83,
                 type: 'insight',
                 tags: ['roles', 'governance'],
@@ -247,7 +247,7 @@ export default function AISuggestionsPanel({
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         return allItems
-            .filter((i) => i.type === activeTab)
+            .filter((i) => i.type === ActiveTab)
             .filter(
                 (i) =>
                     !q ||
@@ -255,7 +255,7 @@ export default function AISuggestionsPanel({
                     i.description.toLowerCase().includes(q) ||
                     (i.tags || []).some((t) => t.toLowerCase().includes(q)),
             );
-    }, [allItems, query, activeTab]);
+    }, [allItems, query, ActiveTab]);
 
     function renderIcon(name: string) {
         const pathByName: Record<string, string> = {
@@ -376,7 +376,7 @@ export default function AISuggestionsPanel({
                                     key={tab.key}
                                     onClick={() => setActiveTab(tab.key as any)}
                                     className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
-                                        activeTab === tab.key
+                                        ActiveTab === tab.key
                                             ? 'bg-white text-primary shadow-sm'
                                             : 'text-slate-600 hover:text-slate-800'
                                     }`}
@@ -538,7 +538,7 @@ export default function AISuggestionsPanel({
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key as any)}
                                 className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ease-in-out ${
-                                    activeTab === tab.key
+                                    ActiveTab === tab.key
                                         ? 'bg-white text-primary-600 shadow-sm'
                                         : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200'
                                 }`}

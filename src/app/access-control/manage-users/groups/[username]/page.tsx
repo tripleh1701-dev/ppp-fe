@@ -88,7 +88,7 @@ export default function UserGroupsPage() {
                     />
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className='inline-flex items-center ml-3 px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark'
+                        className='inline-flex items-center ml-3 px-4 py-2.5 border border-transparent   shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark'
                     >
                         + Create New user group
                     </button>

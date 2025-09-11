@@ -159,15 +159,15 @@ select[name='status'],
 }
 
 /* Status-specific colors - block style like screenshot */
-.task-cell select[value='ACTIVE'],
-.status-select[value='ACTIVE'] {
+.task-cell select[value='Active'],
+.status-select[value='Active'] {
     background-color: #22c55e !important; /* Green like "Done" */
     color: #ffffff !important;
     font-weight: 700 !important;
 }
 
-.task-cell select[value='INACTIVE'],
-.status-select[value='INACTIVE'] {
+.task-cell select[value='Inactive'],
+.status-select[value='Inactive'] {
     background-color: #ef4444 !important; /* Red like "Stuck" */
     color: #ffffff !important;
     font-weight: 700 !important;
@@ -183,10 +183,10 @@ select[name='status'],
 }
 
 /* Status dropdown options styling - block style colors */
-.status-option-active,
-.status-select option[value='ACTIVE'],
-select option[value='ACTIVE'],
-.task-cell select option[value='ACTIVE'] {
+.status-option-Active,
+.status-select option[value='Active'],
+select option[value='Active'],
+.task-cell select option[value='Active'] {
     color: #ffffff !important;
     background-color: #22c55e !important; /* Green block */
     padding: 12px 16px !important;
@@ -196,10 +196,10 @@ select option[value='ACTIVE'],
     text-align: center !important;
 }
 
-.status-option-inactive,
-.status-select option[value='INACTIVE'],
-select option[value='INACTIVE'],
-.task-cell select option[value='INACTIVE'] {
+.status-option-Inactive,
+.status-select option[value='Inactive'],
+select option[value='Inactive'],
+.task-cell select option[value='Inactive'] {
     color: #ffffff !important;
     background-color: #ef4444 !important; /* Red block */
     padding: 12px 16px !important;
@@ -272,16 +272,16 @@ select option[value='INACTIVE'],
 }
 
 /* Status select value styling based on selection - fill entire cell */
-.task-cell select[data-field='status'][value='ACTIVE'],
-select[name='status'][value='ACTIVE'],
-.task-cell[data-column='status'] select[value='ACTIVE'] {
+.task-cell select[data-field='status'][value='Active'],
+select[name='status'][value='Active'],
+.task-cell[data-column='status'] select[value='Active'] {
     color: #065f46 !important;
     background-color: #d1fae5 !important;
 }
 
-.task-cell select[data-field='status'][value='INACTIVE'],
-select[name='status'][value='INACTIVE'],
-.task-cell[data-column='status'] select[value='INACTIVE'] {
+.task-cell select[data-field='status'][value='Inactive'],
+select[name='status'][value='Inactive'],
+.task-cell[data-column='status'] select[value='Inactive'] {
     color: #991b1b !important;
     background-color: #fee2e2 !important;
 }
@@ -333,14 +333,14 @@ select[name='status'][value='INACTIVE'],
 }
 
 /* Active option hover - darker green */
-.task-cell select option[value='ACTIVE']:hover {
+.task-cell select option[value='Active']:hover {
     background-color: #16a34a !important; /* Darker green */
     color: #ffffff !important;
     transform: scale(1.02) !important;
 }
 
 /* Inactive option hover - darker red */
-.task-cell select option[value='INACTIVE']:hover {
+.task-cell select option[value='Inactive']:hover {
     background-color: #dc2626 !important; /* Darker red */
     color: #ffffff !important;
     transform: scale(1.02) !important;
@@ -357,13 +357,13 @@ select[name='status'][value='INACTIVE'],
 /* When column is very narrow, show abbreviated text */
 .task-cell[data-column='status'][style*='width: 80px']
     select
-    option[value='ACTIVE']:after {
+    option[value='Active']:after {
     content: 'A' !important;
 }
 
 .task-cell[data-column='status'][style*='width: 80px']
     select
-    option[value='INACTIVE']:after {
+    option[value='Inactive']:after {
     content: 'I' !important;
 }
 
@@ -398,15 +398,15 @@ select[name='status'][value='INACTIVE'],
 }
 
 /* Active status cell background */
-.task-cell[data-column='status'].status-active,
-.task-cell.status-cell.status-active {
+.task-cell[data-column='status'].status-Active,
+.task-cell.status-cell.status-Active {
     background-color: #d1fae5 !important;
     color: #065f46 !important;
 }
 
 /* Inactive status cell background */
-.task-cell[data-column='status'].status-inactive,
-.task-cell.status-cell.status-inactive {
+.task-cell[data-column='status'].status-Inactive,
+.task-cell.status-cell.status-Inactive {
     background-color: #fee2e2 !important;
     color: #991b1b !important;
 }
@@ -430,13 +430,13 @@ select[name='status'][value='INACTIVE'],
     box-sizing: border-box !important;
 }
 
-.status-badge-active {
+.status-badge-Active {
     color: #065f46 !important;
     background-color: #d1fae5 !important;
     border: 1px solid #10b981 !important;
 }
 
-.status-badge-inactive {
+.status-badge-Inactive {
     color: #991b1b !important;
     background-color: #fee2e2 !important;
     border: 1px solid #ef4444 !important;
@@ -498,12 +498,12 @@ select[name='status'][value='INACTIVE'],
     box-sizing: border-box !important;
 }
 
-.status-display-value.active {
+.status-display-value.Active {
     color: #065f46 !important;
     background-color: #d1fae5 !important;
 }
 
-.status-display-value.inactive {
+.status-display-value.Inactive {
     color: #991b1b !important;
     background-color: #fee2e2 !important;
 }
@@ -916,7 +916,7 @@ select[name='status'][value='INACTIVE'],
     transition: all 0.2s ease !important;
 }
 
-.time-toggle-button.active {
+.time-toggle-button.Active {
     background-color: #3b82f6 !important;
     border-color: #3b82f6 !important;
     color: white !important;
@@ -927,7 +927,7 @@ select[name='status'][value='INACTIVE'],
     border-color: #9ca3af !important;
 }
 
-.time-toggle-button.active:hover {
+.time-toggle-button.Active:hover {
     background-color: #2563eb !important;
     border-color: #2563eb !important;
 }

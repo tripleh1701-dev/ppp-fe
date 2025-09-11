@@ -184,7 +184,7 @@ export default function EnterpriseConfiguration() {
         Array<'enterpriseName' | 'productName' | 'services'>
     >(['enterpriseName', 'productName', 'services']);
     const [hideQuery, setHideQuery] = useState('');
-    const [activeGroup, setActiveGroup] = useState<
+    const [ActiveGroup, setActiveGroup] = useState<
         'None' | 'Enterprise' | 'Product'
     >('None');
 
@@ -861,7 +861,7 @@ export default function EnterpriseConfiguration() {
                                         </div>
                                         <div className='p-3'>
                                             <select
-                                                value={activeGroup}
+                                                value={ActiveGroup}
                                                 onChange={(e) =>
                                                     setActiveGroup(
                                                         e.target.value as any,
@@ -1258,7 +1258,7 @@ function EnterpriseAccountsPanel({
                         lastName: '',
                         email: '',
                         phone: '',
-                        status: 'active',
+                        status: 'Active',
                         servicesCount: 0,
                         enterpriseName: enterprise.name,
                         productName: '',
@@ -2045,7 +2045,7 @@ function ProductSuggestions({
     const [options, setOptions] = useState<{id: string; name: string}[]>([]);
     const [open, setOpen] = useState(false);
     useEffect(() => {
-        let active = true;
+        let Active = true;
         (async () => {
             const q = query.trim();
             if (!q) {
@@ -2063,17 +2063,17 @@ function ProductSuggestions({
                 const list = await api.get<{id: string; name: string}[]>(
                     `/api/products?search=${encodeURIComponent(q)}`,
                 );
-                if (!active) return;
+                if (!Active) return;
                 setOptions(list || []);
                 setOpen((list || []).length > 0 && q !== (selected || ''));
             } catch {
-                if (!active) return;
+                if (!Active) return;
                 setOptions([]);
                 setOpen(false);
             }
         })();
         return () => {
-            active = false;
+            Active = false;
         };
     }, [query, selected]);
     if (!open) return null;
@@ -2200,7 +2200,7 @@ function InlineCreateService({onCreated}: {onCreated: (name: string) => void}) {
             <button
                 type='button'
                 onClick={() => setOpen((v) => !v)}
-                className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-inverse hover:bg-primary-dark transition transform hover:scale-105 active:scale-95 ${
+                className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-inverse hover:bg-primary-dark transition transform hover:scale-105 Active:scale-95 ${
                     pulse ? 'ring-2 ring-primary/40' : ''
                 }`}
                 title='Create service'
@@ -2331,7 +2331,7 @@ function InlineCreateProduct({onCreated}: {onCreated: (name: string) => void}) {
             <button
                 type='button'
                 onClick={() => setOpen((v) => !v)}
-                className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-inverse hover:bg-primary-dark transition transform hover:scale-105 active:scale-95 ${
+                className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-inverse hover:bg-primary-dark transition transform hover:scale-105 Active:scale-95 ${
                     pulse ? 'ring-2 ring-primary/40' : ''
                 }`}
                 title='Create product'

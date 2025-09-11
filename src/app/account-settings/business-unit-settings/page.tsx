@@ -63,7 +63,7 @@ export default function BusinessUnitSettingsPage() {
         Array<'enterprise' | 'account' | 'entities'>
     >(['enterprise', 'account', 'entities']);
     const [hideQuery, setHideQuery] = useState('');
-    const [activeGroup, setActiveGroup] = useState<
+    const [ActiveGroup, setActiveGroup] = useState<
         'None' | 'Enterprise' | 'Account'
     >('None');
 
@@ -99,7 +99,7 @@ export default function BusinessUnitSettingsPage() {
             api.get<EnterpriseMinimal[]>('/api/enterprises'),
         ]);
         // Transform business units data to parse entities from JSON string to array
-        const transformedBus = bus.map(item => ({
+        const transformedBus = bus.map((item) => ({
             ...item,
             id: String(item.id),
             accountId: String(item.clientId || ''),
@@ -119,7 +119,7 @@ export default function BusinessUnitSettingsPage() {
                     console.error('Failed to parse entities:', e);
                     return [];
                 }
-            })()
+            })(),
         }));
         setItems(transformedBus);
         setAccounts(acc);
@@ -377,7 +377,7 @@ export default function BusinessUnitSettingsPage() {
                                         </div>
                                         <div className='p-3'>
                                             <select
-                                                value={activeGroup}
+                                                value={ActiveGroup}
                                                 onChange={(e) =>
                                                     setActiveGroup(
                                                         e.target.value as any,
@@ -479,9 +479,7 @@ export default function BusinessUnitSettingsPage() {
                                         <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider sticky left-0 z-10 bg-tertiary/40'>
                                             <span className='inline-flex items-center gap-1'>
                                                 Enterprise
-                                                <span className='inline-block ml-1 text-slate-400'>
-                                                    
-                                                </span>
+                                                <span className='inline-block ml-1 text-slate-400'></span>
                                             </span>
                                         </th>
                                     )}
@@ -489,9 +487,7 @@ export default function BusinessUnitSettingsPage() {
                                         <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
                                             <span className='inline-flex items-center gap-1'>
                                                 Account
-                                                <span className='inline-block ml-1 text-slate-400'>
-                                                    
-                                                </span>
+                                                <span className='inline-block ml-1 text-slate-400'></span>
                                             </span>
                                         </th>
                                     )}
@@ -499,9 +495,7 @@ export default function BusinessUnitSettingsPage() {
                                         <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
                                             <span className='inline-flex items-center gap-1'>
                                                 Entities
-                                                <span className='inline-block ml-1 text-slate-400'>
-                                                    
-                                                </span>
+                                                <span className='inline-block ml-1 text-slate-400'></span>
                                             </span>
                                         </th>
                                     )}
@@ -600,7 +594,7 @@ export default function BusinessUnitSettingsPage() {
                                                             }, 0);
                                                         } catch {}
                                                     }}
-                                                    className='inline-flex items-center cursor-grab active:cursor-grabbing select-none'
+                                                    className='inline-flex items-center cursor-grab Active:cursor-grabbing select-none'
                                                     title='Drag to trash to delete'
                                                 >
                                                     <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 border border-slate-300'>
@@ -619,16 +613,20 @@ export default function BusinessUnitSettingsPage() {
                                         {visibleCols.includes('entities') && (
                                             <td className='px-6 py-4'>
                                                 <div className='flex flex-wrap gap-1.5'>
-                                                    {Array.isArray(item.entities) ? item.entities.map(
-                                                        (e, idx) => (
-                                                            <span
-                                                                key={idx}
-                                                                className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-50 text-sky-700 border border-sky-200'
-                                                            >
-                                                                {e}
-                                                            </span>
-                                                        ),
-                                                    ) : null}
+                                                    {Array.isArray(
+                                                        item.entities,
+                                                    )
+                                                        ? item.entities.map(
+                                                              (e, idx) => (
+                                                                  <span
+                                                                      key={idx}
+                                                                      className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-50 text-sky-700 border border-sky-200'
+                                                                  >
+                                                                      {e}
+                                                                  </span>
+                                                              ),
+                                                          )
+                                                        : null}
                                                 </div>
                                             </td>
                                         )}

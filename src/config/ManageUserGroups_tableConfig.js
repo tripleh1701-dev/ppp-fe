@@ -2,7 +2,7 @@
  * Manage User Groups Table Configuration
  *
  * Configuration for the user groups management table with comprehensive
- * field definitions, validations, and interactive features.
+ * field definitions, validations, and interActive features.
  */
 
 const ManageUserGroups_tableConfig = {
@@ -99,8 +99,8 @@ const ManageUserGroups_tableConfig = {
             pinned: false,
             required: true,
             options: [
-                {value: 'active', label: 'Active'},
-                {value: 'inactive', label: 'Inactive'},
+                {value: 'Active', label: 'Active'},
+                {value: 'Inactive', label: 'Inactive'},
             ],
             validation: {
                 required: true,
@@ -213,8 +213,8 @@ const ManageUserGroups_tableConfig = {
                     label: 'Status',
                     type: 'select',
                     options: [
-                        {value: 'active', label: 'Active'},
-                        {value: 'inactive', label: 'Inactive'},
+                        {value: 'Active', label: 'Active'},
+                        {value: 'Inactive', label: 'Inactive'},
                     ],
                 },
                 {

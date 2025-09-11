@@ -24,7 +24,7 @@ export default function TestModernPage() {
                         <li>• 🔮 Glass morphism effects with backdrop blur</li>
                         <li>• 🎬 Smooth spring animations</li>
                         <li>• 💎 Professional card layouts</li>
-                        <li>• 🎯 Interactive sliding panels</li>
+                        <li>• 🎯 InterActive sliding panels</li>
                     </ul>
                 </div>
 

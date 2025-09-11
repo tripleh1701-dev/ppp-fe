@@ -52,12 +52,12 @@ interface SimpleAdvancedTableProps {
  * const columns = [
  *   { id: 'name', title: 'Name', type: 'text' },
  *   { id: 'email', title: 'Email', type: 'email' },
- *   { id: 'status', title: 'Status', type: 'select', options: ['active', 'inactive'] },
+ *   { id: 'status', title: 'Status', type: 'select', options: ['Active', 'Inactive'] },
  * ];
  *
  * const data = [
- *   { id: '1', name: 'John Doe', email: 'john@example.com', status: 'active' },
- *   { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'inactive' },
+ *   { id: '1', name: 'John Doe', email: 'john@example.com', status: 'Active' },
+ *   { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'Inactive' },
  * ];
  *
  * <SimpleAdvancedTable
