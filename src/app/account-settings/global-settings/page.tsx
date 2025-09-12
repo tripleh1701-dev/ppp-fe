@@ -30,7 +30,7 @@ interface GlobalSetting {
 const STORAGE_KEY = 'global-settings';
 
 const DEFAULT_ACCOUNTS: {id: string; accountName: string}[] = [
-    {id: 'acc-1001', accountName: 'acme Corp'},
+    {id: 'acc-1001', accountName: 'Systiva Corp'},
     {id: 'acc-1002', accountName: 'Globex Ltd'},
     {id: 'acc-1003', accountName: 'Initech'},
 ];

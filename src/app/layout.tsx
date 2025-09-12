@@ -11,10 +11,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    title: 'acme - Enterprise CI/CD Platform',
+    title: 'Systiva - Enterprise CI/CD Platform',
     description: 'Build and manage your CI/CD pipelines with ease',
     keywords: 'CI/CD, DevOps, Pipeline, Automation, Enterprise',
-    authors: [{name: 'acme Team'}],
+    authors: [{name: 'Systiva Team'}],
     viewport:
         'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
 };
@@ -41,18 +41,18 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
                     name='apple-mobile-web-app-status-bar-style'
                     content='default'
                 />
-                <meta name='apple-mobile-web-app-title' content='acme' />
+                <meta name='apple-mobile-web-app-title' content='Systiva' />
 
                 {/* App icons */}
                 <link
                     rel='icon'
                     type='image/svg+xml'
-                    href='/images/logos/acme-logo.svg'
+                    href='/images/logos/Systiva-logo.svg'
                 />
-                <link rel='alternate icon' href='/images/logos/acme-logo.svg' />
+                <link rel='alternate icon' href='/images/logos/Systiva-logo.svg' />
                 <link
                     rel='apple-touch-icon'
-                    href='/images/logos/acme-logo.svg'
+                    href='/images/logos/Systiva-logo.svg'
                 />
 
                 {/* Preload critical fonts */}

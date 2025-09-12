@@ -1,6 +1,6 @@
 /**
  * Responsive Design Utilities
- * Cross-browser compatible responsive helpers for the acme platform
+ * Cross-browser compatible responsive helpers for the Systiva platform
  */
 
 // Device detection utilities

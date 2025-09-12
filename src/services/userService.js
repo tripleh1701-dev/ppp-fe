@@ -1,6 +1,6 @@
 /**
  * User Service - API integration for user management
- * Handles all CRUD operations for users in the acme.fnd_users table
+ * Handles all CRUD operations for users in the Systiva.fnd_users table
  */
 
 const API_BASE_URL =
