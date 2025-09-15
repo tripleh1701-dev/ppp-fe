@@ -1,0 +1,411 @@
+/* Scope Configuration Sliding Panel Styles */
+
+/* Main sliding panel container */
+.scope-config-sliding-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 60vw;
+    min-width: 800px;
+    max-width: 1200px;
+    height: 100vh;
+    background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 50%, #e6f2ff 100%);
+    border-left: 1px solid #bfdbfe;
+    box-shadow: -12px 0 48px rgba(59, 130, 246, 0.15),
+        -4px 0 16px rgba(59, 130, 246, 0.1);
+    z-index: 60; /* Higher than the user groups sliding pane */
+    display: flex;
+    flex-direction: column;
+    animation: slideInFromRight 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Animation for sliding in from right */
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Panel content wrapper */
+.scope-panel-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Header section */
+.scope-panel-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    min-height: 120px;
+}
+
+.header-content {
+    flex: 1;
+}
+
+.header-content h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.header-content p {
+    margin-bottom: 4px;
+}
+
+/* Action buttons in header */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 24px;
+}
+
+.btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: #f1f5f9;
+    color: #475569;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+}
+
+.btn-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: transparent;
+    color: #64748b;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+    background: #f1f5f9;
+    color: #475569;
+    transform: scale(1.1);
+}
+
+/* Main body content */
+.scope-panel-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Left sidebar */
+.scope-sidebar {
+    width: 280px;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    border-right: 1px solid #e2e8f0;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.sidebar-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.modules-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+/* Module tiles */
+.module-tile {
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.module-tile:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.module-tile-selected {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-color: #3b82f6;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
+}
+
+.module-tile-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+}
+
+.module-icon {
+    color: #6b7280;
+    transition: color 0.2s ease;
+}
+
+.module-tile-selected .module-icon {
+    color: #3b82f6;
+}
+
+.module-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.module-tile-selected .module-name {
+    color: #1e40af;
+    font-weight: 600;
+}
+
+/* Main content area */
+.scope-main-content {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-y: auto;
+    background: white;
+}
+
+.permissions-header {
+    margin-bottom: 32px;
+}
+
+.permissions-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.permissions-header p {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* Permission sections */
+.permission-section {
+    margin-bottom: 32px;
+    padding: 24px;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    background: #fafbfc;
+    transition: all 0.3s ease;
+}
+
+.permission-section-highlighted {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+    border-color: #bfdbfe;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.1);
+}
+
+.permission-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.section-icon {
+    color: #6b7280;
+    transition: color 0.2s ease;
+}
+
+.permission-section-highlighted .section-icon {
+    color: #3b82f6;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.permission-section-highlighted .section-title {
+    color: #1e40af;
+}
+
+/* Permissions grid */
+.permissions-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.permission-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.permission-row:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.permission-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    flex: 1;
+}
+
+.permission-controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+/* Permission checkboxes */
+.permission-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.permission-checkbox:hover {
+    transform: scale(1.02);
+}
+
+.permission-checkbox input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.permission-checkbox input[type='checkbox']:hover {
+    transform: scale(1.1);
+}
+
+.permission-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.permission-checkbox:hover .permission-label {
+    color: #374151;
+}
+
+/* Scrollbar styling */
+.scope-sidebar::-webkit-scrollbar,
+.scope-main-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scope-sidebar::-webkit-scrollbar-track,
+.scope-main-content::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.scope-sidebar::-webkit-scrollbar-thumb,
+.scope-main-content::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.scope-sidebar::-webkit-scrollbar-thumb:hover,
+.scope-main-content::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .scope-config-sliding-panel {
+        width: 70vw;
+        min-width: 700px;
+    }
+
+    .scope-sidebar {
+        width: 240px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .scope-config-sliding-panel {
+        width: 80vw;
+        min-width: 600px;
+    }
+
+    .scope-sidebar {
+        width: 200px;
+        padding: 16px;
+    }
+
+    .scope-main-content {
+        padding: 16px 24px;
+    }
+}

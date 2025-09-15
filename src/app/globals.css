@@ -1,0 +1,2742 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AGGRESSIVE OVERRIDES FOR MANAGE USERS TABLE */
+/* Force bold headers with highest specificity */
+.column-header,
+.table-header .column-header,
+div .column-header,
+* .column-header {
+    font-weight: 700 !important;
+    color: #1f2937 !important;
+}
+
+/* Force grayed out placeholders with small text - AGGRESSIVE */
+input::placeholder,
+textarea::placeholder,
+.task-cell input::placeholder,
+.add-task-input::placeholder,
+div input::placeholder,
+* input::placeholder,
+input[placeholder]::placeholder,
+.task-board-container input::placeholder,
+.table-container input::placeholder,
+.task-row input::placeholder,
+.task-name input::placeholder,
+input[type='text']::placeholder,
+input[type='email']::placeholder {
+    color: #9ca3af !important;
+    font-size: 8px !important;
+    opacity: 0.5 !important;
+    font-weight: 300 !important;
+    font-style: italic !important;
+}
+
+/* Additional specific overrides for ReusableTableComponent */
+.task-board-container .column-header,
+.table-container .column-header {
+    font-weight: 700 !important;
+    color: #1f2937 !important;
+}
+
+/* CSS Variables for ManageUsers table configuration */
+:root {
+    --manage-users-header-font-weight: 700;
+    --manage-users-header-color: #1f2937;
+    --manage-users-placeholder-color: #9ca3af;
+    --manage-users-placeholder-font-size: 9px;
+    --manage-users-placeholder-opacity: 0.6;
+}
+
+/* Apply configuration-based styling */
+.manage-users-table .column-header,
+[data-table='manage-users'] .column-header {
+    font-weight: var(--manage-users-header-font-weight) !important;
+    color: var(--manage-users-header-color) !important;
+}
+
+.manage-users-table input::placeholder,
+[data-table='manage-users'] input::placeholder {
+    color: var(--manage-users-placeholder-color) !important;
+    font-size: var(--manage-users-placeholder-font-size) !important;
+    opacity: var(--manage-users-placeholder-opacity) !important;
+    font-weight: 400 !important;
+}
+
+/* HOVER EDIT FUNCTIONALITY */
+/* Cell hover edit styling */
+.task-cell:hover,
+.task-board-container .task-cell:hover,
+.table-container .task-cell:hover {
+    background-color: #f8fafc !important;
+    border: 2px solid #3b82f6 !important;
+    cursor: text !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Show input on cell hover */
+.task-cell:hover input,
+.task-cell:hover textarea,
+.task-cell:hover select {
+    display: block !important;
+    opacity: 1 !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 4px 8px !important;
+}
+
+/* Hide static text on hover */
+.task-cell:hover .cell-display-text {
+    display: none !important;
+}
+
+/* Edit indicator */
+.task-cell[data-editable='true']:hover::after {
+    content: '✏️';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+/* Hover edit hint */
+.task-cell[data-editable='true']:hover::before {
+    content: 'Click to edit';
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    font-size: 10px;
+    color: #6b7280;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2px 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* STATUS SELECT DROPDOWN STYLING - COMPLETE CELL FILL */
+/* Status select dropdown - fills entire cell with color */
+.status-select,
+.task-cell select[data-field='status'],
+select[name='status'],
+.task-cell[data-column='status'] select,
+.status-cell select,
+.task-cell.status-cell select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    display: block !important;
+    outline: none !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+    background-position: right 8px center !important;
+    background-repeat: no-repeat !important;
+    background-size: 12px 12px !important;
+    line-height: 44px !important;
+}
+
+/* Status-specific colors - block style like screenshot */
+.task-cell select[value='Active'],
+.status-select[value='Active'] {
+    background-color: #22c55e !important; /* Green like "Done" */
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+.task-cell select[value='Inactive'],
+.status-select[value='Inactive'] {
+    background-color: #ef4444 !important; /* Red like "Stuck" */
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* Force no rounded corners on any status elements */
+.task-cell[data-field='status'] *,
+.status-cell *,
+.task-cell select option {
+    border-radius: 0 !important;
+    -webkit-border-radius: 0 !important;
+    -moz-border-radius: 0 !important;
+}
+
+/* Status dropdown options styling - block style colors */
+.status-option-Active,
+.status-select option[value='Active'],
+select option[value='Active'],
+.task-cell select option[value='Active'] {
+    color: #ffffff !important;
+    background-color: #22c55e !important; /* Green block */
+    padding: 12px 16px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    border: none !important;
+    text-align: center !important;
+}
+
+.status-option-Inactive,
+.status-select option[value='Inactive'],
+select option[value='Inactive'],
+.task-cell select option[value='Inactive'] {
+    color: #ffffff !important;
+    background-color: #ef4444 !important; /* Red block */
+    padding: 12px 16px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    border: none !important;
+    text-align: center !important;
+}
+
+/* Dropdown container styling */
+.task-cell select:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    z-index: 1000 !important;
+}
+
+/* Enhanced dropdown styling when opened */
+.task-cell select:focus option,
+.task-cell select:active option {
+    padding: 12px 16px !important;
+    margin: 2px 0 !important;
+    border-radius: 4px !important;
+}
+
+/* Dropdown list container */
+.task-cell select:focus,
+.task-cell select[size]:focus {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Status dropdown hover effects */
+.status-select:hover,
+.task-cell select[data-field='status']:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+    transform: translateY(-0.5px) !important;
+}
+
+.status-select:focus,
+.task-cell select[data-field='status']:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Dropdown arrow rotation on focus */
+.task-cell select[data-field='status']:focus {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m14 12-4-4-4 4'/%3e%3c/svg%3e") !important;
+}
+
+/* Ensure dropdown stays within table bounds */
+.task-cell select[data-field='status'] {
+    position: relative !important;
+}
+
+/* Custom dropdown option styling */
+.task-cell select[data-field='status'] option {
+    color: #374151 !important;
+    background-color: white !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.task-cell select[data-field='status'] option:hover,
+.task-cell select[data-field='status'] option:focus {
+    background-color: #f3f4f6 !important;
+    color: #1f2937 !important;
+}
+
+/* Status select value styling based on selection - fill entire cell */
+.task-cell select[data-field='status'][value='Active'],
+select[name='status'][value='Active'],
+.task-cell[data-column='status'] select[value='Active'] {
+    color: #065f46 !important;
+    background-color: #d1fae5 !important;
+}
+
+.task-cell select[data-field='status'][value='Inactive'],
+select[name='status'][value='Inactive'],
+.task-cell[data-column='status'] select[value='Inactive'] {
+    color: #991b1b !important;
+    background-color: #fee2e2 !important;
+}
+
+/* Status cell container styling - fill entire cell completely */
+.task-cell[data-column='status'],
+.task-cell.status-cell,
+.task-cell[data-field='status'] {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    vertical-align: middle !important;
+    overflow: hidden !important;
+    position: relative !important;
+    z-index: 1 !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    display: block !important;
+    width: 100% !important;
+}
+
+/* Ensure status cell fills completely on resize */
+.task-cell.status-cell,
+.task-cell[data-column='status'] {
+    width: 100% !important;
+    flex: 1 !important;
+    position: relative !important;
+}
+
+/* Status cell specific styling */
+.task-cell[data-column='status'] {
+    background: transparent !important;
+    border-right: 1px solid #e6e9ef !important;
+}
+
+/* Auto-adjust status dropdown on column resize */
+.task-cell[data-column='status'] select,
+.task-cell.status-cell select {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Dropdown option hover effects */
+.task-cell select option:hover {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+    cursor: pointer !important;
+}
+
+/* Active option hover - darker green */
+.task-cell select option[value='Active']:hover {
+    background-color: #16a34a !important; /* Darker green */
+    color: #ffffff !important;
+    transform: scale(1.02) !important;
+}
+
+/* Inactive option hover - darker red */
+.task-cell select option[value='Inactive']:hover {
+    background-color: #dc2626 !important; /* Darker red */
+    color: #ffffff !important;
+    transform: scale(1.02) !important;
+}
+
+/* Responsive text in status dropdown */
+@media (max-width: 150px) {
+    .task-cell[data-column='status'] select {
+        font-size: 12px !important;
+        padding: 0 16px 0 4px !important;
+    }
+}
+
+/* When column is very narrow, show abbreviated text */
+.task-cell[data-column='status'][style*='width: 80px']
+    select
+    option[value='Active']:after {
+    content: 'A' !important;
+}
+
+.task-cell[data-column='status'][style*='width: 80px']
+    select
+    option[value='Inactive']:after {
+    content: 'I' !important;
+}
+
+/* Animated dropdown on focus/click */
+.task-cell select[data-field='status']:focus,
+.task-cell select[data-field='status']:active {
+    z-index: 1000 !important;
+    position: relative !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Dropdown options animation */
+.task-cell select[data-field='status'] option {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    animation: slideDown 0.3s ease-out !important;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Active status cell background */
+.task-cell[data-column='status'].status-Active,
+.task-cell.status-cell.status-Active {
+    background-color: #d1fae5 !important;
+    color: #065f46 !important;
+}
+
+/* Inactive status cell background */
+.task-cell[data-column='status'].status-Inactive,
+.task-cell.status-cell.status-Inactive {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+}
+
+/* Status badge styling - rectangular and compact */
+.status-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    padding: 2px 6px !important;
+    border-radius: 3px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 24px !important;
+    min-width: 60px !important;
+    box-sizing: border-box !important;
+}
+
+.status-badge-Active {
+    color: #065f46 !important;
+    background-color: #d1fae5 !important;
+    border: 1px solid #10b981 !important;
+}
+
+.status-badge-Inactive {
+    color: #991b1b !important;
+    background-color: #fee2e2 !important;
+    border: 1px solid #ef4444 !important;
+}
+
+/* Status select hover effects */
+.status-select:hover,
+.task-cell select[data-field='status']:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Status select focus effects */
+.status-select:focus,
+.task-cell select[data-field='status']:focus {
+    outline: none !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Status cell specific styling */
+.task-cell[data-field='status'],
+.task-cell.status-cell {
+    padding: 2px !important;
+    vertical-align: middle !important;
+}
+
+.task-cell[data-field='status'] select,
+.task-cell.status-cell select {
+    margin: 0 !important;
+    display: block !important;
+}
+
+/* Ensure status dropdown fits cell */
+.status-dropdown-container {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Status value display when not editing - fill entire cell */
+.status-display-value {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-sizing: border-box !important;
+}
+
+.status-display-value.Active {
+    color: #065f46 !important;
+    background-color: #d1fae5 !important;
+}
+
+.status-display-value.Inactive {
+    color: #991b1b !important;
+    background-color: #fee2e2 !important;
+}
+
+.status-display-value:hover {
+    opacity: 0.9 !important;
+    filter: brightness(0.95) !important;
+}
+
+/* Override any default select styling */
+.task-cell select {
+    outline: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
+
+/* Ensure status text fills cell completely */
+.status-cell-content {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+}
+
+/* HORIZONTAL SCROLLING FIX */
+/* Ensure table container allows horizontal scrolling */
+.table-container {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+}
+
+/* Force the task board container to be scrollable */
+.task-board-container {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+}
+
+/* Ensure table content has minimum width to trigger scrolling */
+.task-board-container,
+.task-board {
+    min-width: max-content !important;
+    width: max-content !important;
+}
+
+/* Table headers and rows should maintain alignment with flexible width */
+.table-header,
+.task-row,
+.add-task-row {
+    min-width: 1490px !important;
+    width: max-content !important;
+    display: grid !important;
+    align-items: stretch !important;
+    min-height: 44px !important;
+}
+
+/* Restore proper table structure */
+.task-group {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure table structure maintains consistent layout */
+.task-board-container .table-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background: white !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.task-board-container .task-row {
+    border-bottom: 1px solid #e2e8f0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Remove any gaps between header and rows */
+.task-board-container {
+    gap: 0 !important;
+    row-gap: 0 !important;
+}
+
+.task-board {
+    gap: 0 !important;
+    row-gap: 0 !important;
+}
+
+.task-group {
+    gap: 0 !important;
+    row-gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure no spacing between table header and first row */
+.table-header {
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.task-row:first-of-type {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Remove any default spacing from task list */
+.task-list {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+/* Targeted gap removal - less aggressive */
+.task-group {
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Remove spacing between header and first row only */
+.table-header {
+    margin-bottom: 0 !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.task-row:first-of-type,
+.task-list:first-of-type {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Individual cells should maintain their widths and alignment */
+.task-cell,
+.column-header {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: visible !important;
+    text-overflow: ellipsis !important;
+    position: relative !important;
+}
+
+/* Restore proper cell padding and heights */
+.task-cell {
+    padding: 6px 10px !important;
+    min-height: 44px !important;
+    border-right: 1px solid #e6e9ef !important;
+}
+
+.column-header {
+    padding: 6px 10px !important;
+    min-height: 44px !important;
+    border-right: 1px solid #d1e7ff !important;
+}
+
+/* Ensure resize handles are visible and functional */
+.column-header .resize-handle {
+    position: absolute !important;
+    top: 0 !important;
+    right: -2px !important;
+    width: 8px !important;
+    height: 100% !important;
+    cursor: col-resize !important;
+    background: transparent !important;
+    border-right: 2px solid transparent !important;
+    transition: border-color 0.2s ease, background-color 0.2s ease !important;
+    z-index: 10 !important;
+}
+
+.column-header .resize-handle:hover {
+    border-right-color: #4ba3ff !important;
+    background: rgba(75, 163, 255, 0.1) !important;
+}
+
+.column-header.resizing .resize-handle {
+    border-right-color: #2a8fff !important;
+    background: rgba(75, 163, 255, 0.1) !important;
+}
+
+/* Ensure resizable headers work properly */
+.resizable-header {
+    position: relative !important;
+    user-select: none !important;
+    cursor: grab !important;
+}
+
+.resizable-header:active {
+    cursor: grabbing !important;
+}
+
+.resizable-header.resizing {
+    cursor: col-resize !important;
+}
+
+/* Prevent conflicts with column resizing */
+.column-header:not(.resizing) {
+    cursor: grab !important;
+}
+
+.column-header.resizing {
+    cursor: col-resize !important;
+}
+
+/* Column widths - allow resizing while maintaining minimums */
+.task-cell:nth-child(1),
+.column-header:nth-child(1) {
+    min-width: 40px;
+}
+.task-cell:nth-child(2),
+.column-header:nth-child(2) {
+    min-width: 150px;
+}
+.task-cell:nth-child(3),
+.column-header:nth-child(3) {
+    min-width: 150px;
+}
+.task-cell:nth-child(4),
+.column-header:nth-child(4) {
+    min-width: 150px;
+}
+.task-cell:nth-child(5),
+.column-header:nth-child(5) {
+    min-width: 200px;
+}
+.task-cell:nth-child(6),
+.column-header:nth-child(6) {
+    min-width: 120px;
+}
+.task-cell:nth-child(7),
+.column-header:nth-child(7) {
+    min-width: 180px;
+}
+.task-cell:nth-child(8),
+.column-header:nth-child(8) {
+    min-width: 180px;
+}
+.task-cell:nth-child(9),
+.column-header:nth-child(9) {
+    min-width: 120px;
+}
+.task-cell:nth-child(10),
+.column-header:nth-child(10) {
+    min-width: 200px;
+}
+
+/* Scrollbar styling for better UX */
+.table-container::-webkit-scrollbar {
+    height: 8px !important;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 4px !important;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1 !important;
+    border-radius: 4px !important;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8 !important;
+}
+
+/* DATE PICKER STYLING AND ANIMATIONS */
+/* Date cell container styling */
+.task-cell.startDate-cell,
+.task-cell.endDate-cell {
+    position: relative !important;
+    overflow: visible !important;
+    padding: 4px 8px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Date input field styling */
+.date-input,
+.task-cell input[type='date'],
+.task-cell input[type='datetime-local'],
+.task-cell.startDate-cell input,
+.task-cell.endDate-cell input {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 8px 40px 8px 12px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    width: 100% !important;
+    height: 36px !important;
+    background-color: #ffffff !important;
+    color: #374151 !important;
+    transition: all 0.2s ease !important;
+    outline: none !important;
+}
+
+/* Calendar icon styling */
+.calendar-icon {
+    position: absolute !important;
+    right: 32px !important;
+    top: 50% !important;
+    transform: translateY(-50%) translateX(20px) !important;
+    opacity: 0 !important;
+    transition: all 0.3s ease !important;
+    font-size: 16px !important;
+    color: #6b7280 !important;
+    pointer-events: none !important;
+    z-index: 2 !important;
+}
+
+/* Add button styling */
+.date-add-button {
+    position: absolute !important;
+    right: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) translateX(20px) !important;
+    opacity: 0 !important;
+    transition: all 0.3s ease !important;
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 50% !important;
+    background-color: #3b82f6 !important;
+    color: white !important;
+    border: none !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 2 !important;
+}
+
+/* Hover effects - slide in calendar icon and + button */
+.task-cell.startDate-cell:hover .calendar-icon,
+.task-cell.endDate-cell:hover .calendar-icon {
+    opacity: 1 !important;
+    transform: translateY(-50%) translateX(0) !important;
+}
+
+.task-cell.startDate-cell:hover .date-add-button,
+.task-cell.endDate-cell:hover .date-add-button {
+    opacity: 1 !important;
+    transform: translateY(-50%) translateX(0) !important;
+}
+
+/* Hover effect on date cell */
+.task-cell.startDate-cell:hover,
+.task-cell.endDate-cell:hover {
+    background-color: #f8fafc !important;
+    border-color: #3b82f6 !important;
+}
+
+/* Date input hover and focus effects */
+.task-cell.startDate-cell:hover input,
+.task-cell.endDate-cell:hover input {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.date-input:focus,
+.task-cell input[type='date']:focus,
+.task-cell input[type='datetime-local']:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Calendar popup styling */
+.date-picker-popup {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    z-index: 1000 !important;
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    padding: 16px !important;
+    min-width: 280px !important;
+    animation: slideDown 0.3s ease !important;
+}
+
+/* Use Time toggle button */
+.time-toggle-button {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    background-color: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.time-toggle-button.Active {
+    background-color: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    color: white !important;
+}
+
+.time-toggle-button:hover {
+    background-color: #e5e7eb !important;
+    border-color: #9ca3af !important;
+}
+
+.time-toggle-button.Active:hover {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+}
+
+/* Calendar grid styling */
+.calendar-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 2px !important;
+    margin-top: 32px !important;
+}
+
+.calendar-day {
+    width: 32px !important;
+    height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.calendar-day:hover {
+    background-color: #e5e7eb !important;
+}
+
+.calendar-day.selected {
+    background-color: #3b82f6 !important;
+    color: white !important;
+}
+
+.calendar-day.today {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+    font-weight: 600 !important;
+}
+
+.calendar-day.disabled {
+    color: #d1d5db !important;
+    cursor: not-allowed !important;
+}
+
+.calendar-day.disabled:hover {
+    background-color: transparent !important;
+}
+
+/* Animation keyframes */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Date cell hint text */
+.date-hint {
+    position: absolute !important;
+    bottom: -20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background-color: #374151 !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    opacity: 0 !important;
+    transition: opacity 0.2s ease !important;
+    z-index: 1001 !important;
+}
+
+.task-cell.startDate-cell:hover .date-hint,
+.task-cell.endDate-cell:hover .date-hint {
+    opacity: 1 !important;
+}
+
+/* PASSWORD COLUMN STYLING */
+/* Password cell container */
+.task-cell.password-cell,
+.task-cell[data-column='password'] {
+    position: relative !important;
+    overflow: visible !important;
+    padding: 4px 8px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Modern key icon styling */
+.password-key-icon {
+    font-size: 24px !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    animation: pulse 2s infinite !important;
+    user-select: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 6px !important;
+    background-color: #f3f4f6 !important;
+}
+
+.password-key-icon:hover {
+    color: #3b82f6 !important;
+    background-color: #dbeafe !important;
+    transform: scale(1.1) !important;
+}
+
+/* Key icon when password is set */
+.password-key-icon.password-set {
+    color: #ffffff !important;
+    background-color: #22c55e !important;
+    animation: none !important;
+}
+
+.password-key-icon.password-set:hover {
+    background-color: #16a34a !important;
+}
+
+/* Pulse animation for key icon */
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+/* Password modal container - compact and positioned below key */
+.password-modal {
+    position: fixed !important;
+    z-index: 1000 !important;
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+    padding: 16px !important;
+    width: 320px !important;
+    animation: slideDown 0.3s ease !important;
+    margin-top: 4px !important;
+}
+
+/* Modal title - compact */
+.password-modal-title {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #1f2937 !important;
+    margin-bottom: 12px !important;
+    text-align: center !important;
+}
+
+/* Password input fields - compact */
+.password-input-group {
+    margin-bottom: 12px !important;
+}
+
+.password-input-label {
+    display: block !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+    margin-bottom: 4px !important;
+}
+
+.password-input {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    box-sizing: border-box !important;
+}
+
+.password-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Validation section - compact */
+.password-validation {
+    margin: 12px 0 !important;
+    padding: 12px !important;
+    background-color: #f8fafc !important;
+    border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.validation-rule {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 6px !important;
+    font-size: 11px !important;
+    color: #6b7280 !important;
+    transition: all 0.2s ease !important;
+}
+
+.validation-rule:last-child {
+    margin-bottom: 0 !important;
+}
+
+.validation-icon {
+    width: 16px !important;
+    height: 16px !important;
+    margin-right: 8px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+    background-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    transition: all 0.3s ease !important;
+    flex-shrink: 0 !important;
+}
+
+.validation-icon.valid {
+    background-color: #22c55e !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+}
+
+.validation-rule.valid {
+    color: #22c55e !important;
+    font-weight: 600 !important;
+}
+
+/* Update password button - compact */
+.update-password-btn {
+    width: 100% !important;
+    padding: 10px 16px !important;
+    background-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: not-allowed !important;
+    transition: all 0.2s ease !important;
+    margin-top: 12px !important;
+}
+
+.update-password-btn.enabled {
+    background-color: #3b82f6 !important;
+    color: white !important;
+    cursor: pointer !important;
+}
+
+.update-password-btn.enabled:hover {
+    background-color: #2563eb !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Modal backdrop */
+.password-modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    z-index: 999 !important;
+    backdrop-filter: blur(2px) !important;
+}
+
+/* Animation for modal */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
+/* USER GROUP COLUMN STYLING */
+/* User group cell container */
+.task-cell.assignedUserGroup-cell,
+.task-cell[data-column='assignedUserGroup'],
+.task-cell.assignedUserGroup-cell,
+.assignedUserGroup-cell {
+    position: relative !important;
+    overflow: visible !important;
+    padding: 4px 8px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    z-index: 1 !important;
+}
+
+/* Ensure table containers don't clip tooltip */
+.table-container,
+.task-board-container,
+.task-group,
+.task-row {
+    overflow: visible !important;
+    z-index: auto !important;
+}
+
+.table-container {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+}
+
+.usergroup-wrapper {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Ensure tooltip shows on wrapper hover */
+.usergroup-wrapper:hover {
+    z-index: 10 !important;
+}
+
+.usergroup-display {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+/* User group icon (3 persons) */
+.usergroup-icon {
+    font-size: 20px !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+    background-color: #f3f4f6 !important;
+    position: relative !important;
+}
+
+.usergroup-icon:hover {
+    color: #3b82f6 !important;
+    background-color: #dbeafe !important;
+    transform: scale(1.05) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    border: 2px solid #3b82f6 !important;
+}
+
+/* Highlight wrapper when hovered */
+.usergroup-wrapper:hover .usergroup-icon {
+    color: #3b82f6 !important;
+    background-color: #dbeafe !important;
+    transform: scale(1.05) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    border: 2px solid #3b82f6 !important;
+}
+
+/* Add subtle glow effect when tooltip is visible */
+.usergroup-wrapper:hover {
+    position: relative !important;
+}
+
+.usergroup-wrapper:hover::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    right: -8px !important;
+    width: 8px !important;
+    height: 2px !important;
+    background: linear-gradient(
+        to right,
+        rgba(59, 130, 246, 0.5),
+        transparent
+    ) !important;
+    transform: translateY(-50%) !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease !important;
+}
+
+.usergroup-wrapper:hover::after {
+    opacity: 1 !important;
+}
+
+/* User group count badge */
+.usergroup-count {
+    position: absolute !important;
+    top: -4px !important;
+    right: -4px !important;
+    background-color: #ef4444 !important;
+    color: white !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+    border-radius: 50% !important;
+    width: 16px !important;
+    height: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+}
+
+/* Add button with slide animation */
+.usergroup-add-button {
+    font-size: 16px !important;
+    color: #6b7280 !important;
+    background-color: #f3f4f6 !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 24px !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    transform: translateX(20px) !important;
+    opacity: 0 !important;
+    font-weight: bold !important;
+}
+
+/* Slide animation on hover */
+.usergroup-wrapper:hover .usergroup-add-button {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+}
+
+.usergroup-add-button:hover {
+    color: #ffffff !important;
+    background-color: #3b82f6 !important;
+    transform: scale(1.1) !important;
+}
+
+/* Tooltip for showing assigned user groups */
+.usergroup-tooltip {
+    position: fixed !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    z-index: 99999 !important;
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
+    padding: 12px !important;
+    width: 200px !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: all 0.2s ease !important;
+    pointer-events: none !important;
+}
+
+/* Tooltip visibility is now controlled by JavaScript */
+
+/* Tooltip arrow pointing left (towards icon) */
+.usergroup-tooltip::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: -8px !important;
+    transform: translateY(-50%) !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
+    border-right: 8px solid #e2e8f0 !important;
+}
+
+.usergroup-tooltip::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: -6px !important;
+    transform: translateY(-50%) !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-top: 6px solid transparent !important;
+    border-bottom: 6px solid transparent !important;
+    border-right: 6px solid white !important;
+}
+
+.usergroup-tooltip-title {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    margin-bottom: 8px !important;
+    text-align: left !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding-bottom: 6px !important;
+}
+
+/* Individual user group item */
+.usergroup-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 6px 8px !important;
+    margin-bottom: 4px !important;
+    background-color: #f8fafc !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-item:last-child {
+    margin-bottom: 0 !important;
+}
+
+.usergroup-item:hover {
+    background-color: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+}
+
+.usergroup-name {
+    font-size: 11px !important;
+    color: #374151 !important;
+    font-weight: 500 !important;
+    flex-grow: 1 !important;
+}
+
+/* Remove button (cross) */
+.usergroup-remove {
+    width: 14px !important;
+    height: 14px !important;
+    border: none !important;
+    background-color: #6b7280 !important;
+    color: white !important;
+    border-radius: 50% !important;
+    font-size: 9px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+    margin-left: 6px !important;
+    flex-shrink: 0 !important;
+    opacity: 0.7 !important;
+}
+
+.usergroup-remove:hover {
+    background-color: #ef4444 !important;
+    opacity: 1 !important;
+    transform: scale(1.05) !important;
+}
+
+/* Empty state styling */
+.usergroup-empty {
+    font-size: 10px !important;
+    color: #9ca3af !important;
+    text-align: center !important;
+    padding: 6px !important;
+    font-style: italic !important;
+}
+
+/* USER GROUP ASSIGNMENT PANEL */
+/* Panel backdrop */
+.usergroup-panel-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    z-index: 9998 !important;
+    backdrop-filter: blur(2px) !important;
+}
+
+/* Sliding panel */
+.usergroup-panel {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 800px !important;
+    height: 100vh !important;
+    background: white !important;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15) !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    animation: slideInFromRight 0.3s ease-out !important;
+}
+
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%) !important;
+    }
+    to {
+        transform: translateX(0) !important;
+    }
+}
+
+/* Panel header */
+.usergroup-panel-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 20px 24px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+}
+
+.usergroup-panel-header h3 {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1f2937 !important;
+    margin: 0 !important;
+}
+
+.usergroup-panel-close {
+    width: 32px !important;
+    height: 32px !important;
+    border: none !important;
+    background: #f3f4f6 !important;
+    border-radius: 50% !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-panel-close:hover {
+    background: #ef4444 !important;
+    color: white !important;
+    transform: scale(1.05) !important;
+}
+
+/* Search section */
+.usergroup-panel-search {
+    padding: 16px 24px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.usergroup-search-input {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-search-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Panel content */
+.usergroup-panel-content {
+    flex: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.usergroup-table-container {
+    flex: 1 !important;
+    overflow: auto !important;
+    padding: 0 24px !important;
+}
+
+/* User groups table */
+.usergroup-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 16px !important;
+}
+
+.usergroup-table th {
+    background: #f8fafc !important;
+    padding: 12px 8px !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    color: #374151 !important;
+    border-bottom: 2px solid #e5e7eb !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+.usergroup-table td {
+    padding: 12px 8px !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    vertical-align: top !important;
+}
+
+.usergroup-table tr:hover {
+    background: #f8fafc !important;
+}
+
+/* User group name cell */
+.usergroup-name-cell {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.usergroup-checkbox {
+    width: 16px !important;
+    height: 16px !important;
+    cursor: pointer !important;
+}
+
+/* Input styling */
+.usergroup-input {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Dropdown cells with chips */
+.usergroup-dropdown-cell {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    min-height: 40px !important;
+}
+
+.usergroup-chips {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+}
+
+.usergroup-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 4px 8px !important;
+    background: #dbeafe !important;
+    color: #1e40af !important;
+    border-radius: 12px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+}
+
+.chip-remove {
+    width: 14px !important;
+    height: 14px !important;
+    border: none !important;
+    background: rgba(239, 68, 68, 0.8) !important;
+    color: white !important;
+    border-radius: 50% !important;
+    font-size: 10px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.chip-remove:hover {
+    background: #ef4444 !important;
+    transform: scale(1.1) !important;
+}
+
+.usergroup-add-chip-btn {
+    width: 24px !important;
+    height: 24px !important;
+    border: 1px dashed #9ca3af !important;
+    background: transparent !important;
+    border-radius: 4px !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+    align-self: flex-start !important;
+}
+
+.usergroup-add-chip-btn:hover {
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+    background: #f0f9ff !important;
+    transform: translateX(4px) !important;
+}
+
+/* Roles cell */
+.usergroup-roles-cell {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.usergroup-roles-icon {
+    width: 28px !important;
+    height: 28px !important;
+    background: #f3f4f6 !important;
+    border: 2px solid #e5e7eb !important;
+    border-radius: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+}
+
+.usergroup-roles-icon:hover {
+    background: #dbeafe !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+    transform: scale(1.05) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+}
+
+.usergroup-roles-count {
+    position: absolute !important;
+    top: -4px !important;
+    right: -4px !important;
+    background-color: #3b82f6 !important;
+    color: white !important;
+    font-size: 9px !important;
+    font-weight: bold !important;
+    border-radius: 50% !important;
+    width: 16px !important;
+    height: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 2px solid white !important;
+}
+
+.usergroup-roles-add-btn {
+    width: 22px !important;
+    height: 22px !important;
+    border: 1px dashed #9ca3af !important;
+    background: transparent !important;
+    border-radius: 4px !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-roles-add-btn:hover {
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+    background: #f0f9ff !important;
+    transform: translateX(4px) !important;
+}
+
+/* ROLES MODAL */
+/* 🌊 Ultra-Modern Floating Workspace Styling */
+.floating-workspace-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    backdrop-filter: blur(8px) !important;
+    z-index: 9999 !important;
+}
+
+.floating-workspace {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    pointer-events: none !important;
+    z-index: 10000 !important;
+}
+
+.floating-card {
+    position: absolute !important;
+    width: 350px !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(20px) !important;
+    pointer-events: auto !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transform: translateZ(0) !important;
+}
+
+.floating-card:hover {
+    transform: translateY(-2px) translateZ(0) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+.floating-card.minimized {
+    height: 60px !important;
+    overflow: hidden !important;
+}
+
+.card-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 16px 20px !important;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+    color: white !important;
+    border-radius: 16px 16px 0 0 !important;
+    cursor: move !important;
+    user-select: none !important;
+}
+
+.card-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+}
+
+.card-icon {
+    font-size: 20px !important;
+}
+
+.card-controls {
+    display: flex !important;
+    gap: 8px !important;
+}
+
+.card-btn {
+    width: 28px !important;
+    height: 28px !important;
+    border: none !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+.card-btn:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+    transform: scale(1.1) !important;
+}
+
+.card-content {
+    padding: 20px !important;
+    max-height: 400px !important;
+    overflow-y: auto !important;
+}
+
+.floating-search {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    background: #f8fafc !important;
+    transition: all 0.2s ease !important;
+}
+
+.floating-search:focus {
+    outline: none !important;
+    border-color: #4f46e5 !important;
+    background: white !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+}
+
+.groups-list,
+.roles-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    margin: 16px 0 !important;
+}
+
+.group-item,
+.role-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 12px !important;
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+.group-item:hover,
+.role-item:hover {
+    border-color: #4f46e5 !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1) !important;
+}
+
+.group-info,
+.role-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex: 1 !important;
+}
+
+.group-details h4,
+.role-info h4 {
+    margin: 0 0 4px 0 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+}
+
+.group-details p,
+.role-info p {
+    margin: 0 0 8px 0 !important;
+    font-size: 12px !important;
+    color: #64748b !important;
+}
+
+.connect-btn {
+    padding: 8px 12px !important;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.connect-btn:hover {
+    transform: translateX(2px) !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3) !important;
+}
+
+.usergroup-roles-modal {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    min-width: 200px !important;
+    max-width: 280px !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    animation: rolesModalFadeIn 0.2s ease-out forwards !important;
+}
+
+@keyframes rolesModalFadeIn {
+    from {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transform: translateX(-50%) translateY(-5px) !important;
+    }
+    to {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateX(-50%) translateY(0) !important;
+    }
+}
+
+.usergroup-roles-modal-header {
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    background: #f8fafc !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.usergroup-roles-modal-header h5 {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    margin: 0 !important;
+}
+
+.usergroup-roles-modal-content {
+    padding: 8px !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+.usergroup-role-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 8px 12px !important;
+    margin-bottom: 4px !important;
+    background: #f8fafc !important;
+    border: 1px solid #f1f5f9 !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-role-item:last-child {
+    margin-bottom: 0 !important;
+}
+
+.usergroup-role-item:hover {
+    background: #f0f9ff !important;
+    border-color: #dbeafe !important;
+}
+
+.usergroup-role-name {
+    font-size: 12px !important;
+    color: #374151 !important;
+    font-weight: 500 !important;
+    flex-grow: 1 !important;
+}
+
+.usergroup-role-remove {
+    width: 16px !important;
+    height: 16px !important;
+    border: none !important;
+    background: #6b7280 !important;
+    color: white !important;
+    border-radius: 50% !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+    opacity: 0.7 !important;
+}
+
+.usergroup-role-remove:hover {
+    background: #ef4444 !important;
+    opacity: 1 !important;
+    transform: scale(1.1) !important;
+}
+
+.usergroup-roles-empty {
+    font-size: 11px !important;
+    color: #9ca3af !important;
+    text-align: center !important;
+    padding: 12px !important;
+    font-style: italic !important;
+}
+
+/* Panel footer */
+.usergroup-panel-footer {
+    padding: 20px 24px !important;
+    border-top: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+}
+
+.usergroup-add-new-btn {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    background: #3b82f6 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-add-new-btn:hover {
+    background: #2563eb !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* DROPDOWN COMPONENTS */
+/* Dropdown overlay */
+.usergroup-dropdown-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Dropdown menu */
+.usergroup-dropdown-menu {
+    background: white !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+    width: 400px !important;
+    max-height: 500px !important;
+    overflow: hidden !important;
+    animation: dropdownSlideIn 0.2s ease-out !important;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0 !important;
+        transform: scale(0.95) translateY(-10px) !important;
+    }
+    to {
+        opacity: 1 !important;
+        transform: scale(1) translateY(0) !important;
+    }
+}
+
+/* Dropdown header */
+.usergroup-dropdown-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 16px 20px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+}
+
+.usergroup-dropdown-header h4 {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #1f2937 !important;
+    margin: 0 !important;
+}
+
+.usergroup-dropdown-header button {
+    width: 28px !important;
+    height: 28px !important;
+    border: none !important;
+    background: #f3f4f6 !important;
+    border-radius: 50% !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.usergroup-dropdown-header button:hover {
+    background: #ef4444 !important;
+    color: white !important;
+    transform: scale(1.05) !important;
+}
+
+/* Dropdown content */
+.usergroup-dropdown-content {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+    padding: 8px 0 !important;
+}
+
+/* Dropdown items */
+.usergroup-dropdown-item {
+    padding: 12px 20px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+}
+
+.usergroup-dropdown-item:last-child {
+    border-bottom: none !important;
+}
+
+.usergroup-dropdown-item:hover {
+    background: #f0f9ff !important;
+    border-left: 3px solid #3b82f6 !important;
+    padding-left: 17px !important;
+}
+
+.usergroup-dropdown-item-name {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #1f2937 !important;
+    margin-bottom: 4px !important;
+}
+
+.usergroup-dropdown-item-desc {
+    font-size: 12px !important;
+    color: #6b7280 !important;
+    line-height: 1.4 !important;
+}
+
+/* Tooltip now positioned correctly - shows only on hover */
+
+/* CELL BORDERS AND ROW HOVER EFFECTS */
+/* Always visible cell borders - AGGRESSIVE OVERRIDES */
+.task-cell,
+.column-header,
+.task-row .task-cell,
+.table-container .task-cell,
+.task-board-container .task-cell,
+div .task-cell,
+* .task-cell,
+.task-row > *,
+.table-header > *,
+td,
+th {
+    border: 1px solid #e2e8f0 !important;
+    border-right: 1px solid #e2e8f0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    border-left: 1px solid #e2e8f0 !important;
+    border-top: 1px solid #e2e8f0 !important;
+}
+
+/* Force table structure borders */
+.task-board-container table,
+.table-container table,
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+/* Grid-based table borders */
+.task-row,
+.table-header,
+.add-task-row {
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+/* Enhanced row hover effect with color and shadow */
+.task-row:hover,
+.table-container .task-row:hover,
+.task-board-container .task-row:hover {
+    background-color: #f0f8ff !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+    transform: translateY(-1px) !important;
+    transition: all 0.2s ease !important;
+    z-index: 10 !important;
+}
+
+/* Hover effect for individual cells within the row */
+.task-row:hover .task-cell,
+.table-container .task-row:hover .task-cell,
+.task-board-container .task-row:hover .task-cell {
+    background-color: #f0f8ff !important;
+    border-color: #bfdbfe !important;
+}
+
+/* Add row hover effect */
+.add-task-row:hover,
+.table-container .add-task-row:hover {
+    background-color: #f8fafc !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Table structure borders */
+.table-header,
+.task-board-container .table-header,
+.table-container .table-header {
+    border-bottom: 2px solid #d1d5db !important;
+}
+
+/* Consistent border styling for the entire table */
+.task-board-container,
+.table-container {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
+/* Header row styling */
+.column-header {
+    background-color: #f9fafb !important;
+    border-bottom: 2px solid #d1d5db !important;
+}
+
+/* Alternate row colors for better readability */
+.task-row:nth-child(even) {
+    background-color: #fafafa !important;
+}
+
+.task-row:nth-child(odd) {
+    background-color: #ffffff !important;
+}
+
+:root {
+    --brand-blue: #0171ec;
+    --brand-cyan: #05e9fe;
+
+    --primary-600: var(--brand-blue);
+    --primary-700: #005fca;
+    --primary-800: #004da8;
+    --primary-50: #e6f3ff;
+    --primary-100: #cfe8ff;
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-tertiary: #64748b;
+    --text-inverse: #ffffff;
+
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+
+    --bg-card: #ffffff;
+    --bg-secondary: #f8fafc;
+}
+
+@layer utilities {
+    /* Brand-aligned color utilities to unify buttons and surfaces */
+    .bg-primary {
+        background-color: var(--primary-600);
+    }
+    .bg-primary-dark {
+        background-color: var(--primary-700);
+    }
+    .hover\:bg-primary-dark:hover {
+        background-color: var(--primary-700);
+    }
+    .text-inverse {
+        color: var(--text-inverse);
+    }
+    .text-primary {
+        color: var(--text-primary);
+    }
+    .text-secondary {
+        color: var(--text-secondary);
+    }
+    .bg-card {
+        background-color: var(--bg-card);
+    }
+    .bg-secondary {
+        background-color: var(--bg-secondary);
+    }
+    .border-light {
+        border-color: var(--border-light);
+    }
+    .border-medium {
+        border-color: var(--border-medium);
+    }
+}
+
+/* ===== GLOBAL TYPOGRAPHY SYSTEM ===== */
+/* Professional, consistent typography across all screens */
+
+/* Base font settings for compact, data-dense layout */
+html {
+    font-size: 13px; /* Reduced from 14px for more compact layout */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+}
+
+/* ===== TYPOGRAPHY UTILITY CLASSES ===== */
+/* Compact text styling for data-dense layouts */
+
+/* Headings - Compact hierarchy */
+.heading-xl {
+    @apply text-xl font-bold text-slate-900 leading-tight;
+}
+
+.heading-lg {
+    @apply text-lg font-bold text-slate-900 leading-tight;
+}
+
+.heading-md {
+    @apply text-base font-semibold text-slate-900 leading-snug;
+}
+
+.heading-sm {
+    @apply text-sm font-semibold text-slate-900 leading-snug;
+}
+
+/* Body text - Compact and readable */
+.text-body-lg {
+    @apply text-sm font-medium text-slate-700 leading-relaxed;
+}
+
+.text-body {
+    @apply text-xs font-medium text-slate-700 leading-relaxed;
+}
+
+.text-body-sm {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* Screen descriptions and helper text - Compact */
+.screen-description {
+    @apply text-xs font-normal text-slate-600 leading-relaxed;
+}
+
+.helper-text {
+    @apply text-xs font-normal text-slate-500 leading-relaxed;
+}
+
+/* Breadcrumbs - Compact styling */
+.breadcrumb-text {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* Table controls - Compact styling */
+.table-control {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* AI Assistant text - Compact styling */
+.ai-text {
+    @apply text-xs font-medium text-slate-700 leading-relaxed;
+}
+
+/* Labels and small text - Compact */
+.label-text {
+    @apply text-xs font-semibold text-slate-700 leading-relaxed uppercase tracking-wide;
+}
+
+.small-label {
+    @apply text-xs font-medium text-slate-600 leading-relaxed;
+}
+
+/* ===== LAYOUT UTILITIES ===== */
+/* Native 80% zoom simulation through proper spacing and sizing */
+
+/* Container utilities for dense, content-rich layouts */
+.container-dense {
+    @apply max-w-[1440px] mx-auto px-6;
+}
+
+.container-fluid {
+    @apply w-full px-6;
+}
+
+/* Spacing utilities for 80% zoom effect */
+.spacing-dense {
+    @apply gap-4;
+}
+
+.spacing-normal {
+    @apply gap-6;
+}
+
+.spacing-relaxed {
+    @apply gap-8;
+}
+
+/* ===== COMPONENT STYLES ===== */
+/* Consistent styling for common UI elements */
+
+/* Cards - Professional appearance */
+.card-base {
+    @apply bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+}
+
+.card-compact {
+    @apply p-4;
+}
+
+.card-normal {
+    @apply p-6;
+}
+
+.card-relaxed {
+    @apply p-8;
+}
+
+/* Buttons - Consistent styling */
+.btn-primary {
+    @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200;
+}
+
+.btn-secondary {
+    @apply bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors duration-200;
+}
+
+.btn-sm {
+    @apply px-3 py-1.5 text-sm;
+}
+
+.btn-md {
+    @apply px-4 py-2 text-sm;
+}
+
+.btn-lg {
+    @apply px-6 py-3 text-base;
+}
+
+/* Inputs - Consistent styling */
+.input-base {
+    @apply w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors duration-200;
+}
+
+.input-sm {
+    @apply px-2.5 py-1.5 text-xs;
+}
+
+.input-md {
+    @apply px-3 py-2 text-sm;
+}
+
+.input-lg {
+    @apply px-4 py-3 text-base;
+}
+
+/* Tables - Professional appearance */
+.table-base {
+    @apply w-full text-sm;
+}
+
+.table-header {
+    @apply bg-slate-50 border-b border-slate-200;
+}
+
+.table-header-cell {
+    @apply px-4 py-3 text-left font-semibold text-slate-900;
+}
+
+.table-cell {
+    @apply px-4 py-3 border-b border-slate-100 text-slate-700;
+}
+
+/* Enhanced table styling */
+.table-enhanced {
+    @apply w-full bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden;
+}
+
+.table-enhanced-header {
+    @apply bg-slate-50 border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900;
+}
+
+.table-enhanced-row {
+    @apply border-b border-slate-100 hover:bg-slate-50 transition-colors duration-200 ease-in-out;
+}
+
+.table-enhanced-cell {
+    @apply px-4 py-3 text-sm text-slate-700;
+}
+
+/* Standardized row heights */
+.table-row-h-12 {
+    @apply h-12;
+}
+
+.table-row-h-14 {
+    @apply h-14;
+}
+
+/* Enhanced hover effects */
+.hover-lift {
+    @apply hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ease-in-out;
+}
+
+.hover-glow {
+    @apply hover:shadow-lg hover:ring-2 hover:ring-primary-500/20 transition-all duration-200 ease-in-out;
+}
+
+/* Smooth animations */
+.animate-smooth {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+.animate-fast {
+    @apply transition-all duration-150 ease-in-out;
+}
+
+.animate-slow {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+/* ===== RESPONSIVE UTILITIES ===== */
+/* Mobile-first responsive design */
+
+@media (max-width: 768px) {
+    .container-dense {
+        @apply px-4;
+    }
+
+    .card-normal {
+        @apply p-4;
+    }
+
+    .spacing-normal {
+        @apply gap-4;
+    }
+}
+
+@media (max-width: 1024px) {
+    .container-dense {
+        @apply px-5;
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+/* Ensure proper contrast and readability */
+
+/* Focus states */
+.focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2;
+}
+
+/* Selection styling */
+::selection {
+    @apply bg-primary-100 text-primary-900;
+}
+
+::-moz-selection {
+    @apply bg-primary-100 text-primary-900;
+}
+
+/* ===== ANIMATIONS ===== */
+/* Smooth transitions and micro-interactions */
+
+.transition-base {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+.transition-fast {
+    @apply transition-all duration-150 ease-in-out;
+}
+
+.transition-slow {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+/* ===== LEGACY SUPPORT ===== */
+/* Maintain compatibility with existing components */
+
+/* Brand gradient helpers */
+.brand-gradient {
+    background: linear-gradient(
+        135deg,
+        var(--brand-blue) 0%,
+        var(--brand-cyan) 100%
+    );
+}
+
+.text-brand-gradient {
+    background: linear-gradient(
+        135deg,
+        var(--brand-blue) 0%,
+        var(--brand-cyan) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Ensure page areas scroll when needed */
+.main-scroll {
+    @apply overflow-auto;
+}
+
+/* Links */
+a {
+    @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+}
+
+/* ===== UTILITY OVERRIDES ===== */
+/* Override any conflicting Tailwind utilities */
+
+.text-responsive {
+    @apply text-sm font-medium text-slate-700 leading-relaxed;
+}
+
+.container-responsive {
+    @apply max-w-[1440px] mx-auto px-6;
+}

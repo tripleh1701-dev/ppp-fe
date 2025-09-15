@@ -1,0 +1,9 @@
+# Frontend repo ignores
+.env.local
+.DS_Store
+node_modules/
+.next/
+dist/
+out/
+coverage/
+*.log
