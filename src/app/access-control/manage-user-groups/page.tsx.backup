@@ -273,7 +273,7 @@ export default function ManageUserGroups() {
         {id: 'Sales', name: 'Sales', description: 'Sales entity'},
     ]);
     const [accounts, setAccounts] = useState<Account[]>([
-        {id: '1', name: 'acme Corporation'},
+        {id: '1', name: 'Systiva Corporation'},
     ]);
     const [enterprises, setEnterprises] = useState<Enterprise[]>([
         {id: '1', name: 'Enterprise Solutions'},

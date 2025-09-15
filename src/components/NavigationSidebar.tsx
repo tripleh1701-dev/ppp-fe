@@ -188,7 +188,7 @@ export default function NavigationSidebar({
                 }`}
                 style={{
                     backgroundColor: '#0a1a2f',
-                    backgroundImage: 'url(/images/logos/acme-sidebar.png)',
+                    backgroundImage: 'url(/images/logos/Systiva-sidebar.png)',
                     backgroundSize: 'contain',
                     backgroundPosition: 'center bottom',
                     backgroundRepeat: 'no-repeat',
@@ -254,13 +254,13 @@ export default function NavigationSidebar({
                             className='flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200'
                         >
                             <img
-                                src='/images/logos/acme-logo.svg'
-                                alt='acme Logo'
+                                src='/images/logos/Systiva-logo.svg'
+                                alt='Systiva Logo'
                                 className='w-11 h-11 object-contain'
                             />
                             <div className='min-w-0'>
                                 <h2 className='text-xl font-bold text-white truncate drop-shadow-lg'>
-                                    acme
+                                    Systiva
                                 </h2>
                                 <p className='text-xs text-slate-300 truncate drop-shadow-md'>
                                     Enterprise CI/CD Platform
@@ -274,8 +274,8 @@ export default function NavigationSidebar({
                             className='flex justify-center w-full hover:opacity-80 transition-opacity duration-200'
                         >
                             <img
-                                src='/images/logos/acme-logo.svg'
-                                alt='acme Logo'
+                                src='/images/logos/Systiva-logo.svg'
+                                alt='Systiva Logo'
                                 className='w-11 h-11 object-contain'
                             />
                         </Link>
