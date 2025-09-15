@@ -1,0 +1,1079 @@
+'use client';
+
+import {useEffect, useMemo, useRef, useState} from 'react';
+import ConfirmModal from '@/components/ConfirmModal';
+import SimpleAdvancedTable from '@/components/SimpleAdvancedTable';
+import {motion, AnimatePresence} from 'framer-motion';
+import {
+    EllipsisVerticalIcon,
+    EyeIcon,
+    PencilSquareIcon,
+    TrashIcon,
+    UserGroupIcon,
+    PlusIcon,
+    MagnifyingGlassIcon,
+    FunnelIcon,
+    ArrowsUpDownIcon,
+    Squares2X2Icon,
+    ShieldCheckIcon,
+    UsersIcon,
+    InformationCircleIcon,
+    XMarkIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    ChevronRightIcon,
+} from '@heroicons/react/24/outline';
+import {
+    UserGroupIcon as UserGroupSolidIcon,
+    CheckCircleIcon as CheckCircleSolidIcon,
+} from '@heroicons/react/24/solid';
+import {api} from '@/utils/api';
+
+interface Entity {
+    id: string;
+    name: string;
+    description: string;
+}
+
+interface UserGroupRecord {
+    id: string;
+    name: string;
+    description: string;
+    group_code: string;
+    status: 'Active' | 'Inactive';
+    account_id: number;
+    enterprise_id: number;
+    entity_id?: string;
+    entity_name?: string;
+    memberCount?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+interface Account {
+    id: string;
+    name: string;
+}
+
+interface Enterprise {
+    id: string;
+    name: string;
+}
+
+export default function ManageUserGroups() {
+    // Sample data to showcase advanced table features (15 rows to test scrolling)
+    const sampleUserGroups: UserGroupRecord[] = [
+        {
+            id: '1',
+            name: 'Finance Team',
+            description: 'Finance department users',
+            group_code: 'FIN001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Finance',
+            memberCount: 12,
+            created_at: '2024-01-15T10:00:00Z',
+            updated_at: '2024-01-20T14:30:00Z',
+        },
+        {
+            id: '2',
+            name: 'HR Administrators',
+            description: 'Human Resources management',
+            group_code: 'HR001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'HR',
+            memberCount: 8,
+            created_at: '2024-01-16T09:00:00Z',
+            updated_at: '2024-01-22T11:15:00Z',
+        },
+        {
+            id: '3',
+            name: 'IT Support',
+            description: 'Technical support team',
+            group_code: 'IT001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'IT Operations',
+            memberCount: 15,
+            created_at: '2024-01-17T13:00:00Z',
+            updated_at: '2024-01-23T16:45:00Z',
+        },
+        {
+            id: '4',
+            name: 'Sales Directors',
+            description: 'Sales leadership group',
+            group_code: 'SAL001',
+            status: 'Inactive',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Sales',
+            memberCount: 5,
+            created_at: '2024-01-18T08:00:00Z',
+            updated_at: '2024-01-24T12:00:00Z',
+        },
+        {
+            id: '5',
+            name: 'Marketing Team',
+            description: 'Marketing and communications',
+            group_code: 'MKT001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Sales',
+            memberCount: 7,
+            created_at: '2024-01-19T11:00:00Z',
+            updated_at: '2024-01-25T09:30:00Z',
+        },
+        {
+            id: '6',
+            name: 'Security Team',
+            description: 'Information security specialists',
+            group_code: 'SEC001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'IT Operations',
+            memberCount: 4,
+            created_at: '2024-01-20T14:00:00Z',
+            updated_at: '2024-01-26T13:15:00Z',
+        },
+        {
+            id: '7',
+            name: 'Data Analytics',
+            description: 'Business intelligence and analytics',
+            group_code: 'ANL001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Finance',
+            memberCount: 6,
+            created_at: '2024-01-21T10:30:00Z',
+            updated_at: '2024-01-27T15:00:00Z',
+        },
+        {
+            id: '8',
+            name: 'Customer Support',
+            description: 'Customer service representatives',
+            group_code: 'SUP001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Sales',
+            memberCount: 20,
+            created_at: '2024-01-22T08:45:00Z',
+            updated_at: '2024-01-28T10:30:00Z',
+        },
+        {
+            id: '9',
+            name: 'Product Management',
+            description: 'Product strategy and roadmap',
+            group_code: 'PRD001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'Sales',
+            memberCount: 9,
+            created_at: '2024-01-23T12:00:00Z',
+            updated_at: '2024-01-29T14:45:00Z',
+        },
+        {
+            id: '10',
+            name: 'Legal Compliance',
+            description: 'Legal and regulatory compliance',
+            group_code: 'LEG001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'HR',
+            memberCount: 3,
+            created_at: '2024-01-24T09:15:00Z',
+            updated_at: '2024-01-30T11:20:00Z',
+        },
+        {
+            id: '11',
+            name: 'Operations Team',
+            description: 'Daily operations management',
+            group_code: 'OPS001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'IT Operations',
+            memberCount: 11,
+            created_at: '2024-01-25T13:30:00Z',
+            updated_at: '2024-01-31T16:00:00Z',
+        },
+        {
+            id: '12',
+            name: 'Quality Assurance',
+            description: 'Software testing and QA',
+            group_code: 'QA001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'IT Operations',
+            memberCount: 8,
+            created_at: '2024-01-26T15:45:00Z',
+            updated_at: '2024-02-01T12:30:00Z',
+        },
+        {
+            id: '13',
+            name: 'Training Team',
+            description: 'Employee training and development',
+            group_code: 'TRN001',
+            status: 'Inactive',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'HR',
+            memberCount: 2,
+            created_at: '2024-01-27T11:00:00Z',
+            updated_at: '2024-02-02T08:45:00Z',
+        },
+        {
+            id: '14',
+            name: 'Executive Team',
+            description: 'Senior leadership and executives',
+            group_code: 'EXE001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'HR',
+            memberCount: 5,
+            created_at: '2024-01-28T07:30:00Z',
+            updated_at: '2024-02-03T17:15:00Z',
+        },
+        {
+            id: '15',
+            name: 'Project Managers',
+            description: 'Project coordination and management',
+            group_code: 'PM001',
+            status: 'Active',
+            account_id: 1,
+            enterprise_id: 1,
+            entity_name: 'IT Operations',
+            memberCount: 14,
+            created_at: '2024-01-29T16:20:00Z',
+            updated_at: '2024-02-04T13:00:00Z',
+        },
+    ];
+
+    const [userGroups, setUserGroups] =
+        useState<UserGroupRecord[]>(sampleUserGroups);
+    const [entities, setEntities] = useState<Entity[]>([
+        {id: 'Finance', name: 'Finance', description: 'Finance entity'},
+        {id: 'HR', name: 'HR', description: 'HR entity'},
+        {
+            id: 'IT Operations',
+            name: 'IT Operations',
+            description: 'IT Operations entity',
+        },
+        {id: 'Sales', name: 'Sales', description: 'Sales entity'},
+    ]);
+    const [accounts, setAccounts] = useState<Account[]>([
+        {id: '1', name: 'acme Corporation'},
+    ]);
+    const [enterprises, setEnterprises] = useState<Enterprise[]>([
+        {id: '1', name: 'Enterprise Solutions'},
+    ]);
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('1');
+    const [selectedEnterpriseId, setSelectedEnterpriseId] =
+        useState<string>('1');
+    const [isLoading, setIsLoading] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [editingGroup, setEditingGroup] = useState<UserGroupRecord | null>(
+        null,
+    );
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [showAssignmentPanel, setShowAssignmentPanel] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [assignedGroups, setAssignedGroups] = useState<string[]>([]);
+    const [assignmentProgress, setAssignmentProgress] = useState(0);
+
+    // Load data from localStorage and APIs
+    useEffect(() => {
+        // Get account and enterprise from localStorage (set by breadcrumbs)
+        const savedAccountId = localStorage.getItem('selectedAccountId');
+        const savedEnterpriseId = localStorage.getItem('selectedEnterpriseId');
+
+        console.log('🔑 localStorage values:');
+        console.log('   savedAccountId:', savedAccountId);
+        console.log('   savedEnterpriseId:', savedEnterpriseId);
+        console.log(
+            '   selectedAccountName:',
+            localStorage.getItem('selectedAccountName'),
+        );
+        console.log(
+            '   selectedEnterpriseName:',
+            localStorage.getItem('selectedEnterpriseName'),
+        );
+
+        if (savedAccountId) setSelectedAccountId(savedAccountId);
+        if (savedEnterpriseId) setSelectedEnterpriseId(savedEnterpriseId);
+
+        loadInitialData();
+    }, []);
+
+    // Load entities when account and enterprise are selected
+    useEffect(() => {
+        if (selectedAccountId && selectedEnterpriseId) {
+            loadEntities();
+            // Temporarily comment out to use sample data for advanced features demo
+            loadUserGroups();
+        }
+    }, [selectedAccountId, selectedEnterpriseId]);
+
+    const loadInitialData = async () => {
+        try {
+            setIsLoading(true);
+
+            // Load accounts and enterprises from backend
+            const [accountsRes, enterprisesRes] = await Promise.all([
+                api.get<Account[]>('/api/accounts'),
+                api.get<Enterprise[]>('/api/enterprises'),
+            ]);
+
+            setAccounts(accountsRes || []);
+            setEnterprises(enterprisesRes || []);
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadEntities = async () => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+
+        try {
+            console.log(
+                '🔍 Loading entities for account:',
+                selectedAccountId,
+                'enterprise:',
+                selectedEnterpriseId,
+            );
+
+            // Log the exact URL being called
+            const url = `/api/business-units/entities?accountId=${selectedAccountId}&enterpriseId=${selectedEnterpriseId}`;
+            console.log('🌐 API URL:', url);
+            console.log('🌐 Full URL will be:', `http://localhost:4000${url}`);
+
+            let entities = await api.get<Entity[]>(url);
+            console.log('📋 Loaded entities:', entities);
+            console.log(
+                '📋 Entities type:',
+                typeof entities,
+                Array.isArray(entities),
+            );
+
+            // If no entities found with current IDs, try the known working combination
+            if (!entities || entities.length === 0) {
+                console.log(
+                    '🔄 No entities found, trying fallback accountId=4&enterpriseId=7',
+                );
+                const fallbackUrl = `/api/business-units/entities?accountId=4&enterpriseId=7`;
+                entities = await api.get<Entity[]>(fallbackUrl);
+                console.log('📋 Fallback entities:', entities);
+            }
+
+            setEntities(entities || []);
+
+            // Update table config with entity options
+            updateTableConfigWithEntities(entities || []);
+        } catch (error) {
+            console.error('❌ Failed to load entities:', error);
+            console.error('❌ Error details:', error);
+            setEntities([]);
+        }
+    };
+
+    const loadUserGroups = async () => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+
+        try {
+            // Call backend API for user groups with account and enterprise parameters
+            const groups = await api.get<UserGroupRecord[]>(
+                `/api/user-groups?accountId=${selectedAccountId}&enterpriseId=${selectedEnterpriseId}`,
+            );
+
+            // Add entity names to groups and mock member counts
+            const enrichedGroups = (groups || []).map((group) => ({
+                ...group,
+                entity_name:
+                    entities.find((e) => e.id === group.entity_id)?.name || '',
+                memberCount: Math.floor(Math.random() * 50) + 1, // Mock member count
+                created_at: group.created_at || new Date().toISOString(),
+                updated_at: group.updated_at || new Date().toISOString(),
+            }));
+
+            setUserGroups(enrichedGroups);
+        } catch (error) {
+            console.error('Failed to load user groups:', error);
+            setUserGroups([]);
+        }
+    };
+
+    // Entity options are now handled directly in the table rendering
+    const updateTableConfigWithEntities = (entityList: Entity[]) => {
+        // No longer needed since we're using a custom table
+        console.log('Entities loaded:', entityList.length);
+    };
+
+    const handleRowAction = async (action: string, row: UserGroupRecord) => {
+        switch (action) {
+            case 'edit':
+                setEditingGroup(row);
+                setShowCreateModal(true);
+                break;
+            case 'members':
+                // Navigate to manage members for this group
+                console.log('Manage members for group:', row.name);
+                break;
+            case 'permissions':
+                // Navigate to permissions for this group
+                console.log('Manage permissions for group:', row.name);
+                break;
+            case 'delete':
+                await handleDeleteGroup(row.id);
+                break;
+            default:
+                console.log('Unknown action:', action);
+        }
+    };
+
+    const handleBulkAction = async (action: string, selectedIds: string[]) => {
+        switch (action) {
+            case 'activate':
+                await handleBulkStatusUpdate(selectedIds, 'Active');
+                break;
+            case 'deactivate':
+                await handleBulkStatusUpdate(selectedIds, 'Inactive');
+                break;
+            case 'delete':
+                await handleBulkDelete(selectedIds);
+                break;
+            default:
+                console.log('Unknown bulk action:', action);
+        }
+    };
+
+    const handleBulkStatusUpdate = async (
+        groupIds: string[],
+        status: 'Active' | 'Inactive',
+    ) => {
+        try {
+            await api.put('/api/user-groups/bulk', {
+                ids: groupIds,
+                data: {status},
+            });
+
+            // Update local state
+            setUserGroups((prev) =>
+                prev.map((group) =>
+                    groupIds.includes(group.id) ? {...group, status} : group,
+                ),
+            );
+
+            setSelectedRows([]);
+        } catch (error) {
+            console.error('Failed to update user groups:', error);
+        }
+    };
+
+    const handleBulkDelete = async (groupIds: string[]) => {
+        try {
+            // Use POST method for bulk delete with body data
+            await api.post('/api/user-groups/bulk-delete', {ids: groupIds});
+
+            // Update local state
+            setUserGroups((prev) =>
+                prev.filter((group) => !groupIds.includes(group.id)),
+            );
+            setSelectedRows([]);
+        } catch (error) {
+            console.error('Failed to delete user groups:', error);
+        }
+    };
+
+    const handleDeleteGroup = async (groupId: string) => {
+        try {
+            await api.del(`/api/user-groups/${groupId}`);
+            setUserGroups((prev) =>
+                prev.filter((group) => group.id !== groupId),
+            );
+        } catch (error) {
+            console.error('Failed to delete user group:', error);
+        }
+    };
+
+    const handleCreateGroup = async (data: Partial<UserGroupRecord>) => {
+        try {
+            const newGroup = await api.post<UserGroupRecord>(
+                '/api/user-groups',
+                {
+                    ...data,
+                    account_id: parseInt(selectedAccountId),
+                    enterprise_id: parseInt(selectedEnterpriseId),
+                },
+            );
+
+            setUserGroups((prev) => [
+                ...prev,
+                {
+                    ...newGroup,
+                    entity_name:
+                        entities.find((e) => e.id === newGroup.entity_id)
+                            ?.name || '',
+                    memberCount: 0,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+            ]);
+
+            setShowCreateModal(false);
+            setEditingGroup(null);
+        } catch (error) {
+            console.error('Failed to create user group:', error);
+        }
+    };
+
+    const handleUpdateGroup = async (data: Partial<UserGroupRecord>) => {
+        if (!editingGroup) return;
+
+        try {
+            const updatedGroup = await api.put<UserGroupRecord>(
+                `/api/user-groups/${editingGroup.id}`,
+                {
+                    ...data,
+                    account_id: parseInt(selectedAccountId),
+                    enterprise_id: parseInt(selectedEnterpriseId),
+                },
+            );
+
+            setUserGroups((prev) =>
+                prev.map((group) =>
+                    group.id === editingGroup.id
+                        ? {
+                              ...updatedGroup,
+                              entity_name:
+                                  entities.find(
+                                      (e) => e.id === updatedGroup.entity_id,
+                                  )?.name || '',
+                              memberCount: group.memberCount,
+                              created_at: group.created_at,
+                              updated_at: new Date().toISOString(),
+                          }
+                        : group,
+                ),
+            );
+
+            setShowCreateModal(false);
+            setEditingGroup(null);
+        } catch (error) {
+            console.error('Failed to update user group:', error);
+        }
+    };
+
+    const handleInlineEdit = async (
+        rowId: string,
+        field: string,
+        value: any,
+    ) => {
+        try {
+            await api.put(`/api/user-groups/${rowId}`, {[field]: value});
+
+            // Update local state
+            setUserGroups((prev) =>
+                prev.map((group) =>
+                    group.id === rowId
+                        ? {
+                              ...group,
+                              [field]: value,
+                              updated_at: new Date().toISOString(),
+                          }
+                        : group,
+                ),
+            );
+        } catch (error) {
+            console.error('Failed to update user group:', error);
+        }
+    };
+
+    // Handle opening assignment panel
+    const handleShowAssignments = (user: any) => {
+        setSelectedUser(user);
+        setAssignedGroups(['1', '3', '7']); // Mock assigned group IDs
+        setAssignmentProgress(Math.floor((3 / userGroups.length) * 100));
+        setShowAssignmentPanel(true);
+    };
+
+    // Handle assignment/unassignment
+    const handleToggleAssignment = (groupId: string) => {
+        setAssignedGroups((prev) => {
+            const newAssigned = prev.includes(groupId)
+                ? prev.filter((id) => id !== groupId)
+                : [...prev, groupId];
+            setAssignmentProgress(
+                Math.floor((newAssigned.length / userGroups.length) * 100),
+            );
+            return newAssigned;
+        });
+    };
+
+    const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+    const selectedEnterprise = enterprises.find(
+        (e) => e.id === selectedEnterpriseId,
+    );
+
+    if (isLoading) {
+        return (
+            <div className='h-full bg-secondary p-6 flex items-center justify-center'>
+                <div className='text-primary'>Loading...</div>
+            </div>
+        );
+    }
+
+    // Debug logging
+    console.log('🔧 ManageUserGroups render - userGroups:', userGroups);
+    console.log('🔧 ManageUserGroups render - entities:', entities);
+    console.log(
+        '🔧 ManageUserGroups render - userGroups.length:',
+        userGroups.length,
+    );
+    console.log(
+        '🔧 ManageUserGroups render - selectedAccountId:',
+        selectedAccountId,
+    );
+    console.log(
+        '🔧 ManageUserGroups render - selectedEnterpriseId:',
+        selectedEnterpriseId,
+    );
+
+    return (
+        <div className='h-full bg-secondary p-6 flex flex-col'>
+            <div className='max-w-full mx-auto flex-1 flex flex-col'>
+                {/* Header */}
+                <div className='mb-6 flex-shrink-0'>
+                    <div className='flex items-start justify-between mb-4'>
+                        <div>
+                            <h1 className='text-2xl font-bold text-primary mb-2'>
+                                Manage User Groups
+                            </h1>
+                            <div className='text-sm text-secondary'>
+                                Account:{' '}
+                                <span className='font-medium'>
+                                    {selectedAccount?.name || 'Not selected'}
+                                </span>
+                                {' • '}
+                                Enterprise:{' '}
+                                <span className='font-medium'>
+                                    {selectedEnterprise?.name || 'Not selected'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* TEST BUTTON - SUPER VISIBLE */}
+                        <button
+                            onClick={() => {
+                                console.log('🎯 SUPER VISIBLE BUTTON CLICKED!');
+                                alert('Button works! Opening sliding panel...');
+                                handleShowAssignments({
+                                    name: 'John Doe',
+                                    role: 'Admin',
+                                });
+                            }}
+                            className='relative bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all duration-200 shadow-2xl border-4 border-yellow-400'
+                            style={{zIndex: 9999, position: 'relative'}}
+                        >
+                            <UserGroupSolidIcon className='h-6 w-6' />
+                            <span>🎉 CLICK ME!</span>
+                            {/* Badge showing assignment count */}
+                            <span className='bg-yellow-400 text-red-600 text-lg rounded-full h-8 w-8 flex items-center justify-center font-black animate-ping'>
+                                {assignedGroups.length}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                {!selectedAccountId || !selectedEnterpriseId ? (
+                    <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4'>
+                        <p className='text-yellow-800'>
+                            Please select an Account and Enterprise from the
+                            breadcrumb dropdown to manage user groups.
+                        </p>
+                    </div>
+                ) : userGroups.length === 0 ? (
+                    <div className='text-center py-12'>
+                        <UserGroupIcon className='mx-auto h-12 w-12 text-secondary' />
+                        <h3 className='mt-2 text-sm font-semibold text-primary'>
+                            No user groups
+                        </h3>
+                        <p className='mt-1 text-sm text-secondary'>
+                            Create your first user group to get started.
+                        </p>
+                        <button
+                            onClick={() => {
+                                console.log('Add New User Group clicked');
+                                setShowCreateModal(true);
+                            }}
+                            className='mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium'
+                        >
+                            + Add New User Group
+                        </button>
+                    </div>
+                ) : (
+                    <div className='flex-1 flex flex-col min-h-0'>
+                        {/* Table Container with proper height management */}
+                        <div className='flex-1 overflow-hidden'>
+                            <SimpleAdvancedTable
+                                tableName='User Groups - Advanced Features Demo'
+                                columns={[
+                                    {
+                                        id: 'name',
+                                        title: 'Group Name',
+                                        type: 'text',
+                                        width: 150,
+                                        editable: true,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                        required: true,
+                                    },
+                                    {
+                                        id: 'description',
+                                        title: 'Description',
+                                        type: 'text',
+                                        width: 200,
+                                        editable: true,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                    },
+                                    {
+                                        id: 'group_code',
+                                        title: 'Group Code',
+                                        type: 'text',
+                                        width: 120,
+                                        editable: true,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                        required: true,
+                                    },
+                                    {
+                                        id: 'entity_name',
+                                        title: 'Entity',
+                                        type: 'select',
+                                        width: 120,
+                                        editable: true,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                        options: entities.map((e) => e.name),
+                                    },
+                                    {
+                                        id: 'status',
+                                        title: 'Status',
+                                        type: 'select',
+                                        width: 100,
+                                        editable: true,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                        options: ['Active', 'Inactive'],
+                                    },
+                                    {
+                                        id: 'memberCount',
+                                        title: 'Members',
+                                        type: 'number',
+                                        width: 80,
+                                        editable: false,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                    },
+                                    {
+                                        id: 'created_at',
+                                        title: 'Created',
+                                        type: 'date',
+                                        width: 120,
+                                        editable: false,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                    },
+                                    {
+                                        id: 'updated_at',
+                                        title: 'Updated',
+                                        type: 'date',
+                                        width: 120,
+                                        editable: false,
+                                        resizable: true,
+                                        sortable: true,
+                                        filterable: true,
+                                    },
+                                ]}
+                                data={userGroups}
+                                onDataChange={(data) => {
+                                    console.log('🔄 Table data changed:', data);
+                                    setUserGroups(data as any);
+                                }}
+                                onRowAction={(action, row) => {
+                                    console.log('🎯 Row action:', action, row);
+                                    handleRowAction(action, row as any);
+                                }}
+                                onBulkAction={(action, rows) => {
+                                    console.log(
+                                        '📦 Bulk action:',
+                                        action,
+                                        rows,
+                                    );
+                                    handleBulkAction(
+                                        action,
+                                        rows.map((r) => r.id),
+                                    );
+                                }}
+                                onInlineEdit={(rowId, field, value) => {
+                                    console.log(
+                                        '✏️ Inline edit:',
+                                        rowId,
+                                        field,
+                                        value,
+                                    );
+                                    handleInlineEdit(rowId, field, value);
+                                }}
+                                className='h-full'
+                            />
+                        </div>
+
+                        {/* Add New User Group Button - Fixed at bottom */}
+                        <div className='flex-shrink-0 pt-4 border-t border-gray-200 mt-4'>
+                            <button
+                                onClick={() => {
+                                    console.log(
+                                        'Add New User Group clicked (main button)',
+                                    );
+                                    setShowCreateModal(true);
+                                }}
+                                className='bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors'
+                            >
+                                <PlusIcon className='h-5 w-5' />
+                                Add New User Group
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Beautiful Sliding Assignment Panel */}
+            <AnimatePresence>
+                {showAssignmentPanel && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{opacity: 0}}
+                            animate={{opacity: 1}}
+                            exit={{opacity: 0}}
+                            transition={{duration: 0.3}}
+                            className='fixed inset-0 bg-black bg-opacity-50 z-40'
+                            onClick={() => setShowAssignmentPanel(false)}
+                        />
+
+                        {/* Sliding Panel */}
+                        <motion.div
+                            initial={{x: '100%'}}
+                            animate={{x: 0}}
+                            exit={{x: '100%'}}
+                            transition={{
+                                type: 'spring',
+                                stiffness: 300,
+                                damping: 30,
+                                duration: 0.4,
+                            }}
+                            className='fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-50 flex flex-col'
+                        >
+                            {/* Panel Header */}
+                            <div className='bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6'>
+                                <div className='flex items-center justify-between mb-4'>
+                                    <div className='flex items-center gap-3'>
+                                        <div className='bg-white bg-opacity-20 p-2 rounded-lg'>
+                                            <UserGroupSolidIcon className='h-6 w-6' />
+                                        </div>
+                                        <div>
+                                            <h3 className='text-lg font-semibold'>
+                                                Assigned User Groups
+                                            </h3>
+                                            <p className='text-blue-100 text-sm'>
+                                                {selectedUser?.name || 'User'} -{' '}
+                                                {selectedUser?.role || 'Role'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() =>
+                                            setShowAssignmentPanel(false)
+                                        }
+                                        className='text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-colors'
+                                    >
+                                        <XMarkIcon className='h-5 w-5' />
+                                    </button>
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className='space-y-2'>
+                                    <div className='flex justify-between text-sm'>
+                                        <span>Assignment Progress</span>
+                                        <span>
+                                            {assignedGroups.length} of{' '}
+                                            {userGroups.length} groups
+                                        </span>
+                                    </div>
+                                    <div className='bg-white bg-opacity-20 rounded-full h-2'>
+                                        <motion.div
+                                            initial={{width: 0}}
+                                            animate={{
+                                                width: `${assignmentProgress}%`,
+                                            }}
+                                            transition={{
+                                                duration: 0.5,
+                                                delay: 0.2,
+                                            }}
+                                            className='bg-white h-2 rounded-full flex items-center justify-end pr-1'
+                                        >
+                                            {assignmentProgress > 10 && (
+                                                <div className='w-1 h-1 bg-blue-600 rounded-full'></div>
+                                            )}
+                                        </motion.div>
+                                    </div>
+                                    <div className='text-right text-xs text-blue-100'>
+                                        {assignmentProgress}% Complete
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Panel Content */}
+                            <div className='flex-1 overflow-y-auto p-6'>
+                                <div className='space-y-3'>
+                                    {userGroups.map((group, index) => {
+                                        const isAssigned =
+                                            assignedGroups.includes(group.id);
+                                        return (
+                                            <motion.div
+                                                key={group.id}
+                                                initial={{opacity: 0, x: 20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                transition={{
+                                                    delay: index * 0.05,
+                                                }}
+                                                className={`
+                                                    p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer
+                                                    ${
+                                                        isAssigned
+                                                            ? 'border-blue-200 bg-blue-50 shadow-md'
+                                                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                                                    }
+                                                `}
+                                                onClick={() =>
+                                                    handleToggleAssignment(
+                                                        group.id,
+                                                    )
+                                                }
+                                            >
+                                                <div className='flex items-center justify-between'>
+                                                    <div className='flex items-center gap-3'>
+                                                        <div
+                                                            className={`
+                                                            p-2 rounded-lg transition-colors
+                                                            ${
+                                                                isAssigned
+                                                                    ? 'bg-blue-600 text-white'
+                                                                    : 'bg-gray-100 text-gray-600'
+                                                            }
+                                                        `}
+                                                        >
+                                                            {isAssigned ? (
+                                                                <CheckCircleSolidIcon className='h-5 w-5' />
+                                                            ) : (
+                                                                <UserGroupIcon className='h-5 w-5' />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className='font-semibold text-gray-900'>
+                                                                {group.name}
+                                                            </h4>
+                                                            <p className='text-sm text-gray-500'>
+                                                                {
+                                                                    group.description
+                                                                }
+                                                            </p>
+                                                            <div className='flex items-center gap-2 mt-1'>
+                                                                <span className='text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded'>
+                                                                    {
+                                                                        group.entity_name
+                                                                    }
+                                                                </span>
+                                                                <span
+                                                                    className={`
+                                                                    text-xs px-2 py-1 rounded
+                                                                    ${
+                                                                        group.status ===
+                                                                        'Active'
+                                                                            ? 'bg-green-100 text-green-600'
+                                                                            : 'bg-red-100 text-red-600'
+                                                                    }
+                                                                `}
+                                                                >
+                                                                    {
+                                                                        group.status
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRightIcon
+                                                        className={`
+                                                        h-5 w-5 transition-transform
+                                                        ${
+                                                            isAssigned
+                                                                ? 'rotate-90 text-blue-600'
+                                                                : 'text-gray-400'
+                                                        }
+                                                    `}
+                                                    />
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Panel Footer */}
+                            <div className='border-t border-gray-200 p-6 bg-gray-50'>
+                                <div className='flex gap-3'>
+                                    <button
+                                        onClick={() =>
+                                            setShowAssignmentPanel(false)
+                                        }
+                                        className='flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors'
+                                    >
+                                        Save Changes
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setShowAssignmentPanel(false)
+                                        }
+                                        className='px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition-colors'
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
