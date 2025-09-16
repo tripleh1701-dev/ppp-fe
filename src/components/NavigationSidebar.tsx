@@ -91,7 +91,7 @@ const getIconSvg = (iconName: string) => {
         security: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />`,
         settings: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />`,
         shield: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />`,
-        monitoring: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />`,
+        monitoring: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2v-4" />`,
     };
     return iconMap[iconName] || iconMap.overview;
 };
@@ -112,8 +112,11 @@ export default function NavigationSidebar({
     const router = useRouter();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-    const [previousPathname, setPreviousPathname] = useState(currentPath);
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
+    const [previousPathname, setPreviousPathname] = useState(currentPath);
+
+    // NEW: Track active menu by click
+    const [activeMenuId, setActiveMenuId] = useState<string>('overview');
 
     // Memoize navigation items to prevent unnecessary re-renders
     const memoizedNavigationItems = useMemo(() => navigationItems, []);
@@ -127,7 +130,20 @@ export default function NavigationSidebar({
         });
     }, [router, memoizedNavigationItems]);
 
-    // Close Account Settings panel when navigating to a different page
+    // Set active menu on initial load or route change
+    useEffect(() => {
+        // Find the first matching menu item for the current path
+        const found = memoizedNavigationItems.find(
+            (item) =>
+                currentPath === item.href ||
+                (item.href !== '/' && currentPath.startsWith(item.href))
+        );
+        if (found) {
+            setActiveMenuId(found.id);
+        }
+    }, [currentPath, memoizedNavigationItems]);
+
+    // Close panels when navigating to a different page
     useEffect(() => {
         if (currentPath !== previousPathname) {
             if (isAccountSettingsOpen) setIsAccountSettingsOpen(false);
@@ -147,25 +163,31 @@ export default function NavigationSidebar({
             if (isMobile && onToggleCollapse) {
                 onToggleCollapse();
             }
-            // Use router.push for faster navigation
             router.push(href);
         },
         [isMobile, onToggleCollapse, router],
     );
 
-    // Memoize the navigation item click handler
+    // Updated click handler to ensure only one panel is open at a time
     const handleItemClick = useCallback(
         (item: NavigationItem) => {
+            setActiveMenuId(item.id);
+
             if (item.id === 'account-settings') {
                 setIsAccountSettingsOpen(true);
+                setIsAccessControlOpen(false); // <-- close other panel
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
             if (item.id === 'access-control') {
                 setIsAccessControlOpen(true);
+                setIsAccountSettingsOpen(false); // <-- close other panel
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
+            // Close both panels when clicking any other menu
+            setIsAccountSettingsOpen(false);
+            setIsAccessControlOpen(false);
             handleNavigation(item.href);
         },
         [isMobile, onToggleCollapse, handleNavigation],
@@ -199,12 +221,16 @@ export default function NavigationSidebar({
             >
                 {/* Curved Right Edge / Boundary removed to eliminate white border */}
 
-                {/* Minimal Collapse Handle (middle, outside) */}
+                {/* Minimal Collapse Handle (bottom, outside) */}
                 {!isMobile && (
-                    <div className='absolute -right-4 top-1/2 -translate-y-1/2 z-40 pointer-events-auto group'>
+                    <div className='absolute -right-4 bottom-7 z-40 pointer-events-auto group'>
                         <button
                             onClick={onToggleCollapse}
-                            className='relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl hover:scale-110 opacity-100'
+                            className={`relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl ${
+                                isCollapsed
+                                    ? 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100'
+                                    : 'opacity-100'
+                            }`}
                             aria-label={
                                 isCollapsed
                                     ? 'Expand sidebar'
@@ -314,23 +340,16 @@ export default function NavigationSidebar({
                         {memoizedNavigationItems
                             .slice(0, 3)
                             .map((item, index) => {
-                                const isActive =
-                                    !isAccountSettingsOpen &&
-                                    (currentPath === item.href ||
-                                        (item.href !== '/' &&
-                                            currentPath.startsWith(item.href)));
-
+                                const isActive = activeMenuId === item.id;
                                 return (
                                     <div key={item.id} className='relative'>
                                         <button
-                                            onClick={() =>
-                                                handleItemClick(item)
-                                            }
+                                            onClick={() => handleItemClick(item)}
                                             className={`flex ${
                                                 isCollapsed
                                                     ? 'justify-center px-0'
                                                     : 'items-center space-x-3 px-3'
-                                            } py-2.5 text-sm font-medium transition-all duration-200 w-full ${
+                                            } py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                                 isActive
                                                     ? 'bg-primary-600 text-white shadow-lg backdrop-blur-sm'
                                                     : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
@@ -388,12 +407,7 @@ export default function NavigationSidebar({
                     {/* Secondary Navigation Items */}
                     <div className='space-y-1 px-3 relative z-10'>
                         {memoizedNavigationItems.slice(3).map((item) => {
-                            const isActive =
-                                !isAccountSettingsOpen &&
-                                (currentPath === item.href ||
-                                    (item.href !== '/' &&
-                                        currentPath.startsWith(item.href)));
-
+                            const isActive = activeMenuId === item.id;
                             return (
                                 <div key={item.id} className='relative'>
                                     <button
@@ -402,7 +416,7 @@ export default function NavigationSidebar({
                                             isCollapsed
                                                 ? 'justify-center px-0'
                                                 : 'items-center space-x-3 px-3'
-                                        } py-2.5 text-sm font-medium transition-all duration-200 w-full ${
+                                        } py-2.5 rounded-xl text-sm font-medium transition-all duration-200 w-full ${
                                             isActive
                                                 ? 'bg-primary-600 text-white shadow-lg backdrop-blur-sm'
                                                 : 'text-white hover:bg-white/20 hover:text-white backdrop-blur-sm'
@@ -458,23 +472,11 @@ export default function NavigationSidebar({
                 </nav>
 
                 {/* Footer */}
-                <div
-                    className={`border-t border-white/10 bg-black/10 backdrop-blur-sm ${
-                        isCollapsed ? 'p-2' : 'p-4'
-                    }`}
-                >
+                <div className='p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm'>
                     {/* Keep only profile here to avoid duplicates of settings/access */}
                     <div className='mt-2'>
-                        <div
-                            className={`flex items-center ${
-                                isCollapsed ? 'justify-center' : 'space-x-3'
-                            } relative`}
-                            onMouseEnter={() =>
-                                isCollapsed && setHoveredItem('user-profile')
-                            }
-                            onMouseLeave={() => setHoveredItem(null)}
-                        >
-                            <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg flex-shrink-0'>
+                        <div className='flex items-center space-x-3'>
+                            <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg'>
                                 <svg
                                     className='w-5 h-5 text-white'
                                     fill='none'
@@ -492,25 +494,11 @@ export default function NavigationSidebar({
                             {!isCollapsed && (
                                 <div className='min-w-0 flex-1'>
                                     <p className='text-sm font-medium text-white truncate drop-shadow-sm'>
-                                        Nihar Sharma
+                                        Tushar
                                     </p>
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
                                         Administrator
                                     </p>
-                                </div>
-                            )}
-
-                            {/* Enhanced tooltip for collapsed sidebar */}
-                            {isCollapsed && hoveredItem === 'user-profile' && (
-                                <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
-                                    <div>
-                                        <div className='font-medium'>
-                                            Nihar Sharma
-                                        </div>
-                                        <div className='text-xs text-slate-300'>
-                                            Administrator
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>
