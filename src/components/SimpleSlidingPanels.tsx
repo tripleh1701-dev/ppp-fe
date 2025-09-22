@@ -34,6 +34,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 }) => {
     const [activePanel, setActivePanel] = useState<PanelType>(initialPanel);
     const [selectedRole, setSelectedRole] = useState<any>(null);
+    const [visiblePanels, setVisiblePanels] = useState<Set<PanelType>>(
+        new Set(['userGroups'] as PanelType[]),
+    );
 
     // State for API data
     const [userGroupsData, setUserGroupsData] = useState<any[]>([]);
@@ -48,7 +51,13 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     );
     const [assignmentLoading, setAssignmentLoading] = useState<boolean>(false);
 
-    // Fetch user groups from API
+    // State for role selection and assignment
+    const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
+    const [roleAssignmentLoading, setRoleAssignmentLoading] =
+        useState<boolean>(false);
+    const [selectedUserGroup, setSelectedUserGroup] = useState<any>(null);
+
+    // Fetch user groups from API with role counts
     const fetchUserGroups = async () => {
         try {
             setLoading(true);
@@ -63,7 +72,39 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
             const data = await response.json();
             console.log('📊 Groups data received:', data);
-            setUserGroupsData(Array.isArray(data) ? data : []);
+            console.log(
+                '📊 Data type:',
+                typeof data,
+                'IsArray:',
+                Array.isArray(data),
+            );
+
+            // Fetch role counts for each user group
+            const groupsWithRoleCounts = await Promise.all(
+                (Array.isArray(data) ? data : []).map(async (group: any) => {
+                    try {
+                        const rolesResponse = await fetch(
+                            `http://localhost:4000/api/user-groups/${group.id}/roles`,
+                        );
+                        if (rolesResponse.ok) {
+                            const rolesData = await rolesResponse.json();
+                            const roleCount =
+                                rolesData?.data?.roles?.length || 0;
+                            return {...group, rolesCount: roleCount};
+                        } else {
+                            return {...group, rolesCount: 0};
+                        }
+                    } catch (error) {
+                        console.error(
+                            `Error fetching roles for group ${group.id}:`,
+                            error,
+                        );
+                        return {...group, rolesCount: 0};
+                    }
+                }),
+            );
+
+            setUserGroupsData(groupsWithRoleCounts);
         } catch (err) {
             console.error('Error fetching groups:', err);
             setError(
@@ -76,7 +117,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         }
     };
 
-    // Fetch roles from API
+    // Fetch roles from API with scope configuration status
     const fetchRoles = async () => {
         try {
             console.log('🔄 Fetching roles from API...');
@@ -85,7 +126,50 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             if (response.ok) {
                 const data = await response.json();
                 console.log('📊 Roles data received:', data);
-                setRolesData(Array.isArray(data) ? data : []);
+
+                // Check scope configuration for each role
+                const rolesWithScopeStatus = await Promise.all(
+                    (Array.isArray(data) ? data : []).map(async (role: any) => {
+                        try {
+                            const scopeResponse = await fetch(
+                                `http://localhost:4000/api/roles/${role.id}/scope`,
+                            );
+
+                            if (scopeResponse.ok) {
+                                const scopeData = await scopeResponse.json();
+                                // Check if any category has configured permissions
+                                const hasConfiguration = Object.values(
+                                    scopeData,
+                                ).some(
+                                    (category: any) =>
+                                        Array.isArray(category) &&
+                                        category.length > 0,
+                                );
+
+                                return {
+                                    ...role,
+                                    hasScopeConfig: hasConfiguration,
+                                };
+                            } else {
+                                return {
+                                    ...role,
+                                    hasScopeConfig: false,
+                                };
+                            }
+                        } catch (error) {
+                            console.error(
+                                `Error checking scope for role ${role.id}:`,
+                                error,
+                            );
+                            return {
+                                ...role,
+                                hasScopeConfig: false,
+                            };
+                        }
+                    }),
+                );
+
+                setRolesData(rolesWithScopeStatus);
             } else {
                 console.warn('Failed to fetch roles, using empty array');
                 setRolesData([]);
@@ -153,9 +237,11 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         }
     };
 
-    // Fetch data when component mounts or currentUser changes
+    // Reset visible panels and active panel when component opens
     useEffect(() => {
         if (isOpen) {
+            setVisiblePanels(new Set(['userGroups'] as PanelType[]));
+            setActivePanel('userGroups');
             fetchUserGroups();
             fetchRoles();
             fetchScopeConfig();
@@ -198,7 +284,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         {
             id: 'roles' as const,
             title: 'Assign Roles',
-            subtitle: 'Configure user roles',
+            subtitle: selectedUserGroup
+                ? `Assign roles to "${selectedUserGroup.name}" user group`
+                : 'Configure user roles',
             icon: <ShieldCheckIcon className='w-6 h-6' />,
             color: 'bg-green-500',
             headerGradient: 'from-green-500 to-green-600',
@@ -214,8 +302,69 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     ];
 
     const handleRoleSelect = (role: any) => {
+        console.log('🔄 handleRoleSelect called with role:', role);
         setSelectedRole(role);
+        // Show all panels but make scope the active one
+        console.log('🔄 Setting all panels visible with scope as active');
+        setVisiblePanels(
+            new Set(['userGroups', 'roles', 'scope'] as PanelType[]),
+        );
         setActivePanel('scope');
+        console.log('✅ Panel switch completed');
+    };
+
+    // Handle panel click to collapse current and switch to new panel
+    const handlePanelClick = (panelType: PanelType) => {
+        setActivePanel(panelType);
+        // Only show the selected panel (collapse and switch behavior)
+        setVisiblePanels(new Set([panelType]));
+    };
+
+    // Show roles panel after successful group assignment
+    const showRolesPanel = async (userGroup?: any) => {
+        // Store the selected user group for role assignment
+        if (userGroup) {
+            setSelectedUserGroup(userGroup);
+
+            // Fetch currently assigned roles for this user group
+            try {
+                console.log(
+                    `🔄 Fetching assigned roles for group: ${userGroup.name}`,
+                );
+                const response = await fetch(
+                    `http://localhost:4000/api/user-groups/${userGroup.id}/roles`,
+                );
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const assignedRoleIds =
+                        data?.data?.roles?.map((role: any) => role.id) || [];
+                    console.log(
+                        `✅ Found ${assignedRoleIds.length} assigned roles:`,
+                        assignedRoleIds,
+                    );
+
+                    // Pre-select the assigned roles
+                    setSelectedRoles(new Set(assignedRoleIds));
+                } else {
+                    console.warn(
+                        'Failed to fetch assigned roles:',
+                        response.status,
+                    );
+                    setSelectedRoles(new Set());
+                }
+            } catch (error) {
+                console.error('Error fetching assigned roles:', error);
+                setSelectedRoles(new Set());
+            }
+        }
+
+        // Show all panels but make roles the active one
+        setVisiblePanels(new Set(['userGroups', 'roles'] as PanelType[]));
+        setActivePanel('roles');
+
+        // Refresh roles data to ensure scope configuration status is up to date
+        fetchRoles();
     };
 
     // Handle group selection
@@ -227,6 +376,17 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             newSelection.delete(groupId);
         }
         setSelectedGroups(newSelection);
+    };
+
+    // Handle role selection
+    const handleRoleSelection = (roleId: string, isSelected: boolean) => {
+        const newSelection = new Set(selectedRoles);
+        if (isSelected) {
+            newSelection.add(roleId);
+        } else {
+            newSelection.delete(roleId);
+        }
+        setSelectedRoles(newSelection);
     };
 
     // Handle group assignment
@@ -325,9 +485,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                 `Successfully assigned ${selectedGroups.size} groups to ${currentUser.firstName} ${currentUser.lastName}`,
             );
 
-            // Clear selection and close panel
+            // Clear selection and show roles panel for next step
             setSelectedGroups(new Set());
-            onClose();
+            showRolesPanel();
         } catch (error) {
             console.error('❌ Error assigning groups:', error);
             alert(
@@ -340,25 +500,110 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         }
     };
 
+    // Handle role assignment
+    const handleAssignRoles = async () => {
+        if (selectedRoles.size === 0) {
+            alert('Please select at least one role to assign.');
+            return;
+        }
+
+        if (!selectedUserGroup) {
+            alert('No user group selected for role assignment.');
+            return;
+        }
+
+        try {
+            setRoleAssignmentLoading(true);
+
+            console.log(
+                `🔄 Assigning ${selectedRoles.size} roles to user group: ${selectedUserGroup.name}`,
+            );
+
+            // Assign each selected role to the user group
+            const assignmentPromises = Array.from(selectedRoles).map(
+                async (roleId) => {
+                    const roleData = rolesData.find(
+                        (role) => role.id === roleId,
+                    );
+                    const response = await fetch(
+                        `http://localhost:4000/api/user-groups/${selectedUserGroup.id}/roles`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                roleId: roleId,
+                                roleName:
+                                    roleData?.name ||
+                                    roleData?.roleName ||
+                                    'Unknown Role',
+                            }),
+                        },
+                    );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to assign role ${
+                                roleData?.name || roleId
+                            }: ${response.status}`,
+                        );
+                    }
+
+                    return response.json();
+                },
+            );
+
+            await Promise.all(assignmentPromises);
+
+            console.log('✅ All roles assigned successfully');
+            alert(
+                `Successfully assigned ${selectedRoles.size} role${
+                    selectedRoles.size !== 1 ? 's' : ''
+                } to "${selectedUserGroup.name}" user group`,
+            );
+
+            // Clear selections and refresh data
+            setSelectedRoles(new Set());
+
+            // Refresh user groups data to update role counts
+            await fetchUserGroups();
+        } catch (error) {
+            console.error('❌ Error assigning roles:', error);
+            alert(
+                `Failed to assign roles: ${
+                    error instanceof Error ? error.message : 'Unknown error'
+                }`,
+            );
+        } finally {
+            setRoleAssignmentLoading(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
         <AnimatePresence>
+            {/* Backdrop */}
             <motion.div
-                className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'
+                className='fixed inset-0 z-40 bg-black/50'
                 initial={{opacity: 0}}
                 animate={{opacity: 1}}
                 exit={{opacity: 0}}
                 transition={{duration: 0.2}}
+                onClick={onClose}
+            />
+
+            {/* Sliding Panel Container */}
+            <motion.div
+                className='fixed right-0 top-0 h-full z-50 bg-white shadow-2xl overflow-hidden'
+                style={{width: '60vw', maxWidth: '1600px', minWidth: '800px'}}
+                initial={{x: '100%'}}
+                animate={{x: 0}}
+                exit={{x: '100%'}}
+                transition={{duration: 0.4, ease: 'easeInOut'}}
             >
-                {/* Main Container */}
-                <motion.div
-                    className='flex h-[90vh] w-[95vw] max-w-7xl bg-white shadow-2xl overflow-hidden rounded-lg'
-                    initial={{x: '100%', scale: 0.9}}
-                    animate={{x: 0, scale: 1}}
-                    exit={{x: '100%', scale: 0.9}}
-                    transition={{duration: 0.4, ease: 'easeInOut'}}
-                >
+                <div className='flex h-full'>
                     {/* Panel 1 - User Groups */}
                     <motion.div
                         className={`h-full border-r border-gray-200 overflow-hidden ${
@@ -367,7 +612,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                 : 'bg-gray-50'
                         }`}
                         animate={{
-                            width: activePanel === 'userGroups' ? '90%' : '5%',
+                            width: activePanel === 'userGroups' ? '100%' : '5%',
                         }}
                         transition={{duration: 0.3, ease: 'easeInOut'}}
                     >
@@ -380,7 +625,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                     ? 'h-full flex items-center justify-center'
                                     : ''
                             }`}
-                            onClick={() => setActivePanel('userGroups')}
+                            onClick={() => handlePanelClick('userGroups')}
                         >
                             {activePanel === 'userGroups' ? (
                                 <div className='flex items-center justify-between'>
@@ -406,7 +651,14 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                     </button>
                                 </div>
                             ) : (
-                                <div className='transform -rotate-90 whitespace-nowrap'>
+                                <div
+                                    className='transform -rotate-90 whitespace-nowrap cursor-pointer h-full flex items-center justify-center'
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePanelClick('userGroups');
+                                    }}
+                                    style={{pointerEvents: 'auto'}}
+                                >
                                     <div className='flex items-center space-x-2'>
                                         {panels[0].icon}
                                         <span className='font-semibold'>
@@ -526,6 +778,19 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                     </tr>
                                                 </thead>
                                                 <tbody>
+                                                    {userGroupsData.length ===
+                                                        0 && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={6}
+                                                                className='p-4 text-center text-gray-500'
+                                                            >
+                                                                {loading
+                                                                    ? 'Loading groups...'
+                                                                    : 'No user groups found'}
+                                                            </td>
+                                                        </tr>
+                                                    )}
                                                     {userGroupsData.map(
                                                         (group, index) => (
                                                             <tr
@@ -598,23 +863,42 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                                 <td className='p-3 border-b border-gray-100'>
                                                                     <div className='text-sm'>
                                                                         <button
-                                                                            className='inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors'
-                                                                            onClick={(
+                                                                            className='inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-300 hover:shadow-md hover:scale-105 group'
+                                                                            onClick={async (
                                                                                 e,
                                                                             ) => {
                                                                                 e.stopPropagation();
-                                                                                // This could open roles dialog for this group
                                                                                 console.log(
-                                                                                    'View roles for group:',
+                                                                                    '🎯 Role button clicked for group:',
                                                                                     group.name,
+                                                                                );
+                                                                                await showRolesPanel(
+                                                                                    group,
                                                                                 );
                                                                             }}
                                                                         >
-                                                                            <span className='w-4 h-4 mr-1'>
-                                                                                🛡️
+                                                                            <svg
+                                                                                className='w-4 h-4 mr-1 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 group-hover:drop-shadow-md'
+                                                                                viewBox='0 0 24 24'
+                                                                                fill='none'
+                                                                                stroke='currentColor'
+                                                                                strokeWidth='2'
+                                                                            >
+                                                                                <path
+                                                                                    d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'
+                                                                                    className='transition-all duration-300 group-hover:fill-blue-200 group-hover:stroke-blue-600'
+                                                                                />
+                                                                                <circle
+                                                                                    cx='12'
+                                                                                    cy='11'
+                                                                                    r='3'
+                                                                                    className='transition-all duration-300 group-hover:fill-blue-500 group-hover:animate-pulse'
+                                                                                />
+                                                                            </svg>
+                                                                            <span className='transition-all duration-300 group-hover:font-bold'>
+                                                                                {group.rolesCount ||
+                                                                                    0}
                                                                             </span>
-                                                                            {group.rolesCount ||
-                                                                                0}
                                                                         </button>
                                                                     </div>
                                                                 </td>
@@ -727,219 +1011,439 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                     </motion.div>
 
                     {/* Panel 2 - Roles */}
-                    <motion.div
-                        className={`h-full border-r border-gray-200 overflow-hidden ${
-                            activePanel === 'roles' ? 'bg-white' : 'bg-gray-50'
-                        }`}
-                        animate={{
-                            width: activePanel === 'roles' ? '90%' : '5%',
-                        }}
-                        transition={{duration: 0.3, ease: 'easeInOut'}}
-                    >
-                        {/* Header */}
-                        <div
-                            className={`bg-gradient-to-r ${
-                                panels[1].headerGradient
-                            } text-white p-4 cursor-pointer ${
-                                activePanel !== 'roles'
-                                    ? 'h-full flex items-center justify-center'
-                                    : ''
+                    {visiblePanels.has('roles') && (
+                        <motion.div
+                            className={`h-full border-r border-gray-200 overflow-hidden ${
+                                activePanel === 'roles'
+                                    ? 'bg-white'
+                                    : 'bg-gray-50'
                             }`}
-                            onClick={() => setActivePanel('roles')}
+                            animate={{
+                                width: activePanel === 'roles' ? '100%' : '5%',
+                            }}
+                            transition={{duration: 0.3, ease: 'easeInOut'}}
                         >
-                            {activePanel === 'roles' ? (
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center space-x-3'>
-                                        {panels[1].icon}
-                                        <div>
-                                            <h3 className='text-lg font-semibold'>
-                                                {panels[1].title}
-                                            </h3>
-                                            <p className='text-sm opacity-90'>
-                                                {panels[1].subtitle}
-                                            </p>
+                            {/* Header */}
+                            <div
+                                className={`bg-gradient-to-r ${
+                                    panels[1].headerGradient
+                                } text-white p-4 cursor-pointer ${
+                                    activePanel !== 'roles'
+                                        ? 'h-full flex items-center justify-center'
+                                        : ''
+                                }`}
+                                onClick={() => handlePanelClick('roles')}
+                            >
+                                {activePanel === 'roles' ? (
+                                    <div className='flex items-center justify-between'>
+                                        <div className='flex items-center space-x-3'>
+                                            {panels[1].icon}
+                                            <div>
+                                                <h3 className='text-lg font-semibold'>
+                                                    {panels[1].title}
+                                                </h3>
+                                                <p className='text-sm opacity-90'>
+                                                    {panels[1].subtitle}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onClose();
-                                        }}
-                                        className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                    >
-                                        <XMarkIcon className='w-5 h-5' />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className='transform -rotate-90 whitespace-nowrap'>
-                                    <div className='flex items-center space-x-2'>
-                                        {panels[1].icon}
-                                        <span className='font-semibold'>
-                                            Assign Roles
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Content */}
-                        {activePanel === 'roles' && (
-                            <div className='h-full overflow-hidden'>
-                                {loading ? (
-                                    <div className='flex items-center justify-center h-full'>
-                                        <div className='text-gray-500'>
-                                            Loading roles...
-                                        </div>
-                                    </div>
-                                ) : error ? (
-                                    <div className='flex items-center justify-center h-full'>
-                                        <div className='text-red-500'>
-                                            Error: {error}
-                                            <button
-                                                onClick={fetchRoles}
-                                                className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
-                                            >
-                                                Retry
-                                            </button>
-                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onClose();
+                                            }}
+                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                        >
+                                            <XMarkIcon className='w-5 h-5' />
+                                        </button>
                                     </div>
                                 ) : (
-                                    <ReusableTableComponent
-                                        config={
-                                            {
-                                                ...Roles_tableConfig,
-                                                initialData: rolesData,
-                                                currentUser: currentUser, // Pass current user context for API calls
-                                                onAction: (
-                                                    action: string,
-                                                    item: any,
-                                                ) => {
-                                                    if (
-                                                        action ===
-                                                        'configureScope'
-                                                    ) {
-                                                        setSelectedRole(item);
-                                                        setActivePanel('scope');
-                                                    }
-                                                },
-                                                customRenderers: {},
-                                            } as any
-                                        }
-                                    />
+                                    <div
+                                        className='transform -rotate-90 whitespace-nowrap cursor-pointer h-full flex items-center justify-center'
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePanelClick('roles');
+                                        }}
+                                        style={{pointerEvents: 'auto'}}
+                                    >
+                                        <div className='flex items-center space-x-2'>
+                                            {panels[1].icon}
+                                            <span className='font-semibold'>
+                                                Assign Roles
+                                            </span>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        )}
-                    </motion.div>
+
+                            {/* Content */}
+                            {activePanel === 'roles' && (
+                                <div className='h-full overflow-hidden'>
+                                    {loading ? (
+                                        <div className='flex items-center justify-center h-full'>
+                                            <div className='text-gray-500'>
+                                                Loading roles...
+                                            </div>
+                                        </div>
+                                    ) : error ? (
+                                        <div className='flex items-center justify-center h-full'>
+                                            <div className='text-red-500'>
+                                                Error: {error}
+                                                <button
+                                                    onClick={fetchRoles}
+                                                    className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
+                                                >
+                                                    Retry
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className='h-full flex flex-col'>
+                                            <div className='flex-1 overflow-auto'>
+                                                <ReusableTableComponent
+                                                    config={
+                                                        {
+                                                            ...Roles_tableConfig,
+                                                            initialData:
+                                                                rolesData,
+                                                            currentUser:
+                                                                currentUser, // Pass current user context for API calls
+                                                            externalSelectedItems:
+                                                                selectedRoles,
+                                                            onSelectionChange:
+                                                                setSelectedRoles,
+                                                            onAction: (
+                                                                action: string,
+                                                                item: any,
+                                                            ) => {
+                                                                console.log(
+                                                                    '🔧 onAction called with:',
+                                                                    action,
+                                                                    item,
+                                                                );
+                                                                if (
+                                                                    action ===
+                                                                    'configureScope'
+                                                                ) {
+                                                                    console.log(
+                                                                        '🎯 Scope configuration triggered for role:',
+                                                                        item,
+                                                                    );
+                                                                    handleRoleSelect(
+                                                                        item,
+                                                                    );
+                                                                }
+                                                            },
+                                                            customRenderers: {},
+                                                        } as any
+                                                    }
+                                                />
+                                            </div>
+
+                                            {/* Role Assignment Actions - Fixed at bottom */}
+                                            {selectedRoles.size > 0 && (
+                                                <div
+                                                    className='border-t border-gray-200 p-4 bg-green-50 flex-shrink-0'
+                                                    style={{zIndex: 100}}
+                                                >
+                                                    <div className='flex items-center justify-between'>
+                                                        <div className='text-sm text-gray-600'>
+                                                            {selectedRoles.size}{' '}
+                                                            role
+                                                            {selectedRoles.size !==
+                                                            1
+                                                                ? 's'
+                                                                : ''}{' '}
+                                                            selected
+                                                        </div>
+                                                        <div className='flex items-center gap-3'>
+                                                            <button
+                                                                onClick={() =>
+                                                                    setSelectedRoles(
+                                                                        new Set(),
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    selectedRoles.size ===
+                                                                    0
+                                                                }
+                                                                className='px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed'
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (
+                                                                        selectedRoles.size ===
+                                                                        0
+                                                                    ) {
+                                                                        alert(
+                                                                            'Please select at least one role to assign.',
+                                                                        );
+                                                                        return;
+                                                                    }
+
+                                                                    try {
+                                                                        await handleAssignRoles();
+                                                                    } catch (error) {
+                                                                        console.error(
+                                                                            'Role assignment failed:',
+                                                                            error,
+                                                                        );
+                                                                        alert(
+                                                                            'Failed to assign roles. Please try again.',
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                disabled={
+                                                                    selectedRoles.size ===
+                                                                        0 ||
+                                                                    roleAssignmentLoading
+                                                                }
+                                                                className='px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border-2 border-green-800'
+                                                            >
+                                                                {roleAssignmentLoading ? (
+                                                                    <span className='flex items-center gap-2'>
+                                                                        <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+                                                                        Assigning...
+                                                                    </span>
+                                                                ) : (
+                                                                    `Assign ${
+                                                                        selectedRoles.size
+                                                                    } Role${
+                                                                        selectedRoles.size !==
+                                                                        1
+                                                                            ? 's'
+                                                                            : ''
+                                                                    }`
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Role Assignment Actions */}
+                                            {selectedRoles.size > 0 && (
+                                                <div
+                                                    className='border-t border-gray-200 p-4 bg-green-50'
+                                                    style={{
+                                                        zIndex: 100,
+                                                        position: 'relative',
+                                                    }}
+                                                >
+                                                    <div className='flex items-center justify-between'>
+                                                        <div className='text-sm text-gray-600'>
+                                                            {selectedRoles.size}{' '}
+                                                            role
+                                                            {selectedRoles.size !==
+                                                            1
+                                                                ? 's'
+                                                                : ''}{' '}
+                                                            selected
+                                                        </div>
+                                                        <div className='flex items-center gap-3'>
+                                                            <button
+                                                                onClick={() =>
+                                                                    setSelectedRoles(
+                                                                        new Set(),
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    selectedRoles.size ===
+                                                                    0
+                                                                }
+                                                                className='px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed'
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (
+                                                                        selectedRoles.size ===
+                                                                        0
+                                                                    ) {
+                                                                        alert(
+                                                                            'Please select at least one role to assign.',
+                                                                        );
+                                                                        return;
+                                                                    }
+
+                                                                    try {
+                                                                        await handleAssignRoles();
+                                                                    } catch (error) {
+                                                                        console.error(
+                                                                            'Role assignment failed:',
+                                                                            error,
+                                                                        );
+                                                                        alert(
+                                                                            'Failed to assign roles. Please try again.',
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                disabled={
+                                                                    selectedRoles.size ===
+                                                                        0 ||
+                                                                    roleAssignmentLoading
+                                                                }
+                                                                className='px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border-2 border-green-800'
+                                                            >
+                                                                {roleAssignmentLoading ? (
+                                                                    <span className='flex items-center gap-2'>
+                                                                        <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+                                                                        Assigning...
+                                                                    </span>
+                                                                ) : (
+                                                                    `Assign ${
+                                                                        selectedRoles.size
+                                                                    } Role${
+                                                                        selectedRoles.size !==
+                                                                        1
+                                                                            ? 's'
+                                                                            : ''
+                                                                    }`
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
 
                     {/* Panel 3 - Scope */}
-                    <motion.div
-                        className={`h-full overflow-hidden ${
-                            activePanel === 'scope' ? 'bg-white' : 'bg-gray-50'
-                        }`}
-                        animate={{
-                            width: activePanel === 'scope' ? '90%' : '5%',
-                        }}
-                        transition={{duration: 0.3, ease: 'easeInOut'}}
-                    >
-                        {/* Header */}
-                        <div
-                            className={`bg-gradient-to-r ${
-                                panels[2].headerGradient
-                            } text-white p-4 cursor-pointer ${
-                                activePanel !== 'scope'
-                                    ? 'h-full flex items-center justify-center'
-                                    : ''
+                    {visiblePanels.has('scope') && (
+                        <motion.div
+                            className={`h-full overflow-hidden ${
+                                activePanel === 'scope'
+                                    ? 'bg-white'
+                                    : 'bg-gray-50'
                             }`}
-                            onClick={() => setActivePanel('scope')}
+                            animate={{
+                                width: activePanel === 'scope' ? '100%' : '5%',
+                            }}
+                            transition={{duration: 0.3, ease: 'easeInOut'}}
                         >
-                            {activePanel === 'scope' ? (
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center space-x-3'>
-                                        {panels[2].icon}
-                                        <div>
-                                            <h3 className='text-lg font-semibold'>
-                                                {panels[2].title}
-                                            </h3>
-                                            <p className='text-sm opacity-90'>
-                                                {panels[2].subtitle}
-                                            </p>
+                            {/* Header */}
+                            <div
+                                className={`bg-gradient-to-r ${
+                                    panels[2].headerGradient
+                                } text-white p-4 cursor-pointer ${
+                                    activePanel !== 'scope'
+                                        ? 'h-full flex items-center justify-center'
+                                        : ''
+                                }`}
+                                onClick={() => handlePanelClick('scope')}
+                            >
+                                {activePanel === 'scope' ? (
+                                    <div className='flex items-center justify-between'>
+                                        <div className='flex items-center space-x-3'>
+                                            {panels[2].icon}
+                                            <div>
+                                                <h3 className='text-lg font-semibold'>
+                                                    {panels[2].title}
+                                                </h3>
+                                                <p className='text-sm opacity-90'>
+                                                    {panels[2].subtitle}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    {selectedRole && (
-                                        <span className='px-3 py-1 bg-white/20 rounded-full text-sm font-medium'>
-                                            Role: {selectedRole.name}
-                                        </span>
-                                    )}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onClose();
-                                        }}
-                                        className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                    >
-                                        <XMarkIcon className='w-5 h-5' />
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className='transform -rotate-90 whitespace-nowrap'>
-                                    <div className='flex items-center space-x-2'>
-                                        {panels[2].icon}
-                                        <span className='font-semibold'>
-                                            Configure Scope
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Content */}
-                        {activePanel === 'scope' && (
-                            <div className='h-full overflow-hidden'>
-                                {loading ? (
-                                    <div className='flex items-center justify-center h-full'>
-                                        <div className='text-gray-500'>
-                                            Loading scope configuration...
-                                        </div>
-                                    </div>
-                                ) : error ? (
-                                    <div className='flex items-center justify-center h-full'>
-                                        <div className='text-red-500'>
-                                            Error: {error}
-                                            <button
-                                                onClick={fetchScopeConfig}
-                                                className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
-                                            >
-                                                Retry
-                                            </button>
-                                        </div>
+                                        {selectedRole && (
+                                            <span className='px-3 py-1 bg-white/20 rounded-full text-sm font-medium'>
+                                                Role: {selectedRole.name}
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onClose();
+                                            }}
+                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                        >
+                                            <XMarkIcon className='w-5 h-5' />
+                                        </button>
                                     </div>
                                 ) : (
-                                    <ScopeConfigSlidingPanel
-                                        isOpen={true}
-                                        onClose={() => setActivePanel('roles')}
-                                        roleName={
-                                            selectedRole?.roleName ||
-                                            'Selected Role'
-                                        }
-                                        roleDescription={
-                                            selectedRole?.description ||
-                                            'Configure permissions for this role'
-                                        }
-                                        currentScope={selectedRole?.scope}
-                                        onSave={(scopeConfig) => {
-                                            console.log(
-                                                'Scope configuration saved:',
-                                                scopeConfig,
-                                            );
-                                            // Handle scope save logic here
-                                            setActivePanel('roles');
+                                    <div
+                                        className='transform -rotate-90 whitespace-nowrap cursor-pointer h-full flex items-center justify-center'
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePanelClick('scope');
                                         }}
-                                    />
+                                        style={{pointerEvents: 'auto'}}
+                                    >
+                                        <div className='flex items-center space-x-2'>
+                                            {panels[2].icon}
+                                            <span className='font-semibold'>
+                                                Configure Scope
+                                            </span>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        )}
-                    </motion.div>
-                </motion.div>
+
+                            {/* Content */}
+                            {activePanel === 'scope' && (
+                                <div className='h-full overflow-hidden'>
+                                    {loading ? (
+                                        <div className='flex items-center justify-center h-full'>
+                                            <div className='text-gray-500'>
+                                                Loading scope configuration...
+                                            </div>
+                                        </div>
+                                    ) : error ? (
+                                        <div className='flex items-center justify-center h-full'>
+                                            <div className='text-red-500'>
+                                                Error: {error}
+                                                <button
+                                                    onClick={fetchScopeConfig}
+                                                    className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
+                                                >
+                                                    Retry
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <ScopeConfigSlidingPanel
+                                            isOpen={true}
+                                            onClose={() =>
+                                                setActivePanel('roles')
+                                            }
+                                            roleId={
+                                                selectedRole?.id ||
+                                                selectedRole?.roleId ||
+                                                ''
+                                            }
+                                            roleName={
+                                                selectedRole?.roleName ||
+                                                selectedRole?.name ||
+                                                'Selected Role'
+                                            }
+                                            roleDescription={
+                                                selectedRole?.description ||
+                                                'Configure permissions for this role'
+                                            }
+                                            currentScope={selectedRole?.scope}
+                                            onSave={async (scopeConfig) => {
+                                                console.log(
+                                                    'Scope configuration saved:',
+                                                    scopeConfig,
+                                                );
+                                                // Refresh roles data to update scope configuration status
+                                                await fetchRoles();
+                                                setActivePanel('roles');
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+                </div>
             </motion.div>
         </AnimatePresence>
     );

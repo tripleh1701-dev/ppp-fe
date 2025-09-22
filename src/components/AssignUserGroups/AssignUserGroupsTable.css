@@ -1262,6 +1262,9 @@ div.embedded-content-area div.table-container table.advanced-table tbody tr {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
 }
 
 .roles-link-btn:hover {
@@ -1389,11 +1392,13 @@ div.embedded-content-area div.table-container table.advanced-table tbody tr {
     display: flex;
     align-items: center;
     justify-content: center;
+    pointer-events: none;
 }
 
 .roles-icon {
     color: #3b82f6;
     transition: all 0.2s ease;
+    pointer-events: none;
 }
 
 .roles-link-btn:hover .roles-icon {

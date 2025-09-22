@@ -106,7 +106,7 @@ const AssignUserGroupsTable = ({
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 8,
+                distance: 15, // Increased distance to make it less sensitive
             },
         }),
         useSensor(KeyboardSensor),
@@ -618,14 +618,13 @@ const AssignUserGroupsTable = ({
         return (
             <tr
                 ref={setNodeRef}
-                style={style}
+                style={{...style, pointerEvents: 'auto'}}
                 className={`sortable-row ${item.selected ? 'selected' : ''} ${
                     isDragging ? 'dragging' : ''
                 }`}
-                {...attributes}
             >
                 {children}
-                <td className='drag-handle' {...listeners}>
+                <td className='drag-handle' {...attributes} {...listeners}>
                     <svg width='12' height='12' viewBox='0 0 24 24' fill='none'>
                         <path
                             d='M8 6H16M8 12H16M8 18H16'
@@ -749,9 +748,37 @@ const AssignUserGroupsTable = ({
             case 'roles':
                 return (
                     <button
+                        type='button'
                         className='roles-link-btn'
-                        onClick={() => handleRoleNavigation(item.id)}
+                        onClick={(e) => {
+                            console.log('🔴 Role button clicked!', item.id);
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleRoleNavigation(item.id);
+                        }}
+                        onMouseDown={(e) => {
+                            console.log('🔴 Mouse down on role button');
+                            e.stopPropagation();
+                        }}
+                        onPointerDown={(e) => {
+                            console.log('🔴 Pointer down on role button');
+                            e.stopPropagation();
+                        }}
+                        onTouchStart={(e) => {
+                            console.log('🔴 Touch start on role button');
+                            e.stopPropagation();
+                        }}
+                        style={{
+                            pointerEvents: 'auto',
+                            zIndex: 15,
+                            position: 'relative',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                        }}
                         title={`Assign roles to ${item.group || 'this group'}`}
+                        aria-label={`Assign roles to ${
+                            item.group || 'this group'
+                        }`}
                     >
                         <div className='roles-icon-container'>
                             <svg
@@ -1381,6 +1408,35 @@ const AssignUserGroupsTable = ({
                                                                         item.id,
                                                                         column.id,
                                                                     )
+                                                                }
+                                                                onMouseDown={(
+                                                                    e,
+                                                                ) => {
+                                                                    if (
+                                                                        column.id ===
+                                                                        'roles'
+                                                                    ) {
+                                                                        e.stopPropagation();
+                                                                    }
+                                                                }}
+                                                                onPointerDown={(
+                                                                    e,
+                                                                ) => {
+                                                                    if (
+                                                                        column.id ===
+                                                                        'roles'
+                                                                    ) {
+                                                                        e.stopPropagation();
+                                                                    }
+                                                                }}
+                                                                style={
+                                                                    column.id ===
+                                                                    'roles'
+                                                                        ? {
+                                                                              pointerEvents:
+                                                                                  'auto',
+                                                                          }
+                                                                        : {}
                                                                 }
                                                             >
                                                                 {renderCellContent(

@@ -6,6 +6,7 @@ import './ScopeConfigSlidingPanel.css';
 interface ScopeConfigSlidingPanelProps {
     isOpen: boolean;
     onClose: () => void;
+    roleId: string;
     roleName: string;
     roleDescription: string;
     currentScope?: any;
@@ -15,6 +16,7 @@ interface ScopeConfigSlidingPanelProps {
 const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
     isOpen,
     onClose,
+    roleId,
     roleName,
     roleDescription,
     currentScope,
@@ -179,14 +181,160 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
         });
     };
 
-    const handleSave = () => {
-        onSave({
-            category: selectedCategory,
-            permissions,
-            configuredAt: new Date().toISOString(),
-        });
-        onClose();
+    const handleSave = async () => {
+        try {
+            console.log('🔄 Saving scope configuration for role:', roleId);
+
+            // Transform permissions data for the API
+            const scopeConfigData: any = {
+                accountSettings: [],
+                accessControl: [],
+                securityGovernance: [],
+                pipelines: [],
+                builds: [],
+                configured: true,
+                createdAt: new Date().toISOString(),
+            };
+
+            // Map permissions to scope configuration structure
+            Object.entries(permissions).forEach(
+                ([categoryKey, categoryPermissions]) => {
+                    const permissionObjects = categoryPermissions.map(
+                        (permission) => ({
+                            resource: permission,
+                            view: true, // You can customize this based on actual permission types
+                            create: false,
+                            edit: false,
+                            delete: false,
+                        }),
+                    );
+
+                    switch (categoryKey) {
+                        case 'account-settings':
+                            scopeConfigData.accountSettings = permissionObjects;
+                            break;
+                        case 'access-control':
+                            scopeConfigData.accessControl = permissionObjects;
+                            break;
+                        case 'security-governance':
+                            scopeConfigData.securityGovernance =
+                                permissionObjects;
+                            break;
+                        case 'pipelines':
+                            scopeConfigData.pipelines = permissionObjects;
+                            break;
+                        case 'builds':
+                            scopeConfigData.builds = permissionObjects;
+                            break;
+                    }
+                },
+            );
+
+            // Make API call to save scope configuration
+            const response = await fetch(
+                `http://localhost:4000/api/roles/${roleId}/scope`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(scopeConfigData),
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to save scope configuration: ${response.status}`,
+                );
+            }
+
+            const result = await response.json();
+            console.log('✅ Scope configuration saved successfully:', result);
+
+            // Call the original onSave callback
+            onSave({
+                category: selectedCategory,
+                permissions,
+                configuredAt: new Date().toISOString(),
+                saved: true,
+            });
+
+            onClose();
+        } catch (error) {
+            console.error('❌ Error saving scope configuration:', error);
+            alert('Error saving scope configuration. Please try again.');
+        }
     };
+
+    // Fetch existing scope configuration when component opens
+    useEffect(() => {
+        const fetchScopeConfig = async () => {
+            if (isOpen && roleId) {
+                try {
+                    console.log(
+                        '🔄 Fetching scope configuration for role:',
+                        roleId,
+                    );
+                    const response = await fetch(
+                        `http://localhost:4000/api/roles/${roleId}/scope`,
+                    );
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('✅ Scope configuration loaded:', data);
+
+                        // Transform the loaded data back to permissions format
+                        const loadedPermissions: any = {};
+
+                        // Process each category
+                        Object.entries(data).forEach(
+                            ([categoryKey, categoryData]: [string, any]) => {
+                                if (Array.isArray(categoryData)) {
+                                    categoryData.forEach((item: any) => {
+                                        if (item.resource) {
+                                            const permissionTypes = [];
+                                            if (item.view)
+                                                permissionTypes.push('View');
+                                            if (item.create)
+                                                permissionTypes.push('Create');
+                                            if (item.edit)
+                                                permissionTypes.push('Edit');
+                                            if (item.delete)
+                                                permissionTypes.push('Delete');
+
+                                            loadedPermissions[item.resource] =
+                                                permissionTypes;
+                                        }
+                                    });
+                                }
+                            },
+                        );
+
+                        console.log(
+                            '🔄 Transformed permissions:',
+                            loadedPermissions,
+                        );
+                        setPermissions(loadedPermissions);
+                    } else {
+                        console.log(
+                            'ℹ️ No existing scope configuration found for this role',
+                        );
+                        // Reset permissions if no config found
+                        setPermissions({});
+                    }
+                } catch (error) {
+                    console.error(
+                        '❌ Error fetching scope configuration:',
+                        error,
+                    );
+                    // Reset permissions on error
+                    setPermissions({});
+                }
+            }
+        };
+
+        fetchScopeConfig();
+    }, [isOpen, roleId]);
 
     // Set up global callback for communication with parent
     useEffect(() => {
@@ -288,11 +436,11 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
 
                 <div className='flex flex-1 overflow-hidden'>
                     {/* Left Sidebar - Module Tiles */}
-                    <div className='w-80 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 overflow-y-auto p-6'>
-                        <h3 className='text-lg font-semibold text-gray-800 mb-6 text-center'>
+                    <div className='w-64 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 overflow-y-auto p-4'>
+                        <h3 className='text-lg font-semibold text-gray-800 mb-4 text-center'>
                             System Modules
                         </h3>
-                        <div className='grid grid-cols-1 gap-3'>
+                        <div className='grid grid-cols-1 gap-2'>
                             {categories.map((category, index) => (
                                 <div
                                     key={category.id}
@@ -314,23 +462,23 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                             });
                                         }
                                     }}
-                                    className={`group p-4 rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg animate-slideInLeft ${
+                                    className={`group px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 animate-slideInLeft ${
                                         selectedCategory === category.id
-                                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-md'
+                                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 shadow-sm'
                                             : 'bg-white hover:bg-gray-50 border border-gray-200 hover:border-blue-100'
                                     }`}
-                                    style={{animationDelay: `${index * 100}ms`}}
+                                    style={{animationDelay: `${index * 50}ms`}}
                                 >
-                                    <div className='flex flex-col items-center text-center space-y-3'>
+                                    <div className='flex items-center space-x-3'>
                                         <div
-                                            className={`p-3 rounded-full transition-all duration-300 group-hover:scale-110 ${
+                                            className={`p-1.5 rounded-md transition-all duration-200 group-hover:scale-110 group-hover:rotate-3 transform ${
                                                 selectedCategory === category.id
-                                                    ? 'bg-blue-100 shadow-sm'
+                                                    ? 'bg-blue-100 scale-105'
                                                     : 'bg-gray-100 group-hover:bg-blue-50'
                                             }`}
                                         >
                                             <div
-                                                className={`transition-colors duration-300 ${
+                                                className={`transition-all duration-200 group-hover:scale-110 transform ${
                                                     selectedCategory ===
                                                     category.id
                                                         ? 'text-blue-600'
@@ -341,7 +489,7 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                             </div>
                                         </div>
                                         <span
-                                            className={`font-medium text-sm transition-colors duration-300 ${
+                                            className={`font-medium text-sm transition-colors duration-200 ${
                                                 selectedCategory === category.id
                                                     ? 'text-blue-700'
                                                     : 'text-gray-700 group-hover:text-blue-600'
@@ -372,58 +520,58 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                             </div>
 
                             {/* All Categories - Vertical Layout */}
-                            <div className='space-y-6 max-w-5xl mx-auto'>
+                            <div className='space-y-3 max-w-5xl mx-auto'>
                                 {categories.map((category, index) => (
                                     <div
                                         key={category.id}
                                         id={`category-${category.id}`}
-                                        className='animate-slideInUp'
+                                        className='animate-slideInUp transform hover:scale-[1.01] transition-all duration-300'
                                         style={{
-                                            animationDelay: `${index * 150}ms`,
+                                            animationDelay: `${index * 100}ms`,
                                         }}
                                     >
                                         <div
-                                            className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden transition-all duration-500 hover:shadow-md ${
+                                            className={`bg-white rounded-lg shadow-sm border overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-blue-200 ${
                                                 selectedCategory === category.id
-                                                    ? 'border-blue-300 shadow-lg ring-2 ring-blue-100'
-                                                    : 'border-gray-200 hover:border-gray-300'
+                                                    ? 'border-blue-300 shadow-md ring-1 ring-blue-100'
+                                                    : 'border-gray-200'
                                             }`}
                                         >
                                             {/* Category Header */}
                                             <div
-                                                className={`px-6 py-4 border-b transition-all duration-300 ${
+                                                className={`px-4 py-2.5 border-b transition-all duration-300 ${
                                                     selectedCategory ===
                                                     category.id
                                                         ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
-                                                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                                        : 'bg-gray-50 border-gray-200 hover:bg-blue-25'
                                                 }`}
                                             >
-                                                <div className='flex items-center gap-3'>
+                                                <div className='flex items-center gap-2.5'>
                                                     <div
-                                                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 hover:rotate-3 ${
                                                             selectedCategory ===
                                                             category.id
-                                                                ? 'bg-blue-100 shadow-sm'
-                                                                : 'bg-gray-100 group-hover:bg-blue-50'
+                                                                ? 'bg-blue-100 shadow-sm scale-105'
+                                                                : 'bg-gray-100 hover:bg-blue-50'
                                                         }`}
                                                     >
                                                         <div
-                                                            className={`transition-colors duration-300 ${
+                                                            className={`transition-all duration-300 text-sm ${
                                                                 selectedCategory ===
                                                                 category.id
                                                                     ? 'text-blue-600'
-                                                                    : 'text-gray-600'
+                                                                    : 'text-gray-600 hover:text-blue-500'
                                                             }`}
                                                         >
                                                             {category.icon}
                                                         </div>
                                                     </div>
                                                     <h4
-                                                        className={`text-lg font-semibold transition-colors duration-300 ${
+                                                        className={`text-base font-semibold transition-colors duration-300 ${
                                                             selectedCategory ===
                                                             category.id
                                                                 ? 'text-blue-800'
-                                                                : 'text-gray-800'
+                                                                : 'text-gray-800 hover:text-blue-700'
                                                         }`}
                                                     >
                                                         {category.name}
@@ -432,25 +580,25 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                             </div>
 
                                             {/* Feature Items List */}
-                                            <div className='divide-y divide-gray-100'>
+                                            <div className='divide-y divide-gray-50'>
                                                 {category.items.map(
                                                     (item, itemIndex) => (
                                                         <div
                                                             key={item.id}
-                                                            className='px-6 py-5 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 group'
+                                                            className='px-4 py-3 hover:bg-gradient-to-r hover:from-gray-25 hover:to-blue-25 transition-all duration-200 group transform hover:scale-[1.005] hover:shadow-sm'
                                                             style={{
                                                                 animationDelay: `${
                                                                     index *
-                                                                        150 +
+                                                                        100 +
                                                                     itemIndex *
-                                                                        50
+                                                                        30
                                                                 }ms`,
                                                             }}
                                                         >
                                                             <div className='flex items-center justify-between'>
                                                                 {/* Feature Name */}
                                                                 <div className='flex-1'>
-                                                                    <h5 className='text-base font-medium text-gray-800 mb-1 group-hover:text-gray-900 transition-colors duration-300'>
+                                                                    <h5 className='text-sm font-medium text-gray-800 group-hover:text-gray-900 transition-all duration-200'>
                                                                         {
                                                                             item.name
                                                                         }
@@ -458,7 +606,7 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                                                 </div>
 
                                                                 {/* Permission Checkboxes */}
-                                                                <div className='flex items-center gap-8'>
+                                                                <div className='flex items-center gap-6'>
                                                                     {permissionTypes.map(
                                                                         (
                                                                             type,
@@ -468,19 +616,19 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                                                                 key={
                                                                                     type
                                                                                 }
-                                                                                className='flex flex-col items-center gap-2 animate-fadeIn'
+                                                                                className='flex flex-col items-center gap-1.5 animate-fadeIn transform hover:scale-105 transition-all duration-200'
                                                                                 style={{
                                                                                     animationDelay: `${
                                                                                         index *
-                                                                                            150 +
+                                                                                            100 +
                                                                                         itemIndex *
-                                                                                            50 +
+                                                                                            30 +
                                                                                         typeIndex *
-                                                                                            25
+                                                                                            20
                                                                                     }ms`,
                                                                                 }}
                                                                             >
-                                                                                <span className='text-sm font-medium text-gray-600 group-hover:text-gray-700 transition-colors duration-300'>
+                                                                                <span className='text-xs font-medium text-gray-600 group-hover:text-gray-700 transition-colors duration-200'>
                                                                                     {
                                                                                         type
                                                                                     }
@@ -488,7 +636,7 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                                                                 <label className='cursor-pointer relative group/checkbox'>
                                                                                     <input
                                                                                         type='checkbox'
-                                                                                        className='w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-300 hover:border-blue-400 hover:scale-110'
+                                                                                        className='w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-1 transition-all duration-200 hover:border-blue-400 hover:scale-110 hover:shadow-sm'
                                                                                         checked={
                                                                                             permissions[
                                                                                                 item

@@ -392,9 +392,15 @@ const renderMainTableColumnCell = (
                     onPointerDown={(e) => e.stopPropagation()}
                     title={column.actionText || 'Configure'}
                 >
-                    {column.icon && (
+                    {column.dynamicIcon && column.iconRenderer ? (
+                        <span
+                            dangerouslySetInnerHTML={{
+                                __html: column.iconRenderer(item),
+                            }}
+                        />
+                    ) : column.icon ? (
                         <span dangerouslySetInnerHTML={{__html: column.icon}} />
-                    )}
+                    ) : null}
                     {column.actionText && <span>{column.actionText}</span>}
                 </button>
             );
@@ -1151,6 +1157,8 @@ const ReusableTableComponent = ({config = null}) => {
         searchTerm,
         groupBy,
         customHeaderRenderer,
+        onSelectionChange, // External selection callback
+        externalSelectedItems, // External selection state
     } = configToUse;
 
     // State declarations
@@ -1255,7 +1263,12 @@ const ReusableTableComponent = ({config = null}) => {
 
     const [expanded, setExpanded] = useState(new Set());
     const [newSubitemNameByItem, setNewSubitemNameByItem] = useState({});
-    const [selectedItems, setSelectedItems] = useState(new Set());
+    // Use external selection state if provided, otherwise use internal state
+    const [internalSelectedItems, setInternalSelectedItems] = useState(
+        new Set(),
+    );
+    const selectedItems = externalSelectedItems || internalSelectedItems;
+    const setSelectedItems = onSelectionChange || setInternalSelectedItems;
     const [selectAll, setSelectAll] = useState(false);
     const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
 
