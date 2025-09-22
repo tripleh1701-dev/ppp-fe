@@ -306,7 +306,18 @@ export class AccessControlApiService {
      * Bulk delete users
      */
     async bulkDeleteUsers(userIds: string[]): Promise<void> {
-        await api.del('/api/users/bulk', {body: JSON.stringify({userIds})});
+        await fetch(
+            `${
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000'
+            }/api/users/bulk`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({userIds}),
+            },
+        );
     }
 
     // ========================================

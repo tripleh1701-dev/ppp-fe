@@ -3019,7 +3019,7 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            groupIds: groupIds, // This will be stored as integer[] in acme.fnd_users.assigned_user_group
+                            groupIds: groupIds, // This will be stored as integer[] in Systiva.fnd_users.assigned_user_group
                             userId: userIdInt,
                         }),
                     },

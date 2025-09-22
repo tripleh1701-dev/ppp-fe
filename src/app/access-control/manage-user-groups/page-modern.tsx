@@ -233,7 +233,7 @@ export default function ModernManageUserGroups() {
                                 >
                                     <span className='inline-flex items-center gap-1'>
                                         <CogIcon className='h-4 w-4' />
-                                        acme Corporation
+                                        Systiva Corporation
                                     </span>
                                     <span className='w-1 h-1 bg-slate-300 rounded-full'></span>
                                     <span className='inline-flex items-center gap-1'>
