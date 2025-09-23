@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Reorder, motion, AnimatePresence} from 'framer-motion';
+import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
     ArrowDown,
@@ -2250,6 +2250,7 @@ interface AccountsTableProps {
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
+    enableInlineEditing?: boolean;
     incompleteRowIds?: string[];
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
@@ -2614,20 +2615,98 @@ function SortableAccountRow({
                     if (rowEl) {
                         const rect = rowEl.getBoundingClientRect();
                         const proxy = rowEl.cloneNode(true) as HTMLElement;
+
+                        // Simple squeezed drag image
                         proxy.style.position = 'fixed';
                         proxy.style.top = `${rect.top}px`;
                         proxy.style.left = `${rect.left}px`;
-                        proxy.style.width = `${rect.width}px`;
-                        proxy.style.maxWidth = `${rect.width}px`;
                         proxy.style.pointerEvents = 'none';
-                        proxy.style.background = 'white';
-                        proxy.style.border = '1px solid rgba(148,163,184,0.6)';
-                        proxy.style.boxShadow =
-                            '0 16px 40px rgba(15,23,42,0.2)';
-                        proxy.style.borderRadius = '8px';
                         proxy.style.zIndex = '9999';
+
+                        // Squeeze effect - compress horizontally to 70% width
+                        proxy.style.width = `${rect.width * 0.7}px`;
+                        proxy.style.height = `${rect.height}px`;
+                        proxy.style.overflow = 'hidden';
+                        proxy.style.transform = 'scaleX(0.7)';
+
+                        // Clean visual styling
+                        proxy.style.background = '#ffffff';
+                        proxy.style.border =
+                            '2px solid rgba(59, 130, 246, 0.6)';
+                        proxy.style.boxShadow =
+                            '0 8px 25px rgba(0, 0, 0, 0.15)';
+                        proxy.style.borderRadius = '8px';
+                        proxy.style.opacity = '0.9';
+
+                        // Simple squeeze animation
+                        proxy.classList.add('drag-squeezed-row');
+                        proxy.style.animation =
+                            'dragSqueeze 0.3s ease-out forwards';
+
+                        // Apply compression transforms to child elements
+                        const cells = proxy.querySelectorAll(
+                            'div[style*="grid-column"]',
+                        );
+                        cells.forEach((cell: Element, cellIndex: number) => {
+                            const cellEl = cell as HTMLElement;
+                            cellEl.style.transform = 'scale(0.95)';
+                            // Show first 3 columns normally, add ellipsis indicator for hidden content
+                            if (cellIndex > 2) {
+                                cellEl.style.opacity = '0.3';
+                                cellEl.style.filter = 'blur(1px)';
+                            } else {
+                                cellEl.style.opacity = '1';
+                            }
+                            cellEl.style.transition = 'all 0.2s ease-out';
+                        });
+
+                        // Add visual indicator for hidden columns
+                        if (cells.length > 3) {
+                            const hiddenIndicator =
+                                document.createElement('div');
+                            hiddenIndicator.style.cssText = `
+                                position: absolute;
+                                top: 50%;
+                                right: 30px;
+                                transform: translateY(-50%);
+                                background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.8) 20%, rgba(59, 130, 246, 1) 100%);
+                                color: white;
+                                font-size: 11px;
+                                padding: 3px 8px;
+                                border-radius: 12px;
+                                font-weight: 700;
+                                z-index: 15;
+                                box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            `;
+                            hiddenIndicator.innerHTML = `
+                                <span style="font-size: 8px;">●●●</span>
+                                <span>+${cells.length - 3} more</span>
+                            `;
+                            proxy.appendChild(hiddenIndicator);
+                        }
+
+                        // Pulsing effect is now part of the combined animation above
+
+                        // Add row selection border effect
+                        const selectionBorder = document.createElement('div');
+                        selectionBorder.style.cssText = `
+                            position: absolute;
+                            inset: -2px;
+                            background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
+                            border-radius: 14px;
+                            z-index: -1;
+                            animation: selectionGlow 2s ease-in-out infinite;
+                        `;
+                        proxy.appendChild(selectionBorder);
+
+                        // Remove text badges - keep only visual effects
+
                         document.body.appendChild(proxy);
                         e.dataTransfer.setDragImage(proxy, 12, 12);
+
                         const cleanup = () => {
                             try {
                                 document.body.removeChild(proxy);
@@ -2660,11 +2739,11 @@ function SortableAccountRow({
                     : ''
             } ${
                 compressingRowId === row.id
-                    ? 'animate-pulse transform scale-x-50 opacity-75'
+                    ? 'transform scale-x-75 transition-all duration-500 ease-out'
                     : ''
             } ${
                 foldingRowId === row.id
-                    ? 'transform scale-y-0 opacity-0 transition-all duration-300'
+                    ? 'opacity-0 transform scale-y-50 transition-all duration-300'
                     : ''
             }`}
             style={{
@@ -2959,7 +3038,7 @@ function SortableAccountRow({
                                     );
                                 }}
                                 className='text-[12px]'
-                                placeholder=''
+                                placeholder='Enter Enterprise'
                                 dataAttr={`${row.id}-masterAccount`}
                                 {...createTabNavigation('masterAccount')}
                             />
@@ -2998,7 +3077,7 @@ function SortableAccountRow({
                             }
                             className='text-[12px]'
                             dataAttr={`account-${row.id}`}
-                            placeholder=''
+                            placeholder='Enter Product'
                             {...createTabNavigation('accountName')}
                         />
                     )}
@@ -3070,7 +3149,7 @@ function SortableAccountRow({
                                 })
                             }
                             className='text-[12px]'
-                            placeholder=''
+                            placeholder='Enter Services'
                             dataAttr={`${row.id}-country`}
                             {...createTabNavigation('country')}
                         />
@@ -3350,6 +3429,7 @@ export default function EnterpriseAccountsTable({
     dropdownOptions = {},
     onUpdateField,
     hideRowExpansion = false,
+    enableInlineEditing = true,
     incompleteRowIds = [],
     hasBlankRow = false,
     onDropdownOptionUpdate,

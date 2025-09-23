@@ -11,6 +11,8 @@ interface ScopeConfigSlidingPanelProps {
     roleDescription: string;
     currentScope?: any;
     onSave: (scopeConfig: any) => void;
+    triggerSave?: number;
+    hideHeader?: boolean;
 }
 
 const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
@@ -21,6 +23,8 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
     roleDescription,
     currentScope,
     onSave,
+    triggerSave,
+    hideHeader = false,
 }) => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [rightPanelRef, setRightPanelRef] = useState<HTMLDivElement | null>(
@@ -197,38 +201,58 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
             };
 
             // Map permissions to scope configuration structure
-            Object.entries(permissions).forEach(
-                ([categoryKey, categoryPermissions]) => {
-                    const permissionObjects = categoryPermissions.map(
-                        (permission) => ({
-                            resource: permission,
-                            view: true, // You can customize this based on actual permission types
-                            create: false,
-                            edit: false,
-                            delete: false,
-                        }),
-                    );
+            // permissions are structured as: { itemId: [permissionTypes] }
+            // We need to group them by category for the API
+
+            Object.entries(permissions).forEach(([itemId, permissionTypes]) => {
+                // Find which category this item belongs to
+                let categoryKey = '';
+                let itemName = '';
+
+                // Search through predefined categories to find the item
+                categories.forEach((category: any) => {
+                    category.items.forEach((item: any) => {
+                        if (item.id === itemId) {
+                            categoryKey = category.id; // Use 'id' not 'key'
+                            itemName = item.name;
+                        }
+                    });
+                });
+
+                if (categoryKey && permissionTypes.length > 0) {
+                    const permissionObject = {
+                        resource: itemName,
+                        view: permissionTypes.includes('View'),
+                        create: permissionTypes.includes('Create'),
+                        edit: permissionTypes.includes('Edit'),
+                        delete: permissionTypes.includes('Delete'),
+                    };
 
                     switch (categoryKey) {
                         case 'account-settings':
-                            scopeConfigData.accountSettings = permissionObjects;
+                            scopeConfigData.accountSettings.push(
+                                permissionObject,
+                            );
                             break;
                         case 'access-control':
-                            scopeConfigData.accessControl = permissionObjects;
+                            scopeConfigData.accessControl.push(
+                                permissionObject,
+                            );
                             break;
                         case 'security-governance':
-                            scopeConfigData.securityGovernance =
-                                permissionObjects;
+                            scopeConfigData.securityGovernance.push(
+                                permissionObject,
+                            );
                             break;
                         case 'pipelines':
-                            scopeConfigData.pipelines = permissionObjects;
+                            scopeConfigData.pipelines.push(permissionObject);
                             break;
                         case 'builds':
-                            scopeConfigData.builds = permissionObjects;
+                            scopeConfigData.builds.push(permissionObject);
                             break;
                     }
-                },
-            );
+                }
+            });
 
             // Make API call to save scope configuration
             const response = await fetch(
@@ -251,15 +275,13 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
             const result = await response.json();
             console.log('✅ Scope configuration saved successfully:', result);
 
-            // Call the original onSave callback
+            // Call the original onSave callback (parent handles navigation)
             onSave({
                 category: selectedCategory,
                 permissions,
                 configuredAt: new Date().toISOString(),
                 saved: true,
             });
-
-            onClose();
         } catch (error) {
             console.error('❌ Error saving scope configuration:', error);
             alert('Error saving scope configuration. Please try again.');
@@ -268,6 +290,9 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
 
     // Fetch existing scope configuration when component opens
     useEffect(() => {
+        // Reset mounted flag when opening with a new role
+        setHasBeenMounted(false);
+
         const fetchScopeConfig = async () => {
             if (isOpen && roleId) {
                 try {
@@ -292,28 +317,52 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                 if (Array.isArray(categoryData)) {
                                     categoryData.forEach((item: any) => {
                                         if (item.resource) {
-                                            const permissionTypes = [];
-                                            if (item.view)
-                                                permissionTypes.push('View');
-                                            if (item.create)
-                                                permissionTypes.push('Create');
-                                            if (item.edit)
-                                                permissionTypes.push('Edit');
-                                            if (item.delete)
-                                                permissionTypes.push('Delete');
+                                            // Find the item ID from predefined modules using the resource name
+                                            let itemId = '';
+                                            categories.forEach(
+                                                (category: any) => {
+                                                    category.items.forEach(
+                                                        (moduleItem: any) => {
+                                                            if (
+                                                                moduleItem.name ===
+                                                                item.resource
+                                                            ) {
+                                                                itemId =
+                                                                    moduleItem.id;
+                                                            }
+                                                        },
+                                                    );
+                                                },
+                                            );
 
-                                            loadedPermissions[item.resource] =
-                                                permissionTypes;
+                                            if (itemId) {
+                                                const permissionTypes = [];
+                                                if (item.view)
+                                                    permissionTypes.push(
+                                                        'View',
+                                                    );
+                                                if (item.create)
+                                                    permissionTypes.push(
+                                                        'Create',
+                                                    );
+                                                if (item.edit)
+                                                    permissionTypes.push(
+                                                        'Edit',
+                                                    );
+                                                if (item.delete)
+                                                    permissionTypes.push(
+                                                        'Delete',
+                                                    );
+
+                                                loadedPermissions[itemId] =
+                                                    permissionTypes;
+                                            }
                                         }
                                     });
                                 }
                             },
                         );
 
-                        console.log(
-                            '🔄 Transformed permissions:',
-                            loadedPermissions,
-                        );
                         setPermissions(loadedPermissions);
                     } else {
                         console.log(
@@ -335,6 +384,22 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
 
         fetchScopeConfig();
     }, [isOpen, roleId]);
+
+    // Track if component has been mounted to prevent auto-save on initial load
+    const [hasBeenMounted, setHasBeenMounted] = useState(false);
+
+    // Mark component as mounted after initial render
+    useEffect(() => {
+        setHasBeenMounted(true);
+    }, []);
+
+    // Trigger save when triggerSave prop changes (but only after component is mounted)
+    useEffect(() => {
+        if (triggerSave && triggerSave > 0 && hasBeenMounted) {
+            console.log('🎯 Manual trigger save detected:', triggerSave);
+            handleSave();
+        }
+    }, [triggerSave, hasBeenMounted]);
 
     // Set up global callback for communication with parent
     useEffect(() => {
@@ -363,84 +428,86 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
     return (
         <div className='h-full flex flex-col overflow-hidden'>
             <div className='h-full flex flex-col overflow-hidden'>
-                {/* Header */}
-                <div className='bg-gradient-to-r from-slate-50 to-gray-100 border-b border-gray-200 p-6 flex justify-between items-start'>
-                    <div className='flex-1'>
-                        <h2 className='text-2xl font-bold text-gray-900'>
-                            Configure Role Scope
-                        </h2>
-                        <p className='text-gray-600 mt-1'>
-                            Define permissions for:{' '}
-                            <span className='font-semibold text-blue-600'>
-                                {roleName}
-                            </span>
-                        </p>
-                        <p className='text-gray-500 text-sm mt-1'>
-                            {roleDescription}
-                        </p>
-                    </div>
+                {/* Header - conditionally rendered */}
+                {!hideHeader && (
+                    <div className='bg-gradient-to-r from-slate-50 to-gray-100 border-b border-gray-200 p-6 flex justify-between items-start'>
+                        <div className='flex-1'>
+                            <h2 className='text-2xl font-bold text-gray-900'>
+                                Configure Role Scope
+                            </h2>
+                            <p className='text-gray-600 mt-1'>
+                                Define permissions for:{' '}
+                                <span className='font-semibold text-blue-600'>
+                                    {roleName}
+                                </span>
+                            </p>
+                            <p className='text-gray-500 text-sm mt-1'>
+                                {roleDescription}
+                            </p>
+                        </div>
 
-                    {/* Action Buttons */}
-                    <div className='flex items-center gap-3 ml-6'>
-                        <button
-                            onClick={onClose}
-                            className='flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 rounded-lg transition-all duration-300 font-medium transform hover:scale-105 hover:shadow-md'
-                        >
-                            <svg
-                                width='18'
-                                height='18'
-                                viewBox='0 0 24 24'
-                                fill='none'
+                        {/* Action Buttons */}
+                        <div className='flex items-center gap-3 ml-6'>
+                            <button
+                                onClick={onClose}
+                                className='flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 rounded-lg transition-all duration-300 font-medium transform hover:scale-105 hover:shadow-md'
                             >
-                                <path
-                                    d='M19 12H5M12 19l-7-7 7-7'
-                                    stroke='currentColor'
-                                    strokeWidth='2'
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                />
-                            </svg>
-                            Back to Roles
-                        </button>
+                                <svg
+                                    width='18'
+                                    height='18'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                >
+                                    <path
+                                        d='M19 12H5M12 19l-7-7 7-7'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                    />
+                                </svg>
+                                Back to Roles
+                            </button>
 
-                        <button
-                            onClick={handleSave}
-                            className='flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-0.5'
-                        >
-                            <svg
-                                width='18'
-                                height='18'
-                                viewBox='0 0 24 24'
-                                fill='none'
+                            <button
+                                onClick={handleSave}
+                                className='flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-0.5'
                             >
-                                <path
-                                    d='M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z'
-                                    stroke='currentColor'
-                                    strokeWidth='2'
-                                />
-                                <polyline
-                                    points='17,21 17,13 7,13 7,21'
-                                    stroke='currentColor'
-                                    strokeWidth='2'
-                                />
-                                <polyline
-                                    points='7,3 7,8 15,8'
-                                    stroke='currentColor'
-                                    strokeWidth='2'
-                                />
-                            </svg>
-                            Apply Changes
-                        </button>
+                                <svg
+                                    width='18'
+                                    height='18'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                >
+                                    <path
+                                        d='M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                    />
+                                    <polyline
+                                        points='17,21 17,13 7,13 7,21'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                    />
+                                    <polyline
+                                        points='7,3 7,8 15,8'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                    />
+                                </svg>
+                                Apply Changes
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className='flex flex-1 overflow-hidden'>
                     {/* Left Sidebar - Module Tiles */}
-                    <div className='w-64 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 overflow-y-auto p-4'>
-                        <h3 className='text-lg font-semibold text-gray-800 mb-4 text-center'>
+                    <div className='w-64 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 overflow-y-auto p-2'>
+                        <h3 className='text-base font-semibold text-gray-800 mb-2 text-center'>
                             System Modules
                         </h3>
-                        <div className='grid grid-cols-1 gap-2'>
+                        <div className='grid grid-cols-1 gap-1.5'>
                             {categories.map((category, index) => (
                                 <div
                                     key={category.id}
@@ -508,19 +575,19 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                         ref={setRightPanelRef}
                         className='scope-main-content flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-white'
                     >
-                        <div className='p-6'>
-                            <div className='mb-8 text-center animate-fadeIn'>
-                                <h3 className='text-2xl font-bold text-gray-800 mb-2'>
+                        <div className='px-2 pb-2'>
+                            <div className='mb-2 text-center animate-fadeIn'>
+                                <h3 className='text-lg font-bold text-gray-800 mb-0.5'>
                                     System Permissions Configuration
                                 </h3>
-                                <p className='text-gray-600'>
+                                <p className='text-xs text-gray-600'>
                                     Configure access permissions for all system
                                     modules and features
                                 </p>
                             </div>
 
                             {/* All Categories - Vertical Layout */}
-                            <div className='space-y-3 max-w-5xl mx-auto'>
+                            <div className='space-y-2 max-w-5xl mx-auto'>
                                 {categories.map((category, index) => (
                                     <div
                                         key={category.id}
@@ -539,7 +606,7 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                         >
                                             {/* Category Header */}
                                             <div
-                                                className={`px-4 py-2.5 border-b transition-all duration-300 ${
+                                                className={`px-3 py-1.5 border-b transition-all duration-300 ${
                                                     selectedCategory ===
                                                     category.id
                                                         ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
@@ -585,7 +652,7 @@ const ScopeConfigSlidingPanel: React.FC<ScopeConfigSlidingPanelProps> = ({
                                                     (item, itemIndex) => (
                                                         <div
                                                             key={item.id}
-                                                            className='px-4 py-3 hover:bg-gradient-to-r hover:from-gray-25 hover:to-blue-25 transition-all duration-200 group transform hover:scale-[1.005] hover:shadow-sm'
+                                                            className='px-3 py-2 hover:bg-gradient-to-r hover:from-gray-25 hover:to-blue-25 transition-all duration-200 group transform hover:scale-[1.005] hover:shadow-sm'
                                                             style={{
                                                                 animationDelay: `${
                                                                     index *

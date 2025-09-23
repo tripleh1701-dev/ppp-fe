@@ -49,6 +49,12 @@ const Roles_tableConfig = {
             dynamicIcon: true, // Enable dynamic icon rendering
             iconRenderer: (item) => {
                 const hasConfig = item.hasScopeConfig;
+                console.log(
+                    '🎨 Scope icon renderer - Role:',
+                    item.name || item.roleName,
+                    'hasConfig:',
+                    hasConfig,
+                );
                 const baseClasses = 'w-5 h-5 transition-all duration-300';
                 const configuredClasses = hasConfig
                     ? 'text-green-600 hover:text-green-700 hover:scale-110 drop-shadow-sm'

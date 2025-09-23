@@ -362,7 +362,7 @@ export default function ModernManageUserGroups() {
                             <motion.button
                                 whileHover={{scale: 1.02, y: -1}}
                                 whileTap={{scale: 0.98}}
-                                className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3'
+                                className='bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3'
                             >
                                 <PlusIcon className='h-5 w-5' />
                                 Add New Group

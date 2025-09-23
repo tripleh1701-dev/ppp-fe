@@ -288,13 +288,13 @@
     overflow: hidden;
 }
 
-/* Create New User Group Button */
+/* Create New User Group Button - Standardized Blue */
 .create-group-btn {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: #3b82f6;
     color: white;
     border: none;
     border-radius: 6px;
@@ -306,7 +306,7 @@
 }
 
 .create-group-btn:hover {
-    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    background: #2563eb;
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
     transform: translateY(-1px);
 }
@@ -805,7 +805,7 @@
 }
 
 .assign-btn {
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: #3b82f6;
     color: white;
     border: none;
     padding: 6px 12px;
@@ -821,6 +821,7 @@
 }
 
 .assign-btn:hover:not(:disabled) {
+    background: #2563eb;
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }

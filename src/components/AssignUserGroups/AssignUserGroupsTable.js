@@ -775,7 +775,15 @@ const AssignUserGroupsTable = ({
                             cursor: 'pointer',
                             display: 'inline-flex',
                         }}
-                        title={`Assign roles to ${item.group || 'this group'}`}
+                        title={
+                            value > 0
+                                ? `Roles assigned to ${
+                                      item.group || 'this group'
+                                  } - click to manage`
+                                : `No roles assigned to ${
+                                      item.group || 'this group'
+                                  } - click to assign`
+                        }
                         aria-label={`Assign roles to ${
                             item.group || 'this group'
                         }`}
@@ -783,10 +791,14 @@ const AssignUserGroupsTable = ({
                         <div className='roles-icon-container'>
                             <svg
                                 className='roles-icon'
-                                width='16'
-                                height='16'
+                                width='20'
+                                height='20'
                                 viewBox='0 0 24 24'
                                 fill='none'
+                                style={{
+                                    color: value > 0 ? '#10b981' : '#9ca3af',
+                                    transition: 'all 0.3s ease',
+                                }}
                             >
                                 {/* Modern shield/security icon for roles */}
                                 <path
@@ -812,13 +824,7 @@ const AssignUserGroupsTable = ({
                                     fill='none'
                                 />
                             </svg>
-                            {value > 0 && (
-                                <span className='roles-count-badge'>
-                                    {value}
-                                </span>
-                            )}
                         </div>
-                        <span className='roles-text'>{value || 0} roles</span>
                     </button>
                 );
             default:

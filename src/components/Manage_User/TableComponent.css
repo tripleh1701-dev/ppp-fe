@@ -1050,7 +1050,7 @@
     width: 12px;
     height: 12px;
     margin-right: 4px;
-    color: #4ba3ff;
+    color: #9ca3af;
     animation: subtle-pulse 2s infinite;
 }
 
@@ -1466,15 +1466,28 @@ select option[value=''] {
     justify-content: center;
 }
 
-.unassigned-avatar {
+.initials-avatar {
     width: 100%;
     height: 100%;
-    background: #e6e9ef;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    color: #676879;
+    text-transform: uppercase;
+}
+
+.unassigned-avatar {
+    width: 100%;
+    height: 100%;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .status-dropdown {
@@ -5250,10 +5263,7 @@ textarea::placeholder {
     border-radius: 8px;
 }
 
-.usergroup-count-badge:hover .usergroup-icon {
-    color: #1d4ed8;
-    transform: scale(1.1);
-}
+/* Old hover style removed */
 
 .usergroup-icon-container {
     position: relative;
@@ -5264,42 +5274,7 @@ textarea::placeholder {
     min-width: 18px;
 }
 
-.usergroup-icon {
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-    width: 18px !important;
-    height: 18px !important;
-    display: block;
-    vertical-align: middle;
-}
-
-/* Icon states */
-.usergroup-icon.default {
-    color: #9ca3af;
-}
-
-.usergroup-icon.pending {
-    color: #6b7280;
-    position: relative;
-}
-
-/* Add warning indicator for pending icons */
-.usergroup-icon.pending:after {
-    content: '';
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: #f59e0b;
-    border: 1px solid white;
-    z-index: 5;
-}
-
-.usergroup-icon.saved {
-    color: #10b981;
-}
+/* Old usergroup-icon styles removed - replaced with usergroup-svg-icon */
 
 .usergroup-count-notification {
     position: absolute;
@@ -5348,6 +5323,184 @@ textarea::placeholder {
 .usergroup-count-notification.saved {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+/* New Clickable Icon Styles with Color Animation */
+.usergroup-clickable-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.usergroup-clickable-icon:hover {
+    background: rgba(59, 130, 246, 0.08);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* State-specific button hover backgrounds */
+.usergroup-clickable-icon.pending:hover {
+    background: rgba(245, 158, 11, 0.08);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
+.usergroup-clickable-icon.saved:hover {
+    background: rgba(16, 185, 129, 0.08);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.usergroup-clickable-icon:active {
+    transform: scale(0.95);
+}
+
+/* SVG Icon Color States with Animations */
+.usergroup-svg-icon {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Default state - subtle gray with hover encouragement */
+.usergroup-svg-icon.default {
+    color: #9ca3af;
+    opacity: 0.7;
+}
+
+.usergroup-clickable-icon.default:hover .usergroup-svg-icon {
+    color: #3b82f6;
+    opacity: 1;
+    transform: scale(1.15);
+    filter: drop-shadow(0 2px 6px rgba(59, 130, 246, 0.4));
+    animation: userGroupDefaultHover 0.5s ease-in-out;
+}
+
+/* Pending state - amber/warning with attention-grabbing pulse */
+.usergroup-svg-icon.pending {
+    color: #f59e0b;
+    animation: userGroupPendingPulse 2.5s ease-in-out infinite;
+    filter: drop-shadow(0 1px 3px rgba(245, 158, 11, 0.3));
+}
+
+.usergroup-clickable-icon.pending:hover .usergroup-svg-icon {
+    color: #d97706;
+    transform: scale(1.15);
+    filter: drop-shadow(0 3px 8px rgba(245, 158, 11, 0.5));
+    animation: userGroupPendingHover 0.6s ease-in-out;
+}
+
+/* Saved state - emerald green with success glow */
+.usergroup-svg-icon.saved {
+    color: #10b981;
+    animation: userGroupSavedGlow 4s ease-in-out infinite;
+    filter: drop-shadow(0 1px 3px rgba(16, 185, 129, 0.3));
+    opacity: 1;
+}
+
+.usergroup-clickable-icon.saved:hover .usergroup-svg-icon {
+    color: #059669;
+    transform: scale(1.15);
+    filter: drop-shadow(0 3px 8px rgba(16, 185, 129, 0.5));
+    animation: userGroupSavedHover 0.6s ease-in-out;
+}
+
+/* Enhanced Keyframe Animations for User Group Icons */
+
+/* Default state hover animation - encouraging blue pulse */
+@keyframes userGroupDefaultHover {
+    0% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 2px 6px rgba(59, 130, 246, 0.4));
+    }
+    50% {
+        transform: scale(1.2) rotate(1deg);
+        filter: drop-shadow(0 3px 8px rgba(59, 130, 246, 0.6));
+    }
+    100% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 2px 6px rgba(59, 130, 246, 0.4));
+    }
+}
+
+/* Pending state - enhanced attention-grabbing pulse */
+@keyframes userGroupPendingPulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: drop-shadow(0 1px 3px rgba(245, 158, 11, 0.3));
+    }
+    25% {
+        opacity: 0.8;
+        transform: scale(1.03);
+        filter: drop-shadow(0 2px 5px rgba(245, 158, 11, 0.4));
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.06);
+        filter: drop-shadow(0 3px 7px rgba(245, 158, 11, 0.5));
+    }
+    75% {
+        opacity: 0.8;
+        transform: scale(1.03);
+        filter: drop-shadow(0 2px 5px rgba(245, 158, 11, 0.4));
+    }
+}
+
+/* Saved state - subtle success glow */
+@keyframes userGroupSavedGlow {
+    0%,
+    100% {
+        filter: drop-shadow(0 1px 3px rgba(16, 185, 129, 0.3));
+    }
+    33% {
+        filter: drop-shadow(0 2px 5px rgba(16, 185, 129, 0.4));
+    }
+    66% {
+        filter: drop-shadow(0 3px 7px rgba(16, 185, 129, 0.5));
+    }
+}
+
+/* Pending hover - urgent wiggle effect */
+@keyframes userGroupPendingHover {
+    0% {
+        transform: scale(1.15);
+    }
+    25% {
+        transform: scale(1.18) rotate(-3deg);
+    }
+    50% {
+        transform: scale(1.2) rotate(3deg);
+    }
+    75% {
+        transform: scale(1.18) rotate(-1deg);
+    }
+    100% {
+        transform: scale(1.15);
+    }
+}
+
+/* Saved hover - celebration bounce */
+@keyframes userGroupSavedHover {
+    0% {
+        transform: scale(1.15);
+    }
+    30% {
+        transform: scale(1.2) rotate(2deg);
+    }
+    60% {
+        transform: scale(1.18) rotate(-1deg);
+    }
+    100% {
+        transform: scale(1.15);
+    }
 }
 
 @keyframes notificationPulse {
@@ -6421,8 +6574,8 @@ textarea::placeholder {
     width: 36px;
     height: 36px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border: 2px solid #f59e0b;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    border: 2px solid #d1d5db;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
@@ -6450,21 +6603,21 @@ textarea::placeholder {
 }
 
 .password-key-icon:hover {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    border-color: #d97706;
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+    border-color: #9ca3af;
     transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+    box-shadow: 0 8px 25px rgba(156, 163, 175, 0.3);
 }
 
 .password-icon {
-    color: #92400e;
+    color: #6b7280;
     transition: all 0.3s ease;
     z-index: 2;
     position: relative;
 }
 
 .password-key-icon:hover .password-icon {
-    color: white;
+    color: #4b5563;
     transform: scale(1.1);
 }
 
@@ -6474,17 +6627,17 @@ textarea::placeholder {
 }
 
 .password-key-icon.password-set .password-icon {
-    color: #047857;
+    color: #059669;
 }
 
 .password-key-icon.password-set:hover {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border-color: #059669;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+    border-color: #34d399;
+    box-shadow: 0 8px 25px rgba(52, 211, 153, 0.3);
 }
 
 .password-key-icon.password-set:hover .password-icon {
-    color: white;
+    color: #047857;
 }
 
 /* Password Modal Styling */
@@ -6993,60 +7146,223 @@ textarea::placeholder {
     }
 }
 
-/* ========================================
-   STATUS CELL TOGGLE STYLES
-   ======================================== */
+/* Override ALL possible task-cell padding for status cells */
+.task-cell.status-cell,
+.compact-row .task-cell.status-cell,
+.super-compact-mode .task-cell.status-cell,
+.advanced-table-container.compact-mode .task-cell.status-cell,
+.task-cell[class*='status'] {
+    padding: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border-right: 1px solid #e6e9ef !important;
+}
 
-/* Status cell toggle - fills entire cell */
+/* Override responsive padding */
+@media (max-width: 1200px) {
+    .task-cell.status-cell {
+        padding: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .task-cell.status-cell {
+        padding: 0 !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .task-cell.status-cell {
+        padding: 0 !important;
+    }
+}
+
+@media (max-width: 320px) {
+    .task-cell.status-cell {
+        padding: 0 !important;
+    }
+}
+
+/* Status cell toggle - fills entire cell with page curl effect */
 .status-cell-toggle {
-    width: 100%;
-    height: 100%;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-radius: 4px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0.2px;
+    border-radius: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    min-height: 32px;
-    border: 2px solid transparent;
+    border: none;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+
+    /* Page curl effect setup */
+    position: relative;
+    transform-style: preserve-3d;
+    perspective: 1000px;
 }
 
-/* Hover effects */
-.status-cell-toggle:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.status-cell-toggle:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Ripple effect on click */
+/* Page curl effect - creates the curled corner with white background */
 .status-cell-toggle::before {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 0;
+    right: 0;
     width: 0;
     height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.4s ease, height 0.4s ease;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.9) 30%,
+        rgba(255, 255, 255, 0.95) 50%,
+        rgba(255, 255, 255, 1) 70%
+    );
+    border-style: solid;
+    border-width: 0 0 0 0;
+    border-color: transparent;
+    border-radius: 0 0 0 4px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Page curl shadow effect - subtle gray shadow */
+.status-cell-toggle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    background: radial-gradient(
+        ellipse at top right,
+        rgba(0, 0, 0, 0.15) 0%,
+        rgba(0, 0, 0, 0.08) 40%,
+        transparent 70%
+    );
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
     pointer-events: none;
 }
 
+/* Hover effects - activate subtle page curl */
+.status-cell-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Page curl hover effect - reveal subtle white curl */
+.status-cell-toggle:hover::before {
+    width: 16px;
+    height: 16px;
+    border-width: 0 16px 16px 0;
+    border-color: transparent rgba(240, 240, 240, 0.8) rgba(255, 255, 255, 0.9)
+        transparent;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.95) 20%,
+        rgba(255, 255, 255, 1) 50%,
+        rgba(248, 248, 248, 1) 80%
+    );
+}
+
+/* Page curl shadow on hover - subtle and positioned */
+.status-cell-toggle:hover::after {
+    width: 18px;
+    height: 18px;
+    transform: translateX(-2px) translateY(2px);
+}
+
+/* Enhanced page curl for active status - slightly larger white curl */
+.status-cell-toggle.active:hover::before {
+    width: 20px;
+    height: 20px;
+    border-width: 0 20px 20px 0;
+    border-color: transparent rgba(245, 245, 245, 0.9) rgba(255, 255, 255, 1)
+        transparent;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.98) 10%,
+        rgba(255, 255, 255, 1) 50%,
+        rgba(250, 250, 250, 1) 90%
+    );
+}
+
+/* Enhanced page curl shadow for active status - subtle */
+.status-cell-toggle.active:hover::after {
+    width: 22px;
+    height: 22px;
+    transform: translateX(-3px) translateY(3px);
+    background: radial-gradient(
+        ellipse at top right,
+        rgba(0, 0, 0, 0.18) 0%,
+        rgba(0, 0, 0, 0.1) 40%,
+        transparent 70%
+    );
+}
+
+/* Page curl animation keyframes - subtle white peek */
+@keyframes pageCurlPeek {
+    0% {
+        width: 0;
+        height: 0;
+        border-width: 0 0 0 0;
+        opacity: 0;
+    }
+    50% {
+        width: 12px;
+        height: 12px;
+        border-width: 0 12px 12px 0;
+        border-color: transparent rgba(250, 250, 250, 0.8)
+            rgba(255, 255, 255, 0.9) transparent;
+        opacity: 1;
+    }
+    100% {
+        width: 0;
+        height: 0;
+        border-width: 0 0 0 0;
+        opacity: 0;
+    }
+}
+
+/* Subtle page curl peek animation on focus */
+.status-cell-toggle:focus::before {
+    animation: pageCurlPeek 2s ease-in-out infinite;
+}
+
+/* Page curl effect on click - subtle white curl */
 .status-cell-toggle:active::before {
-    width: 120px;
-    height: 120px;
+    width: 24px !important;
+    height: 24px !important;
+    border-width: 0 24px 24px 0 !important;
+    border-color: transparent rgba(245, 245, 245, 0.9) rgba(255, 255, 255, 1)
+        transparent !important;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.98) 20%,
+        rgba(255, 255, 255, 1) 50%,
+        rgba(248, 248, 248, 1) 80%
+    ) !important;
+    border-radius: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    transition: all 0.2s ease !important;
 }
 
 /* Celebration effect for inactive to active transition */
@@ -7055,30 +7371,66 @@ textarea::placeholder {
     z-index: 10;
 }
 
+/* Page curl celebration effect */
+.status-cell-toggle.celebrate::before {
+    animation: celebratePageCurl 1.2s ease-out !important;
+}
+
+@keyframes celebratePageCurl {
+    0% {
+        width: 0;
+        height: 0;
+        border-width: 0 0 0 0;
+        opacity: 0;
+    }
+    20% {
+        width: 28px;
+        height: 28px;
+        border-width: 0 28px 28px 0;
+        border-color: transparent rgba(250, 250, 250, 0.95)
+            rgba(255, 255, 255, 1) transparent;
+        opacity: 1;
+    }
+    80% {
+        width: 24px;
+        height: 24px;
+        border-width: 0 24px 24px 0;
+        border-color: transparent rgba(245, 245, 245, 0.9)
+            rgba(255, 255, 255, 0.95) transparent;
+        opacity: 0.8;
+    }
+    100% {
+        width: 0;
+        height: 0;
+        border-width: 0 0 0 0;
+        opacity: 0;
+    }
+}
+
 @keyframes celebrate {
     0% {
         transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8);
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.8);
     }
     15% {
         transform: scale(1.1);
-        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.6);
+        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.6);
     }
     30% {
         transform: scale(1.05);
-        box-shadow: 0 0 0 16px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 0 0 16px rgba(34, 197, 94, 0.4);
     }
     50% {
         transform: scale(1.02);
-        box-shadow: 0 0 0 24px rgba(16, 185, 129, 0.2);
+        box-shadow: 0 0 0 24px rgba(34, 197, 94, 0.3);
     }
     75% {
         transform: scale(1.01);
-        box-shadow: 0 0 0 32px rgba(16, 185, 129, 0.1);
+        box-shadow: 0 0 0 32px rgba(34, 197, 94, 0.2);
     }
     100% {
         transform: scale(1);
-        box-shadow: 0 0 0 40px rgba(16, 185, 129, 0);
+        box-shadow: 0 0 0 40px rgba(34, 197, 94, 0);
     }
 }
 
@@ -7125,25 +7477,25 @@ textarea::placeholder {
 @keyframes activePulse {
     0%,
     100% {
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
     }
     50% {
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3),
-            0 0 0 4px rgba(16, 185, 129, 0.1);
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4),
+            0 0 0 4px rgba(34, 197, 94, 0.2);
     }
 }
 
-/* State-specific styling with modern light colors */
+/* State-specific styling with light green theme */
 .status-cell-toggle.active {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
 }
 
 .status-cell-toggle.inactive {
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    color: #374151;
+    box-shadow: 0 2px 8px rgba(243, 244, 246, 0.4);
 }
 
 /* Smooth state transition */

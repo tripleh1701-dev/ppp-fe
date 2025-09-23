@@ -55,6 +55,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
     const [roleAssignmentLoading, setRoleAssignmentLoading] =
         useState<boolean>(false);
+
+    // State for scope configuration save trigger
+    const [triggerScopeSave, setTriggerScopeSave] = useState(0);
     const [selectedUserGroup, setSelectedUserGroup] = useState<any>(null);
 
     // Fetch user groups from API with role counts
@@ -137,14 +140,18 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
                             if (scopeResponse.ok) {
                                 const scopeData = await scopeResponse.json();
-                                // Check if any category has configured permissions
-                                const hasConfiguration = Object.values(
+                                // Check if any category has configured permissions OR if configured flag is true
+                                const hasPermissions = Object.values(
                                     scopeData,
                                 ).some(
                                     (category: any) =>
                                         Array.isArray(category) &&
                                         category.length > 0,
                                 );
+
+                                const hasConfiguration =
+                                    hasPermissions ||
+                                    scopeData.configured === true;
 
                                 return {
                                     ...role,
@@ -278,8 +285,8 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             title: 'Assign User Groups',
             subtitle: 'Manage user group assignments',
             icon: <UserGroupIcon className='w-6 h-6' />,
-            color: 'bg-blue-500',
-            headerGradient: 'from-blue-500 to-blue-600',
+            color: 'bg-[#0171EC]',
+            headerGradient: 'bg-[#0171EC]',
         },
         {
             id: 'roles' as const,
@@ -288,22 +295,24 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                 ? `Assign roles to "${selectedUserGroup.name}" user group`
                 : 'Configure user roles',
             icon: <ShieldCheckIcon className='w-6 h-6' />,
-            color: 'bg-green-500',
-            headerGradient: 'from-green-500 to-green-600',
+            color: 'bg-blue-400',
+            headerGradient: 'bg-blue-400',
         },
         {
             id: 'scope' as const,
             title: 'Configure Scope',
             subtitle: 'Define scope and permissions for selected roles',
             icon: <CogIcon className='w-6 h-6' />,
-            color: 'bg-purple-500',
-            headerGradient: 'from-purple-500 to-purple-600',
+            color: 'bg-blue-300',
+            headerGradient: 'bg-blue-300',
         },
     ];
 
     const handleRoleSelect = (role: any) => {
         console.log('🔄 handleRoleSelect called with role:', role);
         setSelectedRole(role);
+        // Reset trigger to prevent auto-save
+        setTriggerScopeSave(0);
         // Show all panels but make scope the active one
         console.log('🔄 Setting all panels visible with scope as active');
         setVisiblePanels(
@@ -399,13 +408,11 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
         if (!currentUser) {
             console.error('❌ No current user provided');
-            alert('Error: No user selected for group assignment');
             return;
         }
 
         if (selectedGroups.size === 0) {
             console.error('❌ No groups selected');
-            alert('Please select at least one group to assign');
             return;
         }
 
@@ -481,20 +488,12 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             }
 
             console.log('✅ Groups assigned successfully');
-            alert(
-                `Successfully assigned ${selectedGroups.size} groups to ${currentUser.firstName} ${currentUser.lastName}`,
-            );
 
             // Clear selection and show roles panel for next step
             setSelectedGroups(new Set());
             showRolesPanel();
         } catch (error) {
             console.error('❌ Error assigning groups:', error);
-            alert(
-                `Failed to assign groups: ${
-                    error instanceof Error ? error.message : 'Unknown error'
-                }`,
-            );
         } finally {
             setAssignmentLoading(false);
         }
@@ -503,12 +502,12 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     // Handle role assignment
     const handleAssignRoles = async () => {
         if (selectedRoles.size === 0) {
-            alert('Please select at least one role to assign.');
+            console.error('❌ No roles selected');
             return;
         }
 
         if (!selectedUserGroup) {
-            alert('No user group selected for role assignment.');
+            console.error('❌ No user group selected for role assignment');
             return;
         }
 
@@ -557,11 +556,6 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             await Promise.all(assignmentPromises);
 
             console.log('✅ All roles assigned successfully');
-            alert(
-                `Successfully assigned ${selectedRoles.size} role${
-                    selectedRoles.size !== 1 ? 's' : ''
-                } to "${selectedUserGroup.name}" user group`,
-            );
 
             // Clear selections and refresh data
             setSelectedRoles(new Set());
@@ -570,11 +564,6 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             await fetchUserGroups();
         } catch (error) {
             console.error('❌ Error assigning roles:', error);
-            alert(
-                `Failed to assign roles: ${
-                    error instanceof Error ? error.message : 'Unknown error'
-                }`,
-            );
         } finally {
             setRoleAssignmentLoading(false);
         }
@@ -586,6 +575,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         <AnimatePresence>
             {/* Backdrop */}
             <motion.div
+                key='backdrop'
                 className='fixed inset-0 z-40 bg-black/50'
                 initial={{opacity: 0}}
                 animate={{opacity: 1}}
@@ -596,6 +586,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
             {/* Sliding Panel Container */}
             <motion.div
+                key='sliding-panel-container'
                 className='fixed right-0 top-0 h-full z-50 bg-white shadow-2xl overflow-hidden'
                 style={{width: '60vw', maxWidth: '1600px', minWidth: '800px'}}
                 initial={{x: '100%'}}
@@ -618,8 +609,10 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                     >
                         {/* Header */}
                         <div
-                            className={`bg-gradient-to-r ${
-                                panels[0].headerGradient
+                            className={`${
+                                activePanel === 'userGroups'
+                                    ? 'bg-[#0171EC]' // Dark when expanded
+                                    : 'bg-blue-400' // Lighter when collapsed
                             } text-white p-4 cursor-pointer ${
                                 activePanel !== 'userGroups'
                                     ? 'h-full flex items-center justify-center'
@@ -629,7 +622,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                         >
                             {activePanel === 'userGroups' ? (
                                 <div className='flex items-center justify-between'>
-                                    <div className='flex items-center space-x-3'>
+                                    <div className='flex items-center space-x-4'>
                                         {panels[0].icon}
                                         <div>
                                             <h3 className='text-lg font-semibold'>
@@ -639,16 +632,101 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 {panels[0].subtitle}
                                             </p>
                                         </div>
+
+                                        {/* User Info with Animation */}
+                                        {currentUser && (
+                                            <motion.div
+                                                className='flex items-center gap-3 ml-6 pl-6 border-l border-white/30'
+                                                initial={{opacity: 0, x: -20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                transition={{
+                                                    duration: 0.5,
+                                                    delay: 0.2,
+                                                }}
+                                            >
+                                                <motion.div
+                                                    className='w-8 h-8 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg'
+                                                    whileHover={{scale: 1.1}}
+                                                    transition={{
+                                                        type: 'spring',
+                                                        stiffness: 300,
+                                                    }}
+                                                >
+                                                    {(
+                                                        (currentUser
+                                                            .firstName?.[0] ||
+                                                            '') +
+                                                        (currentUser
+                                                            .lastName?.[0] ||
+                                                            '')
+                                                    ).toUpperCase() || 'U'}
+                                                </motion.div>
+                                                <motion.div
+                                                    initial={{opacity: 0}}
+                                                    animate={{opacity: 1}}
+                                                    transition={{
+                                                        duration: 0.5,
+                                                        delay: 0.4,
+                                                    }}
+                                                >
+                                                    <div className='text-sm font-medium text-white'>
+                                                        {currentUser.firstName}{' '}
+                                                        {currentUser.lastName}
+                                                    </div>
+                                                    <div className='text-xs text-white/80'>
+                                                        {currentUser.emailAddress ||
+                                                            'No email provided'}
+                                                    </div>
+                                                </motion.div>
+                                            </motion.div>
+                                        )}
                                     </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onClose();
-                                        }}
-                                        className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                    >
-                                        <XMarkIcon className='w-5 h-5' />
-                                    </button>
+
+                                    <div className='flex items-center gap-2'>
+                                        {/* Assign Groups Button */}
+                                        {selectedGroups.size > 0 && (
+                                            <motion.button
+                                                initial={{
+                                                    opacity: 0,
+                                                    scale: 0.8,
+                                                }}
+                                                animate={{opacity: 1, scale: 1}}
+                                                exit={{opacity: 0, scale: 0.8}}
+                                                onClick={handleAssignGroups}
+                                                disabled={assignmentLoading}
+                                                className='bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 backdrop-blur-sm border border-white/30 disabled:opacity-50'
+                                                whileHover={{scale: 1.05}}
+                                                whileTap={{scale: 0.95}}
+                                            >
+                                                {assignmentLoading ? (
+                                                    <div className='flex items-center gap-2'>
+                                                        <div className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin'></div>
+                                                        Assigning...
+                                                    </div>
+                                                ) : (
+                                                    `Assign ${
+                                                        selectedGroups.size
+                                                    } Group${
+                                                        selectedGroups.size !==
+                                                        1
+                                                            ? 's'
+                                                            : ''
+                                                    }`
+                                                )}
+                                            </motion.button>
+                                        )}
+
+                                        {/* Close Button */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onClose();
+                                            }}
+                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                        >
+                                            <XMarkIcon className='w-5 h-5' />
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div
@@ -672,34 +750,6 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                         {/* Content */}
                         {activePanel === 'userGroups' && (
                             <div className='h-full flex flex-col'>
-                                {/* User Info Section */}
-                                {currentUser && (
-                                    <div className='bg-blue-50 border-b border-blue-100 p-4'>
-                                        <div className='flex items-center gap-3'>
-                                            <div className='w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold'>
-                                                {(currentUser.firstName?.[0] ||
-                                                    'U') +
-                                                    (currentUser
-                                                        .lastName?.[0] || '')}
-                                            </div>
-                                            <div>
-                                                <h4 className='font-semibold text-gray-900'>
-                                                    {currentUser.firstName}{' '}
-                                                    {currentUser.lastName}
-                                                </h4>
-                                                <p className='text-sm text-gray-600'>
-                                                    {currentUser.emailAddress ||
-                                                        'No email provided'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className='mt-3 text-sm text-blue-700 bg-blue-100 rounded-lg p-2'>
-                                            💡 Select groups below to assign to
-                                            this user
-                                        </div>
-                                    </div>
-                                )}
-
                                 {/* Groups Table */}
                                 <div className='flex-1 overflow-auto'>
                                     {loading ? (
@@ -714,7 +764,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 <div>Error: {error}</div>
                                                 <button
                                                     onClick={fetchUserGroups}
-                                                    className='mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600'
+                                                    className='mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700'
                                                 >
                                                     Retry
                                                 </button>
@@ -878,27 +928,43 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                                             }}
                                                                         >
                                                                             <svg
-                                                                                className='w-4 h-4 mr-1 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 group-hover:drop-shadow-md'
+                                                                                className='w-5 h-5 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-md'
                                                                                 viewBox='0 0 24 24'
                                                                                 fill='none'
                                                                                 stroke='currentColor'
                                                                                 strokeWidth='2'
+                                                                                style={{
+                                                                                    color:
+                                                                                        group.rolesCount &&
+                                                                                        group.rolesCount >
+                                                                                            0
+                                                                                            ? '#10b981'
+                                                                                            : '#9ca3af',
+                                                                                }}
                                                                             >
                                                                                 <path
-                                                                                    d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'
-                                                                                    className='transition-all duration-300 group-hover:fill-blue-200 group-hover:stroke-blue-600'
+                                                                                    d='M12 2L3 7L12 22L21 7L12 2Z'
+                                                                                    stroke='currentColor'
+                                                                                    strokeWidth='2'
+                                                                                    strokeLinecap='round'
+                                                                                    strokeLinejoin='round'
+                                                                                    fill='none'
+                                                                                />
+                                                                                <path
+                                                                                    d='M12 7V17'
+                                                                                    stroke='currentColor'
+                                                                                    strokeWidth='1.5'
+                                                                                    strokeLinecap='round'
                                                                                 />
                                                                                 <circle
                                                                                     cx='12'
-                                                                                    cy='11'
-                                                                                    r='3'
-                                                                                    className='transition-all duration-300 group-hover:fill-blue-500 group-hover:animate-pulse'
+                                                                                    cy='10'
+                                                                                    r='2'
+                                                                                    stroke='currentColor'
+                                                                                    strokeWidth='1.5'
+                                                                                    fill='none'
                                                                                 />
                                                                             </svg>
-                                                                            <span className='transition-all duration-300 group-hover:font-bold'>
-                                                                                {group.rolesCount ||
-                                                                                    0}
-                                                                            </span>
                                                                         </button>
                                                                     </div>
                                                                 </td>
@@ -909,102 +975,6 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                             </table>
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Action Buttons - Always Show */}
-                                <div className='border-t border-gray-200 p-4 bg-gray-50 sticky bottom-0'>
-                                    <div className='flex items-center justify-between'>
-                                        <div className='text-sm text-gray-600'>
-                                            {selectedGroups.size > 0 ? (
-                                                <span className='font-medium text-blue-600'>
-                                                    {selectedGroups.size} group
-                                                    {selectedGroups.size !== 1
-                                                        ? 's'
-                                                        : ''}{' '}
-                                                    selected
-                                                </span>
-                                            ) : (
-                                                'No groups selected'
-                                            )}
-                                        </div>
-                                        <div className='flex gap-2'>
-                                            <button
-                                                onClick={() =>
-                                                    setSelectedGroups(new Set())
-                                                }
-                                                disabled={
-                                                    selectedGroups.size === 0
-                                                }
-                                                className='px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed'
-                                            >
-                                                Clear
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    console.log(
-                                                        '🎯 Assign Groups button clicked!',
-                                                        {
-                                                            selectedGroups:
-                                                                Array.from(
-                                                                    selectedGroups,
-                                                                ),
-                                                            currentUser,
-                                                            selectedGroupsSize:
-                                                                selectedGroups.size,
-                                                        },
-                                                    );
-
-                                                    if (
-                                                        selectedGroups.size ===
-                                                        0
-                                                    ) {
-                                                        alert(
-                                                            'Please select at least one group to assign.',
-                                                        );
-                                                        return;
-                                                    }
-
-                                                    try {
-                                                        await handleAssignGroups();
-                                                        console.log(
-                                                            '✅ Assignment completed successfully',
-                                                        );
-                                                    } catch (error) {
-                                                        console.error(
-                                                            '❌ Assignment failed:',
-                                                            error,
-                                                        );
-                                                        alert(
-                                                            'Failed to assign groups. Please try again.',
-                                                        );
-                                                    }
-                                                }}
-                                                disabled={
-                                                    selectedGroups.size === 0 ||
-                                                    assignmentLoading
-                                                }
-                                                className='px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border-2 border-green-800'
-                                            >
-                                                {assignmentLoading ? (
-                                                    <span className='flex items-center gap-2'>
-                                                        <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
-                                                        Assigning...
-                                                    </span>
-                                                ) : (
-                                                    `Assign ${
-                                                        selectedGroups.size > 0
-                                                            ? selectedGroups.size
-                                                            : ''
-                                                    } Group${
-                                                        selectedGroups.size !==
-                                                        1
-                                                            ? 's'
-                                                            : ''
-                                                    }`
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1025,8 +995,10 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                         >
                             {/* Header */}
                             <div
-                                className={`bg-gradient-to-r ${
-                                    panels[1].headerGradient
+                                className={`${
+                                    activePanel === 'roles'
+                                        ? 'bg-[#0171EC]' // Dark when expanded
+                                        : 'bg-blue-400' // Lighter when collapsed
                                 } text-white p-4 cursor-pointer ${
                                     activePanel !== 'roles'
                                         ? 'h-full flex items-center justify-center'
@@ -1047,15 +1019,60 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 </p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onClose();
-                                            }}
-                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                        >
-                                            <XMarkIcon className='w-5 h-5' />
-                                        </button>
+
+                                        <div className='flex items-center gap-2'>
+                                            {/* Assign Roles Button */}
+                                            {selectedRoles.size > 0 && (
+                                                <motion.button
+                                                    initial={{
+                                                        opacity: 0,
+                                                        scale: 0.8,
+                                                    }}
+                                                    animate={{
+                                                        opacity: 1,
+                                                        scale: 1,
+                                                    }}
+                                                    exit={{
+                                                        opacity: 0,
+                                                        scale: 0.8,
+                                                    }}
+                                                    onClick={handleAssignRoles}
+                                                    disabled={
+                                                        roleAssignmentLoading
+                                                    }
+                                                    className='bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 backdrop-blur-sm border border-white/30 disabled:opacity-50'
+                                                    whileHover={{scale: 1.05}}
+                                                    whileTap={{scale: 0.95}}
+                                                >
+                                                    {roleAssignmentLoading ? (
+                                                        <div className='flex items-center gap-2'>
+                                                            <div className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin'></div>
+                                                            Assigning...
+                                                        </div>
+                                                    ) : (
+                                                        `Assign ${
+                                                            selectedRoles.size
+                                                        } Role${
+                                                            selectedRoles.size !==
+                                                            1
+                                                                ? 's'
+                                                                : ''
+                                                        }`
+                                                    )}
+                                                </motion.button>
+                                            )}
+
+                                            {/* Close Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onClose();
+                                                }}
+                                                className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                            >
+                                                <XMarkIcon className='w-5 h-5' />
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div
@@ -1091,7 +1108,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 Error: {error}
                                                 <button
                                                     onClick={fetchRoles}
-                                                    className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
+                                                    className='ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700'
                                                 >
                                                     Retry
                                                 </button>
@@ -1139,175 +1156,6 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                     }
                                                 />
                                             </div>
-
-                                            {/* Role Assignment Actions - Fixed at bottom */}
-                                            {selectedRoles.size > 0 && (
-                                                <div
-                                                    className='border-t border-gray-200 p-4 bg-green-50 flex-shrink-0'
-                                                    style={{zIndex: 100}}
-                                                >
-                                                    <div className='flex items-center justify-between'>
-                                                        <div className='text-sm text-gray-600'>
-                                                            {selectedRoles.size}{' '}
-                                                            role
-                                                            {selectedRoles.size !==
-                                                            1
-                                                                ? 's'
-                                                                : ''}{' '}
-                                                            selected
-                                                        </div>
-                                                        <div className='flex items-center gap-3'>
-                                                            <button
-                                                                onClick={() =>
-                                                                    setSelectedRoles(
-                                                                        new Set(),
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    selectedRoles.size ===
-                                                                    0
-                                                                }
-                                                                className='px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed'
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (
-                                                                        selectedRoles.size ===
-                                                                        0
-                                                                    ) {
-                                                                        alert(
-                                                                            'Please select at least one role to assign.',
-                                                                        );
-                                                                        return;
-                                                                    }
-
-                                                                    try {
-                                                                        await handleAssignRoles();
-                                                                    } catch (error) {
-                                                                        console.error(
-                                                                            'Role assignment failed:',
-                                                                            error,
-                                                                        );
-                                                                        alert(
-                                                                            'Failed to assign roles. Please try again.',
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                disabled={
-                                                                    selectedRoles.size ===
-                                                                        0 ||
-                                                                    roleAssignmentLoading
-                                                                }
-                                                                className='px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border-2 border-green-800'
-                                                            >
-                                                                {roleAssignmentLoading ? (
-                                                                    <span className='flex items-center gap-2'>
-                                                                        <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
-                                                                        Assigning...
-                                                                    </span>
-                                                                ) : (
-                                                                    `Assign ${
-                                                                        selectedRoles.size
-                                                                    } Role${
-                                                                        selectedRoles.size !==
-                                                                        1
-                                                                            ? 's'
-                                                                            : ''
-                                                                    }`
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Role Assignment Actions */}
-                                            {selectedRoles.size > 0 && (
-                                                <div
-                                                    className='border-t border-gray-200 p-4 bg-green-50'
-                                                    style={{
-                                                        zIndex: 100,
-                                                        position: 'relative',
-                                                    }}
-                                                >
-                                                    <div className='flex items-center justify-between'>
-                                                        <div className='text-sm text-gray-600'>
-                                                            {selectedRoles.size}{' '}
-                                                            role
-                                                            {selectedRoles.size !==
-                                                            1
-                                                                ? 's'
-                                                                : ''}{' '}
-                                                            selected
-                                                        </div>
-                                                        <div className='flex items-center gap-3'>
-                                                            <button
-                                                                onClick={() =>
-                                                                    setSelectedRoles(
-                                                                        new Set(),
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    selectedRoles.size ===
-                                                                    0
-                                                                }
-                                                                className='px-3 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed'
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (
-                                                                        selectedRoles.size ===
-                                                                        0
-                                                                    ) {
-                                                                        alert(
-                                                                            'Please select at least one role to assign.',
-                                                                        );
-                                                                        return;
-                                                                    }
-
-                                                                    try {
-                                                                        await handleAssignRoles();
-                                                                    } catch (error) {
-                                                                        console.error(
-                                                                            'Role assignment failed:',
-                                                                            error,
-                                                                        );
-                                                                        alert(
-                                                                            'Failed to assign roles. Please try again.',
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                disabled={
-                                                                    selectedRoles.size ===
-                                                                        0 ||
-                                                                    roleAssignmentLoading
-                                                                }
-                                                                className='px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border-2 border-green-800'
-                                                            >
-                                                                {roleAssignmentLoading ? (
-                                                                    <span className='flex items-center gap-2'>
-                                                                        <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
-                                                                        Assigning...
-                                                                    </span>
-                                                                ) : (
-                                                                    `Assign ${
-                                                                        selectedRoles.size
-                                                                    } Role${
-                                                                        selectedRoles.size !==
-                                                                        1
-                                                                            ? 's'
-                                                                            : ''
-                                                                    }`
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1330,8 +1178,10 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                         >
                             {/* Header */}
                             <div
-                                className={`bg-gradient-to-r ${
-                                    panels[2].headerGradient
+                                className={`${
+                                    activePanel === 'scope'
+                                        ? 'bg-[#0171EC]' // Dark when expanded
+                                        : 'bg-blue-400' // Lighter when collapsed
                                 } text-white p-4 cursor-pointer ${
                                     activePanel !== 'scope'
                                         ? 'h-full flex items-center justify-center'
@@ -1341,31 +1191,87 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                             >
                                 {activePanel === 'scope' ? (
                                     <div className='flex items-center justify-between'>
-                                        <div className='flex items-center space-x-3'>
+                                        <div className='flex items-center space-x-4'>
                                             {panels[2].icon}
                                             <div>
                                                 <h3 className='text-lg font-semibold'>
                                                     {panels[2].title}
                                                 </h3>
                                                 <p className='text-sm opacity-90'>
-                                                    {panels[2].subtitle}
+                                                    Define permissions for:{' '}
+                                                    <span className='font-medium'>
+                                                        {selectedRole?.name ||
+                                                            'Selected Role'}
+                                                    </span>
                                                 </p>
                                             </div>
+
+                                            {/* Role Badge */}
+                                            {selectedRole && (
+                                                <motion.div
+                                                    className='px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium border border-white/30'
+                                                    initial={{
+                                                        opacity: 0,
+                                                        scale: 0.8,
+                                                    }}
+                                                    animate={{
+                                                        opacity: 1,
+                                                        scale: 1,
+                                                    }}
+                                                    transition={{duration: 0.3}}
+                                                >
+                                                    Role: {selectedRole.name}
+                                                </motion.div>
+                                            )}
                                         </div>
-                                        {selectedRole && (
-                                            <span className='px-3 py-1 bg-white/20 rounded-full text-sm font-medium'>
-                                                Role: {selectedRole.name}
-                                            </span>
-                                        )}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onClose();
-                                            }}
-                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                        >
-                                            <XMarkIcon className='w-5 h-5' />
-                                        </button>
+
+                                        <div className='flex items-center gap-2'>
+                                            {/* Apply Changes Button */}
+                                            <motion.button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // Trigger save in ScopeConfigSlidingPanel
+                                                    setTriggerScopeSave(
+                                                        (prev) => prev + 1,
+                                                    );
+                                                }}
+                                                className='bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 backdrop-blur-sm border border-white/30 flex items-center gap-2'
+                                                whileHover={{scale: 1.05}}
+                                                whileTap={{scale: 0.95}}
+                                                initial={{opacity: 0, x: 20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                transition={{
+                                                    duration: 0.3,
+                                                    delay: 0.2,
+                                                }}
+                                            >
+                                                <svg
+                                                    className='w-4 h-4'
+                                                    fill='none'
+                                                    stroke='currentColor'
+                                                    viewBox='0 0 24 24'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M5 13l4 4L19 7'
+                                                    />
+                                                </svg>
+                                                Apply Changes
+                                            </motion.button>
+
+                                            {/* Close Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onClose();
+                                                }}
+                                                className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                            >
+                                                <XMarkIcon className='w-5 h-5' />
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div
@@ -1401,7 +1307,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 Error: {error}
                                                 <button
                                                     onClick={fetchScopeConfig}
-                                                    className='ml-2 px-3 py-1 bg-blue-500 text-white rounded text-sm'
+                                                    className='ml-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700'
                                                 >
                                                     Retry
                                                 </button>
@@ -1428,14 +1334,29 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                                 'Configure permissions for this role'
                                             }
                                             currentScope={selectedRole?.scope}
+                                            triggerSave={triggerScopeSave}
+                                            hideHeader={true}
                                             onSave={async (scopeConfig) => {
                                                 console.log(
                                                     'Scope configuration saved:',
                                                     scopeConfig,
                                                 );
-                                                // Refresh roles data to update scope configuration status
-                                                await fetchRoles();
+
+                                                // Hide scope panel and show only userGroups and roles
+                                                setVisiblePanels(
+                                                    new Set([
+                                                        'userGroups',
+                                                        'roles',
+                                                    ] as PanelType[]),
+                                                );
                                                 setActivePanel('roles');
+
+                                                // Refresh roles data to update scope configuration status (icon color)
+                                                await fetchRoles();
+
+                                                console.log(
+                                                    '✅ Navigated back to roles panel with updated scope icon',
+                                                );
                                             }}
                                         />
                                     )}

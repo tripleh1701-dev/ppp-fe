@@ -385,7 +385,7 @@ export default function ManageUsers() {
                 <div className='flex items-center justify-start gap-2'>
                     <button
                         onClick={handleCreateClick}
-                        className='inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200'
+                        className='inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200'
                     >
                         <PlusIcon className='h-5 w-5 mr-2' />
                         Create New user

@@ -681,9 +681,33 @@ const renderSubitemColumnCell = (
 };
 
 function OwnerAvatar({name}) {
+    // Function to generate user initials
+    const getUserInitials = (fullName) => {
+        if (!fullName || typeof fullName !== 'string') return '👤';
+
+        const nameParts = fullName.trim().split(' ');
+        if (nameParts.length === 1) {
+            return nameParts[0].charAt(0).toUpperCase();
+        }
+
+        const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
+        const lastInitial =
+            nameParts[nameParts.length - 1]?.charAt(0)?.toUpperCase() || '';
+        return firstInitial + lastInitial;
+    };
+
+    const initials = getUserInitials(name);
+    const isInitials = initials !== '👤';
+
     return (
         <div className='owner-avatar'>
-            <div className='unassigned-avatar'>👤</div>
+            <div
+                className={`${
+                    isInitials ? 'initials-avatar' : 'unassigned-avatar'
+                }`}
+            >
+                {initials}
+            </div>
         </div>
     );
 }

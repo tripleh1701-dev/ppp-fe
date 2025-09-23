@@ -1,12 +1,13 @@
 'use client';
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Reorder, motion, AnimatePresence} from 'framer-motion';
+import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
     ArrowDown,
     Trash2,
     Pencil,
+    Edit,
     MoreVertical,
     ChevronRight,
     Plus,
@@ -35,6 +36,7 @@ import {
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
+import {accessControlApi} from '../services/accessControlApi';
 
 // Chip component for dropdown selections
 const SelectionChip = ({
@@ -203,6 +205,7 @@ export interface AccountRow {
     servicesSummary?: string;
     globalClientName?: string;
     masterAccount?: string;
+    technicalUser?: string;
     address?: {
         addressLine1?: string;
         addressLine2?: string;
@@ -312,13 +315,29 @@ function InlineEditableText({
     const isEmpty = !value || value.length === 0;
     return (
         <span
-            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
+            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-2 hover:ring-blue-300 hover:bg-blue-50 cursor-text bg-white border border-gray-200 ${
                 className || ''
             }`}
-            onClick={() => setEditing(true)}
+            onClick={(e) => {
+                console.log('🔍 InlineEditableText clicked!', {value, editing});
+                e.stopPropagation();
+                e.preventDefault();
+                setEditing(true);
+            }}
+            onPointerDown={(e) => {
+                console.log('🔍 InlineEditableText pointer down!');
+                e.stopPropagation();
+                e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+                console.log('🔍 InlineEditableText mouse down!');
+                e.stopPropagation();
+                e.preventDefault();
+            }}
             title={(value || '').toString()}
             data-inline={dataAttr || undefined}
             tabIndex={0}
+            style={{pointerEvents: 'auto', zIndex: 10}}
             onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -340,7 +359,12 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'enterprise' | 'product' | 'service' | 'template';
+type CatalogType =
+    | 'enterprise'
+    | 'product'
+    | 'service'
+    | 'template'
+    | 'technical-users';
 
 function AsyncChipSelect({
     type,
@@ -398,6 +422,20 @@ function AsyncChipSelect({
                     }`,
                 );
                 setOptions(data || []);
+            } else if (type === 'technical-users') {
+                // For technical users, use mock data for now
+                const mockTechnicalUsers = [
+                    {id: '1', name: 'TUSER001'},
+                    {id: '2', name: 'TUSER002'},
+                    {id: '3', name: 'DEVOPS01'},
+                    {id: '4', name: 'SYSADMIN'},
+                ];
+                const filtered = mockTechnicalUsers.filter((user) =>
+                    query
+                        ? user.name.toLowerCase().includes(query.toLowerCase())
+                        : true,
+                );
+                setOptions(filtered);
             } else {
                 const ents = await api.get<Array<{id: string; name: string}>>(
                     '/api/enterprises',
@@ -619,6 +657,32 @@ function AsyncChipSelect({
                                 dot: 'bg-amber-400',
                             },
                         ],
+                        'technical-users': [
+                            {
+                                bg: 'bg-blue-50',
+                                text: 'text-blue-800',
+                                border: 'border-blue-200',
+                                dot: 'bg-blue-400',
+                            },
+                            {
+                                bg: 'bg-cyan-50',
+                                text: 'text-cyan-800',
+                                border: 'border-cyan-200',
+                                dot: 'bg-cyan-400',
+                            },
+                            {
+                                bg: 'bg-indigo-50',
+                                text: 'text-indigo-800',
+                                border: 'border-indigo-200',
+                                dot: 'bg-indigo-400',
+                            },
+                            {
+                                bg: 'bg-slate-50',
+                                text: 'text-slate-800',
+                                border: 'border-slate-200',
+                                dot: 'bg-slate-400',
+                            },
+                        ],
                     };
                     const palette = palettes[type];
                     const tone = palette[hash % palette.length];
@@ -832,6 +896,7 @@ interface AccountsTableProps {
         | 'city'
         | 'state'
         | 'pincode'
+        | 'technicalUser'
         | 'actions'
     >;
     highlightQuery?: string;
@@ -843,7 +908,11 @@ interface AccountsTableProps {
         products?: Array<{id: string; name: string}>;
         services?: Array<{id: string; name: string}>;
     };
-    onUpdateField?: (rowId: string, field: string, value: any) => void;
+    onUpdateField?: (
+        rowId: string,
+        field: keyof AccountRow | string,
+        value: any,
+    ) => void;
     hideRowExpansion?: boolean;
 }
 
@@ -881,7 +950,11 @@ function SortableAccountRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (rowId: string, key: keyof AccountRow, value: any) => void;
+    onUpdateField: (
+        rowId: string,
+        key: keyof AccountRow | string,
+        value: any,
+    ) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
     onStartFill: (rowId: string, col: keyof AccountRow, value: string) => void;
@@ -1159,8 +1232,7 @@ function SortableAccountRow({
 
     const cssTemplate = gridTemplate.split('_').join(' ');
     return (
-        <Reorder.Item
-            value={row.id}
+        <motion.div
             id={row.id}
             data-account-id={row.id}
             layout
@@ -1174,20 +1246,140 @@ function SortableAccountRow({
                     if (rowEl) {
                         const rect = rowEl.getBoundingClientRect();
                         const proxy = rowEl.cloneNode(true) as HTMLElement;
+
+                        // Enhanced folded/compressed drag image
                         proxy.style.position = 'fixed';
                         proxy.style.top = `${rect.top}px`;
                         proxy.style.left = `${rect.left}px`;
-                        proxy.style.width = `${rect.width}px`;
-                        proxy.style.maxWidth = `${rect.width}px`;
                         proxy.style.pointerEvents = 'none';
-                        proxy.style.background = 'white';
-                        proxy.style.border = '1px solid rgba(148,163,184,0.6)';
-                        proxy.style.boxShadow =
-                            '0 16px 40px rgba(15,23,42,0.2)';
-                        proxy.style.borderRadius = '8px';
                         proxy.style.zIndex = '9999';
+
+                        // Compression/folding effects
+                        proxy.style.width = `${Math.min(
+                            rect.width * 0.6,
+                            300,
+                        )}px`; // Compress to 60% width, max 300px
+                        proxy.style.height = `${rect.height * 0.8}px`; // Slightly reduce height
+                        proxy.style.maxWidth = `${Math.min(
+                            rect.width * 0.6,
+                            300,
+                        )}px`;
+                        proxy.style.overflow = 'hidden';
+
+                        // Enhanced visual styling
+                        proxy.style.background =
+                            'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
+                        proxy.style.border =
+                            '2px solid rgba(59, 130, 246, 0.4)';
+                        proxy.style.boxShadow = `
+                            0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                            0 10px 10px -5px rgba(0, 0, 0, 0.04),
+                            0 0 0 1px rgba(59, 130, 246, 0.2),
+                            inset 0 1px 0 0 rgba(255, 255, 255, 0.8)
+                        `;
+                        proxy.style.borderRadius = '12px';
+                        proxy.style.backdropFilter = 'blur(8px)';
+
+                        // Add realistic folding animation with 3D effect
+                        proxy.classList.add('drag-folded-row');
+                        proxy.style.animation =
+                            'paperFold 0.6s ease-out forwards, dragPulse 1.5s ease-in-out infinite 0.6s';
+                        proxy.style.transformOrigin = 'center bottom';
+                        proxy.style.transformStyle = 'preserve-3d';
+
+                        // Add fold line in the middle to simulate paper crease
+                        const foldLine = document.createElement('div');
+                        foldLine.style.cssText = `
+                            position: absolute;
+                            top: 50%;
+                            left: 0;
+                            right: 0;
+                            height: 1px;
+                            background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.6) 20%, rgba(59, 130, 246, 0.8) 50%, rgba(59, 130, 246, 0.6) 80%, transparent 100%);
+                            z-index: 10;
+                            box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
+                            animation: foldLineGlow 2s ease-in-out infinite;
+                        `;
+                        proxy.appendChild(foldLine);
+
+                        // Add secondary fold line for more realistic effect
+                        const secondaryFoldLine = document.createElement('div');
+                        secondaryFoldLine.style.cssText = `
+                            position: absolute;
+                            top: 25%;
+                            left: 10%;
+                            right: 10%;
+                            height: 0.5px;
+                            background: linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.4) 50%, transparent 100%);
+                            z-index: 8;
+                            animation: foldLineGlow 2s ease-in-out infinite 0.3s;
+                        `;
+                        proxy.appendChild(secondaryFoldLine);
+
+                        // Apply compression transforms to child elements
+                        const cells = proxy.querySelectorAll(
+                            'div[style*="grid-column"]',
+                        );
+                        cells.forEach((cell: Element, cellIndex: number) => {
+                            const cellEl = cell as HTMLElement;
+                            cellEl.style.transform = 'scale(0.95)';
+                            // Show first 3 columns normally, add ellipsis indicator for hidden content
+                            if (cellIndex > 2) {
+                                cellEl.style.opacity = '0.3';
+                                cellEl.style.filter = 'blur(1px)';
+                            } else {
+                                cellEl.style.opacity = '1';
+                            }
+                            cellEl.style.transition = 'all 0.2s ease-out';
+                        });
+
+                        // Add visual indicator for hidden columns
+                        if (cells.length > 3) {
+                            const hiddenIndicator =
+                                document.createElement('div');
+                            hiddenIndicator.style.cssText = `
+                                position: absolute;
+                                top: 50%;
+                                right: 30px;
+                                transform: translateY(-50%);
+                                background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.8) 20%, rgba(59, 130, 246, 1) 100%);
+                                color: white;
+                                font-size: 11px;
+                                padding: 3px 8px;
+                                border-radius: 12px;
+                                font-weight: 700;
+                                z-index: 15;
+                                box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            `;
+                            hiddenIndicator.innerHTML = `
+                                <span style="font-size: 8px;">●●●</span>
+                                <span>+${cells.length - 3} more</span>
+                            `;
+                            proxy.appendChild(hiddenIndicator);
+                        }
+
+                        // Pulsing effect is now part of the combined animation above
+
+                        // Add row selection border effect
+                        const selectionBorder = document.createElement('div');
+                        selectionBorder.style.cssText = `
+                            position: absolute;
+                            inset: -2px;
+                            background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
+                            border-radius: 14px;
+                            z-index: -1;
+                            animation: selectionGlow 2s ease-in-out infinite;
+                        `;
+                        proxy.appendChild(selectionBorder);
+
+                        // Remove text badges - keep only visual effects
+
                         document.body.appendChild(proxy);
                         e.dataTransfer.setDragImage(proxy, 12, 12);
+
                         const cleanup = () => {
                             try {
                                 document.body.removeChild(proxy);
@@ -1236,11 +1428,22 @@ function SortableAccountRow({
                 gridTemplateColumns: cssTemplate,
                 willChange: 'transform',
                 zIndex: isDragging ? 20 : 'auto',
+                gap: '0px',
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
-                onSelect(row.id);
                 // If pointerdown starts on non-draggable interActive elements, don't begin HTML5 drag
                 const target = e.target as HTMLElement;
+                const isInlineEditable = target.closest('[data-inline]');
+
+                if (isInlineEditable) {
+                    console.log(
+                        '🔍 Row onPointerDown: detected inline element, skipping selection',
+                    );
+                    (e.currentTarget as HTMLElement).draggable = false;
+                    e.stopPropagation();
+                    return;
+                }
+
                 if (
                     target.closest(
                         'input,textarea,select,button,[contenteditable="true"]',
@@ -1250,6 +1453,8 @@ function SortableAccountRow({
                 } else {
                     (e.currentTarget as HTMLElement).draggable = true;
                 }
+
+                onSelect(row.id);
             }}
         >
             {cols.includes('masterAccount') && (
@@ -1396,6 +1601,7 @@ function SortableAccountRow({
                     className='text-slate-700 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
                     data-row-id={row.id}
                     data-col='accountName'
+                    style={{maxWidth: '120px', width: '120px'}}
                 >
                     <InlineEditableText
                         value={row.accountName}
@@ -1448,13 +1654,8 @@ function SortableAccountRow({
                     data-col='country'
                 >
                     <InlineEditableText
-                        value={(row as any).address?.country || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                country: v,
-                            })
-                        }
+                        value={row.address?.country || ''}
+                        onCommit={(v) => onUpdateField(row.id, 'country', v)}
                         className='text-[12px]'
                         placeholder=''
                         dataAttr={`${row.id}-country`}
@@ -1469,17 +1670,28 @@ function SortableAccountRow({
                     data-col='addressLine1'
                 >
                     <InlineEditableText
-                        value={(row as any).address?.addressLine1 || ''}
+                        value={row.address?.addressLine1 || ''}
                         onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                addressLine1: v,
-                            })
+                            onUpdateField(row.id, 'addressLine1', v)
                         }
                         className='text-[12px]'
-                        placeholder='Address Line 1'
+                        placeholder=''
                         dataAttr={`${row.id}-addressLine1`}
                         {...createTabNavigation('addressLine1')}
+                    />
+                </div>
+            )}
+            {cols.includes('technicalUser') && (
+                <div
+                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
+                    data-row-id={row.id}
+                    data-col='technicalUser'
+                >
+                    <TechnicalUserSelect
+                        value={row.technicalUser || ''}
+                        onChange={(value) =>
+                            onUpdateField(row.id, 'technicalUser', value)
+                        }
                     />
                 </div>
             )}
@@ -1697,7 +1909,34 @@ function SortableAccountRow({
                     </div>
                 </div>
             )}
-            {/* actions column removed */}
+            {cols.includes('actions') && (
+                <div
+                    className='flex items-center justify-center gap-1 border-r border-slate-200 px-1 py-1'
+                    data-row-id={row.id}
+                    data-col='actions'
+                >
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(row.id);
+                        }}
+                        className='h-6 w-6 rounded text-blue-600 hover:bg-blue-50 flex items-center justify-center'
+                        title='Edit'
+                    >
+                        <Edit className='h-3 w-3' />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(row.id);
+                        }}
+                        className='h-6 w-6 rounded text-red-600 hover:bg-red-50 flex items-center justify-center'
+                        title='Delete'
+                    >
+                        <Trash2 className='h-3 w-3' />
+                    </button>
+                </div>
+            )}
             {/* trailing add row removed; fill handle removed */}
             {!hideRowExpansion && isExpanded && expandedContent && (
                 <motion.div
@@ -1709,7 +1948,96 @@ function SortableAccountRow({
                     {expandedContent}
                 </motion.div>
             )}
-        </Reorder.Item>
+        </motion.div>
+    );
+}
+
+// Technical User Select Component
+function TechnicalUserSelect({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const loadTechnicalUsers = async () => {
+            try {
+                setLoading(true);
+                // Fetch only technical users from the API
+                const allUsers = await accessControlApi.listUsers({
+                    limit: 1000,
+                });
+                // Filter to only technical users
+                const technicalUsers = allUsers.filter(
+                    (user) => user.technicalUser,
+                );
+                setUsers(technicalUsers);
+            } catch (error) {
+                console.error('Error loading technical users:', error);
+                // Fallback to mock data if API fails
+                setUsers([
+                    {
+                        id: '1',
+                        firstName: 'Technical',
+                        lastName: 'User One',
+                        emailAddress: 'tuser001@company.com',
+                        technicalUser: true,
+                    },
+                    {
+                        id: '2',
+                        firstName: 'Technical',
+                        lastName: 'User Two',
+                        emailAddress: 'tuser002@company.com',
+                        technicalUser: true,
+                    },
+                    {
+                        id: '3',
+                        firstName: 'DevOps',
+                        lastName: 'Admin',
+                        emailAddress: 'devops01@company.com',
+                        technicalUser: true,
+                    },
+                    {
+                        id: '4',
+                        firstName: 'System',
+                        lastName: 'Administrator',
+                        emailAddress: 'sysadmin@company.com',
+                        technicalUser: true,
+                    },
+                ]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadTechnicalUsers();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className='w-full text-[12px] text-gray-500 px-2 py-1'>
+                Loading...
+            </div>
+        );
+    }
+
+    return (
+        <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className='w-full bg-white text-[12px] border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1'
+        >
+            <option value=''>Select Technical User</option>
+            {users.map((user) => (
+                <option key={user.id} value={user.emailAddress}>
+                    {user.firstName} {user.lastName} ({user.emailAddress})
+                </option>
+            ))}
+        </select>
     );
 }
 
@@ -1886,7 +2214,11 @@ export default function AccountsTable({
         }
     }
 
-    function updateRowField(rowId: string, key: keyof AccountRow, value: any) {
+    function updateRowField(
+        rowId: string,
+        key: keyof AccountRow | string,
+        value: any,
+    ) {
         let changed: AccountRow | null = null;
         setLocalRows((prev) =>
             prev.map((r) => {
@@ -2015,14 +2347,11 @@ export default function AccountsTable({
     const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
         () => [
             // Parent table columns per request
-            'masterAccount',
             'accountName',
+            'masterAccount',
             'country',
             'addressLine1',
-            'addressLine2',
-            'city',
-            'state',
-            'pincode',
+            'technicalUser',
         ],
         [],
     );
@@ -2031,18 +2360,20 @@ export default function AccountsTable({
         if (!visibleColumns || visibleColumns.length === 0) return base;
         const allowed = new Set(visibleColumns as string[]);
         // Keep canonical order from columnOrder; filter by visibility
-        return base.filter((c) => allowed.has(c));
+        const result = base.filter((c) => allowed.has(c));
+        return result;
     }, [visibleColumns, columnOrder]);
 
     const colSizes: Record<string, string> = {
-        masterAccount: '140px',
-        accountName: 'minmax(120px,1.1fr)',
-        country: 'minmax(110px,0.9fr)',
-        addressLine1: 'minmax(160px,1.2fr)',
+        masterAccount: '120px',
+        accountName: '120px',
+        country: '100px',
+        addressLine1: '140px',
         addressLine2: 'minmax(160px,1.1fr)',
         city: 'minmax(100px,0.9fr)',
         state: 'minmax(100px,0.9fr)',
         pincode: 'minmax(100px,0.8fr)',
+        technicalUser: '180px',
     };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -2054,10 +2385,21 @@ export default function AccountsTable({
     const [pinFirst, setPinFirst] = useState(true);
     const firstColWidth = '140px'; // enforce fixed width for first column
     const gridTemplate = useMemo(() => {
-        const base = cols.map((c) => colSizes[c]).join('_');
-        const custom = customColumns.map(() => 'minmax(110px,1fr)').join('_');
-        return [base, custom].filter(Boolean).join('_');
-    }, [cols, customColumns, colWidths]);
+        const base = cols.map((c) => colSizes[c]).join(' ');
+        const custom = customColumns.map(() => 'minmax(110px,1fr)').join(' ');
+        const result = [base, custom].filter(Boolean).join(' ');
+        // Force specific template for the expected columns
+        if (
+            cols.length === 5 &&
+            cols.includes('accountName') &&
+            cols.includes('masterAccount') &&
+            cols.includes('technicalUser')
+        ) {
+            return '120px 120px 100px 140px 180px';
+        }
+
+        return result;
+    }, [cols, customColumns, colWidths, colSizes]);
 
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const [contactModal, setContactModal] = useState<{
@@ -2538,9 +2880,8 @@ export default function AccountsTable({
                             masterAccount: 'Master Account',
                             accountName: 'Account',
                             country: 'Country',
-                            addressLine1: 'Address Line 1',
-                            addressLine2: 'Address Line 2',
-                            city: 'City',
+                            addressLine1: 'Address',
+                            technicalUser: 'Technical User',
                             state: 'State',
                             pincode: 'Pin/Zip',
                         };
@@ -2558,11 +2899,52 @@ export default function AccountsTable({
                             accountName: (
                                 <FileText className='h-3.5 w-3.5 text-blue-600' />
                             ),
-                            country: (
-                                <Globe className='h-3.5 w-3.5 text-blue-600' />
+                            technicalUser: (
+                                <User className='h-3.5 w-3.5 text-blue-600' />
                             ),
                             addressLine1: (
-                                <MapPin className='h-3.5 w-3.5 text-blue-600' />
+                                <motion.div
+                                    className='h-3.5 w-3.5 text-blue-600'
+                                    whileHover={{
+                                        scale: 1.2,
+                                        rotate: [0, -5, 5, 0],
+                                        transition: {duration: 0.3},
+                                    }}
+                                >
+                                    <svg
+                                        viewBox='0 0 24 24'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        className='w-full h-full'
+                                    >
+                                        <motion.path
+                                            d='M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z'
+                                            initial={{pathLength: 0}}
+                                            animate={{pathLength: 1}}
+                                            transition={{
+                                                duration: 1,
+                                                delay: 0.2,
+                                            }}
+                                        />
+                                        <motion.circle
+                                            cx='12'
+                                            cy='10'
+                                            r='3'
+                                            initial={{scale: 0}}
+                                            animate={{scale: 1}}
+                                            transition={{
+                                                duration: 0.5,
+                                                delay: 0.5,
+                                            }}
+                                        />
+                                    </svg>
+                                </motion.div>
+                            ),
+                            country: (
+                                <Globe className='h-3.5 w-3.5 text-blue-600' />
                             ),
                             addressLine2: (
                                 <Home className='h-3.5 w-3.5 text-blue-600' />
@@ -2581,97 +2963,108 @@ export default function AccountsTable({
                             <div className='rounded-xl border border-slate-300 shadow-sm bg-white pb-1'>
                                 <div
                                     className='sticky top-0 z-30 grid w-full overflow-visible gap-0 px-0 py-2 text-xs font-semibold text-slate-900 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 divide-x divide-slate-200 shadow-sm'
-                                    style={{gridTemplateColumns: cssTemplate}}
+                                    style={{
+                                        gridTemplateColumns: cssTemplate,
+                                        gap: '0px',
+                                    }}
                                 >
-                                    {cols.map((c, idx) => (
-                                        <div
-                                            key={c}
-                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-slate-50 transition-colors duration-150 group ${
-                                                idx === 0 && pinFirst
-                                                    ? 'sticky left-0 z-20 bg-sky-50/80 backdrop-blur-sm border-l-4 border-l-slate-200 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] after:content-[" "] after:absolute after:top-0 after:right-0 after:h-full after:w-px after:bg-slate-200'
-                                                    : ''
-                                            }`}
-                                            style={
-                                                idx === 0
-                                                    ? {
-                                                          width: firstColWidth,
-                                                          minWidth:
-                                                              firstColWidth,
-                                                          maxWidth:
-                                                              firstColWidth,
-                                                      }
-                                                    : undefined
-                                            }
-                                        >
-                                            <div className='flex items-center gap-2'>
-                                                {iconFor[c] && iconFor[c]}
-                                                <span>{labelFor[c] || c}</span>
-                                            </div>
-                                            {idx === 0 && (
-                                                <button
-                                                    className='ml-1 p-1 rounded hover:bg-slate-100 text-blue-600'
-                                                    onClick={() =>
-                                                        setPinFirst((v) => !v)
-                                                    }
-                                                    title={
-                                                        pinFirst
-                                                            ? 'Unfreeze column'
-                                                            : 'Freeze column'
-                                                    }
-                                                >
-                                                    {pinFirst ? (
-                                                        <Pin className='w-3.5 h-3.5' />
-                                                    ) : (
-                                                        <PinOff className='w-3.5 h-3.5' />
-                                                    )}
-                                                </button>
-                                            )}
-                                            {[
-                                                'accountName',
-                                                'email',
-                                                'enterpriseName',
-                                            ].includes(c) && (
-                                                <button
-                                                    onClick={() =>
-                                                        toggleSort(c as any)
-                                                    }
-                                                    className='inline-flex items-center -mr-1'
-                                                >
-                                                    <ArrowUp
-                                                        className={`w-3 h-3 ${
-                                                            sortCol ===
-                                                                (c as any) &&
-                                                            sortDir === 'asc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
-                                                        }`}
-                                                    />
-                                                    <ArrowDown
-                                                        className={`w-3 h-3 ${
-                                                            sortCol ===
-                                                                (c as any) &&
-                                                            sortDir === 'desc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
-                                                        }`}
-                                                    />
-                                                </button>
-                                            )}
+                                    {(() => {
+                                        return cols.map((c, idx) => (
                                             <div
-                                                onMouseDown={(e) =>
-                                                    startResize(c, e)
+                                                key={c}
+                                                className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-slate-50 transition-colors duration-150 group ${
+                                                    idx === 0 && pinFirst
+                                                        ? 'sticky left-0 z-20 bg-sky-50/80 backdrop-blur-sm border-l-4 border-l-slate-200 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] after:content-[" "] after:absolute after:top-0 after:right-0 after:h-full after:w-px after:bg-slate-200'
+                                                        : ''
+                                                }`}
+                                                style={
+                                                    idx === 0
+                                                        ? {
+                                                              width: firstColWidth,
+                                                              minWidth:
+                                                                  firstColWidth,
+                                                              maxWidth:
+                                                                  firstColWidth,
+                                                          }
+                                                        : undefined
                                                 }
-                                                className='ml-auto h-4 w-1.5 cursor-col-resize bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150'
-                                                title='Resize column'
-                                            />
-                                            {c === 'accountName' && (
-                                                <span
-                                                    aria-hidden
-                                                    className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
+                                            >
+                                                <div className='flex items-center gap-2'>
+                                                    {iconFor[c] && iconFor[c]}
+                                                    <span>
+                                                        {labelFor[c] || c}
+                                                    </span>
+                                                </div>
+                                                {idx === 0 && (
+                                                    <button
+                                                        className='ml-1 p-1 rounded hover:bg-slate-100 text-blue-600'
+                                                        onClick={() =>
+                                                            setPinFirst(
+                                                                (v) => !v,
+                                                            )
+                                                        }
+                                                        title={
+                                                            pinFirst
+                                                                ? 'Unfreeze column'
+                                                                : 'Freeze column'
+                                                        }
+                                                    >
+                                                        {pinFirst ? (
+                                                            <Pin className='w-3.5 h-3.5' />
+                                                        ) : (
+                                                            <PinOff className='w-3.5 h-3.5' />
+                                                        )}
+                                                    </button>
+                                                )}
+                                                {[
+                                                    'accountName',
+                                                    'email',
+                                                    'enterpriseName',
+                                                ].includes(c) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            toggleSort(c as any)
+                                                        }
+                                                        className='inline-flex items-center -mr-1'
+                                                    >
+                                                        <ArrowUp
+                                                            className={`w-3 h-3 ${
+                                                                sortCol ===
+                                                                    (c as any) &&
+                                                                sortDir ===
+                                                                    'asc'
+                                                                    ? 'text-sky-600'
+                                                                    : 'text-slate-400'
+                                                            }`}
+                                                        />
+                                                        <ArrowDown
+                                                            className={`w-3 h-3 ${
+                                                                sortCol ===
+                                                                    (c as any) &&
+                                                                sortDir ===
+                                                                    'desc'
+                                                                    ? 'text-sky-600'
+                                                                    : 'text-slate-400'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                )}
+                                                <div
+                                                    onMouseDown={(e) =>
+                                                        startResize(c, e)
+                                                    }
+                                                    className='ml-auto h-4 w-1.5 cursor-col-resize bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150'
+                                                    title='Resize column'
                                                 />
-                                            )}
-                                        </div>
-                                    ))}
+                                                {c === 'accountName' && (
+                                                    <span
+                                                        aria-hidden
+                                                        className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
+                                                    />
+                                                )}
+                                            </div>
+                                        ));
+                                    })()}
                                     {customColumns.map((name, idx) => (
                                         <div
                                             key={`custom-${idx}`}
@@ -2686,24 +3079,7 @@ export default function AccountsTable({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <Reorder.Group
-                            axis='y'
-                            values={orderedItems.map((i) => i.id)}
-                            onReorder={(ids) => setOrder(ids as string[])}
-                            className='space-y-0 divide-y divide-slate-200'
-                            transition={{
-                                layout: {
-                                    duration: 0.22,
-                                    ease: [0.22, 1, 0.36, 1],
-                                },
-                                type: 'spring',
-                                stiffness: 420,
-                                damping: 28,
-                                mass: 0.65,
-                            }}
-                            layoutScroll
-                            layout
-                        >
+                        <div className='space-y-0 divide-y divide-slate-200'>
                             {displayItems.map((r, idx) => (
                                 <>
                                     <SortableAccountRow
@@ -4028,8 +4404,8 @@ export default function AccountsTable({
                                     {expandedRows.has(r.id) && (
                                         <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
                                             <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
-                                            {/* Technical User Subtable */}
-                                            <div className='relative mb-4'>
+                                            {/* Technical User Subtable - COMMENTED OUT AS REQUESTED */}
+                                            {/* <div className='relative mb-4'>
                                                 <div className='absolute -left-3 top-4 w-3 h-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
                                                 <div className='absolute -left-3 top-3 h-2 w-2 rounded-full bg-white border border-slate-300'></div>
                                                 <div className='text-[11px] font-semibold text-slate-800 mb-1'>
@@ -4428,7 +4804,7 @@ export default function AccountsTable({
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </div> */}
                                             {/* License Details Subtable */}
                                             <div className='relative'>
                                                 <div className='absolute -left-3 top-4 w-3 h-px bg-slate-400'></div>
@@ -5098,7 +5474,7 @@ export default function AccountsTable({
                                         )}
                                 </>
                             ))}
-                        </Reorder.Group>
+                        </div>
                     ) : (
                         <div className='space-y-2 w-max'>
                             {Object.entries(
@@ -5122,26 +5498,7 @@ export default function AccountsTable({
                                     <div className='px-2 py-1.5 text-[11px] font-medium text-blue-600 bg-slate-50 border-b'>
                                         {grp} • {list.length}
                                     </div>
-                                    <Reorder.Group
-                                        axis='y'
-                                        values={list.map((i) => i.id)}
-                                        onReorder={(ids) =>
-                                            setOrder(ids as string[])
-                                        }
-                                        className='space-y-0 divide-y divide-slate-200'
-                                        transition={{
-                                            layout: {
-                                                duration: 0.22,
-                                                ease: [0.22, 1, 0.36, 1],
-                                            },
-                                            type: 'spring',
-                                            stiffness: 420,
-                                            damping: 28,
-                                            mass: 0.65,
-                                        }}
-                                        layoutScroll
-                                        layout
-                                    >
+                                    <div className='space-y-0 divide-y divide-slate-200'>
                                         {list.map((r, idx) => (
                                             <>
                                                 <SortableAccountRow
@@ -5380,7 +5737,7 @@ export default function AccountsTable({
                                                     )}
                                             </>
                                         ))}
-                                    </Reorder.Group>
+                                    </div>
                                 </div>
                             ))}
                         </div>

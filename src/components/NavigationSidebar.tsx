@@ -115,6 +115,20 @@ export default function NavigationSidebar({
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
 
+    // Mock current user data - in real app this would come from context/props
+    const currentUser = {
+        firstName: 'Nihar',
+        lastName: 'Sharma',
+        emailAddress: 'nihar.sharma@example.com',
+    };
+
+    // Function to generate user initials
+    const getUserInitials = (firstName: string, lastName: string) => {
+        const firstInitial = firstName?.charAt(0)?.toUpperCase() || '';
+        const lastInitial = lastName?.charAt(0)?.toUpperCase() || '';
+        return firstInitial + lastInitial || 'U'; // Fallback to 'U' for User
+    };
+
     // NEW: Track active menu by click
     const [activeMenuId, setActiveMenuId] = useState<string>('overview');
 
@@ -491,27 +505,21 @@ export default function NavigationSidebar({
                             onMouseLeave={() => setHoveredItem(null)}
                         >
                             <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg flex-shrink-0'>
-                                <svg
-                                    className='w-5 h-5 text-white'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    viewBox='0 0 24 24'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-                                    />
-                                </svg>
+                                <span className='text-white font-semibold text-sm'>
+                                    {getUserInitials(
+                                        currentUser.firstName,
+                                        currentUser.lastName,
+                                    )}
+                                </span>
                             </div>
                             {!isCollapsed && (
                                 <div className='min-w-0 flex-1'>
                                     <p className='text-sm font-medium text-white truncate drop-shadow-sm'>
-                                        Nihar Sharma
+                                        {currentUser.firstName}{' '}
+                                        {currentUser.lastName}
                                     </p>
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
-                                        Administrator
+                                        {currentUser.emailAddress}
                                     </p>
                                 </div>
                             )}

@@ -1,6 +1,7 @@
 'use client';
 
 import {useState, useEffect, useMemo, useRef} from 'react';
+import {motion} from 'framer-motion';
 import {
     PlusIcon,
     MagnifyingGlassIcon,
@@ -23,18 +24,27 @@ function ToolbarTrashButton({
 }) {
     const [over, setOver] = useState(false);
     return (
-        <button
+        <motion.button
             id='accounts-trash-target'
             type='button'
             onClick={onClick}
             aria-label='Trash'
             aria-dropeffect='move'
-            className={`relative ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all duration-200 group ${
+            className={`group relative ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all duration-300 transform ${
                 over
-                    ? 'bg-rose-50 border-rose-200 ring-4 ring-rose-300/50 scale-105'
-                    : 'bg-white border-light hover:shadow-md'
+                    ? 'bg-gradient-to-br from-red-400 to-red-600 border-red-500 ring-4 ring-red-300/50 scale-110 shadow-lg'
+                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:from-red-500 hover:to-red-600 hover:border-red-500 hover:shadow-lg hover:scale-105'
             } ${over ? 'drag-over' : ''}`}
             title='Trash'
+            whileHover={{
+                scale: 1.1,
+                rotate: [0, -8, 8, 0],
+                transition: {duration: 0.4},
+            }}
+            whileTap={{
+                scale: 0.95,
+                transition: {duration: 0.1},
+            }}
             onDragOver={(e) => {
                 e.preventDefault();
                 try {
@@ -45,50 +55,81 @@ function ToolbarTrashButton({
             onDragEnter={() => setOver(true)}
             onDragLeave={() => setOver(false)}
             onDrop={(e) => {
+                console.log('🎯 Drop event on trash button triggered');
                 setOver(false);
                 try {
                     const json = e.dataTransfer.getData('application/json');
-                    if (!json) return;
+                    console.log('📦 Drag data received:', json);
+                    if (!json) {
+                        console.warn('⚠️ No drag data found');
+                        return;
+                    }
                     const payload = JSON.parse(json);
+                    console.log('📋 Parsed payload:', payload);
                     const rowId = payload?.rowId as string | undefined;
-                    if (!rowId) return;
+                    if (!rowId) {
+                        console.warn('⚠️ No rowId in payload');
+                        return;
+                    }
+                    console.log(
+                        '🚀 Dispatching accounts-row-drop-trash event for rowId:',
+                        rowId,
+                    );
                     const event = new CustomEvent('accounts-row-drop-trash', {
                         detail: {rowId},
                     });
                     window.dispatchEvent(event);
-                } catch {}
+                } catch (error) {
+                    console.error('❌ Error in drop handler:', error);
+                }
             }}
         >
+            {/* Animated background glow */}
+            <div className='absolute inset-0 bg-red-400 rounded-full opacity-0 group-hover:opacity-30 blur-md transition-opacity duration-300'></div>
+
+            {/* Enhanced trash icon */}
             <svg
                 viewBox='0 0 24 24'
-                className={`w-5 h-5 text-primary/80 transition-colors duration-300 group-hover:text-primary group-hover:rotate-12 group-hover:scale-110 ${
-                    bounce ? 'trash-bounce' : ''
-                }`}
+                className={`w-5 h-5 relative z-10 transition-all duration-300 ${
+                    over
+                        ? 'text-white animate-pulse'
+                        : 'text-red-500 group-hover:text-white group-hover:animate-pulse'
+                } ${bounce ? 'trash-bounce' : ''}`}
                 fill='none'
-                stroke='url(#trash-gradient)'
-                strokeWidth='1.8'
+                stroke='currentColor'
+                strokeWidth='2.5'
                 strokeLinecap='round'
                 strokeLinejoin='round'
             >
-                <defs>
-                    <linearGradient
-                        id='trash-gradient'
-                        x1='0'
-                        y1='0'
-                        x2='1'
-                        y2='1'
-                    >
-                        <stop offset='0%' stopColor='#60A5FA' />
-                        <stop offset='40%' stopColor='#10B981' />
-                        <stop offset='75%' stopColor='#F59E0B' />
-                        <stop offset='100%' stopColor='#8B5CF6' />
-                    </linearGradient>
-                </defs>
-                <path d='M3 6h18' />
-                <path className='trash-lid' d='M8 6l1-2h6l1 2' />
-                <path d='M6 6l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13' />
-                <path d='M10 10v7M14 10v7' />
+                {/* Animated SVG paths */}
+                <motion.path
+                    d='M3 6h18'
+                    initial={{pathLength: 0}}
+                    animate={{pathLength: 1}}
+                    transition={{duration: 0.5, delay: 0.1}}
+                />
+                <motion.path
+                    className='trash-lid'
+                    d='M8 6l1-2h6l1 2'
+                    initial={{pathLength: 0}}
+                    animate={{pathLength: 1}}
+                    transition={{duration: 0.5, delay: 0.2}}
+                />
+                <motion.path
+                    d='M6 6l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13'
+                    initial={{pathLength: 0}}
+                    animate={{pathLength: 1}}
+                    transition={{duration: 0.5, delay: 0.3}}
+                />
+                <motion.path
+                    d='M10 10v7M14 10v7'
+                    initial={{pathLength: 0}}
+                    animate={{pathLength: 1}}
+                    transition={{duration: 0.5, delay: 0.4}}
+                />
             </svg>
+
+            {/* Tooltip */}
             <span
                 className={`pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-md bg-slate-900 text-white text-xs px-2 py-1 shadow-lg transition-opacity duration-200 ${
                     over ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
@@ -96,6 +137,9 @@ function ToolbarTrashButton({
             >
                 Drag a row here to delete
             </span>
+
+            {/* Ripple effect on click */}
+            <div className='absolute inset-0 rounded-full opacity-0 group-active:opacity-40 bg-red-300 animate-ping'></div>
             <style jsx>{`
                 .trash-lid {
                     transform-box: fill-box;
@@ -120,7 +164,7 @@ function ToolbarTrashButton({
                     }
                 }
             `}</style>
-        </button>
+        </motion.button>
     );
 }
 
@@ -318,6 +362,38 @@ export default function ManageAccounts() {
     >([]);
     const [viewsOpen, setViewsOpen] = useState(false);
     const [ActiveViewId, setActiveViewId] = useState<string | null>(null);
+
+    // Handle field updates from the table
+    const handleUpdateField = (rowId: string, field: string, value: any) => {
+        console.log('🔍 handleUpdateField called:', {rowId, field, value});
+        setAccounts((prev) =>
+            prev.map((account) => {
+                if (account.id === rowId) {
+                    // Handle address fields by updating the flat structure
+                    if (
+                        [
+                            'country',
+                            'addressLine1',
+                            'addressLine2',
+                            'city',
+                            'state',
+                            'pincode',
+                        ].includes(field)
+                    ) {
+                        return {
+                            ...account,
+                            [field]: value,
+                        };
+                    }
+                    return {
+                        ...account,
+                        [field]: value,
+                    };
+                }
+                return account;
+            }),
+        );
+    };
     const [hideOpen, setHideOpen] = useState(false);
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
@@ -350,17 +426,14 @@ export default function ManageAccounts() {
         | 'city'
         | 'state'
         | 'pincode'
+        | 'technicalUser'
         | 'actions'
     )[] = [
         'masterAccount',
         'accountName',
         'country',
         'addressLine1',
-        'addressLine2',
-        'city',
-        'state',
-        'pincode',
-        'actions',
+        'technicalUser',
     ];
 
     // Close dropdowns when clicking outside their containers
@@ -521,18 +594,15 @@ export default function ManageAccounts() {
             | 'city'
             | 'state'
             | 'pincode'
+            | 'technicalUser'
             | 'actions'
         )[]
     >([
-        'masterAccount',
         'accountName',
+        'masterAccount',
         'country',
         'addressLine1',
-        'addressLine2',
-        'city',
-        'state',
-        'pincode',
-        'actions',
+        'technicalUser',
     ]);
     const [views, setViews] = useState<any[]>([]);
     const currentUserId = 'demo-user';
@@ -1469,6 +1539,8 @@ export default function ManageAccounts() {
                                                 a.clientName ||
                                                 '',
                                             accountName: a.accountName,
+                                            masterAccount:
+                                                a.masterAccount || '',
                                             firstName: a.firstName || '',
                                             lastName: a.lastName || '',
                                             email: a.email || '',
@@ -1488,6 +1560,8 @@ export default function ManageAccounts() {
                                                 .join(','),
                                             productName: a.productName || '',
                                             serviceName: a.serviceName || '',
+                                            technicalUser:
+                                                a.technicalUsername || '',
                                             address: {
                                                 addressLine1:
                                                     a.address?.addressLine1 ||
@@ -1616,6 +1690,7 @@ export default function ManageAccounts() {
                                     }}
                                     visibleColumns={visibleCols}
                                     highlightQuery={searchTerm}
+                                    onUpdateField={handleUpdateField}
                                     onQuickAddRow={async () => {
                                         const newId = `tmp-${Date.now()}`;
                                         const blank = {
@@ -2827,7 +2902,7 @@ function TechnicalDetailsTab({
 
                                 <button
                                     type='button'
-                                    className='px-4 py-3 border border-primary bg-primary-light text-brand rounded-lg hover:bg-primary-light/80 transition-colors duration-200'
+                                    className='px-4 py-3 border border-transparent bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200'
                                 >
                                     + Add New TUSER
                                 </button>

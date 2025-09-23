@@ -114,9 +114,9 @@ const ManageUsers_tableConfig = {
                 InactiveValue: 'Inactive',
                 ActiveLabel: 'Active',
                 InactiveLabel: 'Inactive',
-                ActiveColor: '#10b981', // Modern emerald green for Active
-                InactiveColor: '#f97316', // Modern orange for Inactive
-                textColor: '#ffffff', // White text
+                ActiveColor: '#22c55e', // Light green for Active
+                InactiveColor: '#f3f4f6', // Light grey for Inactive
+                textColor: '#374151', // Dark grey text for contrast
                 borderRadius: '3px',
                 fillCell: true,
                 fullWidth: true,

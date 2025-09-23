@@ -1114,21 +1114,35 @@ export default function EnterpriseConfiguration() {
         };
     }, [accounts]);
 
-    // Row compression animation sequence
+    // Row squeeze animation sequence with trash effects
     const startRowCompressionAnimation = async (rowId: string) => {
-        console.log('🎬 Starting compression animation for row:', rowId);
+        console.log('🎬 Starting squeeze animation for row:', rowId);
 
-        // Step 1: Compress the row horizontally
+        // Add trash bounce and splash animation
+        const trashButton = document.getElementById('accounts-trash-target');
+        if (trashButton) {
+            trashButton.classList.add('trash-bounce');
+
+            // Add splash effect
+            trashButton.style.animation = 'trashSplash 0.6s ease-out';
+
+            setTimeout(() => {
+                trashButton.classList.remove('trash-bounce');
+                trashButton.style.animation = '';
+            }, 600);
+        }
+
+        // Step 1: Squeeze the row horizontally with animation
         setCompressingRowId(rowId);
 
-        // Wait for compression animation
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        // Wait for squeeze animation
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Step 2: Fold the row vertically
+        // Step 2: Fade out the row
         setFoldingRowId(rowId);
         setCompressingRowId(null);
 
-        // Wait for folding animation
+        // Wait for fade animation
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Step 3: Show confirmation modal
@@ -1182,8 +1196,8 @@ export default function EnterpriseConfiguration() {
     return (
         <div className='h-full bg-secondary flex flex-col'>
             {/* Header Section */}
-            <div className='bg-white px-6 py-4 border-b border-slate-200'>
-                <div className='max-w-7xl mx-auto'>
+            <div className='bg-white px-3 py-4 border-b border-slate-200'>
+                <div className='w-full'>
                     <h1 className='text-2xl font-bold text-slate-900'>
                         Enterprise Configuration
                     </h1>
@@ -1196,7 +1210,7 @@ export default function EnterpriseConfiguration() {
             </div>
 
             {/* Toolbar Section */}
-            <div className='bg-sap-light-gray px-6 py-3 text-primary border-y border-light'>
+            <div className='bg-sap-light-gray px-3 py-3 text-primary border-y border-light'>
                 <div className='flex items-center justify-between gap-3'>
                     <div className='flex items-center gap-3 flex-wrap'>
                         {/* Create New Enterprise Button */}
@@ -1677,10 +1691,10 @@ export default function EnterpriseConfiguration() {
             </div>
 
             {/* Content Area */}
-            <div className='flex-1 p-6 overflow-hidden'>
-                <div className='h-full space-y-6'>
+            <div className='flex-1 p-3 overflow-hidden'>
+                <div className='h-full space-y-3'>
                     {/* Account Details Table - Copied from Manage Accounts */}
-                    <div className='bg-card border border-light rounded-lg p-6 h-full flex flex-col'>
+                    <div className='bg-card border border-light rounded-lg p-3 h-full flex flex-col'>
                         {/* <div className='mb-4'>
                             <h2 className='text-lg font-semibold text-primary'>
                                 Enterprise Account Details
@@ -1796,7 +1810,8 @@ export default function EnterpriseConfiguration() {
                                         accountName: 'Product',
                                         country: 'Services',
                                     }}
-                                    enableDropdownChips={true}
+                                    enableDropdownChips={false}
+                                    enableInlineEditing={true}
                                     dropdownOptions={dropdownOptions}
                                     onDropdownOptionUpdate={
                                         handleDropdownOptionUpdate
