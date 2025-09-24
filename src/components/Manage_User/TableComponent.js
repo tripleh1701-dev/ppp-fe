@@ -102,7 +102,7 @@ const COLUMN_TYPES = [
             </svg>
         ),
         description: 'Dropdown with predefined options',
-        color: '#10b981',
+        color: '#4ba3ff',
         defaultWidth: 140,
         requiresOptions: true,
     },
@@ -1065,7 +1065,7 @@ const renderMainTableColumnCell = (
                                 style={{
                                     color:
                                         buttonState === 'saved'
-                                            ? '#10b981'
+                                            ? '#4ba3ff'
                                             : buttonState === 'pending'
                                             ? '#f59e0b'
                                             : '#9ca3af',
@@ -1878,7 +1878,7 @@ const renderSubitemColumnCell = (
                                 style={{
                                     color:
                                         buttonState === 'saved'
-                                            ? '#10b981'
+                                            ? '#4ba3ff'
                                             : buttonState === 'pending'
                                             ? '#f59e0b'
                                             : '#9ca3af',

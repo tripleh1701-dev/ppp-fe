@@ -205,10 +205,34 @@ export default function ManageUsers() {
     const [autoSaveTimeouts, setAutoSaveTimeouts] = useState<
         Record<string, NodeJS.Timeout>
     >({});
+    const [saveNotifications, setSaveNotifications] = useState<
+        Array<{id: string; message: string; timestamp: number}>
+    >([]);
 
     // Track which temporary IDs have been converted to real IDs to prevent duplicates
     const [convertedIds, setConvertedIds] = useState<Record<string, string>>(
         {},
+    );
+
+    // Function to show save notification
+    const showSaveNotification = useCallback(
+        (userName: string, action: string = 'saved') => {
+            const notification = {
+                id: `${Date.now()}-${Math.random()}`,
+                message: `${userName} ${action} successfully`,
+                timestamp: Date.now(),
+            };
+
+            setSaveNotifications((prev) => [...prev, notification]);
+
+            // Remove notification after 2 seconds
+            setTimeout(() => {
+                setSaveNotifications((prev) =>
+                    prev.filter((n) => n.id !== notification.id),
+                );
+            }, 2000);
+        },
+        [],
     );
 
     // Function to clean up duplicate users
@@ -335,6 +359,10 @@ export default function ManageUsers() {
                             [userId]: 'saved',
                         }));
 
+                        // Show save notification
+                        const userName = `${userData.firstName} ${userData.lastName}`;
+                        showSaveNotification(userName, 'updated');
+
                         setTimeout(() => {
                             setSavingStates((prev) => {
                                 const newState = {...prev};
@@ -430,6 +458,13 @@ export default function ManageUsers() {
                         [isNewUser ? savedUser.id : userId]: 'saved',
                     }));
 
+                    // Show save notification
+                    const userName = `${userData.firstName} ${userData.lastName}`;
+                    showSaveNotification(
+                        userName,
+                        isNewUser ? 'created' : 'updated',
+                    );
+
                     // Clear saved state after 2 seconds
                     setTimeout(() => {
                         setSavingStates((prev) => {
@@ -466,7 +501,13 @@ export default function ManageUsers() {
                 [userId]: 'saving',
             }));
         },
-        [autoSaveTimeouts, accessControlApi, convertedIds, savingStates],
+        [
+            autoSaveTimeouts,
+            accessControlApi,
+            convertedIds,
+            savingStates,
+            showSaveNotification,
+        ],
     );
 
     // New state for animated buttons
@@ -1016,6 +1057,10 @@ export default function ManageUsers() {
                                 [userId_new.toString()]: 'saved',
                             }));
 
+                            // Show save notification
+                            const userName = `${userData.firstName} ${userData.lastName}`;
+                            showSaveNotification(userName, 'created');
+
                             // Clear the temp ID from saving states
                             setSavingStates((prev) => {
                                 const newStates = {...prev};
@@ -1063,6 +1108,11 @@ export default function ManageUsers() {
                                 ...prev,
                                 [userId]: 'saved',
                             }));
+
+                            // Show save notification
+                            const userName = `${userData.firstName} ${userData.lastName}`;
+                            showSaveNotification(userName, 'updated');
+
                             console.log(
                                 '✅ User updated successfully:',
                                 userId,
@@ -1877,6 +1927,31 @@ export default function ManageUsers() {
 
     return (
         <div className='h-full bg-secondary flex flex-col relative'>
+            {/* Save Notifications */}
+            <div
+                style={{
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    zIndex: 10000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                }}
+            >
+                {saveNotifications.map((notification, index) => (
+                    <div
+                        key={notification.id}
+                        className='save-notification-toast'
+                        style={{
+                            animationDelay: `${index * 100}ms`,
+                        }}
+                    >
+                        {notification.message}
+                    </div>
+                ))}
+            </div>
+
             {/* Backdrop for sliding pane */}
             {slidingPaneOpen && (
                 <div
