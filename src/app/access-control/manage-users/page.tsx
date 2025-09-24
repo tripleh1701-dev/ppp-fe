@@ -47,6 +47,8 @@ interface UserRecord {
     createdAt: string;
     updatedAt: string;
     assignedUserGroups?: GroupRecord[];
+    hasPasswordHash?: boolean;
+    passwordSet?: boolean;
 }
 
 // Dynamic user groups - will be loaded from database
