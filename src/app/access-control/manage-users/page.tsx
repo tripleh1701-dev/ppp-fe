@@ -2182,13 +2182,13 @@ export default function ManageUsers() {
                             }
 
                             // Add blank row at the top of the table
-                            const newBlankRow = {
+                            const newBlankRow: UserRecord = {
                                 id: `temp_${Date.now()}`,
                                 firstName: '',
                                 middleName: '',
                                 lastName: '',
                                 emailAddress: '',
-                                status: 'INACTIVE',
+                                status: 'INACTIVE' as 'ACTIVE' | 'INACTIVE',
                                 startDate: new Date()
                                     .toISOString()
                                     .split('T')[0],
