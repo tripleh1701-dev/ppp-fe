@@ -2133,6 +2133,18 @@ export default function ManageUsers() {
                 <div className='flex items-center justify-start gap-2'>
                     <button
                         onClick={() => {
+                            // Check if there's already a blank row at the top
+                            const hasBlankRowAtTop = users.length > 0 && 
+                                users[0].id.toString().startsWith('temp_') &&
+                                !users[0].firstName && 
+                                !users[0].lastName && 
+                                !users[0].emailAddress;
+                            
+                            if (hasBlankRowAtTop) {
+                                console.log('⚠️ Blank row already exists at top - skipping creation');
+                                return;
+                            }
+                            
                             // Add blank row at the top of the table
                             const newBlankRow = {
                                 id: `temp_${Date.now()}`,
@@ -2141,7 +2153,9 @@ export default function ManageUsers() {
                                 lastName: '',
                                 emailAddress: '',
                                 status: 'INACTIVE',
-                                startDate: new Date().toISOString().split('T')[0],
+                                startDate: new Date()
+                                    .toISOString()
+                                    .split('T')[0],
                                 endDate: '',
                                 technicalUser: false,
                                 createdAt: new Date().toISOString(),
@@ -2150,12 +2164,12 @@ export default function ManageUsers() {
                                 hasPasswordHash: false,
                                 passwordSet: false,
                             };
-                            
+
                             // Add to the beginning of the users array
-                            setUsers(prev => [newBlankRow, ...prev]);
-                            
+                            setUsers((prev) => [newBlankRow, ...prev]);
+
                             // Also add to table data if it exists
-                            setTableData(prev => [
+                            setTableData((prev) => [
                                 {
                                     key: newBlankRow.id,
                                     id: newBlankRow.id,
@@ -2170,9 +2184,9 @@ export default function ManageUsers() {
                                     assignedGroups: [],
                                     passwordSet: false,
                                 },
-                                ...prev
+                                ...prev,
                             ]);
-                            
+
                             console.log('✨ Added blank row at top of table');
                         }}
                         className='inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200'
