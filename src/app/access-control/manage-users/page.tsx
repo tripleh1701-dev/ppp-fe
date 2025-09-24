@@ -282,7 +282,11 @@ export default function ManageUsers() {
             }
 
             // Start loading
-            setIsLoadingGroups((prev) => new Set([...prev, userId]));
+            setIsLoadingGroups((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(userId);
+                return newSet;
+            });
 
             try {
                 console.log(`🔄 Fetching fresh groups for user ${userId}`);
@@ -307,7 +311,7 @@ export default function ManageUsers() {
             } finally {
                 // Remove from loading set
                 setIsLoadingGroups((prev) => {
-                    const newSet = new Set([...prev]);
+                    const newSet = new Set(prev);
                     newSet.delete(userId);
                     return newSet;
                 });
