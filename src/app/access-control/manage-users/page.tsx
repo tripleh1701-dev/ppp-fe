@@ -363,6 +363,9 @@ export default function ManageUsers() {
                         const userName = `${userData.firstName} ${userData.lastName}`;
                         showSaveNotification(userName, 'updated');
 
+                        // Refresh data from backend to reflect actual database state
+                        await loadUsers(false);
+
                         setTimeout(() => {
                             setSavingStates((prev) => {
                                 const newState = {...prev};
@@ -465,6 +468,9 @@ export default function ManageUsers() {
                         isNewUser ? 'created' : 'updated',
                     );
 
+                    // Refresh data from backend to reflect actual database state
+                    await loadUsers(false);
+
                     // Clear saved state after 2 seconds
                     setTimeout(() => {
                         setSavingStates((prev) => {
@@ -507,6 +513,7 @@ export default function ManageUsers() {
             convertedIds,
             savingStates,
             showSaveNotification,
+            loadUsers,
         ],
     );
 
@@ -641,10 +648,11 @@ export default function ManageUsers() {
         }
     };
 
-    useEffect(() => {
-        const loadUsers = async () => {
+    // Reusable function to load users from backend
+    const loadUsers = useCallback(
+        async (showLoader = true) => {
             try {
-                setLoading(true);
+                if (showLoader) setLoading(true);
                 console.log('🔄 Loading users from RBAC API...');
 
                 // Use RBAC API service
@@ -698,10 +706,8 @@ export default function ManageUsers() {
                                     ? user.endDate.split('T')[0]
                                     : '',
                                 password: '••••••••', // Placeholder for security
-                                hasPasswordHash:
-                                    user.hasPasswordHash ||
-                                    (user.password && user.password !== ''), // Track if password exists
-                                passwordSet: user.passwordSet || false, // Alternative boolean field
+                                hasPasswordHash: user.hasPasswordHash || false, // From backend
+                                passwordSet: user.hasPasswordHash || false, // Same as hasPasswordHash
                                 technicalUser: user.technicalUser || false,
                                 assignedUserGroups: assignedGroups, // Loaded with group names
                                 assignedGroupIds: assignedGroups.map(
@@ -768,10 +774,13 @@ export default function ManageUsers() {
                 setConvertedIds({});
                 // You might want to show a toast notification here
             } finally {
-                setLoading(false);
+                if (showLoader) setLoading(false);
             }
-        };
+        },
+        [accessControlApi],
+    );
 
+    useEffect(() => {
         loadUsers();
 
         // Set up callback for user group assignment updates
@@ -1061,6 +1070,9 @@ export default function ManageUsers() {
                             const userName = `${userData.firstName} ${userData.lastName}`;
                             showSaveNotification(userName, 'created');
 
+                            // Refresh data from backend to reflect actual database state
+                            await loadUsers(false);
+
                             // Clear the temp ID from saving states
                             setSavingStates((prev) => {
                                 const newStates = {...prev};
@@ -1113,6 +1125,9 @@ export default function ManageUsers() {
                             const userName = `${userData.firstName} ${userData.lastName}`;
                             showSaveNotification(userName, 'updated');
 
+                            // Refresh data from backend to reflect actual database state
+                            await loadUsers(false);
+
                             console.log(
                                 '✅ User updated successfully:',
                                 userId,
@@ -1150,7 +1165,7 @@ export default function ManageUsers() {
             // Store the timeout ID
             setAutoSaveTimeouts((prev) => ({...prev, [userId]: timeoutId}));
         },
-        [autoSaveTimeouts],
+        [autoSaveTimeouts, showSaveNotification, loadUsers],
     );
 
     // Enhanced onDataChange with auto-save
@@ -1715,18 +1730,6 @@ export default function ManageUsers() {
     const [assignGroupsOpen, setAssignGroupsOpen] = useState(false);
     const [assignGroupsAnchor, setAssignGroupsAnchor] =
         useState<HTMLElement | null>(null);
-
-    const loadUsers = async () => {
-        setLoading(true);
-        try {
-            const data = await accessControlApi.listUsers({limit: 1000});
-            setUsers(data);
-        } catch (error) {
-            console.error('Failed to load users:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const loadUserGroups = async () => {
         try {
