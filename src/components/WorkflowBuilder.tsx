@@ -16,6 +16,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import Sidebar from './Sidebar';
+import ModernConnectorToolbar from './ModernConnectorToolbar';
 import PipelineHeader from './PipelineHeader';
 import WorkflowNode from './WorkflowNode';
 import PipelinePanels from './PipelinePanels';
@@ -1073,10 +1074,10 @@ function WorkflowBuilderContent({
                     </ReactFlow>
                 </div>
 
-                {/* New Sliding Sidebar (Left) - Hidden in read-only mode */}
+                {/* Modern Connector Toolbar (Top) - Hidden in read-only mode */}
                 {!isReadOnly && (
-                    <div className='absolute top-0 left-0 h-full z-40'>
-                        <Sidebar onDragStart={onDragStart} />
+                    <div className='absolute top-0 left-0 right-0 z-40'>
+                        <ModernConnectorToolbar onDragStart={onDragStart} />
                     </div>
                 )}
             </div>

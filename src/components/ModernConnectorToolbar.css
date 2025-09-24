@@ -1,0 +1,197 @@
+/* Modern Connector Toolbar Animations */
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes bounce-subtle {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-2px);
+    }
+    60% {
+        transform: translateY(-1px);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.2s ease-out forwards;
+}
+
+.animate-pulse-subtle {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-bounce-subtle {
+    animation: bounce-subtle 0.6s ease-in-out;
+}
+
+/* Hover effects for icons */
+.modern-icon-container:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease-in-out;
+}
+
+.modern-icon-container.active {
+    transform: scale(1.1);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Connector panel slide animations */
+.connector-panel-enter {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.connector-panel-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.connector-panel-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.connector-panel-exit-active {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+}
+
+/* Backdrop blur effect */
+.modern-toolbar-backdrop {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Vertical toolbar specific styles */
+.vertical-toolbar {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    min-height: fit-content;
+}
+
+/* Responsive positioning for smaller screens */
+@media (max-height: 800px) {
+    .vertical-toolbar {
+        max-height: calc(100vh - 200px);
+    }
+}
+
+@media (max-height: 600px) {
+    .vertical-toolbar {
+        max-height: calc(100vh - 150px);
+    }
+}
+
+/* Horizontal panel sliding animation */
+.panel-slide-in {
+    animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+@keyframes slideInFromLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px) translateY(-50%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) translateY(-50%);
+    }
+}
+
+/* Custom scrollbar for connector panel */
+.connector-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.connector-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.connector-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.connector-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Glass morphism effect */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gradient borders for active states */
+.gradient-border {
+    background: linear-gradient(white, white) padding-box,
+        linear-gradient(45deg, #3b82f6, #8b5cf6, #10b981) border-box;
+    border: 2px solid transparent;
+}
+
+/* Smooth transitions for all interactive elements */
+.modern-transition {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shadow effects */
+.modern-shadow {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+        0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.modern-shadow-lg {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Loading shimmer effect for icons */
+@keyframes shimmer {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.loading-shimmer {
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
+    background-size: 200px 100%;
+    animation: shimmer 1.6s infinite;
+}
