@@ -1117,7 +1117,11 @@ const renderMainTableColumnCell = (
 
         case 'toggle':
             const toggleConfig = column.toggleConfig || {};
-            const isActive = value === (toggleConfig.ActiveValue || 'Active');
+            // Handle both 'ACTIVE' and 'Active' from database
+            const isActive =
+                value === (toggleConfig.ActiveValue || 'Active') ||
+                value === 'ACTIVE' ||
+                value === 'active';
             const activeColor = toggleConfig.ActiveColor || '#4ba3ff';
             const inactiveColor = toggleConfig.InactiveColor || '#ef4444';
             const textColor = toggleConfig.textColor || '#ffffff';

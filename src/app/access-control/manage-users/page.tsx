@@ -647,7 +647,7 @@ export default function ManageUsers() {
                                 middleName: user.middleName || '',
                                 lastName: user.lastName || '',
                                 emailAddress: user.emailAddress || '',
-                                status: '',
+                                status: user.status || 'INACTIVE', // Use actual database status
                                 startDate: user.startDate
                                     ? user.startDate.split('T')[0]
                                     : '', // Convert to YYYY-MM-DD
@@ -655,6 +655,10 @@ export default function ManageUsers() {
                                     ? user.endDate.split('T')[0]
                                     : '',
                                 password: '••••••••', // Placeholder for security
+                                hasPasswordHash:
+                                    user.hasPasswordHash ||
+                                    (user.password && user.password !== ''), // Track if password exists
+                                passwordSet: user.passwordSet || false, // Alternative boolean field
                                 technicalUser: user.technicalUser || false,
                                 assignedUserGroups: assignedGroups, // Loaded with group names
                                 assignedGroupIds: assignedGroups.map(
@@ -1200,7 +1204,7 @@ export default function ManageUsers() {
             },
             saved: {
                 text: 'Saved',
-                color: '#10b981',
+                color: '#4ba3ff',
                 icon: '✓',
             },
             error: {
