@@ -1149,6 +1149,32 @@ export default function ManageUsers() {
                         userData.id.toString().startsWith('item-') ||
                         isNaN(parseInt(userData.id.toString(), 10))
                     ) {
+                        // Validate required fields before creating user
+                        const hasRequiredFields =
+                            userData.firstName &&
+                            userData.firstName.trim() &&
+                            userData.lastName &&
+                            userData.lastName.trim() &&
+                            userData.emailAddress &&
+                            userData.emailAddress.trim() &&
+                            userData.emailAddress.includes('@');
+
+                        if (!hasRequiredFields) {
+                            console.log(
+                                '⚠️ Skipping auto-save: Required fields missing',
+                                {
+                                    firstName: userData.firstName,
+                                    lastName: userData.lastName,
+                                    emailAddress: userData.emailAddress,
+                                },
+                            );
+                            setSavingStates((prev) => ({
+                                ...prev,
+                                [userId]: 'error',
+                            }));
+                            return;
+                        }
+
                         // Create new user
                         console.log('🆕 Auto-saving new user:', backendData);
                         const response = await userService.createUser(
@@ -2134,17 +2160,20 @@ export default function ManageUsers() {
                     <button
                         onClick={() => {
                             // Check if there's already a blank row at the top
-                            const hasBlankRowAtTop = users.length > 0 && 
+                            const hasBlankRowAtTop =
+                                users.length > 0 &&
                                 users[0].id.toString().startsWith('temp_') &&
-                                !users[0].firstName && 
-                                !users[0].lastName && 
+                                !users[0].firstName &&
+                                !users[0].lastName &&
                                 !users[0].emailAddress;
-                            
+
                             if (hasBlankRowAtTop) {
-                                console.log('⚠️ Blank row already exists at top - skipping creation');
+                                console.log(
+                                    '⚠️ Blank row already exists at top - skipping creation',
+                                );
                                 return;
                             }
-                            
+
                             // Add blank row at the top of the table
                             const newBlankRow = {
                                 id: `temp_${Date.now()}`,
