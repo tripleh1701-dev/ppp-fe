@@ -1,10 +1,5 @@
 import {api} from './api';
-import {
-    Entity,
-    Service,
-    Role,
-    UserGroup,
-} from '@/constants/formOptions';
+import {Entity, Service, Role, UserGroup} from '@/constants/formOptions';
 
 // Cache for dynamic data to avoid repeated API calls
 class DynamicDataCache {

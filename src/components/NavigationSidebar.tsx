@@ -118,6 +118,7 @@ export default function NavigationSidebar({
         firstName: '',
         lastName: '',
         emailAddress: '',
+        role: '',
     });
 
     // Load current user data from API
@@ -134,22 +135,25 @@ export default function NavigationSidebar({
                         lastName: userData.lastName || '',
                         emailAddress:
                             userData.emailAddress || 'user@company.com',
+                        role: userData.role || 'User',
                     });
                 } else {
-                    // Fallback for development/demo purposes
+                    // Temporary hardcoded user for demo purposes
                     setCurrentUser({
-                        firstName: 'Current',
-                        lastName: 'User',
-                        emailAddress: 'user@company.com',
+                        firstName: 'Nihar',
+                        lastName: 'Sharma',
+                        emailAddress: 'nihar.sharma@company.com',
+                        role: 'Administrator',
                     });
                 }
             } catch (error) {
                 console.error('Error loading current user:', error);
-                // Fallback for development/demo purposes
+                // Temporary hardcoded user for demo purposes
                 setCurrentUser({
-                    firstName: 'Current',
-                    lastName: 'User',
-                    emailAddress: 'user@company.com',
+                    firstName: 'Nihar',
+                    lastName: 'Sharma',
+                    emailAddress: 'nihar.sharma@company.com',
+                    role: 'Administrator',
                 });
             }
         };
@@ -554,6 +558,7 @@ export default function NavigationSidebar({
                                         {currentUser.lastName}
                                     </p>
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
+                                        {currentUser.role} -{' '}
                                         {currentUser.emailAddress}
                                     </p>
                                 </div>
@@ -564,10 +569,11 @@ export default function NavigationSidebar({
                                 <div className='absolute left-full ml-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-xl border border-slate-600'>
                                     <div>
                                         <div className='font-medium'>
-                                            Nihar Sharma
+                                            {currentUser.firstName}{' '}
+                                            {currentUser.lastName}
                                         </div>
                                         <div className='text-xs text-slate-300'>
-                                            Administrator
+                                            {currentUser.role}
                                         </div>
                                     </div>
                                 </div>
