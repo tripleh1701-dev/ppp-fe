@@ -208,6 +208,7 @@ export default function ManageUsers() {
     const [saveNotifications, setSaveNotifications] = useState<
         Array<{id: string; message: string; timestamp: number}>
     >([]);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Track which temporary IDs have been converted to real IDs to prevent duplicates
     const [convertedIds, setConvertedIds] = useState<Record<string, string>>(
@@ -364,7 +365,7 @@ export default function ManageUsers() {
                         showSaveNotification(userName, 'updated');
 
                         // Refresh data from backend to reflect actual database state
-                        await loadUsers(false);
+                        setRefreshTrigger(prev => prev + 1);
 
                         setTimeout(() => {
                             setSavingStates((prev) => {
@@ -462,14 +463,16 @@ export default function ManageUsers() {
                     }));
 
                     // Show save notification
-                    const userName = `${userData.firstName} ${userData.lastName}`;
+                    console.log('📣 Notification userData:', userData);
+                    const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
+                    console.log('📣 Notification userName:', userName);
                     showSaveNotification(
                         userName,
                         isNewUser ? 'created' : 'updated',
                     );
 
                     // Refresh data from backend to reflect actual database state
-                    await loadUsers(false);
+                    setRefreshTrigger(prev => prev + 1);
 
                     // Clear saved state after 2 seconds
                     setTimeout(() => {
@@ -513,7 +516,6 @@ export default function ManageUsers() {
             convertedIds,
             savingStates,
             showSaveNotification,
-            loadUsers,
         ],
     );
 
@@ -862,7 +864,7 @@ export default function ManageUsers() {
             delete (window as any).setPendingGroupAssignments;
             delete (window as any).removeGroupFromUserCallback;
         };
-    }, []);
+    }, [refreshTrigger]);
 
     // Handler functions for action buttons
     const handleSort = (column: string) => {
@@ -1067,11 +1069,13 @@ export default function ManageUsers() {
                             }));
 
                             // Show save notification
-                            const userName = `${userData.firstName} ${userData.lastName}`;
+                            console.log('📣 AutoSave Create - userData:', userData);
+                            const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
+                            console.log('📣 AutoSave Create - userName:', userName);
                             showSaveNotification(userName, 'created');
 
                             // Refresh data from backend to reflect actual database state
-                            await loadUsers(false);
+                            setRefreshTrigger(prev => prev + 1);
 
                             // Clear the temp ID from saving states
                             setSavingStates((prev) => {
@@ -1121,12 +1125,14 @@ export default function ManageUsers() {
                                 [userId]: 'saved',
                             }));
 
-                            // Show save notification
-                            const userName = `${userData.firstName} ${userData.lastName}`;
-                            showSaveNotification(userName, 'updated');
+                        // Show save notification
+                        console.log('📣 AutoSave Update - userData:', userData);
+                        const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
+                        console.log('📣 AutoSave Update - userName:', userName);
+                        showSaveNotification(userName, 'updated');
 
-                            // Refresh data from backend to reflect actual database state
-                            await loadUsers(false);
+                        // Refresh data from backend to reflect actual database state
+                        setRefreshTrigger(prev => prev + 1);
 
                             console.log(
                                 '✅ User updated successfully:',
