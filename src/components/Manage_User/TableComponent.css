@@ -2,6 +2,64 @@
    MODERN PROFESSIONAL COLOR SYSTEM
    ======================================== */
 
+/* Table Scrolling Styles */
+.advanced-table-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px);
+    min-height: 400px;
+}
+
+.advanced-table-container .table-wrapper {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.advanced-table-container table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Sticky table header */
+.advanced-table-container thead th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    border-bottom: 2px solid var(--border-medium);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Custom scrollbar for better UX */
+.advanced-table-container .table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.advanced-table-container .table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.advanced-table-container .table-wrapper::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.advanced-table-container .table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Ensure table takes full height */
+.modern-table-wrapper {
+    height: 100%;
+    overflow: hidden;
+}
+
 :root {
     /* Primary Brand Colors - Professional Blue Palette */
     --brand-primary: #1a73e8;

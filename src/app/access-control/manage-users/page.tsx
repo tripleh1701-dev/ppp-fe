@@ -209,10 +209,19 @@ export default function ManageUsers() {
         Array<{id: string; message: string; timestamp: number}>
     >([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    
+
     // API optimization states
     const [pendingSaves, setPendingSaves] = useState(new Set<string>());
     const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+
+    // Caching states
+    const [userGroupsCache, setUserGroupsCache] = useState(
+        new Map<string, any[]>(),
+    );
+    const [cacheTimestamps, setCacheTimestamps] = useState(
+        new Map<string, number>(),
+    );
+    const [isLoadingGroups, setIsLoadingGroups] = useState(new Set<string>());
 
     // Track which temporary IDs have been converted to real IDs to prevent duplicates
     const [convertedIds, setConvertedIds] = useState<Record<string, string>>(
@@ -239,6 +248,96 @@ export default function ManageUsers() {
         },
         [],
     );
+
+    // Cached user groups fetching
+    const getCachedUserGroups = useCallback(
+        async (userId: string): Promise<any[]> => {
+            const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+            const now = Date.now();
+
+            // Check if we have valid cached data
+            const cachedData = userGroupsCache.get(userId);
+            const cacheTime = cacheTimestamps.get(userId);
+
+            if (cachedData && cacheTime && now - cacheTime < CACHE_DURATION) {
+                console.log(`📋 Using cached groups for user ${userId}`);
+                return cachedData;
+            }
+
+            // Check if already loading to prevent duplicate requests
+            if (isLoadingGroups.has(userId)) {
+                console.log(
+                    `⏳ Already loading groups for user ${userId}, waiting...`,
+                );
+                // Wait for the ongoing request
+                return new Promise((resolve) => {
+                    const checkInterval = setInterval(() => {
+                        if (!isLoadingGroups.has(userId)) {
+                            clearInterval(checkInterval);
+                            const data = userGroupsCache.get(userId) || [];
+                            resolve(data);
+                        }
+                    }, 100);
+                });
+            }
+
+            // Start loading
+            setIsLoadingGroups((prev) => new Set([...prev, userId]));
+
+            try {
+                console.log(`🔄 Fetching fresh groups for user ${userId}`);
+                const response = await accessControlApi.get(
+                    `/users/${userId}/groups`,
+                );
+                const groups = response.data || [];
+
+                // Cache the data
+                setUserGroupsCache(
+                    (prev) => new Map([...prev, [userId, groups]]),
+                );
+                setCacheTimestamps((prev) => new Map([...prev, [userId, now]]));
+
+                return groups;
+            } catch (error) {
+                console.error(
+                    `❌ Failed to fetch groups for user ${userId}:`,
+                    error,
+                );
+                return [];
+            } finally {
+                // Remove from loading set
+                setIsLoadingGroups((prev) => {
+                    const newSet = new Set([...prev]);
+                    newSet.delete(userId);
+                    return newSet;
+                });
+            }
+        },
+        [userGroupsCache, cacheTimestamps, isLoadingGroups, accessControlApi],
+    );
+
+    // Cache invalidation function
+    const invalidateUserGroupsCache = useCallback((userId?: string) => {
+        if (userId) {
+            // Invalidate specific user's cache
+            setUserGroupsCache((prev) => {
+                const newCache = new Map([...prev]);
+                newCache.delete(userId);
+                return newCache;
+            });
+            setCacheTimestamps((prev) => {
+                const newTimestamps = new Map([...prev]);
+                newTimestamps.delete(userId);
+                return newTimestamps;
+            });
+            console.log(`🗑️ Invalidated cache for user ${userId}`);
+        } else {
+            // Clear all cache
+            setUserGroupsCache(new Map());
+            setCacheTimestamps(new Map());
+            console.log('🗑️ Cleared all user groups cache');
+        }
+    }, []);
 
     // Function to clean up duplicate users
     const cleanupDuplicateUsers = useCallback(async () => {
@@ -676,13 +775,12 @@ export default function ManageUsers() {
                     // Transform backend data to match advanced table column structure exactly
                     const transformedUsers = await Promise.all(
                         usersData.map(async (user, index) => {
-                            // Get assigned groups using RBAC API
+                            // Get assigned groups using cached API
                             let assignedGroups: any[] = [];
                             try {
-                                assignedGroups =
-                                    await accessControlApi.getUserGroups(
-                                        user.id,
-                                    );
+                                assignedGroups = await getCachedUserGroups(
+                                    user.id,
+                                );
                                 console.log(
                                     `👤 User ${user.firstName} ${user.lastName} has assigned groups:`,
                                     assignedGroups,
@@ -785,7 +883,7 @@ export default function ManageUsers() {
                 if (showLoader) setLoading(false);
             }
         },
-        [accessControlApi],
+        [accessControlApi, getCachedUserGroups],
     );
 
     useEffect(() => {
@@ -1086,10 +1184,14 @@ export default function ManageUsers() {
                             console.log(`🎉 Created user: ${userName}`);
                             showSaveNotification(userName, 'created');
 
+                            // Invalidate cache for the new user
+                            invalidateUserGroupsCache(userId_new.toString());
+
                             // Delay refresh to batch multiple saves
                             setTimeout(() => {
                                 const now = Date.now();
-                                if (now - lastRefreshTime > 2000) { // Only refresh if 2+ seconds since last refresh
+                                if (now - lastRefreshTime > 2000) {
+                                    // Only refresh if 2+ seconds since last refresh
                                     setRefreshTrigger((prev) => prev + 1);
                                     setLastRefreshTime(now);
                                 }
@@ -1150,10 +1252,14 @@ export default function ManageUsers() {
                             console.log(`💾 Updated user: ${userName}`);
                             showSaveNotification(userName, 'updated');
 
+                            // Invalidate cache for the updated user
+                            invalidateUserGroupsCache(userId);
+
                             // Delay refresh to batch multiple saves
                             setTimeout(() => {
                                 const now = Date.now();
-                                if (now - lastRefreshTime > 2000) { // Only refresh if 2+ seconds since last refresh
+                                if (now - lastRefreshTime > 2000) {
+                                    // Only refresh if 2+ seconds since last refresh
                                     setRefreshTrigger((prev) => prev + 1);
                                     setLastRefreshTime(now);
                                 }
@@ -1196,7 +1302,12 @@ export default function ManageUsers() {
             // Store the timeout ID
             setAutoSaveTimeouts((prev) => ({...prev, [userId]: timeoutId}));
         },
-        [autoSaveTimeouts, showSaveNotification, lastRefreshTime],
+        [
+            autoSaveTimeouts,
+            showSaveNotification,
+            lastRefreshTime,
+            invalidateUserGroupsCache,
+        ],
     );
 
     // Enhanced onDataChange with auto-save
@@ -3692,9 +3803,9 @@ export default function ManageUsers() {
                         </p>
                     </div>
                 ) : !showCreateInline && !showUserTable && !loading ? (
-                    <div className='w-full overflow-x-auto'>
+                    <div className='w-full h-[calc(100vh-250px)] overflow-auto border border-gray-200 rounded-lg'>
                         <div
-                            className='advanced-table-container compact-mode modern-table-wrapper'
+                            className='advanced-table-container compact-mode modern-table-wrapper h-full'
                             data-advanced-features='true'
                             data-compact-mode='true'
                             data-modern-ui='true'
@@ -3766,18 +3877,26 @@ export default function ManageUsers() {
                                             onDataChange: async (
                                                 updatedData: any,
                                             ) => {
-                                                console.log(`📝 Table data changed: ${updatedData.length} users`);
+                                                console.log(
+                                                    `📝 Table data changed: ${updatedData.length} users`,
+                                                );
 
                                                 // Update local state
                                                 setTableData(updatedData);
 
                                                 // Find which user was changed by comparing with current data
                                                 const currentDataMap = new Map(
-                                                    tableData.map(user => [user.id, user])
+                                                    tableData.map((user) => [
+                                                        user.id,
+                                                        user,
+                                                    ]),
                                                 );
 
                                                 for (const updatedUser of updatedData) {
-                                                    const currentUser = currentDataMap.get(updatedUser.id);
+                                                    const currentUser =
+                                                        currentDataMap.get(
+                                                            updatedUser.id,
+                                                        );
 
                                                     console.log(
                                                         `🔍 Processing: ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.id})`,
@@ -3880,9 +3999,22 @@ export default function ManageUsers() {
                                                         hasChanges
                                                     ) {
                                                         console.log(
-                                                            `🔄 Processing save for: ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.id}) - ${isNewUser ? 'NEW' : 'UPDATE'}`,
+                                                            `🔄 Processing save for: ${
+                                                                updatedUser.firstName
+                                                            } ${
+                                                                updatedUser.lastName
+                                                            } (${
+                                                                updatedUser.id
+                                                            }) - ${
+                                                                isNewUser
+                                                                    ? 'NEW'
+                                                                    : 'UPDATE'
+                                                            }`,
                                                         );
-                                                        autoSaveUser(updatedUser, isNewUser);
+                                                        autoSaveUser(
+                                                            updatedUser,
+                                                            isNewUser,
+                                                        );
                                                     }
                                                 }
                                             },
