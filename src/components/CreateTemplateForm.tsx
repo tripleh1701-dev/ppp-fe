@@ -4,7 +4,6 @@ import {useState} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
     ENTERPRISES,
-    FALLBACK_ENTITIES,
     DEPLOYMENT_TYPE_OPTIONS,
     FORM_DEFAULTS,
     FORM_VALIDATION,
@@ -292,7 +291,7 @@ export default function CreateTemplateForm({
                                         <option value=''>
                                             Choose an entity...
                                         </option>
-                                        {FALLBACK_ENTITIES.map((entity) => (
+                                        {[].map((entity) => (
                                             <option key={entity} value={entity}>
                                                 {entity}
                                             </option>

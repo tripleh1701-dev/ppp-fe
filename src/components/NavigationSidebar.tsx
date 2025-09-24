@@ -114,13 +114,45 @@ export default function NavigationSidebar({
     const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
-
-    // Current user data loaded from authentication context/API
-    const currentUser = {
+    const [currentUser, setCurrentUser] = useState({
         firstName: '',
         lastName: '',
         emailAddress: '',
-    };
+    });
+
+    // Load current user data from API
+    useEffect(() => {
+        const loadCurrentUser = async () => {
+            try {
+                const response = await fetch('http://localhost:4000/api/auth/current-user');
+                if (response.ok) {
+                    const userData = await response.json();
+                    setCurrentUser({
+                        firstName: userData.firstName || 'User',
+                        lastName: userData.lastName || '',
+                        emailAddress: userData.emailAddress || 'user@company.com',
+                    });
+                } else {
+                    // Fallback for development/demo purposes
+                    setCurrentUser({
+                        firstName: 'Current',
+                        lastName: 'User',
+                        emailAddress: 'user@company.com',
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading current user:', error);
+                // Fallback for development/demo purposes  
+                setCurrentUser({
+                    firstName: 'Current',
+                    lastName: 'User',
+                    emailAddress: 'user@company.com',
+                });
+            }
+        };
+
+        loadCurrentUser();
+    }, []);
 
     // Function to generate user initials
     const getUserInitials = (firstName: string, lastName: string) => {
