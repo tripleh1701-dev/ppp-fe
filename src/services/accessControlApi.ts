@@ -17,6 +17,7 @@ export interface UserRecord {
     startDate: string;
     endDate?: string;
     technicalUser: boolean;
+    hasPasswordHash?: boolean;
     createdAt: string;
     updatedAt: string;
 }
