@@ -4,7 +4,6 @@ import {
     Service,
     Role,
     UserGroup,
-    FALLBACK_ENTITIES,
 } from '@/constants/formOptions';
 
 // Cache for dynamic data to avoid repeated API calls

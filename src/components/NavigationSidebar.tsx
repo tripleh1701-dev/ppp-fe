@@ -124,13 +124,16 @@ export default function NavigationSidebar({
     useEffect(() => {
         const loadCurrentUser = async () => {
             try {
-                const response = await fetch('http://localhost:4000/api/auth/current-user');
+                const response = await fetch(
+                    'http://localhost:4000/api/auth/current-user',
+                );
                 if (response.ok) {
                     const userData = await response.json();
                     setCurrentUser({
                         firstName: userData.firstName || 'User',
                         lastName: userData.lastName || '',
-                        emailAddress: userData.emailAddress || 'user@company.com',
+                        emailAddress:
+                            userData.emailAddress || 'user@company.com',
                     });
                 } else {
                     // Fallback for development/demo purposes
@@ -142,7 +145,7 @@ export default function NavigationSidebar({
                 }
             } catch (error) {
                 console.error('Error loading current user:', error);
-                // Fallback for development/demo purposes  
+                // Fallback for development/demo purposes
                 setCurrentUser({
                     firstName: 'Current',
                     lastName: 'User',

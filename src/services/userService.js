@@ -389,4 +389,5 @@ class UserService {
 }
 
 // Export singleton instance
-export default new UserService();
+const userService = new UserService();
+export default userService;
