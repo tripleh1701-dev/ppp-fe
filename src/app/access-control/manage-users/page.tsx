@@ -209,6 +209,10 @@ export default function ManageUsers() {
         Array<{id: string; message: string; timestamp: number}>
     >([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    
+    // API optimization states
+    const [pendingSaves, setPendingSaves] = useState(new Set<string>());
+    const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
 
     // Track which temporary IDs have been converted to real IDs to prevent duplicates
     const [convertedIds, setConvertedIds] = useState<Record<string, string>>(
@@ -1006,7 +1010,11 @@ export default function ManageUsers() {
     const autoSaveUser = useCallback(
         async (userData: any, isNewUser: boolean = false) => {
             const userId = userData.id;
-            console.log(`🎯 ${isNewUser ? 'Creating' : 'Updating'} user: ${userData.firstName} ${userData.lastName} (${userId})`);
+            console.log(
+                `🎯 ${isNewUser ? 'Creating' : 'Updating'} user: ${
+                    userData.firstName
+                } ${userData.lastName} (${userId})`,
+            );
 
             // Clear existing timeout for this user
             if (autoSaveTimeouts[userId]) {
@@ -1072,21 +1080,20 @@ export default function ManageUsers() {
                             }));
 
                             // Show save notification
-                            console.log(
-                                '📣 AutoSave Create - userData:',
-                                userData,
-                            );
                             const userName = `${
                                 userData.firstName || 'Unknown'
                             } ${userData.lastName || 'User'}`;
-                            console.log(
-                                '📣 AutoSave Create - userName:',
-                                userName,
-                            );
+                            console.log(`🎉 Created user: ${userName}`);
                             showSaveNotification(userName, 'created');
 
-                            // Refresh data from backend to reflect actual database state
-                            setRefreshTrigger((prev) => prev + 1);
+                            // Delay refresh to batch multiple saves
+                            setTimeout(() => {
+                                const now = Date.now();
+                                if (now - lastRefreshTime > 2000) { // Only refresh if 2+ seconds since last refresh
+                                    setRefreshTrigger((prev) => prev + 1);
+                                    setLastRefreshTime(now);
+                                }
+                            }, 1000);
 
                             // Clear the temp ID from saving states
                             setSavingStates((prev) => {
@@ -1137,21 +1144,20 @@ export default function ManageUsers() {
                             }));
 
                             // Show save notification
-                            console.log(
-                                '📣 AutoSave Update - userData:',
-                                userData,
-                            );
                             const userName = `${
                                 userData.firstName || 'Unknown'
                             } ${userData.lastName || 'User'}`;
-                            console.log(
-                                '📣 AutoSave Update - userName:',
-                                userName,
-                            );
+                            console.log(`💾 Updated user: ${userName}`);
                             showSaveNotification(userName, 'updated');
 
-                            // Refresh data from backend to reflect actual database state
-                            setRefreshTrigger((prev) => prev + 1);
+                            // Delay refresh to batch multiple saves
+                            setTimeout(() => {
+                                const now = Date.now();
+                                if (now - lastRefreshTime > 2000) { // Only refresh if 2+ seconds since last refresh
+                                    setRefreshTrigger((prev) => prev + 1);
+                                    setLastRefreshTime(now);
+                                }
+                            }, 1000);
 
                             console.log(
                                 '✅ User updated successfully:',
@@ -1190,7 +1196,7 @@ export default function ManageUsers() {
             // Store the timeout ID
             setAutoSaveTimeouts((prev) => ({...prev, [userId]: timeoutId}));
         },
-        [autoSaveTimeouts, showSaveNotification, loadUsers],
+        [autoSaveTimeouts, showSaveNotification, lastRefreshTime],
     );
 
     // Enhanced onDataChange with auto-save
@@ -1227,7 +1233,9 @@ export default function ManageUsers() {
                     user.emailAddress.includes('@') &&
                     user.emailAddress.includes('.') &&
                     user.emailAddress.length > 6 &&
-                    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(user.emailAddress) &&
+                    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
+                        user.emailAddress,
+                    ) &&
                     !user.emailAddress.endsWith('@') &&
                     !user.emailAddress.includes('@.');
                 const shouldAutoSave = hasBasicInfo && hasValidEmail;
@@ -3758,42 +3766,21 @@ export default function ManageUsers() {
                                             onDataChange: async (
                                                 updatedData: any,
                                             ) => {
-                                                console.log(
-                                                    '📝 Data changed (2nd table):',
-                                                    updatedData,
-                                                );
-                                                console.log(
-                                                    '📊 Current tableData (2nd table):',
-                                                    tableData,
-                                                );
+                                                console.log(`📝 Table data changed: ${updatedData.length} users`);
 
                                                 // Update local state
                                                 setTableData(updatedData);
 
                                                 // Find which user was changed by comparing with current data
-                                                const currentData = tableData;
+                                                const currentDataMap = new Map(
+                                                    tableData.map(user => [user.id, user])
+                                                );
 
-                                                for (
-                                                    let i = 0;
-                                                    i < updatedData.length;
-                                                    i++
-                                                ) {
-                                                    const updatedUser =
-                                                        updatedData[i];
-                                                    const currentUser =
-                                                        currentData[i];
+                                                for (const updatedUser of updatedData) {
+                                                    const currentUser = currentDataMap.get(updatedUser.id);
 
                                                     console.log(
-                                                        `🔍 Processing user ${i} (2nd table):`,
-                                                        {
-                                                            id: updatedUser.id,
-                                                            firstName:
-                                                                updatedUser.firstName,
-                                                            lastName:
-                                                                updatedUser.lastName,
-                                                            emailAddress:
-                                                                updatedUser.emailAddress,
-                                                        },
+                                                        `🔍 Processing: ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.id})`,
                                                     );
 
                                                     // Check if this user has valid data for saving
@@ -3893,19 +3880,9 @@ export default function ManageUsers() {
                                                         hasChanges
                                                     ) {
                                                         console.log(
-                                                            `🔄 User ${
-                                                                updatedUser.id
-                                                            } ${
-                                                                isNewUser
-                                                                    ? 'is new'
-                                                                    : 'changed'
-                                                            }, triggering debounced save`,
+                                                            `🔄 Processing save for: ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.id}) - ${isNewUser ? 'NEW' : 'UPDATE'}`,
                                                         );
-                                                        debouncedSaveUser(
-                                                            updatedUser.id,
-                                                            updatedUser,
-                                                        );
-                                                        break; // Only save the first changed user to avoid multiple saves
+                                                        autoSaveUser(updatedUser, isNewUser);
                                                     }
                                                 }
                                             },
