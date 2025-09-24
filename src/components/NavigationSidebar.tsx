@@ -142,7 +142,7 @@ export default function NavigationSidebar({
                     setCurrentUser({
                         firstName: 'Nihar',
                         lastName: 'Sharma',
-                        emailAddress: 'nihar.sharma@company.com',
+                        emailAddress: '',
                         role: 'Administrator',
                     });
                 }
@@ -152,7 +152,7 @@ export default function NavigationSidebar({
                 setCurrentUser({
                     firstName: 'Nihar',
                     lastName: 'Sharma',
-                    emailAddress: 'nihar.sharma@company.com',
+                    emailAddress: '',
                     role: 'Administrator',
                 });
             }
@@ -558,7 +558,7 @@ export default function NavigationSidebar({
                                         {currentUser.lastName}
                                     </p>
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
-                                        {currentUser.role} -{' '}
+                                        {currentUser.role}{' '}
                                         {currentUser.emailAddress}
                                     </p>
                                 </div>

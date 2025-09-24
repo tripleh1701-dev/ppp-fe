@@ -98,7 +98,7 @@ const COLUMN_TYPES = [
             </svg>
         ),
         description: 'Dropdown with predefined options',
-        color: '#10b981',
+        color: '#4ba3ff',
         defaultWidth: 140,
         requiresOptions: true,
     },
@@ -332,7 +332,7 @@ const renderMainTableColumnCell = (
         case 'toggle':
             const toggleConfig = column.toggleConfig || {};
             const isActive = value === (toggleConfig.ActiveValue || 'Active');
-            const activeColor = toggleConfig.ActiveColor || '#22c55e';
+            const activeColor = toggleConfig.ActiveColor || '#4ba3ff';
             const inactiveColor = toggleConfig.InactiveColor || '#ef4444';
             const textColor = toggleConfig.textColor || '#ffffff';
 

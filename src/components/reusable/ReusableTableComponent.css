@@ -386,7 +386,7 @@
 }
 
 .save-btn {
-    background: #10b981;
+    background: #4ba3ff;
     color: white;
     left: 50%;
     transform: translateX(-50%) scale(0);
@@ -1013,7 +1013,7 @@ select.add-task-input option {
     align-items: center;
     padding: 2px 8px; /* Reduced for compact rows */
     margin: 1px; /* Reduced for compact rows */
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #4ba3ff 0%, #2563eb 100%);
     color: white;
     border-radius: 16px;
     font-size: 12px;
@@ -1033,7 +1033,7 @@ select.add-task-input option {
 
 /* Different colors for different types of values */
 .status-pill.status-default {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #4ba3ff 0%, #2563eb 100%);
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
@@ -2699,7 +2699,7 @@ select.add-task-input option {
 .auto-save-saved {
     background-color: #d1fae5;
     color: #065f46;
-    border: 1px solid #10b981;
+    border: 1px solid #4ba3ff;
 }
 
 .auto-save-error {
@@ -2713,7 +2713,7 @@ select.add-task-input option {
 }
 
 .auto-save-check {
-    color: #10b981;
+    color: #4ba3ff;
 }
 
 .auto-save-error {
@@ -2783,7 +2783,7 @@ select.add-task-input option {
 }
 
 .table-chip-single {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #4ba3ff 0%, #2563eb 100%);
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 

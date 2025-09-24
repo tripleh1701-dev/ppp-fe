@@ -2901,8 +2901,8 @@ export default function ManageUsers() {
                 }
 
                 .advanced-table-container .status-toggle-button.active {
-                    background: #dcfce7 !important;
-                    color: #16a34a !important;
+                    background: #dbeafe !important;
+                    color: #2563eb !important;
                 }
 
                 .advanced-table-container .status-toggle-button.inactive {
@@ -2928,8 +2928,8 @@ export default function ManageUsers() {
                 }
 
                 .advanced-table-container .auto-save-indicator.saved {
-                    background: #dcfce7 !important;
-                    color: #16a34a !important;
+                    background: #dbeafe !important;
+                    color: #2563eb !important;
                 }
 
                 .advanced-table-container .auto-save-indicator.error {
