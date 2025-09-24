@@ -847,7 +847,6 @@ function ServicesMultiSelect({
                             style={{borderRadius: '0px !important'}}
                             title={service}
                         >
-                            <span className='h-1.5 w-1.5 rounded-full flex-shrink-0 bg-rose-400'></span>
                             <span className='truncate'>{service}</span>
                             <button
                                 onClick={() => removeService(service)}
@@ -944,14 +943,18 @@ function ServicesMultiSelect({
                             ) : (
                                 (() => {
                                     const filteredOptions = options.filter(
-                                        (opt) =>
-                                            query
+                                        (opt) => {
+                                            // First apply search filter
+                                            const matchesSearch = query
                                                 ? opt.name
                                                       .toLowerCase()
                                                       .includes(
                                                           query.toLowerCase(),
                                                       )
-                                                : true,
+                                                : true;
+
+                                            return matchesSearch;
+                                        },
                                     );
 
                                     const hasExactMatch =
@@ -1317,6 +1320,9 @@ function AsyncChipSelect({
     onDropdownOptionUpdate,
     onNewItemCreated,
     accounts = [],
+    currentRowId,
+    currentRowEnterprise,
+    currentRowProduct,
 }: {
     type: CatalogType;
     value?: string;
@@ -1334,6 +1340,9 @@ function AsyncChipSelect({
         item: {id: string; name: string},
     ) => void;
     accounts?: AccountRow[];
+    currentRowId?: string;
+    currentRowEnterprise?: string;
+    currentRowProduct?: string;
 }) {
     const [open, setOpen] = React.useState(false);
     const [current, setCurrent] = React.useState<string | undefined>(value);
@@ -1345,22 +1354,36 @@ function AsyncChipSelect({
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
 
-    // Helper function to check if an option is in use
+    // Helper function to check if an option is in use (with composite key constraint)
     const isOptionInUse = React.useCallback(
         (optionName: string): boolean => {
             if (!accounts || accounts.length === 0) return false;
 
             return accounts.some((account) => {
+                // Skip the current row being edited
+                if (currentRowId && account.id === currentRowId) {
+                    return false;
+                }
+
                 if (type === 'enterprise') {
-                    return (
-                        account.masterAccount === optionName ||
-                        account.enterpriseName === optionName
-                    );
+                    // Never filter enterprises - show all options
+                    return false;
                 } else if (type === 'product') {
-                    return (
-                        account.accountName === optionName ||
-                        account.productName === optionName
-                    );
+                    // For products, check if this product is already paired with the current enterprise
+                    const currentEnterprise = currentRowEnterprise || '';
+
+                    if (currentEnterprise) {
+                        // Check if this product is already used with the selected enterprise
+                        const isUsedWithCurrentEnterprise =
+                            (account.masterAccount === currentEnterprise &&
+                                account.accountName === optionName) ||
+                            (account.enterpriseName === currentEnterprise &&
+                                account.productName === optionName);
+
+                        return isUsedWithCurrentEnterprise;
+                    }
+                    // If no enterprise is selected yet, don't filter anything
+                    return false;
                 } else if (type === 'service') {
                     const services =
                         account.address?.country?.split(', ').filter(Boolean) ||
@@ -1370,7 +1393,7 @@ function AsyncChipSelect({
                 return false;
             });
         },
-        [accounts, type],
+        [accounts, type, currentRowId, currentRowEnterprise],
     );
 
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -1391,7 +1414,11 @@ function AsyncChipSelect({
                         query ? `?search=${encodeURIComponent(query)}` : ''
                     }`,
                 );
-                setOptions(data || []);
+                // Filter out products that are already paired with the current enterprise
+                const filteredData = (data || []).filter(
+                    (product) => !isOptionInUse(product.name),
+                );
+                setOptions(filteredData);
             } else if (type === 'service') {
                 const data = await api.get<Array<{id: string; name: string}>>(
                     `/api/services${
@@ -1423,7 +1450,7 @@ function AsyncChipSelect({
         } finally {
             setLoading(false);
         }
-    }, [type, query]);
+    }, [type, query, currentRowEnterprise]);
 
     React.useEffect(() => {
         if (!open) return;
@@ -1440,6 +1467,13 @@ function AsyncChipSelect({
         }
     }, [open, loadOptions]);
     // Note: search filters locally; do not refetch on query
+
+    // Reload options when currentRowEnterprise changes (for product filtering)
+    React.useEffect(() => {
+        if (type === 'product' && currentRowEnterprise) {
+            loadOptions();
+        }
+    }, [currentRowEnterprise, type, loadOptions]);
 
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
@@ -1693,9 +1727,6 @@ function AsyncChipSelect({
                             style={{borderRadius: '0px !important'}}
                             title={current || value || ''}
                         >
-                            <span
-                                className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${tone.dot}`}
-                            ></span>
                             <span className='truncate'>{current || value}</span>
                             <button
                                 onClick={() => {
@@ -1811,14 +1842,18 @@ function AsyncChipSelect({
                             ) : (
                                 (() => {
                                     const filteredOptions = options.filter(
-                                        (opt) =>
-                                            query
+                                        (opt) => {
+                                            // First apply search filter
+                                            const matchesSearch = query
                                                 ? opt.name
                                                       .toLowerCase()
                                                       .includes(
                                                           query.toLowerCase(),
                                                       )
-                                                : true,
+                                                : true;
+
+                                            return matchesSearch;
+                                        },
                                     );
 
                                     const hasExactMatch =
@@ -2592,9 +2627,6 @@ function SortableAccountRow({
                 style={{borderRadius: '0px !important'}}
                 title={text}
             >
-                <span
-                    className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${t.dot}`}
-                ></span>
                 <span className='truncate'>{text}</span>
             </motion.span>
         );
@@ -2891,7 +2923,7 @@ function SortableAccountRow({
                                                     : product
                                             }
                                         </span>
-                                        <span style="color: #9ca3af;">•</span>
+                                        <span style="color: #9ca3af;"> | </span>
                                         <span style="background: rgba(251,146,60,0.2); padding: 2px 6px; border-radius: 4px; font-size: 10px;">
                                             ${services} service${
                                         services !== 1 ? 's' : ''
@@ -3026,6 +3058,15 @@ function SortableAccountRow({
                                 onDropdownOptionUpdate={onDropdownOptionUpdate}
                                 onNewItemCreated={onNewItemCreated}
                                 accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    (row as any).masterAccount ||
+                                    row.enterpriseName ||
+                                    ''
+                                }
+                                currentRowProduct={
+                                    row.accountName || row.productName || ''
+                                }
                             />
                         ) : (
                             <InlineEditableText
@@ -3068,6 +3109,15 @@ function SortableAccountRow({
                             onDropdownOptionUpdate={onDropdownOptionUpdate}
                             onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
+                            currentRowId={row.id}
+                            currentRowEnterprise={
+                                (row as any).masterAccount ||
+                                row.enterpriseName ||
+                                ''
+                            }
+                            currentRowProduct={
+                                row.accountName || row.productName || ''
+                            }
                         />
                     ) : (
                         <InlineEditableText
@@ -3273,6 +3323,16 @@ function SortableAccountRow({
                         compact
                         onDropdownOptionUpdate={onDropdownOptionUpdate}
                         onNewItemCreated={onNewItemCreated}
+                        accounts={allRows}
+                        currentRowId={row.id}
+                        currentRowEnterprise={
+                            (row as any).masterAccount ||
+                            row.enterpriseName ||
+                            ''
+                        }
+                        currentRowProduct={
+                            row.accountName || row.productName || ''
+                        }
                     />
                 </div>
             )}
@@ -3288,6 +3348,16 @@ function SortableAccountRow({
                         compact
                         onDropdownOptionUpdate={onDropdownOptionUpdate}
                         onNewItemCreated={onNewItemCreated}
+                        accounts={allRows}
+                        currentRowId={row.id}
+                        currentRowEnterprise={
+                            (row as any).masterAccount ||
+                            row.enterpriseName ||
+                            ''
+                        }
+                        currentRowProduct={
+                            row.accountName || row.productName || ''
+                        }
                     />
                 </div>
             )}
@@ -6782,7 +6852,7 @@ export default function EnterpriseAccountsTable({
                                                     }
                                                     className={`w-full grid items-center gap-0 rounded-md border border-dashed ${
                                                         hasBlankRow
-                                                            ? 'border-orange-300 bg-orange-50/40 cursor-not-allowed'
+                                                            ? 'border-blue-300 bg-blue-50/40 cursor-not-allowed'
                                                             : 'border-slate-300 bg-slate-50/40 hover:bg-slate-100/70 cursor-pointer'
                                                     }`}
                                                     style={{
@@ -6805,7 +6875,7 @@ export default function EnterpriseAccountsTable({
                                                     <div
                                                         className={`col-span-full flex items-center gap-2 px-3 py-2 text-[12px] border-t border-dashed ${
                                                             hasBlankRow
-                                                                ? 'text-orange-600 border-orange-300'
+                                                                ? 'text-blue-600 border-blue-300'
                                                                 : 'text-slate-500 border-slate-300'
                                                         }`}
                                                     >
@@ -6843,7 +6913,7 @@ export default function EnterpriseAccountsTable({
                                     className='rounded-lg border border-slate-100'
                                 >
                                     <div className='px-2 py-1.5 text-[11px] font-medium text-blue-600 bg-slate-50 border-b'>
-                                        {grp} • {list.length}
+                                        {grp} ({list.length})
                                     </div>
                                     <div className='space-y-0 divide-y divide-slate-200'>
                                         {list.map((r, idx) => (
@@ -7082,7 +7152,7 @@ export default function EnterpriseAccountsTable({
                                                                 }
                                                                 className={`w-full grid items-center gap-0 rounded-md border border-dashed ${
                                                                     hasBlankRow
-                                                                        ? 'border-orange-300 bg-orange-50/40 cursor-not-allowed'
+                                                                        ? 'border-blue-300 bg-blue-50/40 cursor-not-allowed'
                                                                         : 'border-slate-300 bg-slate-50/40 hover:bg-slate-100/70 cursor-pointer'
                                                                 }`}
                                                                 style={{
@@ -7109,7 +7179,7 @@ export default function EnterpriseAccountsTable({
                                                                 <div
                                                                     className={`col-span-full flex items-center gap-2 px-3 py-2 text-[12px] border-t border-dashed ${
                                                                         hasBlankRow
-                                                                            ? 'text-orange-600 border-orange-300'
+                                                                            ? 'text-blue-600 border-blue-300'
                                                                             : 'text-slate-500 border-slate-300'
                                                                     }`}
                                                                 >

@@ -1,6 +1,6 @@
 'use client';
 
-import {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {motion} from 'framer-motion';
 import {
     PlusIcon,
@@ -187,6 +187,10 @@ export default function EnterpriseConfiguration() {
         (() => void) | null
     >(null);
 
+    // Notification state
+    const [notificationMessage, setNotificationMessage] = useState<string>('');
+    const [showNotification, setShowNotification] = useState(false);
+
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(
@@ -233,20 +237,144 @@ export default function EnterpriseConfiguration() {
     const hideRef = useRef<HTMLDivElement>(null);
     const groupRef = useRef<HTMLDivElement>(null);
 
+    // Helper function to show notifications
+    const showBlueNotification = (message: string, duration: number = 3000) => {
+        setNotificationMessage(message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
+    };
+
+    // Helper function to close all dialogs
+    const closeAllDialogs = () => {
+        setFilterVisible(false);
+        setSortOpen(false);
+        setHideOpen(false);
+        setGroupOpen(false);
+    };
+
+    // Helper function to toggle a specific dialog (closes others)
+    const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'group') => {
+        closeAllDialogs();
+        switch (dialogType) {
+            case 'filter':
+                setFilterVisible(true);
+                break;
+            case 'sort':
+                setSortOpen(true);
+                break;
+            case 'hide':
+                setHideOpen(true);
+                break;
+            case 'group':
+                setGroupOpen(true);
+                break;
+        }
+    };
+
     // All available columns
     type ColumnType = 'masterAccount' | 'accountName' | 'country';
     const allCols: ColumnType[] = ['masterAccount', 'accountName', 'country'];
 
-    // Helper functions
-    const handleFilter = (field: string, value: string) => {
-        setActiveFilters((prev) => ({
-            ...prev,
-            [field]: value,
-        }));
+    // Process accounts data with filtering, sorting, and search
+    const processedAccounts = React.useMemo(() => {
+        let filtered = [...accounts];
+
+        // Apply search filter
+        if (searchTerm.trim()) {
+            filtered = filtered.filter((account) => {
+                const searchLower = searchTerm.toLowerCase();
+                return (
+                    account.masterAccount
+                        ?.toLowerCase()
+                        .includes(searchLower) ||
+                    account.enterpriseName
+                        ?.toLowerCase()
+                        .includes(searchLower) ||
+                    account.accountName?.toLowerCase().includes(searchLower) ||
+                    account.productName?.toLowerCase().includes(searchLower) ||
+                    account.address?.country
+                        ?.toLowerCase()
+                        .includes(searchLower) ||
+                    account.serviceName?.toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        // Apply filters
+        if (activeFilters.enterprise) {
+            filtered = filtered.filter(
+                (account) =>
+                    account.masterAccount === activeFilters.enterprise ||
+                    account.enterpriseName === activeFilters.enterprise,
+            );
+        }
+        if (activeFilters.product) {
+            filtered = filtered.filter(
+                (account) =>
+                    account.accountName === activeFilters.product ||
+                    account.productName === activeFilters.product,
+            );
+        }
+        if (activeFilters.services && activeFilters.services.length > 0) {
+            filtered = filtered.filter((account) => {
+                const accountServices =
+                    account.address?.country?.split(', ') || [];
+                return activeFilters.services.some((service: string) =>
+                    accountServices.includes(service),
+                );
+            });
+        }
+
+        // Note: Sorting is handled internally by EnterpriseAccountsTable
+        // The table has its own internal sorting when you click column headers
+
+        return filtered;
+    }, [accounts, searchTerm, activeFilters]);
+
+    // Helper functions for filter management
+    const applyFilters = (filters: Record<string, any>) => {
+        setActiveFilters(filters);
+        closeAllDialogs();
     };
 
-    const clearFilters = () => {
+    const clearAllFilters = () => {
         setActiveFilters({});
+        closeAllDialogs();
+    };
+
+    // Filter form state
+    const [filterForm, setFilterForm] = useState({
+        enterprise: '',
+        product: '',
+        services: '',
+    });
+
+    const handleApplyFilters = () => {
+        const newFilters: Record<string, any> = {};
+
+        if (filterForm.enterprise.trim()) {
+            newFilters.enterprise = filterForm.enterprise.trim();
+        }
+        if (filterForm.product.trim()) {
+            newFilters.product = filterForm.product.trim();
+        }
+        if (filterForm.services.trim()) {
+            newFilters.services = filterForm.services
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+        }
+
+        setActiveFilters(newFilters);
+        closeAllDialogs();
+    };
+
+    const handleClearFilters = () => {
+        setFilterForm({enterprise: '', product: '', services: ''});
+        setActiveFilters({});
+        closeAllDialogs();
     };
 
     const setGroupByFromLabel = (label: string) => {
@@ -1179,9 +1307,10 @@ export default function EnterpriseConfiguration() {
             setTableVersion((prev) => prev + 1);
         } catch (error) {
             console.error('❌ Failed to delete enterprise linkage:', error);
-            // You could show an error toast here
-            alert(
+            // Show error notification using the blue notification system
+            showBlueNotification(
                 'Failed to delete the enterprise configuration. Please try again.',
+                5000, // Show for 5 seconds for error messages
             );
         } finally {
             setDeletingRow(false);
@@ -1218,7 +1347,7 @@ export default function EnterpriseConfiguration() {
                             onClick={() => {
                                 // Check if there's already a blank row
                                 if (hasBlankRow()) {
-                                    alert(
+                                    showBlueNotification(
                                         'Please complete the existing blank row before adding a new one.',
                                     );
                                     return;
@@ -1343,7 +1472,11 @@ export default function EnterpriseConfiguration() {
                         {/* Filter Button */}
                         <div className='relative'>
                             <button
-                                onClick={() => setFilterVisible(!filterVisible)}
+                                onClick={() =>
+                                    filterVisible
+                                        ? closeAllDialogs()
+                                        : toggleDialog('filter')
+                                }
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
                                     filterVisible ||
                                     Object.keys(activeFilters).length > 0
@@ -1385,15 +1518,13 @@ export default function EnterpriseConfiguration() {
                                             </label>
                                             <input
                                                 type='text'
-                                                value={
-                                                    activeFilters.masterAccount ||
-                                                    ''
-                                                }
+                                                value={filterForm.enterprise}
                                                 onChange={(e) =>
-                                                    handleFilter(
-                                                        'masterAccount',
-                                                        e.target.value,
-                                                    )
+                                                    setFilterForm({
+                                                        ...filterForm,
+                                                        enterprise:
+                                                            e.target.value,
+                                                    })
                                                 }
                                                 placeholder='Search by enterprise...'
                                                 className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
@@ -1407,15 +1538,12 @@ export default function EnterpriseConfiguration() {
                                             </label>
                                             <input
                                                 type='text'
-                                                value={
-                                                    activeFilters.accountName ||
-                                                    ''
-                                                }
+                                                value={filterForm.product}
                                                 onChange={(e) =>
-                                                    handleFilter(
-                                                        'accountName',
-                                                        e.target.value,
-                                                    )
+                                                    setFilterForm({
+                                                        ...filterForm,
+                                                        product: e.target.value,
+                                                    })
                                                 }
                                                 placeholder='Search by product...'
                                                 className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
@@ -1429,16 +1557,15 @@ export default function EnterpriseConfiguration() {
                                             </label>
                                             <input
                                                 type='text'
-                                                value={
-                                                    activeFilters.country || ''
-                                                }
+                                                value={filterForm.services}
                                                 onChange={(e) =>
-                                                    handleFilter(
-                                                        'country',
-                                                        e.target.value,
-                                                    )
+                                                    setFilterForm({
+                                                        ...filterForm,
+                                                        services:
+                                                            e.target.value,
+                                                    })
                                                 }
-                                                placeholder='Search by services...'
+                                                placeholder='Search by services (comma-separated)...'
                                                 className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
                                             />
                                         </div>
@@ -1446,15 +1573,13 @@ export default function EnterpriseConfiguration() {
                                         {/* Action Buttons */}
                                         <div className='flex gap-2'>
                                             <button
-                                                onClick={clearFilters}
+                                                onClick={handleClearFilters}
                                                 className='px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded border border-red-200'
                                             >
                                                 Clear All
                                             </button>
                                             <button
-                                                onClick={() =>
-                                                    setFilterVisible(false)
-                                                }
+                                                onClick={handleApplyFilters}
                                                 className='px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded border border-purple-200'
                                             >
                                                 Apply
@@ -1470,7 +1595,11 @@ export default function EnterpriseConfiguration() {
                             <button
                                 className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
                                 title='Sort'
-                                onClick={() => setSortOpen((v) => !v)}
+                                onClick={() =>
+                                    sortOpen
+                                        ? closeAllDialogs()
+                                        : toggleDialog('sort')
+                                }
                             >
                                 <ArrowsUpDownIcon className='h-4 w-4' />
                                 <span className='text-sm'>Sort</span>
@@ -1485,57 +1614,37 @@ export default function EnterpriseConfiguration() {
                                             Sort by
                                         </div>
                                     </div>
-                                    <div className='p-3 space-y-2'>
-                                        <div className='flex gap-2 items-center'>
-                                            <select
-                                                value={sortColumn}
-                                                onChange={(e) =>
-                                                    setSortColumn(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className='flex-1 bg-white border border-light rounded-md px-2.5 py-1.5 text-sm'
+                                    <div className='p-4 space-y-3'>
+                                        <div className='flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-md'>
+                                            <svg
+                                                className='w-5 h-5'
+                                                fill='currentColor'
+                                                viewBox='0 0 20 20'
                                             >
-                                                <option value=''>
-                                                    Choose column
-                                                </option>
-                                                <option value='masterAccount'>
-                                                    Enterprise
-                                                </option>
-                                                <option value='accountName'>
-                                                    Product
-                                                </option>
-                                                <option value='country'>
-                                                    Services
-                                                </option>
-                                            </select>
-                                            <div className='shrink-0 inline-flex rounded-md border border-light overflow-hidden'>
-                                                <button
-                                                    className={`px-2.5 py-1.5 text-xs ${
-                                                        sortDirection === 'asc'
-                                                            ? 'bg-slate-100 text-primary'
-                                                            : 'bg-white text-secondary'
-                                                    }`}
-                                                    onClick={() =>
-                                                        setSortDirection('asc')
-                                                    }
-                                                >
-                                                    Asc
-                                                </button>
-                                                <button
-                                                    className={`px-2.5 py-1.5 text-xs border-l border-light ${
-                                                        sortDirection === 'desc'
-                                                            ? 'bg-slate-100 text-primary'
-                                                            : 'bg-white text-secondary'
-                                                    }`}
-                                                    onClick={() =>
-                                                        setSortDirection('desc')
-                                                    }
-                                                >
-                                                    Desc
-                                                </button>
+                                                <path
+                                                    fillRule='evenodd'
+                                                    d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
+                                                    clipRule='evenodd'
+                                                />
+                                            </svg>
+                                            <div className='text-sm'>
+                                                <div className='font-medium'>
+                                                    Click Column Headers to Sort
+                                                </div>
+                                                <div className='text-blue-500 mt-1'>
+                                                    Click on Enterprise,
+                                                    Product, or Services column
+                                                    headers in the table to sort
+                                                    the data.
+                                                </div>
                                             </div>
                                         </div>
+                                        <button
+                                            onClick={closeAllDialogs}
+                                            className='w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded border border-blue-200'
+                                        >
+                                            Got it
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1545,7 +1654,11 @@ export default function EnterpriseConfiguration() {
                         <div ref={hideRef} className='relative'>
                             <button
                                 className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
-                                onClick={() => setHideOpen((v) => !v)}
+                                onClick={() =>
+                                    hideOpen
+                                        ? closeAllDialogs()
+                                        : toggleDialog('hide')
+                                }
                             >
                                 <EyeSlashIcon className='h-4 w-4' />
                                 <span className='text-sm'>Hide</span>
@@ -1643,7 +1756,11 @@ export default function EnterpriseConfiguration() {
                         >
                             <button
                                 className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
-                                onClick={() => setGroupOpen((v) => !v)}
+                                onClick={() =>
+                                    groupOpen
+                                        ? closeAllDialogs()
+                                        : toggleDialog('group')
+                                }
                             >
                                 <RectangleStackIcon className='h-4 w-4' />
                                 <span className='text-sm'>Group by</span>
@@ -1810,7 +1927,7 @@ export default function EnterpriseConfiguration() {
                                         accountName: 'Product',
                                         country: 'Services',
                                     }}
-                                    enableDropdownChips={false}
+                                    enableDropdownChips={true}
                                     enableInlineEditing={true}
                                     dropdownOptions={dropdownOptions}
                                     onDropdownOptionUpdate={
@@ -2379,7 +2496,7 @@ export default function EnterpriseConfiguration() {
                                             // Optionally revert the local state change on error
                                         }
                                     }}
-                                    rows={accounts.map<AccountRow>(
+                                    rows={processedAccounts.map<AccountRow>(
                                         (a: any) => ({
                                             id: a.id || '',
                                             globalClientName:
@@ -2650,6 +2767,71 @@ export default function EnterpriseConfiguration() {
                         </motion.div>
                     </div>
                 </div>
+            )}
+
+            {/* Blue-themed Notification Component */}
+            {showNotification && (
+                <motion.div
+                    initial={{opacity: 0, y: -50, scale: 0.9}}
+                    animate={{opacity: 1, y: 0, scale: 1}}
+                    exit={{opacity: 0, y: -50, scale: 0.9}}
+                    transition={{duration: 0.3, ease: 'easeOut'}}
+                    className='fixed top-4 right-4 z-50 max-w-md'
+                >
+                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg overflow-hidden'>
+                        <div className='p-4'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
+                                    <svg
+                                        className='h-5 w-5 text-blue-600'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
+                                    >
+                                        <path
+                                            fillRule='evenodd'
+                                            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+                                            clipRule='evenodd'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='ml-3 flex-1'>
+                                    <p className='text-sm font-medium text-blue-800'>
+                                        {notificationMessage}
+                                    </p>
+                                </div>
+                                <div className='ml-4 flex-shrink-0 flex'>
+                                    <button
+                                        className='inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors duration-200'
+                                        onClick={() =>
+                                            setShowNotification(false)
+                                        }
+                                    >
+                                        <svg
+                                            className='h-5 w-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                                                clipRule='evenodd'
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {/* Animated progress bar */}
+                        <div className='bg-blue-200 h-1'>
+                            <motion.div
+                                initial={{width: '100%'}}
+                                animate={{width: '0%'}}
+                                transition={{duration: 3, ease: 'linear'}}
+                                className='bg-blue-500 h-full'
+                            />
+                        </div>
+                    </div>
+                </motion.div>
             )}
         </div>
     );
