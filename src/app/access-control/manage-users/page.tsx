@@ -1006,14 +1006,7 @@ export default function ManageUsers() {
     const autoSaveUser = useCallback(
         async (userData: any, isNewUser: boolean = false) => {
             const userId = userData.id;
-            console.log(`🎯 AutoSaveUser called with:`, {
-                userId,
-                isNewUser,
-                firstName: userData.firstName,
-                lastName: userData.lastName,
-                emailAddress: userData.emailAddress,
-                fullUserData: userData
-            });
+            console.log(`🎯 ${isNewUser ? 'Creating' : 'Updating'} user: ${userData.firstName} ${userData.lastName} (${userId})`);
 
             // Clear existing timeout for this user
             if (autoSaveTimeouts[userId]) {
@@ -1233,8 +1226,10 @@ export default function ManageUsers() {
                     user.emailAddress &&
                     user.emailAddress.includes('@') &&
                     user.emailAddress.includes('.') &&
-                    user.emailAddress.length > 5 &&
-                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.emailAddress);
+                    user.emailAddress.length > 6 &&
+                    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(user.emailAddress) &&
+                    !user.emailAddress.endsWith('@') &&
+                    !user.emailAddress.includes('@.');
                 const shouldAutoSave = hasBasicInfo && hasValidEmail;
 
                 console.log(`🔍 User ${index}:`, {
@@ -1250,12 +1245,13 @@ export default function ManageUsers() {
                 });
 
                 if (shouldAutoSave) {
-                    console.log(`💾 Triggering auto-save for user ${user.id} - ${user.firstName} ${user.lastName}`);
-                    console.log(`📋 Full user data being passed to autoSaveUser:`, user);
+                    console.log(
+                        `💾 Auto-saving: ${user.firstName} ${user.lastName} (${user.id})`,
+                    );
                     autoSaveUser(user, isNewUser);
                 } else {
                     console.log(
-                        `⏭️ Skipping auto-save for user ${user.id} - no data`,
+                        `⏭️ Skipping save for ${user.firstName} ${user.lastName} - invalid email: ${user.emailAddress}`,
                     );
                 }
             });
