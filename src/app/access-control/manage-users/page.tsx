@@ -2132,7 +2132,49 @@ export default function ManageUsers() {
             <div className='bg-card border-b border-light px-6 py-4'>
                 <div className='flex items-center justify-start gap-2'>
                     <button
-                        onClick={handleCreateClick}
+                        onClick={() => {
+                            // Add blank row at the top of the table
+                            const newBlankRow = {
+                                id: `temp_${Date.now()}`,
+                                firstName: '',
+                                middleName: '',
+                                lastName: '',
+                                emailAddress: '',
+                                status: 'INACTIVE',
+                                startDate: new Date().toISOString().split('T')[0],
+                                endDate: '',
+                                technicalUser: false,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                                assignedUserGroups: [],
+                                hasPasswordHash: false,
+                                passwordSet: false,
+                            };
+                            
+                            // Add to the beginning of the users array
+                            setUsers(prev => [newBlankRow, ...prev]);
+                            
+                            // Also add to table data if it exists
+                            setTableData(prev => [
+                                {
+                                    key: newBlankRow.id,
+                                    id: newBlankRow.id,
+                                    firstName: '',
+                                    middleName: '',
+                                    lastName: '',
+                                    emailAddress: '',
+                                    status: 'INACTIVE',
+                                    startDate: newBlankRow.startDate,
+                                    endDate: '',
+                                    technicalUser: false,
+                                    assignedGroups: [],
+                                    passwordSet: false,
+                                },
+                                ...prev
+                            ]);
+                            
+                            console.log('✨ Added blank row at top of table');
+                        }}
                         className='inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-inverse bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200'
                     >
                         <PlusIcon className='h-5 w-5 mr-2' />
