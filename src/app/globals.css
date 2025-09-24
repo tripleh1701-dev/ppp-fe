@@ -2890,3 +2890,48 @@ a {
 .container-responsive {
     @apply max-w-[1440px] mx-auto px-6;
 }
+
+/* ===== PIPELINE HEADER ANIMATIONS ===== */
+@keyframes dash {
+    0% {
+        stroke-dashoffset: 0;
+    }
+    100% {
+        stroke-dashoffset: 16;
+    }
+}
+
+@keyframes slideDown {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes scaleIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Custom animation utilities */
+.animate-dash {
+    animation: dash 2s linear infinite;
+}
+
+.animate-slideDown {
+    animation: slideDown 200ms ease-out;
+}
+
+.animate-scaleIn {
+    animation: scaleIn 120ms ease-out;
+}

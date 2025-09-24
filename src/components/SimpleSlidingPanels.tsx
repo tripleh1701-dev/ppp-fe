@@ -190,56 +190,20 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     // Fetch scope configuration from API
     const fetchScopeConfig = async () => {
         try {
-            console.log('🔄 Generating scope configuration data...');
-            // For now, create mock scope configuration data
-            // This would typically come from a backend API
-            const mockScopeData = [
-                {
-                    id: 1,
-                    module: 'Account Settings',
-                    view: false,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                },
-                {
-                    id: 2,
-                    module: 'Access Control',
-                    view: false,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                },
-                {
-                    id: 3,
-                    module: 'Security & Governance',
-                    view: false,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                },
-                {
-                    id: 4,
-                    module: 'Pipelines',
-                    view: false,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                },
-                {
-                    id: 5,
-                    module: 'Builds',
-                    view: false,
-                    create: false,
-                    edit: false,
-                    delete: false,
-                },
-            ];
-
-            console.log('📊 Scope config data generated:', mockScopeData);
-            setScopeConfigData(mockScopeData);
+            console.log('🔄 Loading scope configuration from API...');
+            const response = await fetch(
+                'http://localhost:4000/api/scope-config',
+            );
+            if (response.ok) {
+                const scopeData = await response.json();
+                console.log('📊 Scope config data loaded from API:', scopeData);
+                setScopeConfigData(scopeData);
+            } else {
+                console.error('Failed to load scope config from API');
+                setScopeConfigData([]);
+            }
         } catch (err) {
-            console.error('Error generating scope config:', err);
+            console.error('Error loading scope config from API:', err);
             setScopeConfigData([]);
         }
     };

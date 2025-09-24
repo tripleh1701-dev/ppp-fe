@@ -24,6 +24,7 @@ const pathMapping: {[key: string]: {label: string; icon?: string}} = {
     inbox: {label: 'My Inbox', icon: 'mail'},
     dashboard: {label: 'Dashboard', icon: 'chart'},
     pipelines: {label: 'Pipelines', icon: 'bolt'},
+    canvas: {label: 'Canvas', icon: 'template'},
     builds: {label: 'Builds', icon: 'flask'},
     'access-control': {label: 'Access Control', icon: 'lock'},
     'account-settings': {label: 'Account Settings', icon: 'gear'},
@@ -88,10 +89,13 @@ export default function Breadcrumbs({
         const segments = pathValue.split('/').filter(Boolean);
 
         // For account-settings paths, start from Account Settings instead of Overview
+        // For pipelines/canvas paths, start from Pipelines instead of Overview
         const isAccountSettingsPath = segments[0] === 'account-settings';
+        const isPipelineCanvasPath =
+            segments[0] === 'pipelines' && segments[1] === 'canvas';
 
-        if (!isAccountSettingsPath) {
-            // Add home for non-account-settings paths
+        if (!isAccountSettingsPath && !isPipelineCanvasPath) {
+            // Add home for non-account-settings and non-pipeline-canvas paths
             items.push({
                 label: 'Overview',
                 href: '/',

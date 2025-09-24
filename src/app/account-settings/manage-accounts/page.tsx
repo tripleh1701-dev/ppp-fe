@@ -226,75 +226,9 @@ interface Account {
     }[];
 }
 
-// Mock data for technical users (from access control)
-const mockTechnicalUsers: TechnicalUser[] = [
-    {
-        id: '1',
-        username: 'TUSER001',
-        email: 'tuser001@company.com',
-        firstName: 'Technical',
-        lastName: 'User One',
-    },
-    {
-        id: '2',
-        username: 'TUSER002',
-        email: 'tuser002@company.com',
-        firstName: 'Technical',
-        lastName: 'User Two',
-    },
-    {
-        id: '3',
-        username: 'DEVOPS01',
-        email: 'devops01@company.com',
-        firstName: 'DevOps',
-        lastName: 'Admin',
-    },
-    {
-        id: '4',
-        username: 'SYSADMIN',
-        email: 'sysadmin@company.com',
-        firstName: 'System',
-        lastName: 'Administrator',
-    },
-];
+// Technical users data loaded from API
 
-// Mock data for services
-const mockServices: LicenseService[] = [
-    {
-        id: '1',
-        name: 'DevOps',
-        category: 'Development',
-        subcategories: ['CI/CD', 'Pipeline Management', 'Code Quality'],
-    },
-    {
-        id: '2',
-        name: 'Integration Hub',
-        category: 'Integration',
-        subcategories: [
-            'API Management',
-            'Data Integration',
-            'Event Processing',
-        ],
-    },
-    {
-        id: '3',
-        name: 'All Services',
-        category: 'Complete',
-        subcategories: ['Full Access', 'Premium Support', 'Advanced Features'],
-    },
-    {
-        id: '4',
-        name: 'Analytics',
-        category: 'Analytics',
-        subcategories: ['Reporting', 'Dashboards', 'Data Visualization'],
-    },
-    {
-        id: '5',
-        name: 'Security Suite',
-        category: 'Security',
-        subcategories: ['Identity Management', 'Access Control', 'Audit Logs'],
-    },
-];
+// Services data loaded from API
 
 function HideColumnsButton() {
     return (
@@ -605,7 +539,7 @@ export default function ManageAccounts() {
         'technicalUser',
     ]);
     const [views, setViews] = useState<any[]>([]);
-    const currentUserId = 'demo-user';
+    const currentUserId = '';
     const screenKey = 'manage-accounts';
     const isCustomViewActive = useMemo(() => {
         const v = views.find((x) => x.id === ActiveViewId);
@@ -1432,8 +1366,8 @@ export default function ManageAccounts() {
                     <CreateAccountForm
                         onSave={addAccount}
                         onCancel={() => setShowCreateForm(false)}
-                        technicalUsers={mockTechnicalUsers}
-                        services={mockServices}
+                        technicalUsers={[]}
+                        services={[]}
                         mode='create'
                     />
                 ) : editingAccount ? (
@@ -1451,8 +1385,8 @@ export default function ManageAccounts() {
                             setEditingAccount(null);
                             setEditingData(null);
                         }}
-                        technicalUsers={mockTechnicalUsers}
-                        services={mockServices}
+                        technicalUsers={[]}
+                        services={[]}
                         initialData={editingData || editingAccount}
                         mode='edit'
                     />

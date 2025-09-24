@@ -53,21 +53,7 @@ export interface UserGroup {
     enterprise_id: number;
 }
 
-// Fallback entities (used only if database is unavailable)
-export const FALLBACK_ENTITIES = [
-    'Finance',
-    'Payroll',
-    'People',
-    'HR',
-    'Sales',
-    'Marketing',
-    'Customer Service',
-    'Supply Chain',
-    'Procurement',
-    'Analytics',
-    'Security',
-    'IT Operations',
-] as const;
+// Entities loaded from database APIs - no fallback data
 
 export const DEPLOYMENT_TYPE_OPTIONS = [
     {

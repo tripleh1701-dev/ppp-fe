@@ -115,11 +115,11 @@ export default function NavigationSidebar({
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
 
-    // Mock current user data - in real app this would come from context/props
+    // Current user data loaded from authentication context/API
     const currentUser = {
-        firstName: 'Nihar',
-        lastName: 'Sharma',
-        emailAddress: 'nihar.sharma@example.com',
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
     };
 
     // Function to generate user initials

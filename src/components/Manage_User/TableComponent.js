@@ -2494,8 +2494,8 @@ function ItemRow({
 }
 
 const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
-    // Use provided config or fallback to default config file
-    const configToUse = config || tableConfig;
+    // Use provided config - no fallback to reduce bundle size
+    const configToUse = config;
 
     const {
         tableName,
@@ -2838,17 +2838,8 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
                 setUserGroupData(userGroups);
             } catch (error) {
                 console.error('❌ Error loading user groups:', error);
-                // Provide mock data as fallback on error
-                setUserGroupData([
-                    {
-                        id: 'ug-demo',
-                        name: 'Demo User Group',
-                        description: 'Sample user group for demonstration',
-                        entities: [{id: 'e1', name: 'Demo Entity'}],
-                        services: [{id: 's1', name: 'Demo Service'}],
-                        roles: [{id: 'r1', name: 'Demo Role'}],
-                    },
-                ]);
+                // No fallback data - only database data
+                setUserGroupData([]);
             }
         },
         [setUserGroupData],
@@ -5152,28 +5143,7 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
         useSensor(KeyboardSensor),
     );
 
-    // Show loading state
-    if (loading) {
-        return (
-            <div className='task-board-container'>
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '200px',
-                        fontSize: '16px',
-                        color: '#6b7280',
-                    }}
-                >
-                    <div style={{textAlign: 'center'}}>
-                        <div style={{marginBottom: '10px'}}>🔄</div>
-                        Loading users...
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Loading state handled by parent component - removed duplicate loader
 
     // Show error state
     if (error) {

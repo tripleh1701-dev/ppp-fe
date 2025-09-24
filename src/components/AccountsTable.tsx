@@ -423,19 +423,13 @@ function AsyncChipSelect({
                 );
                 setOptions(data || []);
             } else if (type === 'technical-users') {
-                // For technical users, use mock data for now
-                const mockTechnicalUsers = [
-                    {id: '1', name: 'TUSER001'},
-                    {id: '2', name: 'TUSER002'},
-                    {id: '3', name: 'DEVOPS01'},
-                    {id: '4', name: 'SYSADMIN'},
-                ];
-                const filtered = mockTechnicalUsers.filter((user) =>
-                    query
-                        ? user.name.toLowerCase().includes(query.toLowerCase())
-                        : true,
+                // Load technical users from API
+                const data = await api.get<any[]>(
+                    `/api/users?type=technical${
+                        query ? `&search=${encodeURIComponent(query)}` : ''
+                    }`,
                 );
-                setOptions(filtered);
+                setOptions(data || []);
             } else {
                 const ents = await api.get<Array<{id: string; name: string}>>(
                     '/api/enterprises',
@@ -1978,37 +1972,8 @@ function TechnicalUserSelect({
                 setUsers(technicalUsers);
             } catch (error) {
                 console.error('Error loading technical users:', error);
-                // Fallback to mock data if API fails
-                setUsers([
-                    {
-                        id: '1',
-                        firstName: 'Technical',
-                        lastName: 'User One',
-                        emailAddress: 'tuser001@company.com',
-                        technicalUser: true,
-                    },
-                    {
-                        id: '2',
-                        firstName: 'Technical',
-                        lastName: 'User Two',
-                        emailAddress: 'tuser002@company.com',
-                        technicalUser: true,
-                    },
-                    {
-                        id: '3',
-                        firstName: 'DevOps',
-                        lastName: 'Admin',
-                        emailAddress: 'devops01@company.com',
-                        technicalUser: true,
-                    },
-                    {
-                        id: '4',
-                        firstName: 'System',
-                        lastName: 'Administrator',
-                        emailAddress: 'sysadmin@company.com',
-                        technicalUser: true,
-                    },
-                ]);
+                // No fallback data - only database data
+                setUsers([]);
             } finally {
                 setLoading(false);
             }

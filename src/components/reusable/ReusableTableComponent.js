@@ -1164,8 +1164,8 @@ function ItemRow({
 }
 
 const ReusableTableComponent = ({config = null}) => {
-    // Use provided config or fallback to default config file
-    const configToUse = config || tableConfig;
+    // Use provided config - no fallback to reduce bundle size
+    const configToUse = config;
 
     const {
         tableName,
@@ -1465,8 +1465,8 @@ const ReusableTableComponent = ({config = null}) => {
 
             // Get current user context (you may need to pass this as a prop)
             const currentUser = configToUse.currentUser || {
-                accountId: 1, // Default fallback
-                enterpriseId: 1, // Default fallback
+                accountId: breadcrumbData.accountId || 3,
+                enterpriseId: breadcrumbData.enterpriseId || 1,
             };
 
             console.log('👤 Current user context:', currentUser);

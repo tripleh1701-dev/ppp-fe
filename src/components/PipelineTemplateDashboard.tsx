@@ -23,47 +23,7 @@ export interface PipelineTemplate {
     flowTemplateId?: string; // Maps to TEMPLATE_FLOWS keys
 }
 
-const mockTemplates: PipelineTemplate[] = [
-    {
-        id: '1',
-        name: 'SAP Finance Integration',
-        details: {
-            enterprise: 'SAP',
-            entity: 'Finance',
-        },
-        deploymentType: 'Integration',
-        status: 'Active',
-        creationDate: '01-August-2025',
-        description: 'Complete finance integration pipeline for SAP S/4HANA',
-        flowTemplateId: 'sap-integration-suite',
-    },
-    {
-        id: '2',
-        name: 'Oracle Payroll Extension',
-        details: {
-            enterprise: 'Oracle',
-            entity: 'Payroll',
-        },
-        deploymentType: 'Extension',
-        status: 'Active',
-        creationDate: '15-July-2025',
-        description: 'Payroll processing extension for Oracle HCM',
-        flowTemplateId: 'sap-s4hana-extension',
-    },
-    {
-        id: '3',
-        name: 'SAP People Integration',
-        details: {
-            enterprise: 'SAP',
-            entity: 'People',
-        },
-        deploymentType: 'Integration',
-        status: 'Draft',
-        creationDate: '20-July-2025',
-        description: 'HR data integration pipeline',
-        flowTemplateId: 'fiori-app',
-    },
-];
+// Templates loaded from API
 
 interface PipelineTemplateDashboardProps {
     onCreateNew?: () => void;
@@ -95,12 +55,12 @@ export default function PipelineTemplateDashboard({
                     if (templates && Array.isArray(templates)) {
                         setTemplates(templates);
                     } else {
-                        setTemplates(mockTemplates);
+                        setTemplates([]);
                     }
                 })();
             } catch (error) {
                 console.error('Error loading templates:', error);
-                setTemplates(mockTemplates);
+                setTemplates([]);
             }
         };
 
