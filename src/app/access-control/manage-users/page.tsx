@@ -365,7 +365,7 @@ export default function ManageUsers() {
                         showSaveNotification(userName, 'updated');
 
                         // Refresh data from backend to reflect actual database state
-                        setRefreshTrigger(prev => prev + 1);
+                        setRefreshTrigger((prev) => prev + 1);
 
                         setTimeout(() => {
                             setSavingStates((prev) => {
@@ -464,7 +464,9 @@ export default function ManageUsers() {
 
                     // Show save notification
                     console.log('📣 Notification userData:', userData);
-                    const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
+                    const userName = `${userData.firstName || 'Unknown'} ${
+                        userData.lastName || 'User'
+                    }`;
                     console.log('📣 Notification userName:', userName);
                     showSaveNotification(
                         userName,
@@ -472,7 +474,7 @@ export default function ManageUsers() {
                     );
 
                     // Refresh data from backend to reflect actual database state
-                    setRefreshTrigger(prev => prev + 1);
+                    setRefreshTrigger((prev) => prev + 1);
 
                     // Clear saved state after 2 seconds
                     setTimeout(() => {
@@ -1004,6 +1006,14 @@ export default function ManageUsers() {
     const autoSaveUser = useCallback(
         async (userData: any, isNewUser: boolean = false) => {
             const userId = userData.id;
+            console.log(`🎯 AutoSaveUser called with:`, {
+                userId,
+                isNewUser,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                emailAddress: userData.emailAddress,
+                fullUserData: userData
+            });
 
             // Clear existing timeout for this user
             if (autoSaveTimeouts[userId]) {
@@ -1069,13 +1079,21 @@ export default function ManageUsers() {
                             }));
 
                             // Show save notification
-                            console.log('📣 AutoSave Create - userData:', userData);
-                            const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
-                            console.log('📣 AutoSave Create - userName:', userName);
+                            console.log(
+                                '📣 AutoSave Create - userData:',
+                                userData,
+                            );
+                            const userName = `${
+                                userData.firstName || 'Unknown'
+                            } ${userData.lastName || 'User'}`;
+                            console.log(
+                                '📣 AutoSave Create - userName:',
+                                userName,
+                            );
                             showSaveNotification(userName, 'created');
 
                             // Refresh data from backend to reflect actual database state
-                            setRefreshTrigger(prev => prev + 1);
+                            setRefreshTrigger((prev) => prev + 1);
 
                             // Clear the temp ID from saving states
                             setSavingStates((prev) => {
@@ -1125,14 +1143,22 @@ export default function ManageUsers() {
                                 [userId]: 'saved',
                             }));
 
-                        // Show save notification
-                        console.log('📣 AutoSave Update - userData:', userData);
-                        const userName = `${userData.firstName || 'Unknown'} ${userData.lastName || 'User'}`;
-                        console.log('📣 AutoSave Update - userName:', userName);
-                        showSaveNotification(userName, 'updated');
+                            // Show save notification
+                            console.log(
+                                '📣 AutoSave Update - userData:',
+                                userData,
+                            );
+                            const userName = `${
+                                userData.firstName || 'Unknown'
+                            } ${userData.lastName || 'User'}`;
+                            console.log(
+                                '📣 AutoSave Update - userName:',
+                                userName,
+                            );
+                            showSaveNotification(userName, 'updated');
 
-                        // Refresh data from backend to reflect actual database state
-                        setRefreshTrigger(prev => prev + 1);
+                            // Refresh data from backend to reflect actual database state
+                            setRefreshTrigger((prev) => prev + 1);
 
                             console.log(
                                 '✅ User updated successfully:',
@@ -1206,7 +1232,9 @@ export default function ManageUsers() {
                 const hasValidEmail =
                     user.emailAddress &&
                     user.emailAddress.includes('@') &&
-                    user.emailAddress.includes('.');
+                    user.emailAddress.includes('.') &&
+                    user.emailAddress.length > 5 &&
+                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.emailAddress);
                 const shouldAutoSave = hasBasicInfo && hasValidEmail;
 
                 console.log(`🔍 User ${index}:`, {
@@ -1222,7 +1250,8 @@ export default function ManageUsers() {
                 });
 
                 if (shouldAutoSave) {
-                    console.log(`💾 Triggering auto-save for user ${user.id}`);
+                    console.log(`💾 Triggering auto-save for user ${user.id} - ${user.firstName} ${user.lastName}`);
+                    console.log(`📋 Full user data being passed to autoSaveUser:`, user);
                     autoSaveUser(user, isNewUser);
                 } else {
                     console.log(
