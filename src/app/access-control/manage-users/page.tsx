@@ -290,16 +290,19 @@ export default function ManageUsers() {
 
             try {
                 console.log(`🔄 Fetching fresh groups for user ${userId}`);
-                const response = await accessControlApi.get(
-                    `/users/${userId}/groups`,
-                );
-                const groups = response.data || [];
+                const groups = await accessControlApi.getUserGroups(userId);
 
                 // Cache the data
-                setUserGroupsCache(
-                    (prev) => new Map([...prev, [userId, groups]]),
-                );
-                setCacheTimestamps((prev) => new Map([...prev, [userId, now]]));
+                setUserGroupsCache((prev) => {
+                    const newCache = new Map(prev);
+                    newCache.set(userId, groups);
+                    return newCache;
+                });
+                setCacheTimestamps((prev) => {
+                    const newTimestamps = new Map(prev);
+                    newTimestamps.set(userId, now);
+                    return newTimestamps;
+                });
 
                 return groups;
             } catch (error) {
@@ -325,12 +328,12 @@ export default function ManageUsers() {
         if (userId) {
             // Invalidate specific user's cache
             setUserGroupsCache((prev) => {
-                const newCache = new Map([...prev]);
+                const newCache = new Map(prev);
                 newCache.delete(userId);
                 return newCache;
             });
             setCacheTimestamps((prev) => {
-                const newTimestamps = new Map([...prev]);
+                const newTimestamps = new Map(prev);
                 newTimestamps.delete(userId);
                 return newTimestamps;
             });
