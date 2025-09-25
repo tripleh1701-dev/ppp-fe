@@ -178,6 +178,18 @@ export default function EnterpriseConfiguration() {
 
     // Enterprise configuration data state
     const [enterpriseConfigs, setEnterpriseConfigs] = useState<any[]>([]);
+    
+    // Client-side display order tracking - independent of API timestamps
+    const displayOrderRef = useRef<Map<string, number>>(new Map());
+
+    // Function to sort configs by client-side display order for stable UI
+    const sortConfigsByDisplayOrder = useCallback((configs: any[]) => {
+        return [...configs].sort((a, b) => {
+            const orderA = displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderB = displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return orderA - orderB;
+        });
+    }, []);
     const [isLoading, setIsLoading] = useState(true);
     const [editingConfig, setEditingConfig] = useState<any>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1182,7 +1194,7 @@ export default function EnterpriseConfiguration() {
                         ? `✅ Auto-saved ${temporaryRows.length} new entries`
                         : `✅ Auto-saved ${modifiedRows.length} updated entries`;
                     
-                    showBlueNotification(message + ' after 10 seconds of inactivity');
+                    showBlueNotification(message);
                     
                     setTimeout(() => {
                         console.log('✨ Hiding auto-save success animation');
@@ -1440,10 +1452,7 @@ export default function EnterpriseConfiguration() {
             const temporaryCount = incompleteTemporaryRows.length;
             const existingCount = incompleteExistingRows.length;
             
-            let message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}:\n`;
-            if (temporaryCount > 0) message += `• ${temporaryCount} new record${temporaryCount > 1 ? 's' : ''}\n`;
-            if (existingCount > 0) message += `• ${existingCount} existing record${existingCount > 1 ? 's' : ''}\n`;
-            message += `\nMissing required fields: ${Array.from(missingFields).join(', ')}\n\nPlease complete all fields before saving.`;
+            let message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(missingFields).join(', ')}`;
             
             setValidationMessage(message);
             setShowValidationModal(true);
@@ -1790,25 +1799,50 @@ export default function EnterpriseConfiguration() {
                 }
 
                 // Transform linkage data to EnterpriseConfigRow format
-                const transformedConfigs = linkagesRes.map((linkage) => ({
-                    id: linkage.id,
-                    enterpriseName: linkage.enterprise.name || '',
-                    servicesSummary: (linkage.services || [])
-                        .map((service) => service.name)
-                        .join(', '),
-                    productName: linkage.product.name || '',
-                    serviceName: (linkage.services || [])
-                        .map((service) => service.name)
-                        .join(', '),
-                    // New simplified fields
-                    enterprise: linkage.enterprise.name || '',
-                    product: linkage.product.name || '',
-                    services: (linkage.services || [])
-                        .map((service) => service.name)
-                        .join(', '),
-                }));
+                const transformedConfigs = linkagesRes
+                    .map((linkage, index) => ({
+                        id: linkage.id,
+                        enterpriseName: linkage.enterprise.name || '',
+                        servicesSummary: (linkage.services || [])
+                            .map((service) => service.name)
+                            .join(', '),
+                        productName: linkage.product.name || '',
+                        serviceName: (linkage.services || [])
+                            .map((service) => service.name)
+                            .join(', '),
+                        // New simplified fields
+                        enterprise: linkage.enterprise.name || '',
+                        product: linkage.product.name || '',
+                        services: (linkage.services || [])
+                            .map((service) => service.name)
+                            .join(', '),
+                        // Store creation time and display order for stable sorting
+                        createdAt: linkage.createdAt,
+                        updatedAt: linkage.updatedAt,
+                        displayOrder: index, // Preserve original API order
+                    }))
+                    // Sort by creation time first, then by display order for stable ordering
+                    .sort((a, b) => {
+                        const timeA = new Date(a.createdAt).getTime();
+                        const timeB = new Date(b.createdAt).getTime();
+                        if (timeA !== timeB) {
+                            return timeA - timeB;
+                        }
+                        // If creation times are equal, use display order
+                        return a.displayOrder - b.displayOrder;
+                    });
 
-                setEnterpriseConfigs(transformedConfigs);
+                // Initialize client-side display order tracking
+                transformedConfigs.forEach((config, index) => {
+                    displayOrderRef.current.set(config.id, index);
+                });
+
+                console.log('📊 Applied stable sorting by creation time and display order to maintain row order');
+                console.log('📊 Initialized client-side display order tracking:', Object.fromEntries(displayOrderRef.current));
+                
+                // Apply final stable sort by display order
+                const finalSortedConfigs = sortConfigsByDisplayOrder(transformedConfigs);
+                setEnterpriseConfigs(finalSortedConfigs);
                 console.log(
                     '✅ Enterprise linkages loaded and transformed successfully',
                 );
@@ -1833,7 +1867,8 @@ export default function EnterpriseConfiguration() {
                 enterprise: c.enterprise || c.enterpriseName,
                 product: c.product || c.productName,  
                 services: c.services || c.serviceName,
-                hasProduct: !!(c.product || c.productName)?.trim()
+                hasProduct: !!(c.product || c.productName)?.trim(),
+                displayOrder: displayOrderRef.current.get(c.id)
             }))
         );
     }, [enterpriseConfigs]);
@@ -2032,61 +2067,6 @@ export default function EnterpriseConfiguration() {
                             )}
                             <span className='text-sm'>
                                 {isLoading ? 'Loading...' : 'Create New Enterprise'}
-                            </span>
-                        </button>
-
-                        {/* Save Button */}
-                        <button
-                            onClick={handleSaveAll}
-                            disabled={isLoading || isAutoSaving}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
-                                isLoading || isAutoSaving
-                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                    : showAutoSaveSuccess
-                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
-                                    : autoSaveCountdown
-                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
-                            }`}
-                            title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
-                        >
-                            {/* Auto-save success wave animation */}
-                            {showAutoSaveSuccess && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
-                            )}
-                            
-                            {/* Countdown ring animation */}
-                            {autoSaveCountdown && (
-                                <div className="absolute inset-0 border-2 border-white/40 rounded-md animate-pulse"></div>
-                            )}
-                            
-                            {isAutoSaving ? (
-                                <div className='h-4 w-4 animate-spin'>
-                                    <svg
-                                        className='h-full w-full'
-                                        fill='none'
-                                        viewBox='0 0 24 24'
-                                    >
-                                        <circle
-                                            className='opacity-25'
-                                            cx='12'
-                                            cy='12'
-                                            r='10'
-                                            stroke='currentColor'
-                                            strokeWidth='4'
-                                        />
-                                        <path
-                                            className='opacity-75'
-                                            fill='currentColor'
-                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                        />
-                                    </svg>
-                                </div>
-                            ) : (
-                                <BookmarkIcon className='h-4 w-4 relative z-10' />
-                            )}
-                            <span className='text-sm relative z-10'>
-                                {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
                             </span>
                         </button>
 
@@ -2331,17 +2311,6 @@ export default function EnterpriseConfiguration() {
 
                                             {/* Action Buttons */}
                                             <div className='flex items-center gap-2 pt-1 border-t border-gray-200'>
-                                                <button
-                                                    onClick={() => {
-                                                        if (sortColumn) {
-                                                            applySorting(sortColumn, sortDirection);
-                                                        }
-                                                    }}
-                                                    disabled={!sortColumn}
-                                                    className='text-xs text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed'
-                                                >
-                                                    + New sort
-                                                </button>
                                                 {sortColumn && (
                                                     <button
                                                         onClick={clearSorting}
@@ -2518,6 +2487,61 @@ export default function EnterpriseConfiguration() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Save Button */}
+                        <button
+                            onClick={handleSaveAll}
+                            disabled={isLoading || isAutoSaving}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                                isLoading || isAutoSaving
+                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    : showAutoSaveSuccess
+                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                    : autoSaveCountdown
+                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                            }`}
+                            title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                        >
+                            {/* Auto-save success wave animation */}
+                            {showAutoSaveSuccess && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
+                            )}
+                            
+                            {/* Countdown ring animation */}
+                            {autoSaveCountdown && (
+                                <div className="absolute inset-0 border-2 border-white/40 rounded-md animate-pulse"></div>
+                            )}
+                            
+                            {isAutoSaving ? (
+                                <div className='h-4 w-4 animate-spin'>
+                                    <svg
+                                        className='h-full w-full'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <circle
+                                            className='opacity-25'
+                                            cx='12'
+                                            cy='12'
+                                            r='10'
+                                            stroke='currentColor'
+                                            strokeWidth='4'
+                                        />
+                                        <path
+                                            className='opacity-75'
+                                            fill='currentColor'
+                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                        />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <BookmarkIcon className='h-4 w-4 relative z-10' />
+                            )}
+                            <span className='text-sm relative z-10'>
+                                {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                            </span>
+                        </button>
 
                         <ToolbarTrashButton
                             onClick={() => {}}
@@ -2819,14 +2843,31 @@ export default function EnterpriseConfiguration() {
                                                     
                                                     hasServices = (() => {
                                                         if (typeof servicesValue === 'string') {
-                                                            return servicesValue.trim().length > 0;
+                                                            const trimmed = servicesValue.trim();
+                                                            console.log('🔍 Services validation (string):', {
+                                                                original: servicesValue,
+                                                                trimmed: trimmed,
+                                                                length: trimmed.length,
+                                                                hasServices: trimmed.length > 0
+                                                            });
+                                                            return trimmed.length > 0;
                                                         } else if (Array.isArray(servicesValue)) {
+                                                            console.log('🔍 Services validation (array):', {
+                                                                array: servicesValue,
+                                                                length: servicesValue.length,
+                                                                hasServices: servicesValue.length > 0
+                                                            });
                                                             return servicesValue.length > 0;
                                                         }
+                                                        console.log('🔍 Services validation (other):', {
+                                                            value: servicesValue,
+                                                            type: typeof servicesValue,
+                                                            hasServices: false
+                                                        });
                                                         return false;
                                                     })();
                                                     
-                                                    console.log('� Existing record auto-save check:', {
+                                                    console.log('🔍 Existing record auto-save check:', {
                                                         rowId,
                                                         field,
                                                         value,
@@ -2838,7 +2879,20 @@ export default function EnterpriseConfiguration() {
                                                         hasEnterprise: !!hasEnterprise,
                                                         hasProduct: !!hasProduct, 
                                                         hasServices: !!hasServices,
-                                                        willTriggerAutoSave: !!(hasEnterprise && hasProduct && hasServices)
+                                                        willTriggerAutoSave: !!(hasEnterprise && hasProduct && hasServices),
+                                                        enterpriseCheck: { 
+                                                            field: field === 'enterprise' ? 'UPDATING' : 'existing',
+                                                            value: hasEnterprise 
+                                                        },
+                                                        productCheck: { 
+                                                            field: field === 'product' ? 'UPDATING' : 'existing',
+                                                            value: hasProduct 
+                                                        },
+                                                        servicesCheck: { 
+                                                            field: field === 'services' ? 'UPDATING' : 'existing',
+                                                            value: hasServices,
+                                                            rawValue: servicesValue
+                                                        }
                                                     });
                                                     
                                                     // Only trigger auto-save if all fields are complete
@@ -3200,11 +3254,30 @@ export default function EnterpriseConfiguration() {
                                                                             newLinkage as any
                                                                         ).id
                                                                     ) {
+                                                                        const newId = (newLinkage as any).id;
+                                                                        console.log('🔄 Updating record ID from', rowId, 'to', newId);
+                                                                        
+                                                                        // Transfer modified record tracking from old ID to new ID
+                                                                        if (modifiedExistingRecordsRef.current.has(rowId)) {
+                                                                            console.log('🔄 Transferring modified record tracking from old ID to new ID');
+                                                                            modifiedExistingRecordsRef.current.delete(rowId);
+                                                                            modifiedExistingRecordsRef.current.add(newId);
+                                                                            console.log('✅ Modified records tracking updated:', Array.from(modifiedExistingRecordsRef.current));
+                                                                        }
+
+                                                                        // Transfer client-side display order from old ID to new ID
+                                                                        const oldDisplayOrder = displayOrderRef.current.get(rowId);
+                                                                        if (oldDisplayOrder !== undefined) {
+                                                                            displayOrderRef.current.delete(rowId);
+                                                                            displayOrderRef.current.set(newId, oldDisplayOrder);
+                                                                            console.log('🔄 Transferred display order', oldDisplayOrder, 'from', rowId, 'to', newId);
+                                                                        }
+                                                                        
                                                                         setEnterpriseConfigs(
                                                                             (
                                                                                 prev,
-                                                                            ) =>
-                                                                                prev.map(
+                                                                            ) => {
+                                                                                const updated = prev.map(
                                                                                     (
                                                                                         cfg,
                                                                                     ) =>
@@ -3212,13 +3285,17 @@ export default function EnterpriseConfiguration() {
                                                                                         rowId
                                                                                             ? {
                                                                                                   ...cfg,
-                                                                                                  id: (
-                                                                                                      newLinkage as any
-                                                                                                  )
-                                                                                                      .id,
+                                                                                                  id: newId,
+                                                                                                  // Preserve display order and timestamps
+                                                                                                  displayOrder: cfg.displayOrder || oldDisplayOrder || 0,
+                                                                                                  createdAt: cfg.createdAt || new Date().toISOString(),
+                                                                                                  updatedAt: (newLinkage as any).updatedAt || new Date().toISOString(),
                                                                                               }
                                                                                             : cfg,
-                                                                                ),
+                                                                                );
+                                                                                // Apply stable sorting to maintain display order
+                                                                                return sortConfigsByDisplayOrder(updated);
+                                                                            }
                                                                         );
                                                                     }
                                                                 } catch (createError) {
