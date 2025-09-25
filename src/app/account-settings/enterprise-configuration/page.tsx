@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {motion} from 'framer-motion';
 import {
     PlusIcon,
@@ -8,13 +8,14 @@ import {
     ArrowsUpDownIcon,
     EyeSlashIcon,
     RectangleStackIcon,
+    BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import {api} from '@/utils/api';
-import EnterpriseAccountsTable, {
-    AccountRow,
-} from '@/components/EnterpriseAccountsTable';
+import EnterpriseConfigTable, {
+    EnterpriseConfigRow,
+} from '@/components/EnterpriseConfigTable';
 
-// Reusable trash button (copied from manage accounts)
+// Reusable trash button (copied from manage enterprise config)
 function ToolbarTrashButton({
     onClick,
     bounce = false,
@@ -25,7 +26,7 @@ function ToolbarTrashButton({
     const [over, setOver] = useState(false);
     return (
         <motion.button
-            id='accounts-trash-target'
+            id='enterprise-config-trash-target'
             type='button'
             onClick={onClick}
             aria-label='Trash'
@@ -72,10 +73,10 @@ function ToolbarTrashButton({
                         return;
                     }
                     console.log(
-                        '🚀 Dispatching accounts-row-drop-trash event for rowId:',
+                        '🚀 Dispatching enterprise-row-drop-trash event for rowId:',
                         rowId,
                     );
-                    const event = new CustomEvent('accounts-row-drop-trash', {
+                    const event = new CustomEvent('enterprise-row-drop-trash', {
                         detail: {rowId},
                     });
                     window.dispatchEvent(event);
@@ -170,11 +171,15 @@ function ToolbarTrashButton({
 
 export default function EnterpriseConfiguration() {
     console.log('🏗️ EnterpriseConfiguration component mounting...');
+    
+    // Debug: Track re-renders
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
 
-    // Accounts data state
-    const [accounts, setAccounts] = useState<any[]>([]);
+    // Enterprise configuration data state
+    const [enterpriseConfigs, setEnterpriseConfigs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [editingAccount, setEditingAccount] = useState<any>(null);
+    const [editingConfig, setEditingConfig] = useState<any>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [tableVersion, setTableVersion] = useState(0);
@@ -193,10 +198,37 @@ export default function EnterpriseConfiguration() {
 
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [validationMessage, setValidationMessage] = useState('');
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(
         null,
     );
     const [deletingRow, setDeletingRow] = useState(false);
+
+    // Auto-save related state - use useRef to persist through re-renders
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const enterpriseConfigsRef = useRef<any[]>([]);
+    const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
+    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<Set<string>>(new Set());
+    
+    // Debug auto-save state
+    console.log(`🔄 Render #${renderCountRef.current} - Auto-save timer exists:`, !!autoSaveTimerRef.current, 'Countdown:', autoSaveCountdown);
+
+    // Update ref to track current enterpriseConfigs state
+    useEffect(() => {
+        enterpriseConfigsRef.current = enterpriseConfigs;
+    }, [enterpriseConfigs]);
+
+    // Update ref to track current modifiedExistingRecords state
+    useEffect(() => {
+        modifiedExistingRecordsRef.current = modifiedExistingRecords;
+    }, [modifiedExistingRecords]);
+
+    // State to track user's pending local changes that haven't been saved yet
+    const [pendingLocalChanges, setPendingLocalChanges] = useState<Record<string, any>>({});
 
     // Row animation states
     const [compressingRowId, setCompressingRowId] = useState<string | null>(
@@ -212,8 +244,9 @@ export default function EnterpriseConfiguration() {
     });
 
     // Toolbar controls state
-    const [showSearchBar, setShowSearchBar] = useState(false);
+    const [showSearchBar, setShowSearchBar] = useState(true); // Always show search
     const [searchTerm, setSearchTerm] = useState('');
+    const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Applied search term
     const [filterVisible, setFilterVisible] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
     const [sortOpen, setSortOpen] = useState(false);
@@ -226,13 +259,15 @@ export default function EnterpriseConfiguration() {
         'None' | 'Enterprise' | 'Product' | 'Service'
     >('None');
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
-        'masterAccount',
-        'accountName',
-        'country',
+        'enterprise',
+        'product',
+        'services',
     ]);
     const [trashBounce, setTrashBounce] = useState(false);
 
     // Refs for dropdowns
+    const searchRef = useRef<HTMLDivElement>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
     const sortRef = useRef<HTMLDivElement>(null);
     const hideRef = useRef<HTMLDivElement>(null);
     const groupRef = useRef<HTMLDivElement>(null);
@@ -254,6 +289,37 @@ export default function EnterpriseConfiguration() {
         setGroupOpen(false);
     };
 
+    // Click-outside behavior to close dialogs
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            
+            // Check if any dialog is open (excluding search since it's always visible)
+            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
+                return; // No dialog is open, nothing to do
+            }
+            
+            // Check if click is outside all dialog containers (excluding search)
+            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
+            
+            // If click is outside all dialogs, close them (search remains open)
+            if (isOutsideFilter && isOutsideSort && isOutsideHide && isOutsideGroup) {
+                closeAllDialogs();
+            }
+        };
+
+        // Add event listener
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [filterVisible, sortOpen, hideOpen, groupOpen]);
+
     // Helper function to toggle a specific dialog (closes others)
     const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'group') => {
         closeAllDialogs();
@@ -274,30 +340,30 @@ export default function EnterpriseConfiguration() {
     };
 
     // All available columns
-    type ColumnType = 'masterAccount' | 'accountName' | 'country';
-    const allCols: ColumnType[] = ['masterAccount', 'accountName', 'country'];
+    type ColumnType = 'enterprise' | 'product' | 'services';
+    const allCols: ColumnType[] = ['enterprise', 'product', 'services'];
 
-    // Process accounts data with filtering, sorting, and search
-    const processedAccounts = React.useMemo(() => {
-        let filtered = [...accounts];
+    // Process enterprise config data with filtering, sorting, and search
+    const processedConfigs = React.useMemo(() => {
+        let filtered = [...enterpriseConfigs];
 
         // Apply search filter
-        if (searchTerm.trim()) {
-            filtered = filtered.filter((account) => {
-                const searchLower = searchTerm.toLowerCase();
+        if (appliedSearchTerm.trim()) {
+            filtered = filtered.filter((config) => {
+                const searchLower = appliedSearchTerm.toLowerCase();
                 return (
-                    account.masterAccount
+                    config.enterprise
                         ?.toLowerCase()
                         .includes(searchLower) ||
-                    account.enterpriseName
+                    config.enterpriseName
                         ?.toLowerCase()
                         .includes(searchLower) ||
-                    account.accountName?.toLowerCase().includes(searchLower) ||
-                    account.productName?.toLowerCase().includes(searchLower) ||
-                    account.address?.country
+                    config.product?.toLowerCase().includes(searchLower) ||
+                    config.productName?.toLowerCase().includes(searchLower) ||
+                    config.services
                         ?.toLowerCase()
                         .includes(searchLower) ||
-                    account.serviceName?.toLowerCase().includes(searchLower)
+                    config.serviceName?.toLowerCase().includes(searchLower)
                 );
             });
         }
@@ -305,38 +371,87 @@ export default function EnterpriseConfiguration() {
         // Apply filters
         if (activeFilters.enterprise) {
             filtered = filtered.filter(
-                (account) =>
-                    account.masterAccount === activeFilters.enterprise ||
-                    account.enterpriseName === activeFilters.enterprise,
+                (config) => config.enterprise === activeFilters.enterprise,
             );
         }
         if (activeFilters.product) {
             filtered = filtered.filter(
-                (account) =>
-                    account.accountName === activeFilters.product ||
-                    account.productName === activeFilters.product,
+                (config) => config.product === activeFilters.product,
             );
         }
         if (activeFilters.services && activeFilters.services.length > 0) {
-            filtered = filtered.filter((account) => {
-                const accountServices =
-                    account.address?.country?.split(', ') || [];
+            filtered = filtered.filter((config) => {
+                const configServices =
+                    config.services?.split(', ') || [];
                 return activeFilters.services.some((service: string) =>
-                    accountServices.includes(service),
+                    configServices.includes(service),
                 );
             });
         }
 
-        // Note: Sorting is handled internally by EnterpriseAccountsTable
-        // The table has its own internal sorting when you click column headers
+        // Apply sorting
+        if (sortColumn) {
+            filtered.sort((a, b) => {
+                let valueA = '';
+                let valueB = '';
+
+                switch (sortColumn) {
+                    case 'enterprise':
+                        valueA = (a.enterprise || a.enterpriseName || '').toString().toLowerCase();
+                        valueB = (b.enterprise || b.enterpriseName || '').toString().toLowerCase();
+                        break;
+                    case 'product':
+                        valueA = (a.product || a.productName || '').toString().toLowerCase();
+                        valueB = (b.product || b.productName || '').toString().toLowerCase();
+                        break;
+                    case 'services':
+                        valueA = (a.services || a.serviceName || '').toString().toLowerCase();
+                        valueB = (b.services || b.serviceName || '').toString().toLowerCase();
+                        break;
+                }
+
+                if (valueA < valueB) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (valueA > valueB) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
 
         return filtered;
-    }, [accounts, searchTerm, activeFilters]);
+    }, [enterpriseConfigs, appliedSearchTerm, activeFilters, sortColumn, sortDirection]);
 
     // Helper functions for filter management
     const applyFilters = (filters: Record<string, any>) => {
         setActiveFilters(filters);
         closeAllDialogs();
+    };
+
+    // Column label mapping
+    const columnLabels: Record<string, string> = {
+        enterprise: 'Enterprise',
+        product: 'Product', 
+        services: 'Services'
+    };
+
+    // Sort functions
+    const applySorting = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        // Don't close dialog to allow multiple adjustments
+    };
+
+    const applySortAndClose = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        closeAllDialogs();
+    };
+
+    const clearSorting = () => {
+        setSortColumn('');
+        setSortDirection('asc');
     };
 
     const clearAllFilters = () => {
@@ -544,17 +659,18 @@ export default function EnterpriseConfiguration() {
             // Mark row as saving
             setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
 
-            // Use the provided updated account or find it from state
-            const account =
-                updatedAccount || accounts.find((a) => a.id === tempRowId);
-            if (!account) {
-                console.error('❌ Account not found for auto-save:', tempRowId);
+            // Use the provided updated config or find it from current ref state
+            const config =
+                updatedAccount || enterpriseConfigsRef.current.find((a) => a.id === tempRowId);
+            if (!config) {
+                console.error('❌ Config not found for auto-save:', tempRowId);
                 console.log(
-                    '📋 Available accounts:',
-                    accounts.map((a) => ({
+                    '📋 Available configs from ref:',
+                    enterpriseConfigsRef.current.map((a) => ({
                         id: a.id,
-                        enterprise: a.enterpriseName || a.masterAccount,
-                        product: a.productName || a.accountName,
+                        enterprise: a.enterprise,
+                        product: a.product,
+                        services: a.services,
                     })),
                 );
                 setSavingRows((prev) => {
@@ -565,28 +681,26 @@ export default function EnterpriseConfiguration() {
                 return;
             }
 
-            console.log('💾 Auto-saving new row:', account);
+            console.log('💾 Auto-saving new row:', config);
             console.log('📊 Current dropdown options:', dropdownOptions);
             console.log(
-                '🔄 Using updated account data:',
+                '🔄 Using updated config data:',
                 updatedAccount ? 'YES' : 'NO',
             );
 
             // Find the enterprise, product, and service IDs from dropdown options
-            const enterpriseName =
-                account.masterAccount || account.enterpriseName;
-            const productName = account.accountName || account.productName;
+            const enterpriseName = config.enterprise;
+            const productName = config.product;
 
             // Debug the raw service value
-            const rawServiceValue =
-                account.address?.country || account.serviceName || '';
+            const rawServiceValue = config.services || '';
             console.log(
                 '🔍 Raw service value:',
                 rawServiceValue,
                 'Type:',
                 typeof rawServiceValue,
             );
-            console.log('🔍 Full account.address object:', account.address);
+            console.log('🔍 Full config object:', config);
 
             const serviceNames = rawServiceValue.split(', ').filter(Boolean);
 
@@ -664,14 +778,14 @@ export default function EnterpriseConfiguration() {
                 services = createdEntities.services;
             }
 
-            // Check if a record with the same enterprise + product already exists
-            const existingRecord = accounts.find((acc) => {
-                const accEnterprise = acc.masterAccount || acc.enterpriseName;
-                const accProduct = acc.accountName || acc.productName;
+            // Check if a record with the same enterprise + product already exists using ref
+            const existingRecord = enterpriseConfigsRef.current.find((cfg) => {
+                const cfgEnterprise = cfg.enterprise || cfg.enterpriseName;
+                const cfgProduct = cfg.product || cfg.productName;
                 return (
-                    accEnterprise === enterpriseName &&
-                    accProduct === productName &&
-                    !acc.id.toString().startsWith('tmp-') // Exclude temporary rows
+                    cfgEnterprise === enterpriseName &&
+                    cfgProduct === productName &&
+                    !cfg.id.toString().startsWith('tmp-') // Exclude temporary rows
                 );
             });
 
@@ -684,7 +798,7 @@ export default function EnterpriseConfiguration() {
                         product: productName,
                         newServices: serviceNames,
                         existingServices:
-                            existingRecord.address?.country
+                            existingRecord.services
                                 ?.split(', ')
                                 .filter(Boolean) || [],
                     },
@@ -692,7 +806,7 @@ export default function EnterpriseConfiguration() {
 
                 // Merge services: combine existing services with new ones (avoid duplicates)
                 const existingServices =
-                    existingRecord.address?.country
+                    existingRecord.services
                         ?.split(', ')
                         .filter(Boolean) || [];
                 const allServices = Array.from(
@@ -739,23 +853,20 @@ export default function EnterpriseConfiguration() {
                     );
 
                     // Update the existing record in local state with merged services
-                    setAccounts(
+                    setEnterpriseConfigs(
                         (prev) =>
                             prev
-                                .map((acc) => {
-                                    if (acc.id === existingRecord.id) {
+                                .map((cfg) => {
+                                    if (cfg.id === existingRecord.id) {
                                         // Update existing record with merged services
                                         return {
-                                            ...acc,
-                                            address: {
-                                                ...acc.address,
-                                                country: allServices.join(', '),
-                                            },
+                                            ...cfg,
+                                            services: allServices.join(', '),
                                         };
                                     }
-                                    return acc;
+                                    return cfg;
                                 })
-                                .filter((acc) => acc.id !== tempRowId), // Remove the temporary row
+                                .filter((cfg) => cfg.id !== tempRowId), // Remove the temporary row
                     );
 
                     console.log(
@@ -782,12 +893,12 @@ export default function EnterpriseConfiguration() {
                 if (createdLinkage) {
                     console.log('✅ Auto-save successful:', createdLinkage);
 
-                    // Update the account with the real ID from the backend
-                    setAccounts((prev) =>
-                        prev.map((acc) =>
-                            acc.id === tempRowId
-                                ? {...acc, id: (createdLinkage as any).id}
-                                : acc,
+                    // Update the config with the real ID from the backend
+                    setEnterpriseConfigs((prev) =>
+                        prev.map((cfg) =>
+                            cfg.id === tempRowId
+                                ? {...cfg, id: (createdLinkage as any).id}
+                                : cfg,
                         ),
                     );
 
@@ -863,16 +974,14 @@ export default function EnterpriseConfiguration() {
 
     // Function to check for incomplete rows
     const getIncompleteRows = () => {
-        return accounts
-            .filter((account) => {
-                const isTemporary = String(account.id).startsWith('tmp-');
+        return enterpriseConfigs
+            .filter((config) => {
+                const isTemporary = String(config.id).startsWith('tmp-');
                 if (!isTemporary) return false; // Only check temporary rows
 
-                const hasEnterprise =
-                    account.masterAccount || account.enterpriseName;
-                const hasProduct = account.accountName || account.productName;
-                const hasServices =
-                    account.address?.country || account.serviceName;
+                const hasEnterprise = config.enterprise;
+                const hasProduct = config.product;
+                const hasServices = config.services;
 
                 // Row is incomplete if it has some data but not all required fields
                 const hasAnyData = hasEnterprise || hasProduct || hasServices;
@@ -880,22 +989,506 @@ export default function EnterpriseConfiguration() {
 
                 return hasAnyData && !hasAllData;
             })
-            .map((account) => account.id);
+            .map((config) => config.id);
     };
 
     // Function to check if there's a completely blank row
     const hasBlankRow = () => {
-        return accounts.some((account) => {
-            const isTemporary = String(account.id).startsWith('tmp-');
+        return enterpriseConfigs.some((config) => {
+            const isTemporary = String(config.id).startsWith('tmp-');
             const isEmpty =
-                !account.masterAccount &&
-                !account.enterpriseName &&
-                !account.accountName &&
-                !account.productName &&
-                !account.address?.country &&
-                !account.serviceName;
+                !config.enterprise &&
+                !config.product &&
+                !config.services;
             return isTemporary && isEmpty;
         });
+    };
+
+    // Debounced auto-save function with countdown
+    // Function to merge server data with pending local changes
+    const getEffectiveEnterpriseConfigs = useCallback(() => {
+        return enterpriseConfigs.map(config => {
+            const pendingChanges = pendingLocalChanges[config.id];
+            if (pendingChanges) {
+                console.log(`🔄 Applying pending changes to record ${config.id}:`, pendingChanges);
+                // Apply pending changes, ensuring field names match the config structure
+                const mergedConfig = { ...config };
+                Object.keys(pendingChanges).forEach(key => {
+                    const value = pendingChanges[key];
+                    // Apply the change directly to the config
+                    mergedConfig[key] = value;
+                    
+                    // Also handle alternate field names for consistency
+                    if (key === 'enterprise') {
+                        mergedConfig.enterpriseName = value;
+                    } else if (key === 'product') {
+                        mergedConfig.productName = value;
+                    } else if (key === 'services') {
+                        mergedConfig.serviceName = value;
+                    }
+                });
+                console.log(`✅ Merged config for ${config.id}:`, {
+                    original: config,
+                    pending: pendingChanges,
+                    merged: mergedConfig
+                });
+                return mergedConfig;
+            }
+            return config;
+        });
+    }, [enterpriseConfigs, pendingLocalChanges]);
+
+    const debouncedAutoSave = async () => {
+        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
+        
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            clearInterval(countdownIntervalRef.current!);
+        }
+
+        // Start countdown
+        setAutoSaveCountdown(10);
+        
+        // Countdown interval
+        const countdownInterval = setInterval(() => {
+            setAutoSaveCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(countdownInterval);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        const timer = setTimeout(async () => {
+            try {
+                console.log('🔥 10-second timer triggered - starting auto-save process');
+                setIsAutoSaving(true);
+                setAutoSaveCountdown(null);
+                clearInterval(countdownIntervalRef.current!);
+                
+                // Get all temporary (unsaved) rows that are complete using current ref
+                const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
+                    const isTemp = String(config.id).startsWith('tmp-');
+                    if (!isTemp) return false;
+                    
+                    const hasEnterprise = config.enterprise?.trim();
+                    const hasProduct = config.product?.trim();
+                    const hasServices = config.services?.trim();
+                    
+                    return hasEnterprise && hasProduct && hasServices;
+                });
+                
+                // Get all modified existing records that are still complete
+                const modifiedRows = enterpriseConfigsRef.current.filter((config) => {
+                    const isExisting = !String(config.id).startsWith('tmp-');
+                    const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
+                    
+                    if (isExisting && isModified) {
+                        // Double-check that the record still has all required fields
+                        const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+                        const hasProduct = (config.product || config.productName)?.trim();
+                        
+                        // Enhanced services validation for timer
+                        const servicesValue = config.services || config.serviceName || '';
+                        const hasServices = (() => {
+                            if (typeof servicesValue === 'string') {
+                                return servicesValue.trim().length > 0;
+                            } else if (Array.isArray(servicesValue)) {
+                                return servicesValue.length > 0;
+                            }
+                            return false;
+                        })();
+                        
+                        const isComplete = hasEnterprise && hasProduct && hasServices;
+                        
+                        console.log(`🔍 Checking modified record ${config.id}: isComplete=${isComplete}`, {
+                            hasEnterprise: !!hasEnterprise,
+                            hasProduct: !!hasProduct,
+                            hasServices: !!hasServices,
+                            servicesValue: servicesValue,
+                            servicesValueType: typeof servicesValue
+                        });
+                        
+                        return isComplete;
+                    }
+                    
+                    console.log(`🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                    return false;
+                });
+                
+            console.log(`📊 Found ${temporaryRows.length} complete temporary rows to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing rows to auto-save`);
+            console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
+            console.log('🔍 All current configs:', enterpriseConfigsRef.current.map(c => ({
+                id: c.id,
+                isTemp: String(c.id).startsWith('tmp-'),
+                isModified: modifiedExistingRecordsRef.current.has(String(c.id)),
+                enterprise: c.enterprise,
+                product: c.product,
+                services: c.services,
+                hasEnterprise: !!(c.enterprise || c.enterpriseName)?.trim(),
+                hasProduct: !!(c.product || c.productName)?.trim(),
+                hasServices: !!(c.services || c.serviceName)?.trim()
+            })));
+            
+            // Check for orphaned records in modifiedExistingRecords
+            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
+                !enterpriseConfigsRef.current.find(config => String(config.id) === recordId)
+            );
+            if (orphanedRecords.length > 0) {
+                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
+                console.log('🧹 Cleaning up orphaned records from modified set');
+                setModifiedExistingRecords(prev => {
+                    const newSet = new Set(prev);
+                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
+                    return newSet;
+                });
+                // Update the ref immediately for this operation
+                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
+                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
+                modifiedExistingRecordsRef.current = cleanedSet;
+            }                const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+                if (totalRowsToSave > 0) {
+                    console.log('� Auto-saving rows after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
+                    
+                    for (const tempRow of temporaryRows) {
+                        console.log(`💾 Auto-saving row: ${tempRow.id}`);
+                        await autoSaveNewRow(tempRow.id);
+                    }
+                    
+                    // Save modified existing rows - they're already saved via immediate API calls
+                    // but we still want to show the success animation
+                    for (const modifiedRow of modifiedRows) {
+                        console.log(`💾 Modified existing row already saved: ${modifiedRow.id}`);
+                    }
+                    
+                    // Clear the modified records set (including any incomplete records that were filtered out)
+                    const modifiedRecordIds = modifiedRows.map(row => String(row.id));
+                    console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
+                    setModifiedExistingRecords(new Set());
+                    
+                    // Show success animation for all auto-saved entries
+                    console.log('✨ Showing auto-save success animation for all entries');
+                    setShowAutoSaveSuccess(true);
+                    
+                    // Also show notification
+                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
+                        ? `✅ Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
+                        : temporaryRows.length > 0
+                        ? `✅ Auto-saved ${temporaryRows.length} new entries`
+                        : `✅ Auto-saved ${modifiedRows.length} updated entries`;
+                    
+                    showBlueNotification(message + ' after 10 seconds of inactivity');
+                    
+                    setTimeout(() => {
+                        console.log('✨ Hiding auto-save success animation');
+                        setShowAutoSaveSuccess(false);
+                    }, 3000); // Show for 3 seconds
+                    
+                    console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+                } else {
+                    console.log('ℹ️ No rows found to auto-save');
+                }
+            } catch (error) {
+                console.error('❌ Auto-save failed:', error);
+            } finally {
+                setIsAutoSaving(false);
+            }
+        }, 10000); // 10 seconds delay
+
+        autoSaveTimerRef.current = timer;
+        console.log('⏰ Auto-save timer set for 10 seconds');
+    };
+
+    // Extract auto-save logic into a separate function for reuse
+    const executeAutoSave = async () => {
+        console.log('🔥 Executing auto-save process');
+        setIsAutoSaving(true);
+        
+        try {
+            // Get all temporary (unsaved) rows that are complete using current ref
+            const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
+                const isTemp = String(config.id).startsWith('tmp-');
+                if (!isTemp) return false;
+                
+                const hasEnterprise = config.enterprise?.trim();
+                const hasProduct = config.product?.trim();
+                const hasServices = config.services?.trim();
+                
+                return hasEnterprise && hasProduct && hasServices;
+            });
+            
+            // Get all modified existing records that are still complete
+            const modifiedRows = enterpriseConfigsRef.current.filter((config) => {
+                const isExisting = !String(config.id).startsWith('tmp-');
+                const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
+                
+                if (isExisting && isModified) {
+                    // Double-check that the record still has all required fields
+                    const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+                    const hasProduct = (config.product || config.productName)?.trim();
+                    
+                    // Enhanced services validation
+                    const servicesValue = config.services || config.serviceName || '';
+                    const hasServices = (() => {
+                        if (typeof servicesValue === 'string') {
+                            return servicesValue.trim().length > 0;
+                        } else if (Array.isArray(servicesValue)) {
+                            return servicesValue.length > 0;
+                        }
+                        return false;
+                    })();
+                    
+                    const isComplete = hasEnterprise && hasProduct && hasServices;
+                    
+                    console.log(`🔍 Checking modified record ${config.id}: isComplete=${isComplete}`, {
+                        hasEnterprise: !!hasEnterprise,
+                        hasProduct: !!hasProduct,
+                        hasServices: !!hasServices,
+                        servicesValue: servicesValue,
+                        servicesValueType: typeof servicesValue
+                    });
+                    
+                    return isComplete;
+                }
+                
+                console.log(`🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                return false;
+            });
+            
+            console.log(`📊 Found ${temporaryRows.length} complete temporary rows to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing rows to auto-save`);
+            console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
+
+            const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+            if (totalRowsToSave > 0) {
+                console.log('💾 Auto-saving rows...', temporaryRows.map(r => r.id));
+                
+                for (const tempRow of temporaryRows) {
+                    console.log(`💾 Auto-saving row: ${tempRow.id}`);
+                    await autoSaveNewRow(tempRow.id);
+                }
+                
+                // Save modified existing rows - they're already saved via immediate API calls
+                // but we still want to show the success animation
+                for (const modifiedRow of modifiedRows) {
+                    console.log(`💾 Modified existing row already saved: ${modifiedRow.id}`);
+                }
+                
+                // Clear the modified records set
+                const modifiedRecordIds = modifiedRows.map(row => String(row.id));
+                console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
+                setModifiedExistingRecords(new Set());
+                
+                // Show success animation for all auto-saved entries
+                console.log('✨ Showing auto-save success animation for all entries');
+                setShowAutoSaveSuccess(true);
+                
+                setTimeout(() => {
+                    console.log('✨ Hiding auto-save success animation');
+                    setShowAutoSaveSuccess(false);
+                }, 3000); // Show for 3 seconds
+                
+                console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+                return totalRowsToSave;
+            } else {
+                console.log('ℹ️ No rows found to auto-save');
+                return 0;
+            }
+        } catch (error) {
+            console.error('❌ Auto-save failed:', error);
+            throw error;
+        } finally {
+            setIsAutoSaving(false);
+        }
+    };
+    
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Clear auto-save timer on component unmount
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // Show all columns handler
+    const showAllColumns = () => {
+        setVisibleCols(allCols);
+    };
+
+    // Handle save all entries with validation
+    const handleSaveAll = async () => {
+        const effectiveConfigs = getEffectiveEnterpriseConfigs();
+        
+        console.log('💾 Save button clicked - effective enterpriseConfigs state:'); 
+        effectiveConfigs.forEach((c: any, index: number) => {
+            console.log(`  Record ${index + 1}:`, {
+                id: c.id,
+                enterprise: c.enterprise || c.enterpriseName,
+                product: c.product || c.productName,  
+                services: c.services || c.serviceName,
+                hasEnterprise: !!(c.enterprise || c.enterpriseName)?.trim(),
+                hasProduct: !!(c.product || c.productName)?.trim(),
+                hasServices: !!(c.services || c.serviceName)?.trim(),
+                hasPendingChanges: !!pendingLocalChanges[c.id]
+            });
+        });
+
+        // Clear auto-save timer since user is manually saving
+        if (autoSaveTimerRef.current) {
+            console.log('🛑 Manual save clicked - clearing auto-save timer');
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            setAutoSaveCountdown(null);
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        }
+        
+        // Clear any pending auto-save data from localStorage
+        localStorage.removeItem('enterpriseAutoSave');
+        console.log('🧹 Cleared auto-save data from localStorage due to manual save');
+        
+        // Clear any pending auto-save data from localStorage
+        localStorage.removeItem('enterpriseAutoSave');
+        console.log('🧹 Cleared auto-save data from localStorage due to manual save');
+
+        // Get all temporary (unsaved) rows using effective configs
+        const temporaryRows = effectiveConfigs.filter((config: any) => 
+            String(config.id).startsWith('tmp-')
+        );
+
+        // Get all existing rows that might have incomplete data using effective configs
+        const existingRows = effectiveConfigs.filter((config: any) => 
+            !String(config.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows
+        const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
+            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasProduct = (config.product || config.productName)?.trim();
+            const hasServices = (config.services || config.serviceName)?.trim();
+
+            return !hasEnterprise || !hasProduct || !hasServices;
+        });
+
+        // Check for incomplete existing rows
+        const incompleteExistingRows = existingRows.filter((config: any) => {
+            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasProduct = (config.product || config.productName)?.trim();
+            const hasServices = (config.services || config.serviceName)?.trim();
+
+            return !hasEnterprise || !hasProduct || !hasServices;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+
+        // Check if there are any pending changes (auto-save timer or modified records)
+        const hasActiveAutoSave = autoSaveTimerRef.current !== null;
+        const hasModifiedExistingRecords = modifiedExistingRecordsRef.current.size > 0;
+        const hasPendingChanges = hasActiveAutoSave || hasModifiedExistingRecords;
+
+        console.log('🔍 Save button validation check:', {
+            temporaryRowsCount: temporaryRows.length,
+            incompleteTemporaryRowsCount: incompleteTemporaryRows.length,
+            incompleteExistingRowsCount: incompleteExistingRows.length,
+            hasActiveAutoSave,
+            hasModifiedExistingRecords,
+            hasPendingChanges,
+            allExistingRows: existingRows.map((r: any) => ({
+                id: r.id,
+                enterprise: r.enterprise || r.enterpriseName,
+                product: r.product || r.productName,
+                services: r.services || r.serviceName,
+                hasEnterprise: !!(r.enterprise || r.enterpriseName)?.trim(),
+                hasProduct: !!(r.product || r.productName)?.trim(),
+                hasServices: !!(r.services || r.serviceName)?.trim()
+            })),
+            incompleteExistingRows: incompleteExistingRows.map((r: any) => ({
+                id: r.id,
+                enterprise: r.enterprise,
+                product: r.product,
+                services: r.services
+            }))
+        });
+
+        if (temporaryRows.length === 0 && incompleteExistingRows.length === 0 && !hasPendingChanges) {
+            showBlueNotification('No unsaved entries to save.');
+            return;
+        }
+
+        if (incompleteRows.length > 0) {
+            const missingFields = new Set<string>();
+            incompleteRows.forEach((config) => {
+                if (!(config.enterprise || config.enterpriseName)?.trim()) missingFields.add('Enterprise');
+                if (!(config.product || config.productName)?.trim()) missingFields.add('Product');
+                if (!(config.services || config.serviceName)?.trim()) missingFields.add('Services');
+            });
+            
+            const incompleteCount = incompleteRows.length;
+            const temporaryCount = incompleteTemporaryRows.length;
+            const existingCount = incompleteExistingRows.length;
+            
+            let message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}:\n`;
+            if (temporaryCount > 0) message += `• ${temporaryCount} new record${temporaryCount > 1 ? 's' : ''}\n`;
+            if (existingCount > 0) message += `• ${existingCount} existing record${existingCount > 1 ? 's' : ''}\n`;
+            message += `\nMissing required fields: ${Array.from(missingFields).join(', ')}\n\nPlease complete all fields before saving.`;
+            
+            setValidationMessage(message);
+            setShowValidationModal(true);
+            return;
+        }
+
+        // Save all complete temporary rows and handle pending changes
+        try {
+            let savedCount = 0;
+            const completeTemporaryRows = temporaryRows.filter((config: any) => {
+                const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+                const hasProduct = (config.product || config.productName)?.trim();
+                const hasServices = (config.services || config.serviceName)?.trim();
+                return hasEnterprise && hasProduct && hasServices;
+            });
+            
+            // Save temporary rows
+            for (const tempRow of completeTemporaryRows) {
+                await autoSaveNewRow(tempRow.id);
+                savedCount++;
+            }
+            
+            // Handle pending changes from modified existing records
+            if (hasActiveAutoSave || hasModifiedExistingRecords) {
+                console.log('💾 Manual save triggered - processing pending changes immediately');
+                
+                // Trigger the auto-save process immediately instead of waiting for timer
+                const pendingSavedCount = await executeAutoSave();
+                
+                if (pendingSavedCount > 0) {
+                    savedCount += pendingSavedCount;
+                }
+            }
+            
+            if (savedCount > 0) {
+                showBlueNotification(`Successfully saved ${savedCount} entries.`);
+            } else if (hasPendingChanges) {
+                showBlueNotification('Pending changes saved successfully.');
+            } else {
+                showBlueNotification('No complete entries to save.');
+            }
+        } catch (error) {
+            console.error('Failed to save entries:', error);
+            showBlueNotification('Failed to save some entries. Please try again.');
+        }
     };
 
     // Navigation warning handler
@@ -910,10 +1503,19 @@ export default function EnterpriseConfiguration() {
         }
     };
 
-    // Add beforeunload event listener for browser navigation
+    // Add beforeunload event listener for browser navigation and auto-save on exit
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             const incomplete = getIncompleteRows();
+            
+            // Check for pending auto-save and execute synchronously
+            const storedData = localStorage.getItem('enterpriseAutoSave');
+            if (storedData) {
+                console.log('⚠️ Pending auto-save detected on page unload');
+                // We can't await in beforeunload, but we can trigger the save
+                // The user will see a warning if there are incomplete rows
+            }
+            
             if (incomplete.length > 0) {
                 e.preventDefault();
                 e.returnValue =
@@ -923,9 +1525,61 @@ export default function EnterpriseConfiguration() {
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
-        return () =>
+        
+        // Also handle when user switches tabs or minimizes window
+        const handleVisibilityChange = async () => {
+            if (document.hidden) {
+                console.log('📱 Page hidden - checking for pending auto-save');
+                const storedData = localStorage.getItem('enterpriseAutoSave');
+                if (storedData) {
+                    console.log('⚡ Executing auto-save due to page visibility change');
+                    // Execute auto-save inline since we can't access the function
+                    try {
+                        setIsAutoSaving(true);
+                        
+                        const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
+                            const isTemp = String(config.id).startsWith('tmp-');
+                            if (!isTemp) return false;
+                            
+                            const hasEnterprise = config.enterprise?.trim();
+                            const hasProduct = config.product?.trim();
+                            const hasServices = config.services?.trim();
+                            
+                            return hasEnterprise && hasProduct && hasServices;
+                        });
+                        
+                        let savedCount = 0;
+                        for (const tempRow of temporaryRows) {
+                            try {
+                                await autoSaveNewRow(tempRow.id);
+                                savedCount++;
+                            } catch (error) {
+                                console.error(`❌ Failed to auto-save row ${tempRow.id}:`, error);
+                            }
+                        }
+                        
+                        if (savedCount > 0) {
+                            showBlueNotification(`✅ Auto-saved ${savedCount} entries before leaving page`);
+                            console.log(`✅ Auto-saved ${savedCount} entries on page hide`);
+                        }
+                        
+                        localStorage.removeItem('enterpriseAutoSave');
+                    } catch (error) {
+                        console.error('❌ Auto-save on visibility change failed:', error);
+                    } finally {
+                        setIsAutoSaving(false);
+                    }
+                }
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [accounts, getIncompleteRows]);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [enterpriseConfigs, getIncompleteRows]);
 
     // Add test functions (temporary for debugging)
     if (typeof window !== 'undefined') {
@@ -934,22 +1588,11 @@ export default function EnterpriseConfiguration() {
             const newId = `tmp-${Date.now()}`;
             const testRow = {
                 id: newId,
-                accountName: '',
-                firstName: '',
-                lastName: '',
-                email: '',
-                phone: '',
-                status: 'Active',
-                servicesCount: 0,
-                enterpriseName: '',
-                productName: '',
-                serviceName: '',
-                masterAccount: '',
-                address: {
-                    country: '',
-                },
+                enterprise: '',
+                product: '',
+                services: '',
             } as any;
-            setAccounts((prev) => [...prev, testRow]);
+            setEnterpriseConfigs((prev) => [...prev, testRow]);
             console.log('🧪 Added test row:', newId);
         };
         (window as any).testAutoSave = (tempRowId?: string) => {
@@ -958,7 +1601,7 @@ export default function EnterpriseConfiguration() {
             autoSaveNewRow(rowId);
         };
         (window as any).showAccounts = () => {
-            console.log('📋 Current accounts:', accounts);
+            console.log('📋 Current enterprise configs:', enterpriseConfigs);
             console.log('📊 Current dropdown options:', dropdownOptions);
         };
         (window as any).testNavigationWarning = () => {
@@ -978,7 +1621,7 @@ export default function EnterpriseConfiguration() {
         // Test animation function
         (window as any).testAnimation = (rowId?: string) => {
             const testRowId =
-                rowId || (accounts.length > 0 ? accounts[0].id : 'test-id');
+                rowId || (enterpriseConfigs.length > 0 ? enterpriseConfigs[0].id : 'test-id');
             console.log('🧪 Testing animation for row:', testRowId);
             startRowCompressionAnimation(testRowId);
         };
@@ -1023,46 +1666,36 @@ export default function EnterpriseConfiguration() {
         }
 
         // Update all affected rows in the table
-        setAccounts((prev) => {
+        setEnterpriseConfigs((prev) => {
             let updatedCount = 0;
-            const updatedAccounts = prev.map((account) => {
-                const updatedAccount = {...account};
+            const updatedConfigs = prev.map((config: any) => {
+                const updatedConfig = {...config};
                 let wasUpdated = false;
 
                 if (type === 'enterprises') {
-                    if (
-                        updatedAccount.masterAccount === oldName ||
-                        updatedAccount.enterpriseName === oldName
-                    ) {
+                    if (updatedConfig.enterprise === oldName) {
                         if (action === 'update' && newName) {
-                            updatedAccount.masterAccount = newName;
-                            updatedAccount.enterpriseName = newName;
+                            updatedConfig.enterprise = newName;
                             wasUpdated = true;
                         } else if (action === 'delete') {
-                            updatedAccount.masterAccount = '';
-                            updatedAccount.enterpriseName = '';
+                            updatedConfig.enterprise = '';
                             wasUpdated = true;
                         }
                     }
                 } else if (type === 'products') {
-                    if (
-                        updatedAccount.accountName === oldName ||
-                        updatedAccount.productName === oldName
-                    ) {
+                    if (updatedConfig.product === oldName) {
                         if (action === 'update' && newName) {
-                            updatedAccount.accountName = newName;
-                            updatedAccount.productName = newName;
+                            updatedConfig.product = newName;
                             wasUpdated = true;
                         } else if (action === 'delete') {
-                            updatedAccount.accountName = '';
-                            updatedAccount.productName = '';
+                            updatedConfig.product = '';
                             wasUpdated = true;
                         }
                     }
                 } else if (type === 'services') {
-                    // Services are stored in address.country as comma-separated values
-                    if (updatedAccount.address?.country) {
-                        const services = updatedAccount.address.country
+                    // Services are stored in services field as comma-separated values
+                    if (updatedConfig.services) {
+                        const services = updatedConfig.services
                             .split(', ')
                             .filter(Boolean);
                         if (services.includes(oldName)) {
@@ -1071,18 +1704,14 @@ export default function EnterpriseConfiguration() {
                                     (s: string) =>
                                         s === oldName ? newName : s,
                                 );
-                                updatedAccount.address.country =
-                                    updatedServices.join(', ');
-                                updatedAccount.serviceName =
+                                updatedConfig.services =
                                     updatedServices.join(', ');
                                 wasUpdated = true;
                             } else if (action === 'delete') {
                                 const updatedServices = services.filter(
                                     (s: string) => s !== oldName,
                                 );
-                                updatedAccount.address.country =
-                                    updatedServices.join(', ');
-                                updatedAccount.serviceName =
+                                updatedConfig.services =
                                     updatedServices.join(', ');
                                 wasUpdated = true;
                             }
@@ -1094,13 +1723,13 @@ export default function EnterpriseConfiguration() {
                     updatedCount++;
                 }
 
-                return updatedAccount;
+                return updatedConfig;
             });
 
             console.log(
                 `📊 Updated ${updatedCount} table rows for ${type} ${action}`,
             );
-            return updatedAccounts;
+            return updatedConfigs;
         });
 
         // Force table re-render by incrementing version
@@ -1154,23 +1783,15 @@ export default function EnterpriseConfiguration() {
 
                 if (!linkagesRes || linkagesRes.length === 0) {
                     console.log('ℹ️ No enterprise linkages found');
-                    setAccounts([]);
+                    setEnterpriseConfigs([]);
                     setIsLoading(false);
                     // Don't return here - dropdown options are still loaded and ready for new records
                     return;
                 }
 
-                // Transform linkage data to AccountRow format
-                const transformedAccounts = linkagesRes.map((linkage) => ({
+                // Transform linkage data to EnterpriseConfigRow format
+                const transformedConfigs = linkagesRes.map((linkage) => ({
                     id: linkage.id,
-                    globalClientName: linkage.enterprise.name || '',
-                    accountName: linkage.product.name || '',
-                    firstName: '',
-                    lastName: '',
-                    email: '',
-                    phone: '',
-                    status: 'Active' as const,
-                    servicesCount: linkage.services?.length || 0,
                     enterpriseName: linkage.enterprise.name || '',
                     servicesSummary: (linkage.services || [])
                         .map((service) => service.name)
@@ -1179,34 +1800,43 @@ export default function EnterpriseConfiguration() {
                     serviceName: (linkage.services || [])
                         .map((service) => service.name)
                         .join(', '),
-                    masterAccount: linkage.enterprise.name || '',
-                    address: {
-                        country: (linkage.services || [])
-                            .map((service) => service.name)
-                            .join(', '), // Store services in country field for display
-                    },
+                    // New simplified fields
+                    enterprise: linkage.enterprise.name || '',
+                    product: linkage.product.name || '',
+                    services: (linkage.services || [])
+                        .map((service) => service.name)
+                        .join(', '),
                 }));
 
-                setAccounts(transformedAccounts);
+                setEnterpriseConfigs(transformedConfigs);
                 console.log(
                     '✅ Enterprise linkages loaded and transformed successfully',
                 );
             } catch (error) {
                 console.error('❌ Failed to load enterprise linkages:', error);
-                setAccounts([]);
+                setEnterpriseConfigs([]);
             } finally {
                 setIsLoading(false);
             }
         })();
     }, []);
 
-    // Force table re-render when accounts data changes
+    // Force table re-render when configs data changes
     useEffect(() => {
         console.log(
-            '📋 Accounts data changed, current count:',
-            accounts.length,
+            '📋 Enterprise configs data changed, current count:',
+            enterpriseConfigs.length,
         );
-    }, [accounts]);
+        console.log('📋 Current enterprise configs state:', 
+            enterpriseConfigs.map(c => ({
+                id: c.id,
+                enterprise: c.enterprise || c.enterpriseName,
+                product: c.product || c.productName,  
+                services: c.services || c.serviceName,
+                hasProduct: !!(c.product || c.productName)?.trim()
+            }))
+        );
+    }, [enterpriseConfigs]);
 
     // Handle drag-and-drop delete events
     useEffect(() => {
@@ -1217,7 +1847,7 @@ export default function EnterpriseConfiguration() {
             );
             const {rowId} = event.detail;
             if (rowId) {
-                const row = accounts.find((account) => account.id === rowId);
+                const row = enterpriseConfigs.find((config) => config.id === rowId);
                 if (row) {
                     console.log('🎯 Found row for animation:', row);
                     // Start the compression animation sequence
@@ -1231,16 +1861,16 @@ export default function EnterpriseConfiguration() {
         };
 
         window.addEventListener(
-            'accounts-row-drop-trash',
+            'enterprise-row-drop-trash',
             handleRowDropTrash as EventListener,
         );
         return () => {
             window.removeEventListener(
-                'accounts-row-drop-trash',
+                'enterprise-row-drop-trash',
                 handleRowDropTrash as EventListener,
             );
         };
-    }, [accounts]);
+    }, [enterpriseConfigs]);
 
     // Row squeeze animation sequence with trash effects
     const startRowCompressionAnimation = async (rowId: string) => {
@@ -1293,8 +1923,8 @@ export default function EnterpriseConfiguration() {
             );
 
             // Remove from local state
-            setAccounts((prev) =>
-                prev.filter((account) => account.id !== pendingDeleteRowId),
+            setEnterpriseConfigs((prev) =>
+                prev.filter((config) => config.id !== pendingDeleteRowId),
             );
 
             console.log('✅ Enterprise linkage deleted successfully');
@@ -1331,9 +1961,7 @@ export default function EnterpriseConfiguration() {
                         Enterprise Configuration
                     </h1>
                     <p className='mt-2 text-sm text-slate-600 leading-relaxed'>
-                        Create, edit, and manage enterprise-product-service
-                        linkages at scale with advanced grouping, filtering, and
-                        quick actions for streamlined configuration management.
+                        Build, customize, and maintain linkages that unify enterprise offerings into a single ecosystem.
                     </p>
                 </div>
             </div>
@@ -1356,22 +1984,11 @@ export default function EnterpriseConfiguration() {
                                 const newId = `tmp-${Date.now()}`;
                                 const blank = {
                                     id: newId,
-                                    accountName: '',
-                                    firstName: '',
-                                    lastName: '',
-                                    email: '',
-                                    phone: '',
-                                    status: 'Active',
-                                    servicesCount: 0,
-                                    enterpriseName: '',
-                                    productName: '',
-                                    serviceName: '',
-                                    masterAccount: '',
-                                    address: {
-                                        country: '',
-                                    },
+                                    enterprise: '',
+                                    product: '',
+                                    services: '',
                                 } as any;
-                                setAccounts((prev) => [...prev, blank]);
+                                setEnterpriseConfigs((prev) => [...prev, blank]);
                                 console.log('➕ Added new blank row:', newId);
                                 // scroll to bottom where the new row is rendered
                                 setTimeout(() => {
@@ -1414,63 +2031,103 @@ export default function EnterpriseConfiguration() {
                                 <PlusIcon className='h-4 w-4' />
                             )}
                             <span className='text-sm'>
-                                {isLoading ? 'Loading...' : 'New Enterprise'}
+                                {isLoading ? 'Loading...' : 'Create New Enterprise'}
                             </span>
                         </button>
 
-                        {/* Search Button */}
-                        <div className='flex items-center'>
-                            {showSearchBar && (
-                                <div className='relative w-72 mr-3'>
-                                    <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                        <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
-                                    </div>
-                                    <input
-                                        type='text'
-                                        placeholder='Search accounts...'
-                                        value={searchTerm}
-                                        onChange={(e) =>
-                                            setSearchTerm(e.target.value)
-                                        }
-                                        className='block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-400'
-                                        autoFocus
-                                    />
-                                </div>
+                        {/* Save Button */}
+                        <button
+                            onClick={handleSaveAll}
+                            disabled={isLoading || isAutoSaving}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                                isLoading || isAutoSaving
+                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    : showAutoSaveSuccess
+                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                    : autoSaveCountdown
+                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                            }`}
+                            title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                        >
+                            {/* Auto-save success wave animation */}
+                            {showAutoSaveSuccess && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
                             )}
-                            <button
-                                onClick={() => setShowSearchBar((v) => !v)}
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    showSearchBar
-                                        ? 'border-blue-300 bg-blue-50 text-blue-600 shadow-blue-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-lg'
-                                }`}
-                            >
-                                <svg
-                                    className={`w-4 h-4 transition-transform duration-300 ${
-                                        showSearchBar
-                                            ? 'rotate-90'
-                                            : 'group-hover:scale-110'
-                                    }`}
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
-                                    />
-                                </svg>
-                                <span className='text-sm'>Search</span>
-                                {showSearchBar && (
-                                    <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-blue-500 rounded-full animate-pulse'></div>
+                            
+                            {/* Countdown ring animation */}
+                            {autoSaveCountdown && (
+                                <div className="absolute inset-0 border-2 border-white/40 rounded-md animate-pulse"></div>
+                            )}
+                            
+                            {isAutoSaving ? (
+                                <div className='h-4 w-4 animate-spin'>
+                                    <svg
+                                        className='h-full w-full'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <circle
+                                            className='opacity-25'
+                                            cx='12'
+                                            cy='12'
+                                            r='10'
+                                            stroke='currentColor'
+                                            strokeWidth='4'
+                                        />
+                                        <path
+                                            className='opacity-75'
+                                            fill='currentColor'
+                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                        />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <BookmarkIcon className='h-4 w-4 relative z-10' />
+                            )}
+                            <span className='text-sm relative z-10'>
+                                {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                            </span>
+                        </button>
+
+                        {/* Search Input - Always Visible */}
+                        <div ref={searchRef} className='flex items-center'>
+                            <div className='relative w-60'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                                </div>
+                                <input
+                                    type='text'
+                                    placeholder='Search Enterprise, Product, Services'
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            setAppliedSearchTerm(searchTerm);
+                                        }
+                                    }}
+                                    className='block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-400 text-base placeholder:text-base'
+                                />
+                                {appliedSearchTerm && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setAppliedSearchTerm('');
+                                        }}
+                                        className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
+                                        title='Clear search'
+                                    >
+                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                                        </svg>
+                                    </button>
                                 )}
-                            </button>
+                            </div>
                         </div>
 
                         {/* Filter Button */}
-                        <div className='relative'>
+                        {/* Filter Button */}
+                        <div ref={filterRef} className='relative'>
                             <button
                                 onClick={() =>
                                     filterVisible
@@ -1593,7 +2250,11 @@ export default function EnterpriseConfiguration() {
                         {/* Sort Button */}
                         <div ref={sortRef} className='relative'>
                             <button
-                                className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    sortOpen || !!sortColumn
+                                        ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                                }`}
                                 title='Sort'
                                 onClick={() =>
                                     sortOpen
@@ -1601,50 +2262,115 @@ export default function EnterpriseConfiguration() {
                                         : toggleDialog('sort')
                                 }
                             >
-                                <ArrowsUpDownIcon className='h-4 w-4' />
+                                <ArrowsUpDownIcon className={`h-4 w-4 transition-transform duration-300 ${
+                                    sortOpen
+                                        ? 'rotate-180'
+                                        : 'group-hover:rotate-180'
+                                }`} />
                                 <span className='text-sm'>Sort</span>
                                 {!!sortColumn && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
                                 )}
+                                <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
                             </button>
                             {sortOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[420px] rounded-lg bg-card text-primary shadow-xl border border-light'>
-                                    <div className='flex items-center justify-between px-4 py-2.5 border-b border-light'>
-                                        <div className='text-sm font-semibold'>
-                                            Sort by
-                                        </div>
-                                    </div>
-                                    <div className='p-4 space-y-3'>
-                                        <div className='flex items-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-md'>
-                                            <svg
-                                                className='w-5 h-5'
-                                                fill='currentColor'
-                                                viewBox='0 0 20 20'
-                                            >
-                                                <path
-                                                    fillRule='evenodd'
-                                                    d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z'
-                                                    clipRule='evenodd'
-                                                />
-                                            </svg>
-                                            <div className='text-sm'>
-                                                <div className='font-medium'>
-                                                    Click Column Headers to Sort
-                                                </div>
-                                                <div className='text-blue-500 mt-1'>
-                                                    Click on Enterprise,
-                                                    Product, or Services column
-                                                    headers in the table to sort
-                                                    the data.
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[340px] rounded-lg bg-white shadow-xl border border-gray-200'>
+                                    <div className='p-4'>
+                                        <div className='space-y-4'>
+                                            {/* Column Selection */}
+                                            <div>
+                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                    Choose column
+                                                </label>
+                                                <div className='relative'>
+                                                    <select
+                                                        value={sortColumn}
+                                                        onChange={(e) => {
+                                                            const newColumn = e.target.value;
+                                                            setSortColumn(newColumn);
+                                                            // If a column is selected, auto-apply the sort
+                                                            if (newColumn) {
+                                                                applySorting(newColumn, sortDirection);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white'
+                                                    >
+                                                        <option value=''>Select a column</option>
+                                                        {allCols.map((col) => (
+                                                            <option key={col} value={col}>
+                                                                {columnLabels[col]}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <div className='absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none'>
+                                                        <svg className='w-5 h-5 text-gray-400' viewBox='0 0 20 20' fill='currentColor'>
+                                                            <path fillRule='evenodd' d='M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z' clipRule='evenodd' />
+                                                        </svg>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            {/* Direction Selection */}
+                                            <div>
+                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                    Sort direction
+                                                </label>
+                                                <div className='relative'>
+                                                    <select
+                                                        value={sortDirection}
+                                                        onChange={(e) => {
+                                                            const newDirection = e.target.value as 'asc' | 'desc';
+                                                            setSortDirection(newDirection);
+                                                            // If a column is already selected, auto-apply the sort
+                                                            if (sortColumn) {
+                                                                applySorting(sortColumn, newDirection);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white'
+                                                    >
+                                                        <option value='asc'>Ascending</option>
+                                                        <option value='desc'>Descending</option>
+                                                    </select>
+                                                    <div className='absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none'>
+                                                        <svg className='w-5 h-5 text-gray-400' viewBox='0 0 20 20' fill='currentColor'>
+                                                            <path fillRule='evenodd' d='M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z' clipRule='evenodd' />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className='flex items-center gap-2 pt-2 border-t border-gray-200'>
+                                                <button
+                                                    onClick={() => {
+                                                        if (sortColumn) {
+                                                            applySorting(sortColumn, sortDirection);
+                                                        }
+                                                    }}
+                                                    disabled={!sortColumn}
+                                                    className='text-sm text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed'
+                                                >
+                                                    + New sort
+                                                </button>
+                                                {sortColumn && (
+                                                    <button
+                                                        onClick={clearSorting}
+                                                        className='text-sm text-gray-500 hover:text-gray-700'
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Current Sort Display */}
+                                            {sortColumn && (
+                                                <div className='mt-2 p-2 bg-blue-50 rounded border text-sm'>
+                                                    <span className='font-medium text-blue-800'>
+                                                        Sorting by: {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Ascending' : 'Descending'})
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                        <button
-                                            onClick={closeAllDialogs}
-                                            className='w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded border border-blue-200'
-                                        >
-                                            Got it
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1653,24 +2379,28 @@ export default function EnterpriseConfiguration() {
                         {/* Hide Columns Button */}
                         <div ref={hideRef} className='relative'>
                             <button
-                                className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    hideOpen || visibleCols.length < allCols.length
+                                        ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                                }`}
                                 onClick={() =>
                                     hideOpen
                                         ? closeAllDialogs()
                                         : toggleDialog('hide')
                                 }
                             >
-                                <EyeSlashIcon className='h-4 w-4' />
-                                <span className='text-sm'>Hide</span>
+                                <EyeSlashIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                                <span className='text-sm'>Show/Hide</span>
                                 {visibleCols.length < allCols.length && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
                                 )}
                             </button>
                             {hideOpen && (
                                 <div className='absolute left-0 top-full z-50 mt-2 w-[420px] rounded-lg bg-card text-primary shadow-xl border border-light'>
                                     <div className='flex items-center justify-between px-4 py-2.5 border-b border-light'>
                                         <div className='text-sm font-semibold'>
-                                            Hide columns
+                                            Displayed Columns
                                         </div>
                                     </div>
                                     <div className='p-3 space-y-2'>
@@ -1698,13 +2428,13 @@ export default function EnterpriseConfiguration() {
                                                     >
                                                         <span className='text-sm capitalize'>
                                                             {c ===
-                                                            'masterAccount'
+                                                            'enterprise'
                                                                 ? 'Enterprise'
                                                                 : c ===
-                                                                  'accountName'
+                                                                  'product'
                                                                 ? 'Product'
                                                                 : c ===
-                                                                  'country'
+                                                                  'services'
                                                                 ? 'Services'
                                                                 : c}
                                                         </span>
@@ -1755,17 +2485,21 @@ export default function EnterpriseConfiguration() {
                             className='relative flex items-center'
                         >
                             <button
-                                className='relative inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    groupOpen || ActiveGroupLabel !== 'None'
+                                        ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                                }`}
                                 onClick={() =>
                                     groupOpen
                                         ? closeAllDialogs()
                                         : toggleDialog('group')
                                 }
                             >
-                                <RectangleStackIcon className='h-4 w-4' />
+                                <RectangleStackIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
                                 <span className='text-sm'>Group by</span>
                                 {ActiveGroupLabel !== 'None' && (
-                                    <span className='absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-primary-600 animate-pulse'></span>
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
                                 )}
                             </button>
                             {groupOpen && (
@@ -1794,10 +2528,6 @@ export default function EnterpriseConfiguration() {
                                 </div>
                             )}
                         </div>
-
-                        <button className='inline-flex items-center gap-2 px-2 py-2 rounded text-slate-600 hover:text-slate-900'>
-                            <span className='text-xl leading-none'>…</span>
-                        </button>
 
                         <ToolbarTrashButton
                             onClick={() => {}}
@@ -1856,7 +2586,7 @@ export default function EnterpriseConfiguration() {
                                     </p>
                                 </div>
                             </div>
-                        ) : accounts.length === 0 ? (
+                        ) : enterpriseConfigs.length === 0 ? (
                             // Empty State
                             <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
                                 <div className='mx-auto max-w-md'>
@@ -1879,8 +2609,7 @@ export default function EnterpriseConfiguration() {
                                     </h3>
                                     <p className='mt-2 text-sm text-slate-500'>
                                         No enterprise-product-service linkages
-                                        have been configured yet. Create your
-                                        first enterprise configuration to get
+                                        have been configured yet. Create enterprise configuration to get
                                         started.
                                     </p>
                                     <div className='mt-6'>
@@ -1890,42 +2619,30 @@ export default function EnterpriseConfiguration() {
                                                 const newId = `tmp-${Date.now()}`;
                                                 const blank = {
                                                     id: newId,
-                                                    accountName: '',
-                                                    firstName: '',
-                                                    lastName: '',
-                                                    email: '',
-                                                    phone: '',
-                                                    status: 'Active',
-                                                    servicesCount: 0,
-                                                    enterpriseName: '',
-                                                    productName: '',
-                                                    serviceName: '',
-                                                    masterAccount: '',
-                                                    address: {
-                                                        country: '',
-                                                    },
+                                                    enterprise: '',
+                                                    product: '',
+                                                    services: '',
                                                 } as any;
-                                                setAccounts([blank]);
+                                                setEnterpriseConfigs([blank]);
                                             }}
                                             className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
                                         >
                                             <PlusIcon className='-ml-1 mr-2 h-5 w-5' />
-                                            Create First Enterprise
-                                            Configuration
+                                            Create New Enterprise
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             <div className='flex-1 overflow-auto'>
-                                <EnterpriseAccountsTable
-                                    key={`table-v${tableVersion}-${accounts.length}`}
+                                <EnterpriseConfigTable
+                                    key={`table-v${tableVersion}-sort-${sortColumn}-${sortDirection}`}
                                     // title='Account Details'
                                     hideRowExpansion={true}
                                     customColumnLabels={{
-                                        masterAccount: 'Enterprise',
-                                        accountName: 'Product',
-                                        country: 'Services',
+                                        enterprise: 'Enterprise',
+                                        product: 'Product',
+                                        services: 'Services',
                                     }}
                                     enableDropdownChips={true}
                                     enableInlineEditing={true}
@@ -1954,45 +2671,47 @@ export default function EnterpriseConfiguration() {
                                             },
                                         );
 
-                                        // Update local state immediately for responsiveness
-                                        setAccounts((prev) =>
-                                            prev.map((account) =>
-                                                account.id === rowId
+                                        // Store pending changes separately to preserve user input during data reloads
+                                        setPendingLocalChanges(prev => ({
+                                            ...prev,
+                                            [rowId]: {
+                                                ...prev[rowId],
+                                                [field]: value
+                                            }
+                                        }));
+
+                                        // Also update main state for immediate responsiveness (but this may get overwritten)
+                                        setEnterpriseConfigs((prev) =>
+                                            prev.map((config) =>
+                                                config.id === rowId
                                                     ? {
-                                                          ...account,
+                                                          ...config,
                                                           [field]: value,
                                                       }
-                                                    : account,
+                                                    : config,
                                             ),
                                         );
 
-                                        // Handle field-specific updates for enterprise linkages
+                                        // Update local state immediately for responsiveness
                                         try {
-                                            const account = accounts.find(
+                                            const config = enterpriseConfigs.find(
                                                 (a) => a.id === rowId,
                                             );
-                                            if (!account) return;
+                                            if (!config) return;
 
                                             let updateData: any = {};
 
-                                            if (field === 'masterAccount') {
+                                            if (field === 'enterprise') {
                                                 // Enterprise field updated
-                                                updateData.enterpriseName =
-                                                    value;
-                                            } else if (
-                                                field === 'accountName'
-                                            ) {
+                                                updateData.enterpriseName = value;
+                                            } else if (field === 'product') {
                                                 // Product field updated
                                                 updateData.productName = value;
-                                            } else if (
-                                                field === 'address' &&
-                                                value?.country
-                                            ) {
-                                                // Services field updated (stored in address.country)
-                                                updateData.serviceNames =
-                                                    value.country
-                                                        .split(', ')
-                                                        .filter(Boolean);
+                                            } else if (field === 'services') {
+                                                // Services field updated
+                                                updateData.serviceNames = value
+                                                    .split(', ')
+                                                    .filter(Boolean);
                                             }
 
                                             // For new rows (temporary IDs), check if we can auto-save
@@ -2005,28 +2724,27 @@ export default function EnterpriseConfiguration() {
                                                 );
 
                                                 // Check if all required fields are filled for auto-save
-                                                const updatedAccount =
-                                                    accounts.find(
+                                                const updatedConfig =
+                                                    enterpriseConfigs.find(
                                                         (a) => a.id === rowId,
                                                     );
-                                                if (updatedAccount) {
+                                                if (updatedConfig) {
                                                     // Apply the current update to check completeness
-                                                    const accountWithUpdate = {
-                                                        ...updatedAccount,
+                                                    const configWithUpdate = {
+                                                        ...updatedConfig,
                                                         [field]: value,
                                                     };
 
                                                     // Check if we have enterprise, product, and at least one service
                                                     const hasEnterprise =
-                                                        accountWithUpdate.masterAccount ||
-                                                        accountWithUpdate.enterpriseName;
+                                                        configWithUpdate.enterprise ||
+                                                        configWithUpdate.enterpriseName;
                                                     const hasProduct =
-                                                        accountWithUpdate.accountName ||
-                                                        accountWithUpdate.productName;
+                                                        configWithUpdate.product ||
+                                                        configWithUpdate.productName;
                                                     const hasServices =
-                                                        accountWithUpdate
-                                                            .address?.country ||
-                                                        accountWithUpdate.serviceName;
+                                                        configWithUpdate.services ||
+                                                        configWithUpdate.serviceName;
 
                                                     console.log(
                                                         '🔍 Auto-save check:',
@@ -2034,38 +2752,27 @@ export default function EnterpriseConfiguration() {
                                                             rowId,
                                                             field,
                                                             value,
-                                                            accountWithUpdate,
+                                                            configWithUpdate,
                                                             hasEnterprise,
                                                             hasProduct,
                                                             hasServices,
-                                                            willAutoSave:
+                                                            willTriggerDebouncedSave:
                                                                 hasEnterprise &&
                                                                 hasProduct &&
                                                                 hasServices,
                                                         },
                                                     );
 
+                                                    // Trigger debounced auto-save instead of immediate save
                                                     if (
                                                         hasEnterprise &&
                                                         hasProduct &&
                                                         hasServices
                                                     ) {
                                                         console.log(
-                                                            '✅ All required fields filled, auto-saving new row...',
+                                                            '✅ All required fields filled, starting 10-second auto-save timer...',
                                                         );
-                                                        console.log(
-                                                            '⏰ Setting timeout to call autoSaveNewRow in 500ms',
-                                                        );
-                                                        // Auto-save the new row
-                                                        setTimeout(() => {
-                                                            console.log(
-                                                                '⏰ Timeout triggered, calling autoSaveNewRow now',
-                                                            );
-                                                            autoSaveNewRow(
-                                                                rowId,
-                                                                accountWithUpdate,
-                                                            );
-                                                        }, 500); // Small delay to ensure state is updated
+                                                        debouncedAutoSave();
                                                     } else {
                                                         console.log(
                                                             '❌ Auto-save conditions not met:',
@@ -2074,21 +2781,107 @@ export default function EnterpriseConfiguration() {
                                                                 hasProduct,
                                                                 hasServices,
                                                                 enterpriseValue:
-                                                                    accountWithUpdate.masterAccount ||
-                                                                    accountWithUpdate.enterpriseName,
+                                                                    configWithUpdate.enterprise ||
+                                                                    configWithUpdate.enterpriseName,
                                                                 productValue:
-                                                                    accountWithUpdate.accountName ||
-                                                                    accountWithUpdate.productName,
+                                                                    configWithUpdate.product ||
+                                                                    configWithUpdate.productName,
                                                                 servicesValue:
-                                                                    accountWithUpdate
-                                                                        .address
-                                                                        ?.country ||
-                                                                    accountWithUpdate.serviceName,
+                                                                    configWithUpdate.services ||
+                                                                    configWithUpdate.serviceName,
                                                             },
                                                         );
                                                     }
                                                 }
                                                 return;
+                                            }
+
+                                            // For existing rows, check if we should trigger auto-save timer
+                                            if (!rowId.startsWith('tmp-')) {
+                                                // Create updated config with the new value to check completeness
+                                                const config = enterpriseConfigs.find((a) => a.id === rowId);
+                                                if (config) {
+                                                    const updatedConfig = { ...config, [field]: value };
+                                                    
+                                                    // Check if all required fields are present and not empty
+                                                    // Only check the updated value for the field being modified to avoid stale data
+                                                    let hasEnterprise, hasProduct, hasServices;
+                                                    
+                                                    if (field === 'enterprise') {
+                                                        hasEnterprise = updatedConfig.enterprise?.trim();
+                                                    } else {
+                                                        hasEnterprise = (updatedConfig.enterprise || updatedConfig.enterpriseName)?.trim();
+                                                    }
+                                                    
+                                                    if (field === 'product') {
+                                                        hasProduct = updatedConfig.product?.trim();
+                                                    } else {
+                                                        hasProduct = (updatedConfig.product || updatedConfig.productName)?.trim();
+                                                    }
+                                                    
+                                                    // More robust services validation - only check the field that's being updated
+                                                    let servicesValue;
+                                                    if (field === 'services') {
+                                                        servicesValue = updatedConfig.services || '';
+                                                    } else {
+                                                        servicesValue = updatedConfig.services || updatedConfig.serviceName || '';
+                                                    }
+                                                    
+                                                    hasServices = (() => {
+                                                        if (typeof servicesValue === 'string') {
+                                                            return servicesValue.trim().length > 0;
+                                                        } else if (Array.isArray(servicesValue)) {
+                                                            return servicesValue.length > 0;
+                                                        }
+                                                        return false;
+                                                    })();
+                                                    
+                                                    console.log('� Existing record auto-save check:', {
+                                                        rowId,
+                                                        field,
+                                                        value,
+                                                        updatedConfigServices: updatedConfig.services,
+                                                        updatedConfigServiceName: updatedConfig.serviceName,
+                                                        servicesValue: servicesValue,
+                                                        servicesValueType: typeof servicesValue,
+                                                        fieldBeingUpdated: field,
+                                                        hasEnterprise: !!hasEnterprise,
+                                                        hasProduct: !!hasProduct, 
+                                                        hasServices: !!hasServices,
+                                                        willTriggerAutoSave: !!(hasEnterprise && hasProduct && hasServices)
+                                                    });
+                                                    
+                                                    // Only trigger auto-save if all fields are complete
+                                                    if (hasEnterprise && hasProduct && hasServices) {
+                                                        console.log('🔄 Triggering auto-save timer for complete existing record:', rowId);
+                                                        // Add to modified records set
+                                                        setModifiedExistingRecords(prev => {
+                                                            const newSet = new Set(prev);
+                                                            newSet.add(rowId);
+                                                            return newSet;
+                                                        });
+                                                        // Trigger auto-save timer for visual feedback
+                                                        debouncedAutoSave();
+                                                    } else {
+                                                        console.log('❌ Not triggering auto-save for incomplete existing record:', rowId, {
+                                                            hasEnterprise: !!hasEnterprise,
+                                                            hasProduct: !!hasProduct,
+                                                            hasServices: !!hasServices
+                                                        });
+                                                        // Remove from modified records set if it was there
+                                                        setModifiedExistingRecords(prev => {
+                                                            const newSet = new Set(prev);
+                                                            const wasRemoved = newSet.delete(rowId);
+                                                            console.log(`🧹 Removing incomplete record ${rowId} from modified set: ${wasRemoved ? 'removed' : 'not found'}`);
+                                                            console.log(`🧹 Modified set after removal:`, Array.from(newSet));
+                                                            return newSet;
+                                                        });
+                                                        
+                                                        // Exit early - do not proceed with API call for incomplete record
+                                                        console.log(`🛑 Skipping API call for incomplete record: ${rowId}`);
+                                                        return;
+                                                    }
+                                                }
                                             }
 
                                             // For existing rows, attempt to update via API
@@ -2100,28 +2893,29 @@ export default function EnterpriseConfiguration() {
 
                                             // Update the enterprise linkage via API
                                             try {
-                                                const account = accounts.find(
+                                                const config = enterpriseConfigs.find(
                                                     (a) => a.id === rowId,
                                                 );
-                                                if (account) {
-                                                    // Create updated account with the new value
-                                                    const updatedAccount = {
-                                                        ...account,
+                                                if (config) {
+                                                    // Create updated config with the new value
+                                                    const updatedConfig = {
+                                                        ...config,
                                                         [field]: value,
                                                     };
 
-                                                    // Find the IDs for the current values (use updated account)
+                                                    // Find the IDs for the current values (use updated config)
                                                     const enterpriseName =
-                                                        updatedAccount.masterAccount ||
-                                                        updatedAccount.enterpriseName;
+                                                        updatedConfig.enterprise ||
+                                                        updatedConfig.enterpriseName;
                                                     const productName =
-                                                        updatedAccount.accountName ||
-                                                        updatedAccount.productName;
-                                                    const rawServiceValue =
-                                                        updatedAccount.address
-                                                            ?.country ||
-                                                        updatedAccount.serviceName ||
-                                                        '';
+                                                        updatedConfig.product ||
+                                                        updatedConfig.productName;
+                                                    // Use field-specific value to avoid stale data from alternate field names
+                                                    const rawServiceValue = 
+                                                        field === 'services' ? updatedConfig.services :
+                                                        field === 'serviceName' ? updatedConfig.serviceName :
+                                                        updatedConfig.services || updatedConfig.serviceName || '';
+                                                    
                                                     const serviceNames =
                                                         rawServiceValue
                                                             .split(', ')
@@ -2132,9 +2926,8 @@ export default function EnterpriseConfiguration() {
                                                         {
                                                             field,
                                                             oldRawServiceValue:
-                                                                account.address
-                                                                    ?.country ||
-                                                                account.serviceName ||
+                                                                config.services ||
+                                                                config.serviceName ||
                                                                 '',
                                                             newRawServiceValue:
                                                                 rawServiceValue,
@@ -2146,40 +2939,38 @@ export default function EnterpriseConfiguration() {
 
                                                     // Check if Enterprise or Product changed - this might create a duplicate
                                                     const oldEnterpriseName =
-                                                        account.masterAccount ||
-                                                        account.enterpriseName;
+                                                        config.enterprise ||
+                                                        config.enterpriseName;
                                                     const oldProductName =
-                                                        account.accountName ||
-                                                        account.productName;
+                                                        config.product ||
+                                                        config.productName;
 
                                                     if (
-                                                        (field ===
-                                                            'masterAccount' &&
+                                                        (field === 'enterprise' &&
                                                             enterpriseName !==
                                                                 oldEnterpriseName) ||
-                                                        (field ===
-                                                            'accountName' &&
+                                                        (field === 'product' &&
                                                             productName !==
                                                                 oldProductName)
                                                     ) {
                                                         // Check if the new Enterprise + Product combination already exists
                                                         const duplicateRecord =
-                                                            accounts.find(
-                                                                (acc) => {
-                                                                    const accEnterprise =
-                                                                        acc.masterAccount ||
-                                                                        acc.enterpriseName;
-                                                                    const accProduct =
-                                                                        acc.accountName ||
-                                                                        acc.productName;
+                                                            enterpriseConfigs.find(
+                                                                (cfg) => {
+                                                                    const cfgEnterprise =
+                                                                        cfg.enterprise ||
+                                                                        cfg.enterpriseName;
+                                                                    const cfgProduct =
+                                                                        cfg.product ||
+                                                                        cfg.productName;
                                                                     return (
-                                                                        accEnterprise ===
+                                                                        cfgEnterprise ===
                                                                             enterpriseName &&
-                                                                        accProduct ===
+                                                                        cfgProduct ===
                                                                             productName &&
-                                                                        acc.id !==
+                                                                        cfg.id !==
                                                                             rowId && // Different record
-                                                                        !acc.id
+                                                                        !cfg.id
                                                                             .toString()
                                                                             .startsWith(
                                                                                 'tmp-',
@@ -2205,21 +2996,13 @@ export default function EnterpriseConfiguration() {
 
                                                             // Merge services into the existing duplicate record
                                                             const existingServices =
-                                                                duplicateRecord.address?.country
-                                                                    ?.split(
-                                                                        ', ',
-                                                                    )
-                                                                    .filter(
-                                                                        Boolean,
-                                                                    ) || [];
+                                                                duplicateRecord.services
+                                                                    ?.split(', ')
+                                                                    .filter(Boolean) || [];
                                                             const currentServices =
-                                                                account.address?.country
-                                                                    ?.split(
-                                                                        ', ',
-                                                                    )
-                                                                    .filter(
-                                                                        Boolean,
-                                                                    ) || [];
+                                                                config.services
+                                                                    ?.split(', ')
+                                                                    .filter(Boolean) || [];
                                                             const allServices =
                                                                 Array.from(
                                                                     new Set([
@@ -2294,37 +3077,33 @@ export default function EnterpriseConfiguration() {
                                                                 );
 
                                                                 // Update local state: merge into duplicate and remove current
-                                                                setAccounts(
+                                                                setEnterpriseConfigs(
                                                                     (prev) =>
                                                                         prev
                                                                             .map(
                                                                                 (
-                                                                                    acc,
+                                                                                    cfg,
                                                                                 ) => {
                                                                                     if (
-                                                                                        acc.id ===
+                                                                                        cfg.id ===
                                                                                         duplicateRecord.id
                                                                                     ) {
                                                                                         return {
-                                                                                            ...acc,
-                                                                                            address:
-                                                                                                {
-                                                                                                    ...acc.address,
-                                                                                                    country:
-                                                                                                        allServices.join(
-                                                                                                            ', ',
-                                                                                                        ),
-                                                                                                },
+                                                                                            ...cfg,
+                                                                                            services:
+                                                                                                allServices.join(
+                                                                                                    ', ',
+                                                                                                ),
                                                                                         };
                                                                                     }
-                                                                                    return acc;
+                                                                                    return cfg;
                                                                                 },
                                                                             )
                                                                             .filter(
                                                                                 (
-                                                                                    acc,
+                                                                                    cfg,
                                                                                 ) =>
-                                                                                    acc.id !==
+                                                                                    cfg.id !==
                                                                                     rowId,
                                                                             ),
                                                                 );
@@ -2431,24 +3210,24 @@ export default function EnterpriseConfiguration() {
                                                                             newLinkage as any
                                                                         ).id
                                                                     ) {
-                                                                        setAccounts(
+                                                                        setEnterpriseConfigs(
                                                                             (
                                                                                 prev,
                                                                             ) =>
                                                                                 prev.map(
                                                                                     (
-                                                                                        acc,
+                                                                                        cfg,
                                                                                     ) =>
-                                                                                        acc.id ===
+                                                                                        cfg.id ===
                                                                                         rowId
                                                                                             ? {
-                                                                                                  ...acc,
+                                                                                                  ...cfg,
                                                                                                   id: (
                                                                                                       newLinkage as any
                                                                                                   )
                                                                                                       .id,
                                                                                               }
-                                                                                            : acc,
+                                                                                            : cfg,
                                                                                 ),
                                                                         );
                                                                     }
@@ -2496,48 +3275,29 @@ export default function EnterpriseConfiguration() {
                                             // Optionally revert the local state change on error
                                         }
                                     }}
-                                    rows={processedAccounts.map<AccountRow>(
+                                    rows={processedConfigs.map<EnterpriseConfigRow>(
                                         (a: any) => ({
                                             id: a.id || '',
-                                            globalClientName:
-                                                a.globalClientName ||
-                                                a.clientName ||
-                                                '',
-                                            accountName: a.accountName || '',
-                                            firstName: a.firstName || '',
-                                            lastName: a.lastName || '',
-                                            email: a.email || '',
-                                            phone: a.phone || '',
-                                            status: a.status || 'Active',
-                                            servicesCount:
-                                                a.services?.length || 0,
-                                            enterpriseName:
+                                            enterprise:
                                                 a.enterpriseName ||
-                                                a.enterpriseId ||
+                                                a.enterprise ||
                                                 '',
-                                            servicesSummary: (a.services || [])
-                                                .map(
-                                                    (s: any) =>
-                                                        `${s.service} • ${s.category}`,
-                                                )
-                                                .join(','),
-                                            productName: a.productName || '',
-                                            serviceName: a.serviceName || '',
-                                            masterAccount:
-                                                a.masterAccount || '',
-                                            address: {
-                                                country:
-                                                    a.address?.country || '',
-                                            },
-                                            licenses: [],
+                                            product:
+                                                a.productName ||
+                                                a.product ||
+                                                '',
+                                            services:
+                                                a.services ||
+                                                a.serviceName ||
+                                                '',
                                         }),
                                     )}
                                     onEdit={(id) => {
-                                        const acc = accounts.find(
+                                        const cfg = enterpriseConfigs.find(
                                             (x) => x.id === id,
                                         );
-                                        if (acc) {
-                                            setEditingAccount(acc);
+                                        if (cfg) {
+                                            setEditingConfig(cfg);
                                             setShowCreateForm(true);
                                         }
                                     }}
@@ -2547,6 +3307,7 @@ export default function EnterpriseConfiguration() {
                                     visibleColumns={visibleCols}
                                     highlightQuery={searchTerm}
                                     groupByExternal={groupByProp}
+                                    onShowAllColumns={showAllColumns}
                                     onQuickAddRow={async () => {
                                         // Check if there's already a blank row
                                         if (hasBlankRow()) {
@@ -2557,27 +3318,15 @@ export default function EnterpriseConfiguration() {
                                         const newId = `tmp-${Date.now()}`;
                                         const blank = {
                                             id: newId,
-                                            accountName: '',
-                                            firstName: '',
-                                            lastName: '',
-                                            email: '',
-                                            phone: '',
-                                            status: 'Active',
-                                            servicesCount: 0,
-                                            enterpriseName: '',
-                                            productName: '',
-                                            serviceName: '',
-                                            masterAccount: '',
-                                            address: {
-                                                country: '',
-                                            },
-                                            licenses: [],
+                                            enterprise: '',
+                                            product: '',
+                                            services: '',
                                         } as any;
-                                        setAccounts((prev) => [...prev, blank]);
+                                        setEnterpriseConfigs((prev) => [...prev, blank]);
                                         // Smooth scroll to the new row for visibility
                                         setTimeout(() => {
                                             const el = document.querySelector(
-                                                `[data-account-id="${newId}"]`,
+                                                `[data-config-id="${newId}"]`,
                                             );
                                             if (el) {
                                                 el.scrollIntoView({
@@ -2666,6 +3415,57 @@ export default function EnterpriseConfiguration() {
                                     }}
                                 >
                                     Stay & Complete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Validation Modal */}
+            {showValidationModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => setShowValidationModal(false)}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Fill Required Fields
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {validationMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => setShowValidationModal(false)}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
                                 </button>
                             </div>
                         </div>
