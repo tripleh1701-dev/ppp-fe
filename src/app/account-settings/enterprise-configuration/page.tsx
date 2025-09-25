@@ -256,7 +256,7 @@ export default function EnterpriseConfiguration() {
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'Enterprise' | 'Product' | 'Service'
+        'None' | 'Enterprise' | 'Product' | 'Services'
     >('None');
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
         'enterprise',
@@ -493,7 +493,7 @@ export default function EnterpriseConfiguration() {
     };
 
     const setGroupByFromLabel = (label: string) => {
-        const l = label as 'None' | 'Enterprise' | 'Product' | 'Service';
+        const l = label as 'None' | 'Enterprise' | 'Product' | 'Services';
         setActiveGroupLabel(l);
     };
 
@@ -502,7 +502,7 @@ export default function EnterpriseConfiguration() {
             ? 'enterpriseName'
             : ActiveGroupLabel === 'Product'
             ? 'productName'
-            : ActiveGroupLabel === 'Service'
+            : ActiveGroupLabel === 'Services'
             ? 'serviceName'
             : 'none';
 
@@ -2274,13 +2274,13 @@ export default function EnterpriseConfiguration() {
                                 <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
                             </button>
                             {sortOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[340px] rounded-lg bg-white shadow-xl border border-gray-200'>
-                                    <div className='p-4'>
-                                        <div className='space-y-4'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-white shadow-xl border border-gray-200'>
+                                    <div className='p-3'>
+                                        <div className='space-y-3'>
                                             {/* Column Selection */}
                                             <div>
-                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                    Choose column
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Column
                                                 </label>
                                                 <div className='relative'>
                                                     <select
@@ -2293,27 +2293,22 @@ export default function EnterpriseConfiguration() {
                                                                 applySorting(newColumn, sortDirection);
                                                             }
                                                         }}
-                                                        className='w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white'
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select a column</option>
+                                                        <option value=''>Select column</option>
                                                         {allCols.map((col) => (
                                                             <option key={col} value={col}>
                                                                 {columnLabels[col]}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <div className='absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none'>
-                                                        <svg className='w-5 h-5 text-gray-400' viewBox='0 0 20 20' fill='currentColor'>
-                                                            <path fillRule='evenodd' d='M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z' clipRule='evenodd' />
-                                                        </svg>
-                                                    </div>
                                                 </div>
                                             </div>
 
                                             {/* Direction Selection */}
                                             <div>
-                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                    Sort direction
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Direction
                                                 </label>
                                                 <div className='relative'>
                                                     <select
@@ -2326,21 +2321,16 @@ export default function EnterpriseConfiguration() {
                                                                 applySorting(sortColumn, newDirection);
                                                             }
                                                         }}
-                                                        className='w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-md bg-white'
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option value='asc'>Ascending</option>
                                                         <option value='desc'>Descending</option>
                                                     </select>
-                                                    <div className='absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none'>
-                                                        <svg className='w-5 h-5 text-gray-400' viewBox='0 0 20 20' fill='currentColor'>
-                                                            <path fillRule='evenodd' d='M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z' clipRule='evenodd' />
-                                                        </svg>
-                                                    </div>
                                                 </div>
                                             </div>
 
                                             {/* Action Buttons */}
-                                            <div className='flex items-center gap-2 pt-2 border-t border-gray-200'>
+                                            <div className='flex items-center gap-2 pt-1 border-t border-gray-200'>
                                                 <button
                                                     onClick={() => {
                                                         if (sortColumn) {
@@ -2348,14 +2338,14 @@ export default function EnterpriseConfiguration() {
                                                         }
                                                     }}
                                                     disabled={!sortColumn}
-                                                    className='text-sm text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed'
+                                                    className='text-xs text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed'
                                                 >
                                                     + New sort
                                                 </button>
                                                 {sortColumn && (
                                                     <button
                                                         onClick={clearSorting}
-                                                        className='text-sm text-gray-500 hover:text-gray-700'
+                                                        className='text-xs text-gray-500 hover:text-gray-700'
                                                     >
                                                         Clear
                                                     </button>
@@ -2364,9 +2354,9 @@ export default function EnterpriseConfiguration() {
 
                                             {/* Current Sort Display */}
                                             {sortColumn && (
-                                                <div className='mt-2 p-2 bg-blue-50 rounded border text-sm'>
+                                                <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
                                                     <span className='font-medium text-blue-800'>
-                                                        Sorting by: {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Ascending' : 'Descending'})
+                                                        {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
                                                     </span>
                                                 </div>
                                             )}
@@ -2397,22 +2387,22 @@ export default function EnterpriseConfiguration() {
                                 )}
                             </button>
                             {hideOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[420px] rounded-lg bg-card text-primary shadow-xl border border-light'>
-                                    <div className='flex items-center justify-between px-4 py-2.5 border-b border-light'>
-                                        <div className='text-sm font-semibold'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-light'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-light'>
+                                        <div className='text-xs font-semibold'>
                                             Displayed Columns
                                         </div>
                                     </div>
-                                    <div className='p-3 space-y-2'>
+                                    <div className='p-2 space-y-2'>
                                         <input
                                             value={hideQuery}
                                             onChange={(e) =>
                                                 setHideQuery(e.target.value)
                                             }
                                             placeholder='Search columns'
-                                            className='w-full bg-white border border-light rounded-md px-2.5 py-1.5 text-sm'
+                                            className='w-full bg-white border border-light rounded px-2 py-1 text-xs'
                                         />
-                                        <div className='max-h-56 overflow-auto divide-y divide-light'>
+                                        <div className='max-h-40 overflow-auto divide-y divide-light'>
                                             {allCols
                                                 .filter((c) =>
                                                     c
@@ -2424,9 +2414,9 @@ export default function EnterpriseConfiguration() {
                                                 .map((c) => (
                                                     <label
                                                         key={c}
-                                                        className='flex items-center justify-between py-2'
+                                                        className='flex items-center justify-between py-1.5'
                                                     >
-                                                        <span className='text-sm capitalize'>
+                                                        <span className='text-xs capitalize'>
                                                             {c ===
                                                             'enterprise'
                                                                 ? 'Enterprise'
@@ -2503,13 +2493,13 @@ export default function EnterpriseConfiguration() {
                                 )}
                             </button>
                             {groupOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[420px] rounded-lg bg-card text-primary shadow-xl border border-light'>
-                                    <div className='flex items-center justify-between px-4 py-2.5 border-b border-light'>
-                                        <div className='text-sm font-semibold'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-light'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-light'>
+                                        <div className='text-xs font-semibold'>
                                             Group by
                                         </div>
                                     </div>
-                                    <div className='p-3 space-y-2'>
+                                    <div className='p-2 space-y-2'>
                                         <select
                                             value={ActiveGroupLabel}
                                             onChange={(e) =>
@@ -2517,12 +2507,12 @@ export default function EnterpriseConfiguration() {
                                                     e.target.value,
                                                 )
                                             }
-                                            className='w-full bg-white border border-light rounded-md px-2.5 py-1.5 text-sm'
+                                            className='w-full bg-white border border-light rounded px-2 py-1 text-xs'
                                         >
                                             <option>None</option>
                                             <option>Enterprise</option>
                                             <option>Product</option>
-                                            <option>Service</option>
+                                            <option>Services</option>
                                         </select>
                                     </div>
                                 </div>
