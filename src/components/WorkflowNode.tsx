@@ -10,35 +10,71 @@ import {usePipeline} from '@/contexts/PipelineContext';
 
 const nodeIcons = {
     // Nodes (Environments)
-    node_dev: 'aws',
-    node_qa: 'aws',
-    node_prod: 'aws',
+    node_dev: 'devenvironment',
+    node_qa: 'qaenvironment',
+    node_prod: 'prodenvironment',
+
     // Plan
     plan_jira: 'jira',
     plan_trello: 'trello',
     plan_asana: 'asana',
-    // Code
+
+    // Code (Version Control)
     code_github: 'github',
     code_gitlab: 'gitlab',
     code_bitbucket: 'bitbucket',
-    // Build
+    code_svn: 'svn',
+    code_mercurial: 'mercurial',
+    code_perforce: 'perforce',
+
+    // Build (CI/CD)
     build_jenkins: 'jenkins',
     build_github_actions: 'github',
     build_azure_pipelines: 'azure',
+    build_circleci: 'circleci',
+    build_travis: 'travis',
+    build_gitlab_ci: 'gitlab',
+    build_teamcity: 'teamcity',
+    build_bamboo: 'jenkins', // Using jenkins as fallback for Bamboo
+
     // Test
     test_jest: 'jest',
     test_selenium: 'selenium',
     test_cypress: 'cypress',
+    test_mocha: 'mocha',
+    test_playwright: 'playwright',
+    test_testng: 'testng',
+    test_puppeteer: 'cypress', // Using cypress as fallback for Puppeteer
+
     // Deploy
     deploy_kubernetes: 'kubernetes',
     deploy_helm: 'helm',
     deploy_aws: 'aws',
+    deploy_docker: 'docker',
+    deploy_ansible: 'ansible',
+    deploy_terraform: 'terraform',
     deploy_gcp: 'gcp',
     deploy_azure: 'azure',
+
+    // Monitor
+    monitor_prometheus: 'prometheus',
+    monitor_grafana: 'grafana',
+    monitor_newrelic: 'newrelic',
+    monitor_datadog: 'datadog',
+
+    // Notify
+    notify_slack: 'slack',
+    notify_teams: 'teams',
+    notify_discord: 'discord',
+    notify_email: 'slack', // Using slack as fallback for Email
+    notify_pagerduty: 'pagerduty',
+    notify_webhook: 'slack', // Using slack as fallback for Webhook
+
     // Approval
-    approval_manual: 'slack',
+    approval_manual: 'manualapproval',
     approval_slack: 'slack',
-    approval_teams: 'slack',
+    approval_teams: 'teams',
+
     // Release
     release_docker: 'docker',
     release_npm: 'npm',

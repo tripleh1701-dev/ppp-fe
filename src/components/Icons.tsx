@@ -50,33 +50,12 @@ export const GitHubIcon = ({className = '', size = 24}: IconProps) => (
 
 // GitLab Logo
 export const GitLabIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/gitlab.svg'
+        alt='GitLab'
+        size={size}
         className={className}
-    >
-        <path d='M12 21.42l3.684-11.333H8.316L12 21.42z' fill='#E24329' />
-        <path d='M12 21.42l-3.684-11.333H1.858L12 21.42z' fill='#FC6D26' />
-        <path
-            d='M1.858 10.087L.328 14.58c-.133.41.015.865.356 1.154L12 21.42 1.858 10.087z'
-            fill='#FCA326'
-        />
-        <path
-            d='M1.858 10.087h6.458L6.441.93C6.169.265 5.327.265 5.055.93L1.858 10.087z'
-            fill='#E24329'
-        />
-        <path d='M12 21.42l3.684-11.333h6.458L12 21.42z' fill='#FC6D26' />
-        <path
-            d='M22.142 10.087L23.672 14.58c.133.41-.015.865-.356 1.154L12 21.42l10.142-11.333z'
-            fill='#FCA326'
-        />
-        <path
-            d='M22.142 10.087h-6.458L17.559.93c.272-.665 1.114-.665 1.386 0l3.197 9.157z'
-            fill='#E24329'
-        />
-    </svg>
+    />
 );
 
 // Realistic Jira Logo
@@ -91,148 +70,62 @@ export const JiraIcon = ({className = '', size = 24}: IconProps) => (
 
 // Trello Logo
 export const TrelloIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/trello.svg'
+        alt='Trello'
+        size={size}
         className={className}
-    >
-        <rect x='2' y='2' width='20' height='20' rx='3' fill='#0079BF' />
-        <rect x='5' y='5' width='5' height='10' rx='1' fill='white' />
-        <rect x='14' y='5' width='5' height='6' rx='1' fill='white' />
-    </svg>
+    />
 );
 
 // Asana Logo
 export const AsanaIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/asana.svg'
+        alt='Asana'
+        size={size}
         className={className}
-    >
-        <circle cx='8' cy='8' r='4' fill='#F06A6A' />
-        <circle cx='16' cy='8' r='4' fill='#F06A6A' />
-        <circle cx='12' cy='16' r='4' fill='#F06A6A' />
-    </svg>
+    />
 );
 
 // Realistic Bitbucket Logo
 export const BitbucketIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/bitbucket.svg'
+        alt='Bitbucket'
+        size={size}
         className={className}
-    >
-        <defs>
-            <linearGradient
-                id='bitbucket-gradient'
-                x1='0%'
-                y1='0%'
-                x2='100%'
-                y2='100%'
-            >
-                <stop offset='0%' stopColor='#0052CC' />
-                <stop offset='100%' stopColor='#2684FF' />
-            </linearGradient>
-        </defs>
-        <path
-            d='M1.679 2.75a.75.75 0 0 0-.748.83l3.064 17.9a1.25 1.25 0 0 0 1.245 1.07h13.52a.75.75 0 0 0 .748-.83L22.069 3.58a.75.75 0 0 0-.748-.83H1.679z'
-            fill='url(#bitbucket-gradient)'
-        />
-        <path d='M14.5 14h-5l-.8-5h6.6l-.8 5z' fill='#FFF' />
-        <ellipse cx='12' cy='6.5' rx='1' ry='0.8' fill='#FFF' opacity='0.8' />
-    </svg>
+    />
 );
 
 // Realistic Jenkins Logo
 export const JenkinsIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/jenkins.svg'
+        alt='Jenkins'
+        size={size}
         className={className}
-    >
-        <defs>
-            <radialGradient id='jenkins-gradient' cx='50%' cy='30%' r='70%'>
-                <stop offset='0%' stopColor='#F8F8F8' />
-                <stop offset='100%' stopColor='#D4E1F1' />
-            </radialGradient>
-        </defs>
-        <circle
-            cx='12'
-            cy='12'
-            r='11'
-            fill='url(#jenkins-gradient)'
-            stroke='#335061'
-            strokeWidth='1'
-        />
-        <circle cx='12' cy='12' r='8' fill='#FFF' />
-        <path
-            d='M12 6c-1 0-2 .5-2.5 1.5-.3.6-.5 1.2-.5 2 0 1 .5 2 1.5 2.5.5.3 1 .5 1.5.5s1-.2 1.5-.5c1-.5 1.5-1.5 1.5-2.5 0-.8-.2-1.4-.5-2C14 6.5 13 6 12 6z'
-            fill='#335061'
-        />
-        <circle cx='10.5' cy='9' r='0.8' fill='#FFF' />
-        <circle cx='13.5' cy='9' r='0.8' fill='#FFF' />
-        <path d='M10.5 13h3c0 .8-.7 1.5-1.5 1.5s-1.5-.7-1.5-1.5z' fill='#FFF' />
-        <path
-            d='M12 18c-.5 0-1-.2-1.5-.5-1-.5-1.5-1.5-1.5-2.5h6c0 1-.5 2-1.5 2.5-.5.3-1 .5-1.5.5z'
-            fill='#D33833'
-        />
-    </svg>
+    />
 );
 
 // Kubernetes Logo
 export const KubernetesIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/kubernetes.svg'
+        alt='Kubernetes'
+        size={size}
         className={className}
-    >
-        <path
-            d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'
-            stroke='#326CE5'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            fill='none'
-        />
-        <circle cx='12' cy='7' r='1' fill='#326CE5' />
-        <circle cx='12' cy='12' r='1' fill='#326CE5' />
-        <circle cx='12' cy='17' r='1' fill='#326CE5' />
-    </svg>
+    />
 );
 
 // Helm Logo
 export const HelmIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/helm.svg'
+        alt='Helm'
+        size={size}
         className={className}
-    >
-        <path
-            d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'
-            stroke='#0F1689'
-            strokeWidth='1.5'
-            fill='#0F1689'
-            fillOpacity='0.1'
-        />
-        <path
-            d='M12 7v10M8 9l8 6M16 9l-8 6'
-            stroke='#0F1689'
-            strokeWidth='1.5'
-            strokeLinecap='round'
-        />
-    </svg>
+    />
 );
 
 // Jest Logo
@@ -401,45 +294,12 @@ export const SlackIcon = ({className = '', size = 24}: IconProps) => (
 
 // Realistic Docker Logo
 export const DockerIcon = ({className = '', size = 24}: IconProps) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
+    <ImgIcon
+        src='/images/logos/docker.svg'
+        alt='Docker'
+        size={size}
         className={className}
-    >
-        <defs>
-            <linearGradient
-                id='docker-gradient'
-                x1='0%'
-                y1='0%'
-                x2='100%'
-                y2='100%'
-            >
-                <stop offset='0%' stopColor='#2496ED' />
-                <stop offset='100%' stopColor='#0073E6' />
-            </linearGradient>
-        </defs>
-        <rect
-            x='2'
-            y='2'
-            width='20'
-            height='20'
-            rx='3'
-            fill='url(#docker-gradient)'
-        />
-        <g transform='translate(3, 6)'>
-            <rect x='0' y='3' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='3' y='3' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='6' y='3' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='9' y='3' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='12' y='3' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='3' y='0' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='6' y='0' width='2' height='2' rx='0.2' fill='#FFF' />
-            <rect x='6' y='6' width='2' height='2' rx='0.2' fill='#FFF' />
-            <ellipse cx='16' cy='2' rx='2' ry='1' fill='#FFF' />
-        </g>
-    </svg>
+    />
 );
 
 // NPM Logo
@@ -645,13 +505,626 @@ export const TemplateIcon = ({className = '', size = 24}: IconProps) => (
         <rect x='6' y='12' width='5' height='5' rx='1' />
     </svg>
 );
+
+// Travis CI Logo
+export const TravisCIIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/travis_ci.svg'
+        alt='Travis CI'
+        size={size}
+        className={className}
+    />
+);
+
+// TeamCity Logo
+export const TeamCityIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/teamcity.svg'
+        alt='TeamCity'
+        size={size}
+        className={className}
+    />
+);
+
+// Mocha Logo
+export const MochaIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/mocha.svg'
+        alt='Mocha'
+        size={size}
+        className={className}
+    />
+);
+
+// Playwright Logo
+export const PlaywrightIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/playwright.svg'
+        alt='Playwright'
+        size={size}
+        className={className}
+    />
+);
+
+// TestNG Logo
+export const TestNGIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <rect x='3' y='3' width='18' height='18' rx='3' fill='#FF6B35' />
+        <rect x='5' y='5' width='14' height='14' rx='2' fill='white' />
+        <text
+            x='12'
+            y='16'
+            textAnchor='middle'
+            fontSize='10'
+            fontWeight='bold'
+            fill='#FF6B35'
+        >
+            TestNG
+        </text>
+        <circle cx='8' cy='9' r='1' fill='#10B981' />
+        <circle cx='12' cy='9' r='1' fill='#F59E0B' />
+        <circle cx='16' cy='9' r='1' fill='#EF4444' />
+    </svg>
+);
+
+// New Relic Logo
+export const NewRelicIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/new_relic.svg'
+        alt='New Relic'
+        size={size}
+        className={className}
+    />
+);
+
+// Datadog Logo
+export const DatadogIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/datadog.svg'
+        alt='Datadog'
+        size={size}
+        className={className}
+    />
+);
+
+// Teams Logo
+export const TeamsIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/teams.svg'
+        alt='Microsoft Teams'
+        size={size}
+        className={className}
+    />
+);
+
+// Discord Logo
+export const DiscordIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/discord.svg'
+        alt='Discord'
+        size={size}
+        className={className}
+    />
+);
+
+// PagerDuty Logo
+export const PagerDutyIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='pagerduty-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#06AC38' />
+                <stop offset='100%' stopColor='#028A2F' />
+            </linearGradient>
+        </defs>
+        {/* PagerDuty logo design */}
+        <circle cx='12' cy='12' r='10' fill='url(#pagerduty-gradient)' />
+        <circle cx='12' cy='12' r='8' fill='white' />
+
+        {/* Bell icon for alerting */}
+        <path
+            d='M12 2a3 3 0 0 1 3 3v6l2 2H7l2-2V5a3 3 0 0 1 3-3z'
+            fill='#06AC38'
+        />
+        <path
+            d='M8.5 16a3.5 3.5 0 0 0 7 0'
+            stroke='#06AC38'
+            strokeWidth='1.5'
+            strokeLinecap='round'
+        />
+
+        {/* Alert indicators */}
+        <circle cx='16' cy='8' r='2' fill='#FF4444' />
+        <circle cx='16' cy='8' r='1' fill='white' />
+    </svg>
+);
+
+// SVN (Subversion) Logo
+export const SVNIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='svn-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#FF6B35' />
+                <stop offset='100%' stopColor='#D84315' />
+            </linearGradient>
+        </defs>
+        {/* SVN repository design */}
+        <rect
+            x='3'
+            y='4'
+            width='18'
+            height='16'
+            rx='2'
+            fill='url(#svn-gradient)'
+        />
+        <rect x='5' y='6' width='14' height='12' rx='1' fill='white' />
+
+        {/* SVN branching visualization */}
+        <circle cx='8' cy='9' r='1' fill='#FF6B35' />
+        <circle cx='12' cy='12' r='1' fill='#FF6B35' />
+        <circle cx='16' cy='15' r='1' fill='#FF6B35' />
+
+        {/* Branch lines */}
+        <path
+            d='M8 10L12 11M12 13L16 14'
+            stroke='#FF6B35'
+            strokeWidth='1.5'
+            strokeLinecap='round'
+        />
+
+        {/* SVN text */}
+        <text
+            x='12'
+            y='8'
+            textAnchor='middle'
+            fontSize='6'
+            fontWeight='bold'
+            fill='#FF6B35'
+        >
+            SVN
+        </text>
+    </svg>
+);
+
+// Mercurial Logo
+export const MercurialIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='mercurial-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#999999' />
+                <stop offset='100%' stopColor='#666666' />
+            </linearGradient>
+        </defs>
+        {/* Mercurial repository design */}
+        <circle cx='12' cy='12' r='10' fill='url(#mercurial-gradient)' />
+        <circle cx='12' cy='12' r='8' fill='white' />
+
+        {/* Mercury symbol (Hg) */}
+        <text
+            x='12'
+            y='16'
+            textAnchor='middle'
+            fontSize='8'
+            fontWeight='bold'
+            fill='#999999'
+        >
+            Hg
+        </text>
+
+        {/* Branch visualization */}
+        <path
+            d='M8 8L12 10L16 8M12 10L12 6'
+            stroke='#999999'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <circle cx='8' cy='8' r='1' fill='#999999' />
+        <circle cx='12' cy='6' r='1' fill='#999999' />
+        <circle cx='16' cy='8' r='1' fill='#999999' />
+    </svg>
+);
+
+// Perforce Logo
+export const PerforceIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='perforce-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#404040' />
+                <stop offset='100%' stopColor='#1A1A1A' />
+            </linearGradient>
+        </defs>
+        {/* Perforce design */}
+        <rect
+            x='3'
+            y='3'
+            width='18'
+            height='18'
+            rx='3'
+            fill='url(#perforce-gradient)'
+        />
+        <rect x='5' y='5' width='14' height='14' rx='2' fill='white' />
+
+        {/* Perforce P4 logo */}
+        <text
+            x='12'
+            y='16'
+            textAnchor='middle'
+            fontSize='7'
+            fontWeight='bold'
+            fill='#404040'
+        >
+            P4
+        </text>
+
+        {/* Depot visualization */}
+        <rect x='8' y='7' width='8' height='1' fill='#404040' />
+        <rect x='9' y='9' width='6' height='1' fill='#404040' />
+        <rect x='10' y='11' width='4' height='1' fill='#404040' />
+    </svg>
+);
+
+// Manual Approval Logo
+export const ManualApprovalIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='approval-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#4CAF50' />
+                <stop offset='100%' stopColor='#2E7D32' />
+            </linearGradient>
+        </defs>
+        {/* Manual approval design */}
+        <circle cx='12' cy='12' r='10' fill='url(#approval-gradient)' />
+        <circle cx='12' cy='12' r='8' fill='white' />
+
+        {/* Checkmark */}
+        <path
+            d='M8 12l2 2 4-4'
+            stroke='#4CAF50'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+
+        {/* User icon */}
+        <circle cx='12' cy='7' r='1.5' fill='#4CAF50' />
+        <path
+            d='M9 17c0-1.7 1.3-3 3-3s3 1.3 3 3'
+            stroke='#4CAF50'
+            strokeWidth='1.5'
+            strokeLinecap='round'
+        />
+    </svg>
+);
+
+// Development Environment Icon
+export const DevEnvironmentIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='dev-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#10B981' />
+                <stop offset='100%' stopColor='#059669' />
+            </linearGradient>
+        </defs>
+        {/* Terminal/Code Editor Frame */}
+        <rect
+            x='2'
+            y='3'
+            width='20'
+            height='18'
+            rx='3'
+            fill='url(#dev-gradient)'
+        />
+        <rect x='3' y='6' width='18' height='14' rx='2' fill='#1F2937' />
+
+        {/* Terminal Header */}
+        <circle cx='5' cy='4.5' r='0.8' fill='#EF4444' />
+        <circle cx='7' cy='4.5' r='0.8' fill='#F59E0B' />
+        <circle cx='9' cy='4.5' r='0.8' fill='#10B981' />
+
+        {/* Code Lines */}
+        <rect x='5' y='8' width='3' height='1' rx='0.5' fill='#10B981' />
+        <rect x='9' y='8' width='6' height='1' rx='0.5' fill='#60A5FA' />
+        <rect x='5' y='10' width='8' height='1' rx='0.5' fill='#A78BFA' />
+        <rect x='5' y='12' width='5' height='1' rx='0.5' fill='#F472B6' />
+        <rect x='5' y='14' width='10' height='1' rx='0.5' fill='#34D399' />
+        <rect x='5' y='16' width='4' height='1' rx='0.5' fill='#FBBF24' />
+
+        {/* Cursor */}
+        <rect x='10' y='16' width='0.5' height='1' fill='#10B981' />
+
+        {/* Dev Badge */}
+        <circle cx='18' cy='6' r='2' fill='#10B981' />
+        <path
+            d='M17 6l0.5 0.5L19 5'
+            stroke='white'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+    </svg>
+);
+
+// QA Environment Icon
+export const QAEnvironmentIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='qa-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#F59E0B' />
+                <stop offset='100%' stopColor='#D97706' />
+            </linearGradient>
+        </defs>
+        {/* Testing Device Frame */}
+        <rect
+            x='2'
+            y='3'
+            width='20'
+            height='18'
+            rx='3'
+            fill='url(#qa-gradient)'
+        />
+        <rect x='3' y='6' width='18' height='13' rx='2' fill='#FEF3C7' />
+
+        {/* Test Dashboard Header */}
+        <rect x='5' y='8' width='14' height='2' rx='1' fill='#F59E0B' />
+        <circle cx='17' cy='9' r='0.5' fill='white' />
+        <rect x='16.5' y='8.7' width='1' height='0.6' rx='0.3' fill='white' />
+
+        {/* Test Results List */}
+        <circle cx='6' cy='12' r='0.8' fill='#10B981' />
+        <path
+            d='M5.3 12l0.4 0.3 0.6-0.6'
+            stroke='white'
+            strokeWidth='0.6'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        <rect x='8' y='11.5' width='8' height='1' rx='0.5' fill='#6B7280' />
+
+        <circle cx='6' cy='14.5' r='0.8' fill='#EF4444' />
+        <path
+            d='M5.5 14l1 1M6.5 14l-1 1'
+            stroke='white'
+            strokeWidth='0.6'
+            strokeLinecap='round'
+        />
+        <rect x='8' y='14' width='6' height='1' rx='0.5' fill='#6B7280' />
+
+        <circle cx='6' cy='17' r='0.8' fill='#F59E0B' />
+        <circle cx='6' cy='17' r='0.3' fill='white' />
+        <rect x='8' y='16.5' width='7' height='1' rx='0.5' fill='#6B7280' />
+
+        {/* QA Badge */}
+        <circle cx='18' cy='6' r='2' fill='#F59E0B' />
+        <rect x='17.2' y='5.2' width='1.6' height='1.6' rx='0.3' fill='white' />
+        <path
+            d='M17.5 6l0.3 0.3 0.5-0.6'
+            stroke='#F59E0B'
+            strokeWidth='0.5'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+    </svg>
+);
+
+// Production Environment Icon
+export const ProductionEnvironmentIcon = ({
+    className = '',
+    size = 24,
+}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='prod-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#EF4444' />
+                <stop offset='100%' stopColor='#DC2626' />
+            </linearGradient>
+        </defs>
+        {/* Server Rack Frame */}
+        <rect
+            x='2'
+            y='3'
+            width='20'
+            height='18'
+            rx='3'
+            fill='url(#prod-gradient)'
+        />
+        <rect x='3' y='5' width='18' height='15' rx='2' fill='#1F2937' />
+
+        {/* Server Status Lights */}
+        <circle cx='5' cy='7' r='0.8' fill='#10B981' />
+        <circle cx='7' cy='7' r='0.8' fill='#10B981' />
+        <circle cx='9' cy='7' r='0.8' fill='#F59E0B' />
+
+        {/* Server Panels */}
+        <rect
+            x='5'
+            y='9'
+            width='14'
+            height='2'
+            rx='0.5'
+            fill='#374151'
+            stroke='#6B7280'
+            strokeWidth='0.5'
+        />
+        <rect x='6' y='9.5' width='2' height='1' rx='0.3' fill='#10B981' />
+        <rect x='9' y='9.5' width='8' height='0.5' rx='0.25' fill='#6B7280' />
+
+        <rect
+            x='5'
+            y='12'
+            width='14'
+            height='2'
+            rx='0.5'
+            fill='#374151'
+            stroke='#6B7280'
+            strokeWidth='0.5'
+        />
+        <rect x='6' y='12.5' width='2' height='1' rx='0.3' fill='#10B981' />
+        <rect x='9' y='12.5' width='6' height='0.5' rx='0.25' fill='#6B7280' />
+
+        <rect
+            x='5'
+            y='15'
+            width='14'
+            height='2'
+            rx='0.5'
+            fill='#374151'
+            stroke='#6B7280'
+            strokeWidth='0.5'
+        />
+        <rect x='6' y='15.5' width='2' height='1' rx='0.3' fill='#EF4444' />
+        <rect x='9' y='15.5' width='4' height='0.5' rx='0.25' fill='#6B7280' />
+
+        {/* Network Activity */}
+        <rect
+            x='15'
+            y='10'
+            width='3'
+            height='1'
+            rx='0.5'
+            fill='#10B981'
+            opacity='0.8'
+        />
+        <rect
+            x='15'
+            y='13'
+            width='2'
+            height='1'
+            rx='0.5'
+            fill='#60A5FA'
+            opacity='0.6'
+        />
+        <rect
+            x='15'
+            y='16'
+            width='1'
+            height='1'
+            rx='0.5'
+            fill='#F472B6'
+            opacity='0.4'
+        />
+
+        {/* Production Badge */}
+        <circle cx='18' cy='6' r='2' fill='#EF4444' />
+        <path
+            d='M17 6.5l1 1 2-2'
+            stroke='white'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+    </svg>
+);
+
 // CircleCI Logo
 export const CircleCIIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' className={className}>
-        <circle cx='12' cy='12' r='10' fill='#161616' />
-        <circle cx='12' cy='12' r='6' fill='white' />
-        <circle cx='12' cy='12' r='2.6' fill='#161616' />
-    </svg>
+    <ImgIcon
+        src='/images/logos/circleci.svg'
+        alt='CircleCI'
+        size={size}
+        className={className}
+    />
 );
 
 // SonarQube Logo
@@ -690,46 +1163,44 @@ export const ArgoIcon = ({className = '', size = 24}: IconProps) => (
     </svg>
 );
 
-// Terraform Logo (stylized)
+// Terraform Logo
 export const TerraformIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' className={className}>
-        <g fill='#7B42BC'>
-            <path d='M3 5l6 3.5v6L3 11V5z' />
-            <path d='M10 8.5l6 3.5v6l-6-3.5v-6z' />
-            <path d='M10 2l6 3.5v4L10 6V2z' />
-        </g>
-    </svg>
+    <ImgIcon
+        src='/images/logos/terraform.svg'
+        alt='Terraform'
+        size={size}
+        className={className}
+    />
 );
 
 // Ansible Logo
 export const AnsibleIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' className={className}>
-        <circle cx='12' cy='12' r='10' fill='#000000' />
-        <path
-            d='M12 6l5 12h-2l-1.1-2.7H10l-1 2.7H7L12 6zm-0.8 7.3h3L12 9.7l-0.8 3.6z'
-            fill='#FFFFFF'
-        />
-    </svg>
+    <ImgIcon
+        src='/images/logos/ansible.svg'
+        alt='Ansible'
+        size={size}
+        className={className}
+    />
 );
 
-// Prometheus Logo (stylized)
+// Prometheus Logo
 export const PrometheusIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' className={className}>
-        <circle cx='12' cy='12' r='10' fill='#E6522C' />
-        <path
-            d='M12 5l2 4-2 1-2-1 2-4zm0 6c2.2 0 4 1.8 4 4v2H8v-2c0-2.2 1.8-4 4-4z'
-            fill='white'
-        />
-    </svg>
+    <ImgIcon
+        src='/images/logos/prometheus.svg'
+        alt='Prometheus'
+        size={size}
+        className={className}
+    />
 );
 
-// Grafana Logo (stylized)
+// Grafana Logo
 export const GrafanaIcon = ({className = '', size = 24}: IconProps) => (
-    <svg width={size} height={size} viewBox='0 0 24 24' className={className}>
-        <circle cx='12' cy='12' r='9' fill='#F46800' />
-        <circle cx='12' cy='12' r='5' fill='#FFE6D1' />
-        <path d='M12 3c3 2 5 3 7 6-2-1-4-1-7 0 1-3 1-4 0-6z' fill='#FFB155' />
-    </svg>
+    <ImgIcon
+        src='/images/logos/grafana.svg'
+        alt='Grafana'
+        size={size}
+        className={className}
+    />
 );
 
 // Azure DevOps (Boards/Pipelines) Logo (stylized)
@@ -980,6 +1451,17 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         ansible: AnsibleIcon,
         prometheus: PrometheusIcon,
         grafana: GrafanaIcon,
+        // New icons
+        travis: TravisCIIcon,
+        teamcity: TeamCityIcon,
+        mocha: MochaIcon,
+        playwright: PlaywrightIcon,
+        testng: TestNGIcon,
+        newrelic: NewRelicIcon,
+        datadog: DatadogIcon,
+        teams: TeamsIcon,
+        discord: DiscordIcon,
+        pagerduty: PagerDutyIcon,
         azdo: AzureDevOpsIcon,
         cloudbuild: CloudBuildIcon,
         codepipeline: CodePipelineIcon,
@@ -990,6 +1472,14 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         account: AccountIcon,
         users: UsersIcon,
         enterprise: EnterpriseIcon,
+        // Environment icons
+        devenvironment: DevEnvironmentIcon,
+        qaenvironment: QAEnvironmentIcon,
+        prodenvironment: ProductionEnvironmentIcon,
+        svn: SVNIcon,
+        mercurial: MercurialIcon,
+        perforce: PerforceIcon,
+        manualapproval: ManualApprovalIcon,
         // Shell icons
         grid: GridIcon,
         mail: MailIcon,

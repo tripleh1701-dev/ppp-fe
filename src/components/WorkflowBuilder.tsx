@@ -733,16 +733,16 @@ function WorkflowBuilderContent({
     return (
         <div className='flex flex-col h-full bg-gray-50'>
             {/* Pipeline Header - Below Breadcrumbs */}
-            <div className='bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0 shadow-sm'>
-                <div className='flex items-center justify-between gap-6'>
+            <div className='bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0 shadow-sm'>
+                <div className='flex items-center justify-between gap-4'>
                     {/* Left: Pipeline Info with Better Spacing */}
-                    <div className='flex items-center gap-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-6 py-3 min-w-0 flex-1 max-w-4xl'>
+                    <div className='flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-4 py-2 w-fit'>
                         {/* Pipeline Name Section */}
-                        <div className='flex items-center gap-3 min-w-0'>
+                        <div className='flex items-center gap-2 min-w-0'>
                             <div className='flex items-center gap-2'>
-                                <div className='w-2 h-2 bg-blue-500 rounded-full flex-shrink-0'></div>
+                                <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full flex-shrink-0'></div>
                                 <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
-                                    Pipeline Name:
+                                    Pipeline:
                                 </span>
                             </div>
                             <input
@@ -751,31 +751,27 @@ function WorkflowBuilderContent({
                                 onChange={(e) =>
                                     setPipelineName(e.target.value)
                                 }
-                                className='text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                                className='text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                                 placeholder='Enter pipeline name'
                                 disabled={isReadOnly}
-                                style={{minWidth: '200px', width: '200px'}}
+                                style={{minWidth: '150px', width: '150px'}}
                             />
                         </div>
 
-                        {/* Visual Separator */}
-                        <div className='flex items-center'>
-                            <div className='w-px h-8 bg-blue-300'></div>
-                            <div className='w-2 h-2 bg-blue-400 rounded-full mx-2'></div>
-                            <div className='w-px h-8 bg-blue-300'></div>
-                        </div>
+                        {/* Gradient Separator */}
+                        <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full'></div>
 
-                        {/* Deployment Type Section */}
-                        <div className='flex items-center gap-3'>
+                        {/* Service Section */}
+                        <div className='flex items-center gap-2'>
                             <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
-                                Deployment Type:
+                                Service:
                             </span>
                             <select
                                 value={deploymentType}
                                 onChange={(e) =>
                                     setDeploymentType(e.target.value)
                                 }
-                                className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
+                                className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
                                 disabled={isReadOnly}
                             >
                                 {DEPLOYMENT_TYPES.map((option) => (
@@ -789,52 +785,30 @@ function WorkflowBuilderContent({
                             </select>
                         </div>
 
-                        {/* Visual Separator */}
-                        <div className='flex items-center'>
-                            <div className='w-px h-8 bg-blue-300'></div>
-                            <div className='w-2 h-2 bg-blue-400 rounded-full mx-2'></div>
-                            <div className='w-px h-8 bg-blue-300'></div>
-                        </div>
+                        {/* Gradient Separator */}
+                        <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full'></div>
 
-                        {/* State Section */}
-                        <div className='flex items-center gap-3'>
+                        {/* Entity Section */}
+                        <div className='flex items-center gap-2'>
                             <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
-                                State:
+                                Entity:
                             </span>
-                            <div className='flex items-center gap-2'>
-                                <button
-                                    onClick={() =>
-                                        setPipelineState(!pipelineState)
-                                    }
-                                    disabled={isReadOnly}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                                        pipelineState
-                                            ? 'bg-green-500 focus:ring-green-500'
-                                            : 'bg-gray-300 focus:ring-gray-500'
-                                    } ${
-                                        isReadOnly
-                                            ? 'opacity-50 cursor-not-allowed'
-                                            : 'cursor-pointer'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 shadow-md ${
-                                            pipelineState
-                                                ? 'translate-x-6'
-                                                : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                                <span
-                                    className={`text-sm font-semibold ${
-                                        pipelineState
-                                            ? 'text-green-600'
-                                            : 'text-gray-500'
-                                    }`}
-                                >
-                                    {pipelineState ? 'ON' : 'OFF'}
-                                </span>
-                            </div>
+                            <select
+                                value={entity}
+                                onChange={(e) => setEntity(e.target.value)}
+                                className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
+                                disabled={isReadOnly}
+                            >
+                                <option value=''>Select Entity</option>
+                                <option value='Customer'>Customer</option>
+                                <option value='Product'>Product</option>
+                                <option value='Order'>Order</option>
+                                <option value='Invoice'>Invoice</option>
+                                <option value='Employee'>Employee</option>
+                                <option value='Vendor'>Vendor</option>
+                                <option value='Contract'>Contract</option>
+                                <option value='Asset'>Asset</option>
+                            </select>
                         </div>
                     </div>
 
@@ -1068,7 +1042,12 @@ function WorkflowBuilderContent({
                             nodeBorderRadius={12}
                             position='bottom-right'
                             className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
-                            style={{right: '20px', bottom: '80px'}}
+                            style={{
+                                right: '180px',
+                                bottom: '20px',
+                                width: '140px',
+                                height: '100px',
+                            }}
                             pannable
                             zoomable
                         />

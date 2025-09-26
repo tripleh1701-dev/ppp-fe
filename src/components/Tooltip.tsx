@@ -19,7 +19,7 @@ export const Tooltip = ({
     delay = 200,
     disabled = false,
     className = '',
-    maxWidth = 'max-w-48',
+    maxWidth = 'max-w-24',
 }: TooltipProps) => {
     const [isVisible, setIsVisible] = useState(false);
     const [actualPosition, setActualPosition] = useState<
@@ -123,14 +123,14 @@ export const Tooltip = ({
                 >
                     <div
                         className={`
-                        bg-gray-900/95 backdrop-blur-sm text-white text-xs rounded-md px-2 py-1.5
-                        shadow-lg border border-gray-700/50 ${maxWidth} break-words whitespace-pre-line
+                        bg-gray-900/95 backdrop-blur-sm text-white text-[10px] rounded px-1 py-0
+                        shadow-sm border border-gray-700/50 ${maxWidth} break-words whitespace-pre-line
                         animate-in fade-in-0 zoom-in-95 duration-150
                     `}
                     >
                         {content}
                         <div
-                            className={`absolute w-2 h-2 bg-gray-900/95 border-l border-t border-gray-700/50 transform rotate-45 ${arrowClasses[actualPosition]}`}
+                            className={`absolute w-1 h-1 bg-gray-900/95 border-l border-t border-gray-700/50 transform rotate-45 ${arrowClasses[actualPosition]}`}
                         />
                     </div>
                 </div>
