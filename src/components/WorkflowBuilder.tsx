@@ -16,7 +16,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import Sidebar from './Sidebar';
-import ModernConnectorToolbar from './ModernConnectorToolbar';
+import ConnectorSlidingPanel from './ConnectorSlidingPanel';
 import PipelineHeader from './PipelineHeader';
 import WorkflowNode from './WorkflowNode';
 import PipelinePanels from './PipelinePanels';
@@ -1055,11 +1055,12 @@ function WorkflowBuilderContent({
                         elementsSelectable={!isReadOnly}
                     >
                         <Controls
-                            position='bottom-left'
+                            position='bottom-right'
                             showZoom={true}
                             showFitView={true}
                             showInteractive={true}
                             className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
+                            style={{right: '20px', bottom: '20px'}}
                         />
                         <MiniMap
                             nodeStrokeColor='#4f46e5'
@@ -1067,6 +1068,7 @@ function WorkflowBuilderContent({
                             nodeBorderRadius={12}
                             position='bottom-right'
                             className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
+                            style={{right: '20px', bottom: '80px'}}
                             pannable
                             zoomable
                         />
@@ -1074,10 +1076,16 @@ function WorkflowBuilderContent({
                     </ReactFlow>
                 </div>
 
-                {/* Modern Connector Toolbar (Top) - Hidden in read-only mode */}
+                {/* Connector Sliding Panel - Hidden in read-only mode */}
                 {!isReadOnly && (
-                    <div className='absolute top-0 left-0 right-0 z-40'>
-                        <ModernConnectorToolbar onDragStart={onDragStart} />
+                    <div className='absolute left-0 top-0 bottom-0 z-40 w-12'>
+                        <ConnectorSlidingPanel
+                            onConnectorSelect={(nodeType) => {
+                                // Handle connector selection if needed
+                                console.log('Connector selected:', nodeType);
+                            }}
+                            onDragStart={onDragStart}
+                        />
                     </div>
                 )}
             </div>
