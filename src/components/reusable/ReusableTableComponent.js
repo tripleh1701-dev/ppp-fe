@@ -1464,6 +1464,7 @@ const ReusableTableComponent = ({config = null}) => {
             const optionsMap = {};
 
             // Get current user context (you may need to pass this as a prop)
+            const breadcrumbData = configToUse.breadcrumbData || {};
             const currentUser = configToUse.currentUser || {
                 accountId: breadcrumbData.accountId || 3,
                 enterpriseId: breadcrumbData.enterpriseId || 1,

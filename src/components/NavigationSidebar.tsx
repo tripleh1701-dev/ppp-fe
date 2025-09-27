@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
+import SecurityGovernancePanel from './SecurityGovernancePanel';
 import {motion} from 'framer-motion';
 
 interface NavigationItem {
@@ -113,6 +114,8 @@ export default function NavigationSidebar({
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
+    const [isSecurityGovernanceOpen, setIsSecurityGovernanceOpen] =
+        useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
     const [currentUser, setCurrentUser] = useState({
         firstName: '',
@@ -201,6 +204,7 @@ export default function NavigationSidebar({
         if (currentPath !== previousPathname) {
             if (isAccountSettingsOpen) setIsAccountSettingsOpen(false);
             if (isAccessControlOpen) setIsAccessControlOpen(false);
+            if (isSecurityGovernanceOpen) setIsSecurityGovernanceOpen(false);
         }
         setPreviousPathname(currentPath);
     }, [
@@ -208,6 +212,7 @@ export default function NavigationSidebar({
         previousPathname,
         isAccountSettingsOpen,
         isAccessControlOpen,
+        isSecurityGovernanceOpen,
     ]);
 
     // Handle mobile close on navigation
@@ -229,19 +234,29 @@ export default function NavigationSidebar({
 
             if (item.id === 'account-settings') {
                 setIsAccountSettingsOpen(true);
-                setIsAccessControlOpen(false); // <-- close other panel
+                setIsAccessControlOpen(false); // <-- close other panels
+                setIsSecurityGovernanceOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
             if (item.id === 'access-control') {
                 setIsAccessControlOpen(true);
-                setIsAccountSettingsOpen(false); // <-- close other panel
+                setIsAccountSettingsOpen(false); // <-- close other panels
+                setIsSecurityGovernanceOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
-            // Close both panels when clicking any other menu
+            if (item.id === 'security-governance') {
+                setIsSecurityGovernanceOpen(true);
+                setIsAccountSettingsOpen(false); // <-- close other panels
+                setIsAccessControlOpen(false);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            // Close all panels when clicking any other menu
             setIsAccountSettingsOpen(false);
             setIsAccessControlOpen(false);
+            setIsSecurityGovernanceOpen(false);
             handleNavigation(item.href);
         },
         [isMobile, onToggleCollapse, handleNavigation],
@@ -597,6 +612,15 @@ export default function NavigationSidebar({
                 <AccessControlPanel
                     isOpen={isAccessControlOpen}
                     onClose={() => setIsAccessControlOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
+            )}
+
+            {/* Security & Governance Panel */}
+            {isSecurityGovernanceOpen && (
+                <SecurityGovernancePanel
+                    isOpen={isSecurityGovernanceOpen}
+                    onClose={() => setIsSecurityGovernanceOpen(false)}
                     sidebarWidth={isCollapsed ? 48 : 208}
                 />
             )}

@@ -12,6 +12,7 @@ interface BreadcrumbItem {
     href: string;
     isLast?: boolean;
     icon?: string;
+    customIcon?: React.ReactNode;
 }
 
 interface BreadcrumbsProps {
@@ -19,7 +20,9 @@ interface BreadcrumbsProps {
     isMobile?: boolean; // Mobile responsiveness flag
 }
 
-const pathMapping: {[key: string]: {label: string; icon?: string}} = {
+const pathMapping: {
+    [key: string]: {label: string; icon?: string; customIcon?: React.ReactNode};
+} = {
     '': {label: 'Overview', icon: 'grid'},
     inbox: {label: 'My Inbox', icon: 'mail'},
     dashboard: {label: 'Dashboard', icon: 'chart'},
@@ -43,6 +46,115 @@ const pathMapping: {[key: string]: {label: string; icon?: string}} = {
     },
     'global-settings': {label: 'Global Settings', icon: 'globe'},
     'security-governance': {label: 'Security & Governance', icon: 'shield'},
+    credentials: {
+        label: 'Credential Manager',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M12 1L3 5v6c0 5.55 3.84 9.739 9 11 5.16-1.261 9-5.45 9-11V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z' />
+            </svg>
+        ),
+    },
+    connectors: {
+        label: 'Connectors',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z' />
+                <circle cx='8' cy='12' r='2' />
+                <circle cx='16' cy='12' r='2' />
+                <path d='M10 12h4' />
+            </svg>
+        ),
+    },
+    environments: {
+        label: 'Environments',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' />
+                <circle
+                    cx='12'
+                    cy='12'
+                    r='3'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='1.5'
+                />
+                <path
+                    d='M12 1v6m0 10v6m11-7h-6M6 12H0'
+                    stroke='currentColor'
+                    strokeWidth='1'
+                    opacity='0.6'
+                />
+            </svg>
+        ),
+    },
+    webhooks: {
+        label: 'Webhooks',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M10 15l4-4-4-4v3H3v2h7v3z' />
+                <path d='M21 12l-4 4v-3h-7v-2h7V8l4 4z' opacity='0.7' />
+                <circle cx='12' cy='12' r='1.5' />
+                <path
+                    d='M12 8.5c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5z'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='1'
+                    opacity='0.4'
+                />
+            </svg>
+        ),
+    },
+    notifications: {
+        label: 'Notifications',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' />
+                <circle
+                    cx='18'
+                    cy='8'
+                    r='3'
+                    fill='currentColor'
+                    opacity='0.8'
+                />
+                <circle cx='18' cy='8' r='1.5' fill='white' />
+            </svg>
+        ),
+    },
+    'linting-rules': {
+        label: 'Linting Rules',
+        icon: 'custom',
+        customIcon: (
+            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                <path d='M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z' />
+                <path
+                    d='M10,12L8,14L10,16M14,12L16,14L14,16'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='1.5'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                />
+                <circle
+                    cx='16'
+                    cy='6'
+                    r='2'
+                    fill='currentColor'
+                    opacity='0.8'
+                />
+                <path
+                    d='M15 6h2'
+                    stroke='white'
+                    strokeWidth='1'
+                    strokeLinecap='round'
+                />
+            </svg>
+        ),
+    },
     monitoring: {label: 'Monitoring', icon: 'chart'},
     templates: {label: 'Pipeline Templates', icon: 'template'},
 };
@@ -90,12 +202,21 @@ export default function Breadcrumbs({
 
         // For account-settings paths, start from Account Settings instead of Overview
         // For pipelines/canvas paths, start from Pipelines instead of Overview
+        // For security-governance paths, start from Security & Governance instead of Overview
+        // For access-control paths, start from Access Control instead of Overview
         const isAccountSettingsPath = segments[0] === 'account-settings';
         const isPipelineCanvasPath =
             segments[0] === 'pipelines' && segments[1] === 'canvas';
+        const isSecurityGovernancePath = segments[0] === 'security-governance';
+        const isAccessControlPath = segments[0] === 'access-control';
 
-        if (!isAccountSettingsPath && !isPipelineCanvasPath) {
-            // Add home for non-account-settings and non-pipeline-canvas paths
+        if (
+            !isAccountSettingsPath &&
+            !isPipelineCanvasPath &&
+            !isSecurityGovernancePath &&
+            !isAccessControlPath
+        ) {
+            // Add home for paths that should start from Overview
             items.push({
                 label: 'Overview',
                 href: '/',
@@ -116,6 +237,7 @@ export default function Breadcrumbs({
                 href: currentPath,
                 isLast,
                 icon: node?.icon,
+                customIcon: node?.customIcon,
             });
         });
 
@@ -378,11 +500,17 @@ export default function Breadcrumbs({
 
                             {item.isLast ? (
                                 <div className='flex items-center space-x-1.5'>
-                                    {item.icon && (
-                                        <Icon
-                                            name={item.icon}
-                                            className='w-3.5 h-3.5 text-slate-500 flex-shrink-0'
-                                        />
+                                    {item.customIcon ? (
+                                        <div className='text-slate-500 flex-shrink-0'>
+                                            {item.customIcon}
+                                        </div>
+                                    ) : (
+                                        item.icon && (
+                                            <Icon
+                                                name={item.icon}
+                                                className='w-3.5 h-3.5 text-slate-500 flex-shrink-0'
+                                            />
+                                        )
                                     )}
                                     <span className='text-[13px] font-semibold text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500 truncate'>
                                         {item.label}
@@ -396,11 +524,17 @@ export default function Breadcrumbs({
                                     }}
                                     className='flex items-center space-x-1.5 text-[13px] text-slate-600 transition-colors duration-200 hover:bg-slate-100 px-1.5 py-0.5 rounded-md group'
                                 >
-                                    {item.icon && (
-                                        <Icon
-                                            name={item.icon}
-                                            className='w-3.5 h-3.5 text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'
-                                        />
+                                    {item.customIcon ? (
+                                        <div className='text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'>
+                                            {item.customIcon}
+                                        </div>
+                                    ) : (
+                                        item.icon && (
+                                            <Icon
+                                                name={item.icon}
+                                                className='w-3.5 h-3.5 text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'
+                                            />
+                                        )
                                     )}
                                     <span className='truncate max-w-[180px] group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-indigo-500 transition-colors duration-200'>
                                         {item.label}
@@ -411,11 +545,17 @@ export default function Breadcrumbs({
                                     href={item.href}
                                     className='flex items-center space-x-1.5 text-[13px] text-slate-600 transition-colors duration-200 hover:bg-slate-100 px-1.5 py-0.5 rounded-md group'
                                 >
-                                    {item.icon && (
-                                        <Icon
-                                            name={item.icon}
-                                            className='w-3.5 h-3.5 text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'
-                                        />
+                                    {item.customIcon ? (
+                                        <div className='text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'>
+                                            {item.customIcon}
+                                        </div>
+                                    ) : (
+                                        item.icon && (
+                                            <Icon
+                                                name={item.icon}
+                                                className='w-3.5 h-3.5 text-slate-400 group-hover:text-primary flex-shrink-0 transition-colors duration-200'
+                                            />
+                                        )
                                     )}
                                     <span className='truncate max-w-[180px] group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-indigo-500 transition-colors duration-200'>
                                         {item.label}
