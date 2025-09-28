@@ -15,159 +15,7 @@ import EnterpriseConfigTable, {
     EnterpriseConfigRow,
 } from '@/components/EnterpriseConfigTable';
 
-// Reusable trash button (copied from manage enterprise config)
-function ToolbarTrashButton({
-    onClick,
-    bounce = false,
-}: {
-    onClick?: () => void;
-    bounce?: boolean;
-}) {
-    const [over, setOver] = useState(false);
-    return (
-        <motion.button
-            id='enterprise-config-trash-target'
-            type='button'
-            onClick={onClick}
-            aria-label='Trash'
-            aria-dropeffect='move'
-            className={`group relative ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all duration-300 transform ${
-                over
-                    ? 'bg-gradient-to-br from-red-400 to-red-600 border-red-500 ring-4 ring-red-300/50 scale-110 shadow-lg'
-                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:from-red-500 hover:to-red-600 hover:border-red-500 hover:shadow-lg hover:scale-105'
-            } ${over ? 'drag-over' : ''}`}
-            title='Trash'
-            whileHover={{
-                scale: 1.1,
-                rotate: [0, -8, 8, 0],
-                transition: {duration: 0.4},
-            }}
-            whileTap={{
-                scale: 0.95,
-                transition: {duration: 0.1},
-            }}
-            onDragOver={(e) => {
-                e.preventDefault();
-                try {
-                    e.dataTransfer.dropEffect = 'move';
-                } catch {}
-                if (!over) setOver(true);
-            }}
-            onDragEnter={() => setOver(true)}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-                console.log('🎯 Drop event on trash button triggered');
-                setOver(false);
-                try {
-                    const json = e.dataTransfer.getData('application/json');
-                    console.log('📦 Drag data received:', json);
-                    if (!json) {
-                        console.warn('⚠️ No drag data found');
-                        return;
-                    }
-                    const payload = JSON.parse(json);
-                    console.log('📋 Parsed payload:', payload);
-                    const rowId = payload?.rowId as string | undefined;
-                    if (!rowId) {
-                        console.warn('⚠️ No rowId in payload');
-                        return;
-                    }
-                    console.log(
-                        '🚀 Dispatching enterprise-row-drop-trash event for rowId:',
-                        rowId,
-                    );
-                    const event = new CustomEvent('enterprise-row-drop-trash', {
-                        detail: {rowId},
-                    });
-                    window.dispatchEvent(event);
-                } catch (error) {
-                    console.error('❌ Error in drop handler:', error);
-                }
-            }}
-        >
-            {/* Animated background glow */}
-            <div className='absolute inset-0 bg-red-400 rounded-full opacity-0 group-hover:opacity-30 blur-md transition-opacity duration-300'></div>
 
-            {/* Enhanced trash icon */}
-            <svg
-                viewBox='0 0 24 24'
-                className={`w-5 h-5 relative z-10 transition-all duration-300 ${
-                    over
-                        ? 'text-white animate-pulse'
-                        : 'text-red-500 group-hover:text-white group-hover:animate-pulse'
-                } ${bounce ? 'trash-bounce' : ''}`}
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2.5'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-            >
-                {/* Animated SVG paths */}
-                <motion.path
-                    d='M3 6h18'
-                    initial={{pathLength: 0}}
-                    animate={{pathLength: 1}}
-                    transition={{duration: 0.5, delay: 0.1}}
-                />
-                <motion.path
-                    className='trash-lid'
-                    d='M8 6l1-2h6l1 2'
-                    initial={{pathLength: 0}}
-                    animate={{pathLength: 1}}
-                    transition={{duration: 0.5, delay: 0.2}}
-                />
-                <motion.path
-                    d='M6 6l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13'
-                    initial={{pathLength: 0}}
-                    animate={{pathLength: 1}}
-                    transition={{duration: 0.5, delay: 0.3}}
-                />
-                <motion.path
-                    d='M10 10v7M14 10v7'
-                    initial={{pathLength: 0}}
-                    animate={{pathLength: 1}}
-                    transition={{duration: 0.5, delay: 0.4}}
-                />
-            </svg>
-
-            {/* Tooltip */}
-            <span
-                className={`pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-md bg-slate-900 text-white text-xs px-2 py-1 shadow-lg transition-opacity duration-200 ${
-                    over ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                }`}
-            >
-                Drag a row here to delete
-            </span>
-
-            {/* Ripple effect on click */}
-            <div className='absolute inset-0 rounded-full opacity-0 group-active:opacity-40 bg-red-300 animate-ping'></div>
-            <style jsx>{`
-                .trash-lid {
-                    transform-box: fill-box;
-                    transform-origin: 60% 30%;
-                }
-                .group:hover .trash-lid,
-                .drag-over .trash-lid {
-                    animation: trash-lid-wiggle 0.55s ease-in-out;
-                }
-                @keyframes trash-lid-wiggle {
-                    0% {
-                        transform: rotate(0deg) translateY(0);
-                    }
-                    35% {
-                        transform: rotate(-16deg) translateY(-1px);
-                    }
-                    65% {
-                        transform: rotate(-6deg) translateY(-0.5px);
-                    }
-                    100% {
-                        transform: rotate(0deg) translateY(0);
-                    }
-                }
-            `}</style>
-        </motion.button>
-    );
-}
 
 export default function EnterpriseConfiguration() {
     console.log('🏗️ EnterpriseConfiguration component mounting...');
@@ -275,7 +123,7 @@ export default function EnterpriseConfiguration() {
         'product',
         'services',
     ]);
-    const [trashBounce, setTrashBounce] = useState(false);
+
 
     // Refs for dropdowns
     const searchRef = useRef<HTMLDivElement>(null);
@@ -905,14 +753,25 @@ export default function EnterpriseConfiguration() {
                 if (createdLinkage) {
                     console.log('✅ Auto-save successful:', createdLinkage);
 
+                    // Preserve display order for the new ID
+                    const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+                    const newId = (createdLinkage as any).id;
+                    
                     // Update the config with the real ID from the backend
                     setEnterpriseConfigs((prev) =>
                         prev.map((cfg) =>
                             cfg.id === tempRowId
-                                ? {...cfg, id: (createdLinkage as any).id}
+                                ? {...cfg, id: newId}
                                 : cfg,
                         ),
                     );
+
+                    // Update display order reference with the new ID
+                    if (oldDisplayOrder !== undefined) {
+                        displayOrderRef.current.delete(tempRowId); // Remove old reference
+                        displayOrderRef.current.set(newId, oldDisplayOrder); // Add new reference
+                        console.log(`📍 Preserved display order ${oldDisplayOrder} for new ID ${newId}`);
+                    }
 
                     // Show success feedback
                     console.log(
@@ -1016,6 +875,66 @@ export default function EnterpriseConfiguration() {
         });
     };
 
+    // Function to validate incomplete rows and return validation details
+    const validateIncompleteRows = () => {
+        const effectiveConfigs = getEffectiveEnterpriseConfigs();
+        
+        // Get all temporary (unsaved) rows using effective configs
+        const temporaryRows = effectiveConfigs.filter((config: any) => 
+            String(config.id).startsWith('tmp-')
+        );
+
+        // Get all existing rows that might have incomplete data using effective configs
+        const existingRows = effectiveConfigs.filter((config: any) => 
+            !String(config.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows
+        const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
+            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasProduct = (config.product || config.productName)?.trim();
+            const hasServices = (config.services || config.serviceName)?.trim();
+
+            return !hasEnterprise || !hasProduct || !hasServices;
+        });
+
+        // Check for incomplete existing rows
+        const incompleteExistingRows = existingRows.filter((config: any) => {
+            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasProduct = (config.product || config.productName)?.trim();
+            const hasServices = (config.services || config.serviceName)?.trim();
+
+            return !hasEnterprise || !hasProduct || !hasServices;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        if (incompleteRows.length > 0) {
+            const missingFields = new Set<string>();
+            incompleteRows.forEach((config) => {
+                if (!(config.enterprise || config.enterpriseName)?.trim()) missingFields.add('Enterprise');
+                if (!(config.product || config.productName)?.trim()) missingFields.add('Product');
+                if (!(config.services || config.serviceName)?.trim()) missingFields.add('Services');
+            });
+            
+            const incompleteCount = incompleteRows.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
+            
+            return {
+                hasIncomplete: true,
+                incompleteRows,
+                message
+            };
+        }
+        
+        return {
+            hasIncomplete: false,
+            incompleteRows: [],
+            message: ''
+        };
+    };
+
     // Debounced auto-save function with countdown
     // Function to merge server data with pending local changes
     const getEffectiveEnterpriseConfigs = useCallback(() => {
@@ -1087,11 +1006,25 @@ export default function EnterpriseConfiguration() {
                     const isTemp = String(config.id).startsWith('tmp-');
                     if (!isTemp) return false;
                     
-                    const hasEnterprise = config.enterprise?.trim();
-                    const hasProduct = config.product?.trim();
-                    const hasServices = config.services?.trim();
+                    // Be more strict about what constitutes a complete row
+                    const hasEnterprise = config.enterprise?.trim() && config.enterprise.trim().length > 0;
+                    const hasProduct = config.product?.trim() && config.product.trim().length > 0;
+                    const hasServices = config.services?.trim() && config.services.trim().length > 0;
                     
-                    return hasEnterprise && hasProduct && hasServices;
+                    const isComplete = hasEnterprise && hasProduct && hasServices;
+                    
+                    if (isTemp && !isComplete) {
+                        console.log(`🚫 Skipping incomplete temporary row ${config.id}:`, {
+                            hasEnterprise: !!hasEnterprise,
+                            hasProduct: !!hasProduct,
+                            hasServices: !!hasServices,
+                            enterpriseValue: config.enterprise,
+                            productValue: config.product,
+                            servicesValue: config.services
+                        });
+                    }
+                    
+                    return isComplete;
                 });
                 
                 // Get all modified existing records that are still complete
@@ -1753,6 +1686,8 @@ export default function EnterpriseConfiguration() {
 
     // Load data on component mount
     useEffect(() => {
+        let mounted = true; // Prevent state updates if component unmounted
+        
         (async () => {
             try {
                 setIsLoading(true);
@@ -1784,6 +1719,12 @@ export default function EnterpriseConfiguration() {
                     >('/api/enterprise-products-services'),
                     loadDropdownOptions(),
                 ]);
+
+                // Only update state if component is still mounted
+                if (!mounted) {
+                    console.log('⚠️ Component unmounted during data load, skipping state update');
+                    return;
+                }
 
                 console.log(
                     '📊 Loaded enterprise linkages:',
@@ -1842,18 +1783,38 @@ export default function EnterpriseConfiguration() {
                 
                 // Apply final stable sort by display order
                 const finalSortedConfigs = sortConfigsByDisplayOrder(transformedConfigs);
-                setEnterpriseConfigs(finalSortedConfigs);
+                
+                // Only set initial state if no configs exist yet (to prevent overwriting user changes)
+                setEnterpriseConfigs((prevConfigs) => {
+                    // If user has already added temporary rows, preserve them
+                    const hasTemporaryRows = prevConfigs.some(config => String(config.id).startsWith('tmp-'));
+                    if (hasTemporaryRows) {
+                        console.log('⚠️ Preserving temporary rows, not overwriting with API data');
+                        return prevConfigs; // Keep existing state with temporary rows
+                    }
+                    return finalSortedConfigs; // Initial load
+                });
+                
                 console.log(
                     '✅ Enterprise linkages loaded and transformed successfully',
                 );
             } catch (error) {
                 console.error('❌ Failed to load enterprise linkages:', error);
-                setEnterpriseConfigs([]);
+                if (mounted) {
+                    setEnterpriseConfigs([]);
+                }
             } finally {
-                setIsLoading(false);
+                if (mounted) {
+                    setIsLoading(false);
+                }
             }
         })();
-    }, []);
+
+        // Cleanup function
+        return () => {
+            mounted = false;
+        };
+    }, []); // Empty dependency array - only run once on mount
 
     // Force table re-render when configs data changes
     useEffect(() => {
@@ -1873,57 +1834,11 @@ export default function EnterpriseConfiguration() {
         );
     }, [enterpriseConfigs]);
 
-    // Handle drag-and-drop delete events
-    useEffect(() => {
-        const handleRowDropTrash = (event: CustomEvent) => {
-            console.log(
-                '🗑️ Drag-and-drop delete event received:',
-                event.detail,
-            );
-            const {rowId} = event.detail;
-            if (rowId) {
-                const row = enterpriseConfigs.find((config) => config.id === rowId);
-                if (row) {
-                    console.log('🎯 Found row for animation:', row);
-                    // Start the compression animation sequence
-                    startRowCompressionAnimation(rowId);
-                } else {
-                    console.warn('⚠️ Row not found for ID:', rowId);
-                }
-            } else {
-                console.warn('⚠️ No rowId in event detail');
-            }
-        };
 
-        window.addEventListener(
-            'enterprise-row-drop-trash',
-            handleRowDropTrash as EventListener,
-        );
-        return () => {
-            window.removeEventListener(
-                'enterprise-row-drop-trash',
-                handleRowDropTrash as EventListener,
-            );
-        };
-    }, [enterpriseConfigs]);
 
-    // Row squeeze animation sequence with trash effects
+    // Row squeeze animation sequence
     const startRowCompressionAnimation = async (rowId: string) => {
         console.log('🎬 Starting squeeze animation for row:', rowId);
-
-        // Add trash bounce and splash animation
-        const trashButton = document.getElementById('accounts-trash-target');
-        if (trashButton) {
-            trashButton.classList.add('trash-bounce');
-
-            // Add splash effect
-            trashButton.style.animation = 'trashSplash 0.6s ease-out';
-
-            setTimeout(() => {
-                trashButton.classList.remove('trash-bounce');
-                trashButton.style.animation = '';
-            }, 600);
-        }
 
         // Step 1: Squeeze the row horizontally with animation
         setCompressingRowId(rowId);
@@ -2008,11 +1923,31 @@ export default function EnterpriseConfiguration() {
                         {/* Create New Enterprise Button */}
                         <button
                             onClick={() => {
+                                // Clear any pending autosave to prevent blank rows from being saved
+                                if (autoSaveTimerRef.current) {
+                                    clearTimeout(autoSaveTimerRef.current);
+                                    autoSaveTimerRef.current = null;
+                                }
+                                if (countdownIntervalRef.current) {
+                                    clearInterval(countdownIntervalRef.current);
+                                    countdownIntervalRef.current = null;
+                                }
+                                setAutoSaveCountdown(null);
+                                setIsAutoSaving(false);
+                                
                                 // Check if there's already a blank row
                                 if (hasBlankRow()) {
                                     showBlueNotification(
                                         'Please complete the existing blank row before adding a new one.',
                                     );
+                                    return;
+                                }
+
+                                // Check for incomplete rows before adding new row
+                                const validation = validateIncompleteRows();
+                                if (validation.hasIncomplete) {
+                                    setValidationMessage(validation.message);
+                                    setShowValidationModal(true);
                                     return;
                                 }
 
@@ -2086,7 +2021,7 @@ export default function EnterpriseConfiguration() {
                                             setAppliedSearchTerm(searchTerm);
                                         }
                                     }}
-                                    className='block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-400 text-base placeholder:text-base'
+                                    className='block w-full pl-10 pr-3 py-2.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-600 text-base placeholder:text-base'
                                 />
                                 {appliedSearchTerm && (
                                     <button
@@ -2118,7 +2053,7 @@ export default function EnterpriseConfiguration() {
                                     filterVisible ||
                                     Object.keys(activeFilters).length > 0
                                         ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
                                 }`}
                             >
                                 <svg
@@ -2142,12 +2077,19 @@ export default function EnterpriseConfiguration() {
 
                             {/* Filter Dropdown */}
                             {filterVisible && (
-                                <div className='absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-80'>
-                                    <div className='p-4'>
-                                        <div className='text-sm font-medium text-gray-700 mb-3'>
-                                            Apply Filters:
+                                <div className='absolute top-full mt-2 left-0 bg-card text-primary shadow-xl border border-blue-200 rounded-lg z-50 min-w-80'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                        <div className='text-xs font-semibold'>
+                                            Filters
                                         </div>
-
+                                        <button
+                                            onClick={handleClearFilters}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
+                                    <div className='p-4'>
                                         {/* Enterprise Filter */}
                                         <div className='mb-3'>
                                             <label className='block text-xs font-medium text-gray-600 mb-1'>
@@ -2164,7 +2106,7 @@ export default function EnterpriseConfiguration() {
                                                     })
                                                 }
                                                 placeholder='Search by enterprise...'
-                                                className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
                                             />
                                         </div>
 
@@ -2183,7 +2125,7 @@ export default function EnterpriseConfiguration() {
                                                     })
                                                 }
                                                 placeholder='Search by product...'
-                                                className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
                                             />
                                         </div>
 
@@ -2203,23 +2145,17 @@ export default function EnterpriseConfiguration() {
                                                     })
                                                 }
                                                 placeholder='Search by services (comma-separated)...'
-                                                className='w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
                                             />
                                         </div>
 
-                                        {/* Action Buttons */}
-                                        <div className='flex gap-2'>
-                                            <button
-                                                onClick={handleClearFilters}
-                                                className='px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded border border-red-200'
-                                            >
-                                                Clear All
-                                            </button>
+                                        {/* Apply Button */}
+                                        <div className='flex justify-end'>
                                             <button
                                                 onClick={handleApplyFilters}
-                                                className='px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded border border-purple-200'
+                                                className='px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded font-medium transition-colors shadow-sm'
                                             >
-                                                Apply
+                                                Apply Filters
                                             </button>
                                         </div>
                                     </div>
@@ -2233,7 +2169,7 @@ export default function EnterpriseConfiguration() {
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
                                     sortOpen || !!sortColumn
                                         ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
                                 }`}
                                 title='Sort'
                                 onClick={() =>
@@ -2254,7 +2190,20 @@ export default function EnterpriseConfiguration() {
                                 <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
                             </button>
                             {sortOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-white shadow-xl border border-gray-200'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                        <div className='text-xs font-semibold'>
+                                            Sort
+                                        </div>
+                                        {sortColumn && (
+                                            <button
+                                                onClick={clearSorting}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className='p-3'>
                                         <div className='space-y-3'>
                                             {/* Column Selection */}
@@ -2275,7 +2224,6 @@ export default function EnterpriseConfiguration() {
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select column</option>
                                                         {allCols.map((col) => (
                                                             <option key={col} value={col}>
                                                                 {columnLabels[col]}
@@ -2301,7 +2249,7 @@ export default function EnterpriseConfiguration() {
                                                                 applySorting(sortColumn, newDirection);
                                                             }
                                                         }}
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option value='asc'>Ascending</option>
                                                         <option value='desc'>Descending</option>
@@ -2309,17 +2257,6 @@ export default function EnterpriseConfiguration() {
                                                 </div>
                                             </div>
 
-                                            {/* Action Buttons */}
-                                            <div className='flex items-center gap-2 pt-1 border-t border-gray-200'>
-                                                {sortColumn && (
-                                                    <button
-                                                        onClick={clearSorting}
-                                                        className='text-xs text-gray-500 hover:text-gray-700'
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
-                                            </div>
 
                                             {/* Current Sort Display */}
                                             {sortColumn && (
@@ -2341,7 +2278,7 @@ export default function EnterpriseConfiguration() {
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
                                     hideOpen || visibleCols.length < allCols.length
                                         ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
                                 }`}
                                 onClick={() =>
                                     hideOpen
@@ -2356,8 +2293,8 @@ export default function EnterpriseConfiguration() {
                                 )}
                             </button>
                             {hideOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-light'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-light'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
                                         <div className='text-xs font-semibold'>
                                             Displayed Columns
                                         </div>
@@ -2369,7 +2306,7 @@ export default function EnterpriseConfiguration() {
                                                 setHideQuery(e.target.value)
                                             }
                                             placeholder='Search columns'
-                                            className='w-full bg-white border border-light rounded px-2 py-1 text-xs'
+                                            className='w-full bg-white border border-blue-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                                         />
                                         <div className='max-h-40 overflow-auto divide-y divide-light'>
                                             {allCols
@@ -2447,7 +2384,7 @@ export default function EnterpriseConfiguration() {
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
                                     groupOpen || ActiveGroupLabel !== 'None'
                                         ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
                                 }`}
                                 onClick={() =>
                                     groupOpen
@@ -2462,8 +2399,8 @@ export default function EnterpriseConfiguration() {
                                 )}
                             </button>
                             {groupOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-light'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-light'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
                                         <div className='text-xs font-semibold'>
                                             Group by
                                         </div>
@@ -2476,7 +2413,7 @@ export default function EnterpriseConfiguration() {
                                                     e.target.value,
                                                 )
                                             }
-                                            className='w-full bg-white border border-light rounded px-2 py-1 text-xs'
+                                            className='w-full bg-white border border-blue-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                                         >
                                             <option>None</option>
                                             <option>Enterprise</option>
@@ -2503,6 +2440,11 @@ export default function EnterpriseConfiguration() {
                             }`}
                             title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
                         >
+                            {/* Wave progress animation for auto-save countdown */}
+                            {autoSaveCountdown && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-blue-200 via-blue-400 to-blue-600 animate-[wave_2s_ease-in-out_infinite]"></div>
+                            )}
+                            
                             {/* Auto-save success wave animation */}
                             {showAutoSaveSuccess && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
@@ -2542,11 +2484,6 @@ export default function EnterpriseConfiguration() {
                                 {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
                             </span>
                         </button>
-
-                        <ToolbarTrashButton
-                            onClick={() => {}}
-                            bounce={trashBounce}
-                        />
                     </div>
                 </div>
             </div>
@@ -2629,6 +2566,18 @@ export default function EnterpriseConfiguration() {
                                     <div className='mt-6'>
                                         <button
                                             onClick={() => {
+                                                // Clear any pending autosave to prevent blank rows from being saved
+                                                if (autoSaveTimerRef.current) {
+                                                    clearTimeout(autoSaveTimerRef.current);
+                                                    autoSaveTimerRef.current = null;
+                                                }
+                                                if (countdownIntervalRef.current) {
+                                                    clearInterval(countdownIntervalRef.current);
+                                                    countdownIntervalRef.current = null;
+                                                }
+                                                setAutoSaveCountdown(null);
+                                                setIsAutoSaving(false);
+                                                
                                                 // Trigger the "New Enterprise" action
                                                 const newId = `tmp-${Date.now()}`;
                                                 const blank = {
@@ -3369,16 +3318,35 @@ export default function EnterpriseConfiguration() {
                                         }
                                     }}
                                     onDelete={(id) => {
-                                        setPendingDeleteId(id);
+                                        // Trigger the delete confirmation flow
+                                        startRowCompressionAnimation(id);
                                     }}
                                     visibleColumns={visibleCols}
                                     highlightQuery={searchTerm}
                                     groupByExternal={groupByProp}
                                     onShowAllColumns={showAllColumns}
                                     onQuickAddRow={async () => {
+                                        console.log('🔄 Add row clicked - current state:', {
+                                            configsLength: enterpriseConfigs.length,
+                                            hasBlank: hasBlankRow(),
+                                            configs: enterpriseConfigs.map(c => ({ id: c.id, isEmpty: !c.enterprise && !c.product && !c.services }))
+                                        });
+
                                         // Check if there's already a blank row
                                         if (hasBlankRow()) {
-                                            // Don't add a new row, the inline warning will show
+                                            console.log('⚠️ Blank row already exists, showing notification');
+                                            showBlueNotification(
+                                                'Please complete the existing blank row before adding a new one.',
+                                            );
+                                            return;
+                                        }
+
+                                        // Check for incomplete rows before adding new row
+                                        const validation = validateIncompleteRows();
+                                        if (validation.hasIncomplete) {
+                                            console.log('⚠️ Incomplete rows found, showing validation modal');
+                                            setValidationMessage(validation.message);
+                                            setShowValidationModal(true);
                                             return;
                                         }
 
@@ -3389,7 +3357,23 @@ export default function EnterpriseConfiguration() {
                                             product: '',
                                             services: '',
                                         } as any;
-                                        setEnterpriseConfigs((prev) => [...prev, blank]);
+                                        
+                                        console.log('✅ Adding new blank row:', { newId, blank });
+                                        
+                                        // Use functional update to ensure we get latest state
+                                        setEnterpriseConfigs((prev) => {
+                                            console.log('📝 State update - prev length:', prev.length);
+                                            const newConfigs = [...prev, blank];
+                                            
+                                            // Set display order for the new row (should be at the end)
+                                            const newDisplayOrder = prev.length; // Next position after current rows
+                                            displayOrderRef.current.set(newId, newDisplayOrder);
+                                            console.log(`📍 Set display order ${newDisplayOrder} for new row ${newId}`);
+                                            
+                                            console.log('📝 State update - new length:', newConfigs.length);
+                                            return newConfigs;
+                                        });
+                                        
                                         // Smooth scroll to the new row for visibility
                                         setTimeout(() => {
                                             const el = document.querySelector(
@@ -3400,8 +3384,10 @@ export default function EnterpriseConfiguration() {
                                                     behavior: 'smooth',
                                                     block: 'center',
                                                 });
+                                            } else {
+                                                console.log('⚠️ Could not find element to scroll to:', newId);
                                             }
-                                        }, 50);
+                                        }, 100); // Increased timeout slightly
                                     }}
                                 />
                             </div>
@@ -3573,17 +3559,9 @@ export default function EnterpriseConfiguration() {
                                     </svg>
                                 </div>
                                 <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
-                                    <h3 className='text-base font-semibold leading-6 text-gray-900'>
-                                        Delete Enterprise Configuration
-                                    </h3>
                                     <div className='mt-2'>
-                                        <p className='text-sm text-gray-500'>
-                                            Are you sure you want to delete this
-                                            enterprise configuration? This
-                                            action cannot be undone and will
-                                            permanently remove the
-                                            enterprise-product-service linkage
-                                            from the system.
+                                        <p className='text-sm text-gray-900'>
+                                            Are you sure you want to delete this enterprise configuration?
                                         </p>
                                     </div>
                                 </div>
@@ -3619,7 +3597,7 @@ export default function EnterpriseConfiguration() {
                                             Deleting...
                                         </>
                                     ) : (
-                                        'Delete'
+                                        'Yes'
                                     )}
                                 </button>
                                 <button
@@ -3628,7 +3606,7 @@ export default function EnterpriseConfiguration() {
                                     className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
                                     onClick={handleDeleteCancel}
                                 >
-                                    Cancel
+                                    No
                                 </button>
                             </div>
                         </motion.div>

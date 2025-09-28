@@ -1089,7 +1089,7 @@ function ServicesMultiSelect({
                 )}
             </div>
 
-            {open &&
+            {open && query.trim() &&
                 dropdownPos &&
                 createPortal(
                     <div
@@ -1580,34 +1580,26 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
             
-            console.log(`Loading options for type: ${type}`);
-            
             if (type === 'product') {
-                console.log('Calling API: /api/products');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/products',
                 ) || [];
             } else if (type === 'service') {
-                console.log('Calling API: /api/services');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/services',
                 ) || [];
             } else if (type === 'template') {
-                console.log('Calling API: /api/products (for template)');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/products',
                 ) || [];
             } else {
-                console.log('Calling API: /api/enterprises');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/enterprises',
                 ) || [];
             }
             
-            console.log(`API call successful for ${type}, got ${allData.length} items:`, allData);
             setAllOptions(allData);
-        } catch (error) {
-            console.error(`API call failed for ${type}:`, error);
+        } catch (_e) {
             setAllOptions([]);
         } finally {
             setLoading(false);
@@ -1755,7 +1747,6 @@ function AsyncChipSelect({
                 }
             }
         } catch (error: any) {
-            console.error(`Failed to create ${type}:`, error);
             // Handle duplicate error from backend
             if (
                 error?.message?.includes('already exists') ||
@@ -1836,28 +1827,100 @@ function AsyncChipSelect({
                 {(!current && !value) || open ? (
                     <input
                         ref={inputRef}
-                        value={query}
+                        value={query || current || value || ''}
                         onChange={(e) => {
-                            const newValue = e.target.value;
-                            setQuery(newValue);
-                            
-                            // Always open dropdown when typing
-                            setOpen(true);
-                            
-                            // Load options if not already loaded
-                            if (allOptions.length === 0) {
-                                loadAllOptions();
+                            setQuery(e.target.value);
+                            if (e.target.value.trim()) {
+                                setOpen(true);
+                            } else {
+                                setOpen(false);
                             }
-                            
-                            // Clear current selection if user clears the input completely
-                            if (newValue === '') {
+                            if (!e.target.value.trim()) {
                                 onChange('');
                                 setCurrent('');
                             }
                         }}
                         onFocus={() => {
-                            // Don't automatically open dropdown on focus - only open when user starts typing
-                            // This prevents the unwanted list from showing in the background
+                            setQuery(current || value || '');
+                        }}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500`}
+                        placeholder={placeholder || 'Type to search...'}
+                    />
+                ) : null}
+            </div>
+            
+            {/* Dropdown - temporarily disabled for debugging */}
+            {false && open && query.trim() && (
+                <div>Dropdown placeholder</div>
+            )}
+        </div>
+    );
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
+                {/* Show selected value as chip when there's a value and not actively typing */}
+                {(current || value) && !open && (
+                    <motion.span
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border bg-blue-50 text-blue-800 border-blue-200 rounded-sm'
+                        style={{width: '100%', minWidth: '100%'}}
+                        title={current || value}
+                        onClick={(e) => {
+                            // Only open dropdown if clicking on the text, not the X button
+                            const target = e.target as HTMLElement;
+                            if (!target.closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                console.log('X button clicked'); // Debug log
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X className='h-3 w-3' />
+                        </button>
+                    </motion.span>
+                )}
+                
+                {/* Show input when no value selected or actively typing */}
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query || current || value || ''}
+                        onChange={(e) => {
+                            setQuery(e.target.value);
+                            if (e.target.value.trim()) {
+                                setOpen(true);
+                            } else {
+                                setOpen(false);
+                            }
+                            if (!e.target.value.trim()) {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            setQuery(current || value || '');
+                            // Don't automatically open dropdown on focus
                         }}
                         onKeyDown={async (e) => {
                             // Helper function to navigate to next field
@@ -2006,202 +2069,19 @@ function AsyncChipSelect({
                 ) : null}
             </div>
             
-            {/* Full Autocomplete Dropdown */}
-            {open && (
-                <div className='absolute top-full left-0 right-0 z-[99999] mt-1'>
-                    <div 
-                        ref={dropdownRef}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl backdrop-blur-sm max-h-[300px] overflow-y-auto overflow-x-hidden w-full'
-                    >
-                        <div className='py-2'>
+            {/* Dropdown - temporarily simplified */}
+            {open && query.trim() && (
+                <div className='absolute top-full left-0 right-0 z-[9999] mt-1'>
+                    <div className='rounded-xl border border-slate-200 bg-white shadow-2xl backdrop-blur-sm max-h-[200px] overflow-y-auto overflow-x-hidden w-full'>
+                        <div className='py-1'>
                             {loading ? (
-                                <div className='px-3 py-2 text-slate-500 flex items-center gap-2'>
-                                    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
-                                    Loading options...
+                                <div className='px-3 py-2 text-slate-500'>
+                                    Loading…
                                 </div>
                             ) : (
-                                (() => {
-                                    // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim() 
-                                        ? options.filter(opt => 
-                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
-                                            opt.name.toLowerCase().includes(query.toLowerCase())
-                                        ).sort((a, b) => {
-                                            const aLower = a.name.toLowerCase();
-                                            const bLower = b.name.toLowerCase();
-                                            const queryLower = query.toLowerCase();
-                                            
-                                            // Prioritize starts with matches
-                                            const aStartsWith = aLower.startsWith(queryLower);
-                                            const bStartsWith = bLower.startsWith(queryLower);
-                                            
-                                            if (aStartsWith && !bStartsWith) return -1;
-                                            if (bStartsWith && !aStartsWith) return 1;
-                                            
-                                            return aLower.localeCompare(bLower);
-                                        })
-                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-                                    
-                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
-                                    
-                                    // Check if query exactly matches an existing option
-                                    const exactMatch = query.trim() ? options.find(opt => 
-                                        opt.name.toLowerCase() === query.toLowerCase().trim()
-                                    ) : null;
-                                    
-                                    const showCreateNew = query.trim() && !exactMatch;
-
-                                    return (
-                                        <div className='space-y-1'>
-                                            {/* Show existing matching options */}
-                                            {filteredOptions.length > 0 && (
-                                                <div className='space-y-1 px-2'>
-                                                    {filteredOptions.map((opt, idx) => (
-                                                        <motion.button
-                                                            key={opt.id}
-                                                            initial={{ opacity: 0, y: -2 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: idx * 0.03 }}
-                                                            onClick={() => {
-                                                                onChange(opt.name);
-                                                                setCurrent(opt.name);
-                                                                setQuery('');
-                                                                setOpen(false);
-                                                            }}
-                                                            className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-150 group'
-                                                        >
-                                                            <div className='flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 transition-colors'>
-                                                                {type === 'enterprise' ? (
-                                                                    <Building2 className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                ) : type === 'product' ? (
-                                                                    <Package className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                ) : (
-                                                                    <Globe className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                )}
-                                                            </div>
-                                                            <div className='flex-1'>
-                                                                <span className='text-sm font-medium text-slate-900 group-hover:text-blue-900'>
-                                                                    {opt.name}
-                                                                </span>
-                                                                <div className='text-xs text-slate-500 group-hover:text-blue-600'>
-                                                                    Select existing {type}
-                                                                </div>
-                                                            </div>
-                                                            <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
-                                                                <div className='w-2 h-2 rounded-full bg-blue-500'></div>
-                                                            </div>
-                                                        </motion.button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            
-                                            {/* Show separator if both existing options and create new option exist */}
-                                            {filteredOptions.length > 0 && showCreateNew && (
-                                                <div className='px-4 py-1'>
-                                                    <div className='h-px bg-slate-200'></div>
-                                                </div>
-                                            )}
-                                            
-                                            {/* Show "Create New" option */}
-                                            {showCreateNew && (
-                                                <div className='px-2'>
-                                                    <motion.button
-                                                        initial={{ opacity: 0, scale: 0.98 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
-                                                        onClick={async () => {
-                                                            try {
-                                                                let created: { id: string; name: string; } | null = null;
-                                                                
-                                                                if (type === 'enterprise') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/enterprises', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'product') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/products', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'service') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/services', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                }
-                                                                
-                                                                if (created) {
-                                                                    // Update options list
-                                                                    setOptions((prev) => [...prev, created!]);
-                                                                    setAllOptions((prev) => [...prev, created!]);
-                                                                    
-                                                                    // Set the new value
-                                                                    onChange(created.name);
-                                                                    setCurrent(created.name);
-                                                                    setQuery('');
-                                                                    setOpen(false);
-                                                                    
-                                                                    // Notify parent component
-                                                                    if (onNewItemCreated) {
-                                                                        const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
-                                                                        onNewItemCreated(dropdownType, created);
-                                                                    }
-                                                                }
-                                                            } catch (error) {
-                                                                console.log(`API creation failed for ${type}, creating local entry`);
-                                                                
-                                                                // Fallback: create a local entry when API fails
-                                                                const newId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                                                                const created = { id: newId, name: query.trim() };
-                                                                
-                                                                // Update options list
-                                                                setOptions((prev) => [...prev, created]);
-                                                                setAllOptions((prev) => [...prev, created]);
-                                                                
-                                                                // Set the new value
-                                                                onChange(created.name);
-                                                                setCurrent(created.name);
-                                                                setQuery('');
-                                                                setOpen(false);
-                                                                
-                                                                // Notify parent component
-                                                                if (onNewItemCreated) {
-                                                                    const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
-                                                                    onNewItemCreated(dropdownType, created);
-                                                                }
-                                                            }
-                                                        }}
-                                                        className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 transition-all duration-150 group'
-                                                    >
-                                                        <div className='flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 group-hover:bg-blue-600 transition-colors shadow-sm'>
-                                                            <Plus className='h-4 w-4 text-white' />
-                                                        </div>
-                                                        <div className='flex-1'>
-                                                            <span className='text-sm font-medium text-blue-700 group-hover:text-blue-800'>
-                                                                Create &quot;{query.trim()}&quot;
-                                                            </span>
-                                                            <div className='text-xs text-blue-600 group-hover:text-blue-700'>
-                                                                Add new {type} to database
-                                                            </div>
-                                                        </div>
-                                                        <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
-                                                            <div className='px-2 py-1 bg-blue-100 rounded-full'>
-                                                                <span className='text-xs font-medium text-blue-700'>New</span>
-                                                            </div>
-                                                        </div>
-                                                    </motion.button>
-                                                </div>
-                                            )}
-                                            
-                                            {/* Show "No results" message */}
-                                            {filteredOptions.length === 0 && !showCreateNew && (
-                                                <div className='px-4 py-6 text-center text-slate-500'>
-                                                    {query.trim() ? (
-                                                        <div className='text-sm'>No {type}s found matching &quot;{query}&quot;</div>
-                                                    ) : (
-                                                        <div className='text-sm'>No {type}s available</div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })()
+                                <div className='px-3 py-2 text-slate-500 text-center'>
+                                    Dropdown temporarily disabled for debugging
+                                </div>
                             )}
                         </div>
                     </div>
@@ -2668,6 +2548,7 @@ function SortableEnterpriseConfigRow({
                                 className='text-[12px]'
                                 placeholder='Enter Enterprise'
                                 dataAttr={`${row.id}-enterprise`}
+                                {...createTabNavigation('enterprise')}
                             />
                         )}
                     </div>
@@ -2707,6 +2588,7 @@ function SortableEnterpriseConfigRow({
                             className='text-[12px]'
                             dataAttr={`product-${row.id}`}
                             placeholder='Enter Product'
+                            {...createTabNavigation('product')}
                         />
                     )}
                 </div>
@@ -3422,7 +3304,7 @@ export default function EnterpriseConfigTable({
                     ) : (
                         <div className='space-y-4'>
                             {Object.entries(groupedItems).map(([groupName, groupRows]) => (
-                                <div key={groupName} className='border border-slate-200 rounded-lg overflow-x-hidden'>
+                                <div key={groupName} className='border border-slate-200 rounded-lg overflow-hidden'>
                                     {/* Group Header */}
                                     <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
                                         <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
@@ -3492,7 +3374,7 @@ export default function EnterpriseConfigTable({
                 {/* Add new row section - styled exactly like data rows */}
                 {onQuickAddRow && (
                     <div 
-                        className={`w-full grid items-center gap-0 rounded-md border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${
+                        className={`w-full grid items-center gap-0 rounded-md overflow-hidden border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${
                             displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
                         }`}
                         style={{

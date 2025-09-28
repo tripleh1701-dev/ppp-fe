@@ -68,6 +68,21 @@
     }
 }
 
+/* Wave progress animation for Save button */
+@keyframes wave {
+    0% {
+        transform: translateX(-100%) skewX(-15deg);
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(200%) skewX(-15deg);
+        opacity: 0.6;
+    }
+}
+
 /* Crease effect for folding */
 @keyframes creaseEffect {
     0% {
