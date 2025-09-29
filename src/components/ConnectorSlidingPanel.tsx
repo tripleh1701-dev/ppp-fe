@@ -1103,780 +1103,798 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
         <>
             <style dangerouslySetInnerHTML={{__html: animationStyles}} />
             <div
-                className={`relative h-full flex transition-all duration-300 ease-in-out shadow-lg cursor-pointer overflow-hidden ${
-                    isHovered
-                        ? 'w-[480px]' // Expanded width (bar + categories + connectors)
+                className={`relative h-full flex transition-all duration-300 ease-in-out shadow-lg overflow-hidden ${
+                    isPanelExpanded
+                        ? 'w-[380px]' // Blue bar (48px) + Expanded content (332px) - Reduced width
                         : 'w-12' // Just the blue bar
                 }`}
-                style={{
-                    background:
-                        'linear-gradient(180deg, #0171EC 0%, #005fca 100%)',
-                }}
-                onMouseEnter={() => {
-                    setIsHovered(true);
-                    if (!selectedCategory) {
-                        setSelectedCategory(null); // This will show "All Connectors" by default
-                    }
-                }}
-                onMouseLeave={() => {
-                    setIsHovered(false);
-                    setIsPanelExpanded(false);
-                    setSelectedCategory(null);
-                }}
+                style={{}}
             >
                 {/* Blue Bar Section (always visible) */}
-                <div className='w-12 h-full flex items-center justify-center group'>
-                    {!isHovered && (
-                        <div className='text-white text-sm font-semibold transform -rotate-90 whitespace-nowrap flex items-center gap-1 group-hover:scale-105 transition-transform duration-200'>
+                <div
+                    className='w-12 h-full flex flex-col items-center py-2 flex-shrink-0'
+                    style={{
+                        backgroundColor: '#0a1a2f',
+                        backgroundImage: 'url(/images/logos/sidebar.png)',
+                        backgroundSize: 'contain',
+                        backgroundPosition: 'center bottom',
+                        backgroundRepeat: 'no-repeat',
+                    }}
+                >
+                    {/* Show All Button */}
+                    <div
+                        className='w-8 h-8 mb-3 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                        onClick={() => handleCategoryClick('showAll')}
+                    >
+                        <div className='group-hover:drop-shadow-lg'>
                             <svg
-                                className='w-4 h-4 transform rotate-90'
-                                fill='currentColor'
+                                className='w-6 h-6'
+                                fill='none'
+                                stroke='currentColor'
                                 viewBox='0 0 24 24'
                             >
-                                <defs>
-                                    <linearGradient
-                                        id='connectorGradient'
-                                        x1='0%'
-                                        y1='0%'
-                                        x2='100%'
-                                        y2='100%'
-                                    >
-                                        <stop
-                                            offset='0%'
-                                            stopColor='currentColor'
-                                            stopOpacity='0.8'
-                                        />
-                                        <stop
-                                            offset='100%'
-                                            stopColor='currentColor'
-                                            stopOpacity='0.4'
-                                        />
-                                    </linearGradient>
-                                </defs>
-                                <rect
-                                    x='7'
-                                    y='6'
-                                    width='10'
-                                    height='12'
-                                    rx='2'
-                                    fill='url(#connectorGradient)'
-                                    stroke='currentColor'
-                                    strokeWidth='1'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.8;1;0.8'
-                                        dur='3s'
-                                        repeatCount='indefinite'
-                                    />
-                                </rect>
-                                <circle
-                                    cx='9'
-                                    cy='9'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.2s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='9'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.5s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='9'
-                                    cy='12'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.8s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='12'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='2.1s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='9'
-                                    cy='15'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.7s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='15'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.3s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
                                 <path
-                                    d='M2 12H7M17 12H22'
-                                    stroke='currentColor'
-                                    strokeWidth='2.5'
                                     strokeLinecap='round'
-                                >
-                                    <animate
-                                        attributeName='stroke-dasharray'
-                                        values='0 10;5 5;10 0;5 5;0 10'
-                                        dur='4s'
-                                        repeatCount='indefinite'
-                                    />
-                                    <animate
-                                        attributeName='opacity'
-                                        values='0.6;1;0.6'
-                                        dur='2s'
-                                        repeatCount='indefinite'
-                                    />
-                                </path>
-                                <circle
-                                    cx='3'
-                                    cy='12'
-                                    r='1'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='r'
-                                        values='1;2;1'
-                                        dur='2s'
-                                        repeatCount='indefinite'
-                                    />
-                                    <animate
-                                        attributeName='opacity'
-                                        values='0.7;1;0.7'
-                                        dur='2s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='21'
-                                    cy='12'
-                                    r='1'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='r'
-                                        values='1;2;1'
-                                        dur='2.5s'
-                                        repeatCount='indefinite'
-                                    />
-                                    <animate
-                                        attributeName='opacity'
-                                        values='0.7;1;0.7'
-                                        dur='2.5s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M4 6h16M4 10h16M4 14h16M4 18h16'
+                                />
                             </svg>
-                            Connectors
                         </div>
-                    )}
-                </div>
-
-                {/* Categories Section (visible on hover) */}
-                <div
-                    className={`flex-shrink-0 text-white p-2 flex flex-col justify-start pt-4 transition-all duration-300 ${
-                        isHovered ? 'w-[160px] opacity-100' : 'w-0 opacity-0'
-                    }`}
-                >
-                    <div className='space-y-2'>
-                        <div className='text-center mb-3'>
-                            <h3 className='text-base font-semibold text-white flex items-center justify-center gap-2'>
-                                <svg
-                                    className='w-4 h-4'
-                                    fill='currentColor'
-                                    viewBox='0 0 24 24'
-                                >
-                                    <defs>
-                                        <linearGradient
-                                            id='connectorGradient2'
-                                            x1='0%'
-                                            y1='0%'
-                                            x2='100%'
-                                            y2='100%'
-                                        >
-                                            <stop
-                                                offset='0%'
-                                                stopColor='currentColor'
-                                                stopOpacity='0.8'
-                                            />
-                                            <stop
-                                                offset='100%'
-                                                stopColor='currentColor'
-                                                stopOpacity='0.4'
-                                            />
-                                        </linearGradient>
-                                    </defs>
-                                    <rect
-                                        x='7'
-                                        y='6'
-                                        width='10'
-                                        height='12'
-                                        rx='2'
-                                        fill='url(#connectorGradient2)'
-                                        stroke='currentColor'
-                                        strokeWidth='1'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.8;1;0.8'
-                                            dur='3s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </rect>
-                                    <circle
-                                        cx='9'
-                                        cy='9'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='1.2s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <circle
-                                        cx='15'
-                                        cy='9'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='1.5s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <circle
-                                        cx='9'
-                                        cy='12'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='1.8s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <circle
-                                        cx='15'
-                                        cy='12'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='2.1s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <circle
-                                        cx='9'
-                                        cy='15'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='1.7s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <circle
-                                        cx='15'
-                                        cy='15'
-                                        r='1.5'
-                                        fill='currentColor'
-                                    >
-                                        <animate
-                                            attributeName='fill-opacity'
-                                            values='0.5;1;0.5'
-                                            dur='1.3s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </circle>
-                                    <path
-                                        d='M2 12H7M17 12H22'
-                                        stroke='currentColor'
-                                        strokeWidth='2.5'
-                                        strokeLinecap='round'
-                                    >
-                                        <animate
-                                            attributeName='stroke-dasharray'
-                                            values='0 10;5 5;10 0;5 5;0 10'
-                                            dur='4s'
-                                            repeatCount='indefinite'
-                                        />
-                                        <animate
-                                            attributeName='opacity'
-                                            values='0.6;1;0.6'
-                                            dur='2s'
-                                            repeatCount='indefinite'
-                                        />
-                                    </path>
-                                </svg>
-                                Connectors
-                            </h3>
+                        {/* Sliding Tooltip */}
+                        <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                            Show All Connectors
                         </div>
+                    </div>
 
+                    {/* First Separator */}
+                    <div className='w-8 h-px bg-white/30 mb-3'></div>
+
+                    {/* Category Icons Stack */}
+                    <div className='flex flex-col space-y-3 mb-3 relative'>
+                        {/* Small click indicator */}
+                        <div className='absolute -left-1 top-0 w-0.5 h-full bg-white/20 rounded-full'></div>
+                        {/* Node */}
                         <div
-                            onClick={() => handleCategoryClick('showAll')}
-                            className='flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-white/20 hover:backdrop-blur-sm hover:shadow-lg hover:transform hover:scale-[1.02] transition-all duration-200 group'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('node')}
                         >
-                            <div className='flex items-center space-x-2'>
-                                <span className='text-lg'>☰</span>
-                                <span className='text-sm font-medium'>
-                                    Show All
-                                </span>
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.node
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
                             </div>
-                            <span className='bg-primary-700 text-xs px-2 py-1 rounded-full'>
-                                {getAllConnectors().length}
-                            </span>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Node
+                            </div>
                         </div>
 
-                        <div className='border-t border-primary-800 my-2'></div>
+                        {/* Plan */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('plan')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.plan
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Plan
+                            </div>
+                        </div>
 
-                        {Object.entries(CONNECTOR_CATEGORIES)
-                            .filter(([key]) => key !== 'showAll')
-                            .map(([key, category]) => (
-                                <div
-                                    key={key}
-                                    onClick={() => handleCategoryClick(key)}
-                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-300 ease-out group ${
-                                        selectedCategory === key
-                                            ? 'bg-white/40 backdrop-blur-sm shadow-xl transform scale-105 border-2 border-white/50 ring-2 ring-white/20'
-                                            : 'hover:bg-white/25 hover:backdrop-blur-sm hover:shadow-xl hover:transform hover:scale-105 hover:border-2 hover:border-white/30 hover:-translate-y-1'
-                                    }`}
+                        {/* Code */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('code')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.code
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Code
+                            </div>
+                        </div>
+
+                        {/* Build */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('build')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.build
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Build
+                            </div>
+                        </div>
+
+                        {/* Test */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('test')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.test
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Test
+                            </div>
+                        </div>
+
+                        {/* Deploy */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('deploy')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.deploy
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Deploy
+                            </div>
+                        </div>
+
+                        {/* Approval */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('approval')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.approval
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Approval
+                            </div>
+                        </div>
+
+                        {/* Release */}
+                        <div
+                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            onClick={() => handleCategoryClick('release')}
+                        >
+                            <div className='group-hover:drop-shadow-lg'>
+                                {React.cloneElement(
+                                    CONNECTOR_CATEGORIES.release
+                                        .icon as React.ReactElement,
+                                    {
+                                        className: 'w-6 h-6',
+                                        style: {
+                                            width: '24px',
+                                            height: '24px',
+                                        },
+                                    },
+                                )}
+                            </div>
+                            {/* Sliding Tooltip */}
+                            <div className='absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300 pointer-events-none z-50'>
+                                Release
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Second Separator */}
+                    <div className='w-8 h-px bg-white/30 mb-auto'></div>
+
+                    {/* Connector Name (Vertically Aligned) */}
+                    <div className='text-white/90 text-xs font-medium transform -rotate-90 whitespace-nowrap flex items-center gap-1 group-hover:scale-105 transition-transform duration-200 mb-4'>
+                        <svg
+                            className='w-3 h-3 transform rotate-90'
+                            fill='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <defs>
+                                <linearGradient
+                                    id='connectorGradient'
+                                    x1='0%'
+                                    y1='0%'
+                                    x2='100%'
+                                    y2='100%'
                                 >
-                                    <div className='flex items-center space-x-2'>
-                                        <span className='text-lg'>
-                                            {category.icon}
-                                        </span>
-                                        <span className='text-sm font-medium'>
-                                            {category.name}
-                                        </span>
-                                    </div>
-                                    <span className='bg-white/25 text-xs px-3 py-1 rounded-full font-bold group-hover:bg-white/40 group-hover:scale-125 group-hover:rotate-12 transition-all duration-300 shadow-md group-hover:shadow-lg'>
-                                        {category.connectors.length}
-                                    </span>
-                                </div>
-                            ))}
+                                    <stop
+                                        offset='0%'
+                                        stopColor='currentColor'
+                                        stopOpacity='0.8'
+                                    />
+                                    <stop
+                                        offset='100%'
+                                        stopColor='currentColor'
+                                        stopOpacity='0.4'
+                                    />
+                                </linearGradient>
+                            </defs>
+                            <rect
+                                x='7'
+                                y='6'
+                                width='10'
+                                height='12'
+                                rx='2'
+                                fill='url(#connectorGradient)'
+                                stroke='currentColor'
+                                strokeWidth='1'
+                            >
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.8;1;0.8'
+                                    dur='3s'
+                                    repeatCount='indefinite'
+                                />
+                            </rect>
+                            <circle cx='9' cy='9' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='1.2s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='15' cy='9' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='1.5s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='9' cy='12' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='1.8s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='15' cy='12' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='2.1s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='9' cy='15' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='1.7s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='15' cy='15' r='1.5' fill='currentColor'>
+                                <animate
+                                    attributeName='fill-opacity'
+                                    values='0.5;1;0.5'
+                                    dur='1.3s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <path
+                                d='M2 12H7M17 12H22'
+                                stroke='currentColor'
+                                strokeWidth='2.5'
+                                strokeLinecap='round'
+                            >
+                                <animate
+                                    attributeName='stroke-dasharray'
+                                    values='0 10;5 5;10 0;5 5;0 10'
+                                    dur='4s'
+                                    repeatCount='indefinite'
+                                />
+                                <animate
+                                    attributeName='opacity'
+                                    values='0.6;1;0.6'
+                                    dur='2s'
+                                    repeatCount='indefinite'
+                                />
+                            </path>
+                            <circle cx='3' cy='12' r='1' fill='currentColor'>
+                                <animate
+                                    attributeName='r'
+                                    values='1;2;1'
+                                    dur='2s'
+                                    repeatCount='indefinite'
+                                />
+                                <animate
+                                    attributeName='opacity'
+                                    values='0.7;1;0.7'
+                                    dur='2s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                            <circle cx='21' cy='12' r='1' fill='currentColor'>
+                                <animate
+                                    attributeName='r'
+                                    values='1;2;1'
+                                    dur='2.5s'
+                                    repeatCount='indefinite'
+                                />
+                                <animate
+                                    attributeName='opacity'
+                                    values='0.7;1;0.7'
+                                    dur='2.5s'
+                                    repeatCount='indefinite'
+                                />
+                            </circle>
+                        </svg>
+                        Connectors
                     </div>
                 </div>
 
-                {/* White Section - Connectors (visible on hover) */}
-                <div
-                    className={`bg-white shadow-lg flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${
-                        isHovered ? 'w-[320px] opacity-100' : 'w-0 opacity-0'
-                    }`}
-                >
-                    <div className='p-3 h-full flex flex-col'>
-                        <h4 className='text-base font-semibold text-gray-800 mb-3 flex items-center gap-2'>
-                            <svg
-                                className='w-4 h-4 text-primary-600'
-                                fill='currentColor'
-                                viewBox='0 0 24 24'
-                            >
-                                <defs>
-                                    <linearGradient
-                                        id='connectorGradient3'
-                                        x1='0%'
-                                        y1='0%'
-                                        x2='100%'
-                                        y2='100%'
-                                    >
-                                        <stop
-                                            offset='0%'
-                                            stopColor='currentColor'
-                                            stopOpacity='0.8'
-                                        />
-                                        <stop
-                                            offset='100%'
-                                            stopColor='currentColor'
-                                            stopOpacity='0.4'
-                                        />
-                                    </linearGradient>
-                                </defs>
-                                <rect
-                                    x='7'
-                                    y='6'
-                                    width='10'
-                                    height='12'
-                                    rx='2'
-                                    fill='url(#connectorGradient3)'
-                                    stroke='currentColor'
-                                    strokeWidth='1'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.8;1;0.8'
-                                        dur='3s'
-                                        repeatCount='indefinite'
-                                    />
-                                </rect>
-                                <circle
-                                    cx='9'
-                                    cy='9'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.2s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='9'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.5s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='9'
-                                    cy='12'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.8s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='12'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='2.1s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='9'
-                                    cy='15'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.7s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <circle
-                                    cx='15'
-                                    cy='15'
-                                    r='1.5'
-                                    fill='currentColor'
-                                >
-                                    <animate
-                                        attributeName='fill-opacity'
-                                        values='0.5;1;0.5'
-                                        dur='1.3s'
-                                        repeatCount='indefinite'
-                                    />
-                                </circle>
-                                <path
-                                    d='M2 12H7M17 12H22'
-                                    stroke='currentColor'
-                                    strokeWidth='2.5'
-                                    strokeLinecap='round'
-                                >
-                                    <animate
-                                        attributeName='stroke-dasharray'
-                                        values='0 10;5 5;10 0;5 5;0 10'
-                                        dur='4s'
-                                        repeatCount='indefinite'
-                                    />
-                                    <animate
-                                        attributeName='opacity'
-                                        values='0.6;1;0.6'
-                                        dur='2s'
-                                        repeatCount='indefinite'
-                                    />
-                                </path>
-                            </svg>
-                            {selectedCategory && selectedCategory !== 'showAll'
-                                ? CONNECTOR_CATEGORIES[
-                                      selectedCategory as keyof typeof CONNECTOR_CATEGORIES
-                                  ]?.name + ' Connectors'
-                                : 'Connectors'}
-                        </h4>
-
-                        {/* Search Bar (only for Show All) */}
-                        {isShowingAll && (
-                            <div className='relative mb-3'>
-                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                {/* White Section - Connectors (visible when expanded) */}
+                {isPanelExpanded && (
+                    <div className='bg-white shadow-lg w-full flex flex-col h-full'>
+                        <div className='p-3 h-full flex flex-col'>
+                            {/* Header with Close Button */}
+                            <div className='flex items-center justify-between mb-3'>
+                                <h4 className='text-base font-semibold text-gray-800 flex items-center gap-2'>
                                     <svg
-                                        className='h-4 w-4 text-gray-400'
-                                        fill='none'
+                                        className='w-4 h-4 text-primary-600'
+                                        fill='currentColor'
                                         viewBox='0 0 24 24'
+                                    >
+                                        <defs>
+                                            <linearGradient
+                                                id='connectorGradient3'
+                                                x1='0%'
+                                                y1='0%'
+                                                x2='100%'
+                                                y2='100%'
+                                            >
+                                                <stop
+                                                    offset='0%'
+                                                    stopColor='currentColor'
+                                                    stopOpacity='0.8'
+                                                />
+                                                <stop
+                                                    offset='100%'
+                                                    stopColor='currentColor'
+                                                    stopOpacity='0.4'
+                                                />
+                                            </linearGradient>
+                                        </defs>
+                                        <rect
+                                            x='7'
+                                            y='6'
+                                            width='10'
+                                            height='12'
+                                            rx='2'
+                                            fill='url(#connectorGradient3)'
+                                            stroke='currentColor'
+                                            strokeWidth='1'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.8;1;0.8'
+                                                dur='3s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </rect>
+                                        <circle
+                                            cx='9'
+                                            cy='9'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='1.2s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <circle
+                                            cx='15'
+                                            cy='9'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='1.5s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <circle
+                                            cx='9'
+                                            cy='12'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='1.8s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <circle
+                                            cx='15'
+                                            cy='12'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='2.1s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <circle
+                                            cx='9'
+                                            cy='15'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='1.7s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <circle
+                                            cx='15'
+                                            cy='15'
+                                            r='1.5'
+                                            fill='currentColor'
+                                        >
+                                            <animate
+                                                attributeName='fill-opacity'
+                                                values='0.5;1;0.5'
+                                                dur='1.3s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </circle>
+                                        <path
+                                            d='M2 12H7M17 12H22'
+                                            stroke='currentColor'
+                                            strokeWidth='2.5'
+                                            strokeLinecap='round'
+                                        >
+                                            <animate
+                                                attributeName='stroke-dasharray'
+                                                values='0 10;5 5;10 0;5 5;0 10'
+                                                dur='4s'
+                                                repeatCount='indefinite'
+                                            />
+                                            <animate
+                                                attributeName='opacity'
+                                                values='0.6;1;0.6'
+                                                dur='2s'
+                                                repeatCount='indefinite'
+                                            />
+                                        </path>
+                                    </svg>
+                                    {selectedCategory &&
+                                    selectedCategory !== 'showAll'
+                                        ? CONNECTOR_CATEGORIES[
+                                              selectedCategory as keyof typeof CONNECTOR_CATEGORIES
+                                          ]?.name + ' Connectors'
+                                        : 'Connectors'}
+                                </h4>
+
+                                {/* Close Button */}
+                                <button
+                                    onClick={() => setIsPanelExpanded(false)}
+                                    className='p-1 hover:bg-gray-100 rounded transition-colors duration-200 flex items-center justify-center'
+                                    title='Close'
+                                >
+                                    <svg
+                                        className='w-5 h-5 text-gray-500 hover:text-gray-700'
+                                        fill='none'
                                         stroke='currentColor'
+                                        viewBox='0 0 24 24'
                                     >
                                         <path
                                             strokeLinecap='round'
                                             strokeLinejoin='round'
                                             strokeWidth={2}
-                                            d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                            d='M6 18L18 6M6 6l12 12'
                                         />
                                     </svg>
-                                </div>
-                                <input
-                                    type='text'
-                                    placeholder='Search connectors...'
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-sm'
-                                />
-                                {searchQuery && (
-                                    <div className='absolute inset-y-0 right-0 pr-3 flex items-center'>
-                                        <button
-                                            type='button'
-                                            onClick={() => setSearchQuery('')}
-                                            className='h-4 w-4 text-gray-400 hover:text-gray-600'
-                                        >
-                                            <svg
-                                                fill='none'
-                                                viewBox='0 0 24 24'
-                                                stroke='currentColor'
-                                            >
-                                                <path
-                                                    strokeLinecap='round'
-                                                    strokeLinejoin='round'
-                                                    strokeWidth={2}
-                                                    d='M6 18L18 6M6 6l12 12'
-                                                />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                )}
+                                </button>
                             </div>
-                        )}
 
-                        <div className='flex-1 overflow-y-auto'>
-                            {isShowingAll ? (
-                                // Show All: Display with category separators
-                                Object.entries(CONNECTOR_CATEGORIES)
-                                    .filter(([key]) => key !== 'showAll')
-                                    .map(([key, category]) => {
-                                        // Filter connectors by search query (case insensitive)
-                                        const filteredConnectors =
-                                            searchQuery.trim()
-                                                ? category.connectors.filter(
-                                                      (connector) =>
-                                                          connector.name
-                                                              .toLowerCase()
-                                                              .includes(
-                                                                  searchQuery.toLowerCase(),
-                                                              ),
-                                                  )
-                                                : category.connectors;
-
-                                        // Only show category if it has connectors after filtering
-                                        if (filteredConnectors.length === 0)
-                                            return null;
-
-                                        return (
-                                            <div key={key} className='mb-6'>
-                                                <h5 className='text-sm font-semibold text-gray-700 mb-3 border-b border-gray-200 pb-2'>
-                                                    {category.name} (
-                                                    {filteredConnectors.length})
-                                                </h5>
-                                                <div className='grid grid-cols-3 gap-2'>
-                                                    {filteredConnectors.map(
-                                                        (connector, index) => (
-                                                            <div
-                                                                key={
-                                                                    connector.id
-                                                                }
-                                                                draggable
-                                                                onDragStart={(
-                                                                    e,
-                                                                ) =>
-                                                                    onDragStart(
-                                                                        e,
-                                                                        connector.type,
-                                                                    )
-                                                                }
-                                                                onClick={() =>
-                                                                    onConnectorSelect(
-                                                                        connector.type,
-                                                                    )
-                                                                }
-                                                                className='connector-card connector-fade-in flex flex-col items-center p-3 border-2 border-gray-200 rounded-xl cursor-move bg-white hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
-                                                            >
-                                                                <div className='icon-float w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center mb-2 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ease-out shadow-md group-hover:shadow-lg'>
-                                                                    {connector.icon ? (
-                                                                        <div className='w-7 h-7 flex items-center justify-center'>
-                                                                            {
-                                                                                connector.icon
-                                                                            }
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className='text-primary-600 text-xs'>
-                                                                            {
-                                                                                category.icon
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <span className='text-xs text-gray-800 text-center font-semibold leading-tight group-hover:text-blue-800 group-hover:scale-105 transition-all duration-300 ease-out'>
-                                                                    {
-                                                                        connector.name
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                            ) : (
-                                // Category view: Display as grid
-                                <div className='grid grid-cols-2 gap-3'>
-                                    {getDisplayedConnectors().map(
-                                        (connector, index) => (
-                                            <div
-                                                key={connector.id}
-                                                draggable
-                                                onDragStart={(e) =>
-                                                    onDragStart(
-                                                        e,
-                                                        connector.type,
-                                                    )
-                                                }
-                                                onClick={() =>
-                                                    onConnectorSelect(
-                                                        connector.type,
-                                                    )
-                                                }
-                                                className='category-card connector-slide-up flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl cursor-move bg-gradient-to-br from-white to-gray-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
-                                            >
-                                                <div className='connector-pulse w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 ease-out shadow-lg group-hover:shadow-2xl'>
-                                                    {connector.icon ? (
-                                                        <div className='w-7 h-7 flex items-center justify-center'>
-                                                            {connector.icon}
-                                                        </div>
-                                                    ) : (
-                                                        <span className='text-primary-600 text-sm'>
-                                                            {
-                                                                CONNECTOR_CATEGORIES[
-                                                                    Object.keys(
-                                                                        CONNECTOR_CATEGORIES,
-                                                                    ).find(
-                                                                        (key) =>
-                                                                            CONNECTOR_CATEGORIES[
-                                                                                key as keyof typeof CONNECTOR_CATEGORIES
-                                                                            ].connectors.some(
-                                                                                (
-                                                                                    c,
-                                                                                ) =>
-                                                                                    c.id ===
-                                                                                    connector.id,
-                                                                            ),
-                                                                    ) as keyof typeof CONNECTOR_CATEGORIES
-                                                                ]?.icon
-                                                            }
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <span className='text-sm text-gray-800 text-center font-bold group-hover:text-blue-800 group-hover:scale-110 group-hover:tracking-wider transition-all duration-300 ease-out'>
-                                                    {connector.name}
-                                                </span>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            )}
-
-                            {getDisplayedConnectors().length === 0 && (
-                                <div className='text-center text-gray-500 py-8'>
-                                    <span>
-                                        {searchQuery.trim()
-                                            ? `No connectors found for "${searchQuery}"`
-                                            : 'No connectors available'}
-                                    </span>
-                                    {searchQuery.trim() && (
-                                        <div className='mt-2'>
+                            {/* Search Bar (for all categories) */}
+                            {isPanelExpanded && (
+                                <div className='relative mb-3'>
+                                    <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                        <svg
+                                            className='h-4 w-4 text-gray-400'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                            stroke='currentColor'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                            />
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type='text'
+                                        placeholder='Search connectors...'
+                                        value={searchQuery}
+                                        onChange={(e) =>
+                                            setSearchQuery(e.target.value)
+                                        }
+                                        className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-sm'
+                                    />
+                                    {searchQuery && (
+                                        <div className='absolute inset-y-0 right-0 pr-3 flex items-center'>
                                             <button
+                                                type='button'
                                                 onClick={() =>
                                                     setSearchQuery('')
                                                 }
-                                                className='text-primary-600 hover:text-primary-800 text-sm underline'
+                                                className='h-4 w-4 text-gray-400 hover:text-gray-600'
                                             >
-                                                Clear search
+                                                <svg
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M6 18L18 6M6 6l12 12'
+                                                    />
+                                                </svg>
                                             </button>
                                         </div>
                                     )}
                                 </div>
                             )}
+
+                            <div className='flex-1 overflow-y-auto'>
+                                {isShowingAll ? (
+                                    // Show All: Display with category separators
+                                    Object.entries(CONNECTOR_CATEGORIES)
+                                        .filter(([key]) => key !== 'showAll')
+                                        .map(([key, category]) => {
+                                            // Filter connectors by search query (case insensitive)
+                                            const filteredConnectors =
+                                                searchQuery.trim()
+                                                    ? category.connectors.filter(
+                                                          (connector) =>
+                                                              connector.name
+                                                                  .toLowerCase()
+                                                                  .includes(
+                                                                      searchQuery.toLowerCase(),
+                                                                  ),
+                                                      )
+                                                    : category.connectors;
+
+                                            // Only show category if it has connectors after filtering
+                                            if (filteredConnectors.length === 0)
+                                                return null;
+
+                                            return (
+                                                <div key={key} className='mb-6'>
+                                                    <h5 className='text-sm font-semibold text-gray-700 mb-3 border-b border-gray-200 pb-2'>
+                                                        {category.name} (
+                                                        {
+                                                            filteredConnectors.length
+                                                        }
+                                                        )
+                                                    </h5>
+                                                    <div className='grid grid-cols-3 gap-2'>
+                                                        {filteredConnectors.map(
+                                                            (
+                                                                connector,
+                                                                index,
+                                                            ) => (
+                                                                <div
+                                                                    key={
+                                                                        connector.id
+                                                                    }
+                                                                    draggable
+                                                                    onDragStart={(
+                                                                        e,
+                                                                    ) =>
+                                                                        onDragStart(
+                                                                            e,
+                                                                            connector.type,
+                                                                        )
+                                                                    }
+                                                                    onClick={() =>
+                                                                        onConnectorSelect(
+                                                                            connector.type,
+                                                                        )
+                                                                    }
+                                                                    className='connector-card connector-fade-in flex flex-col items-center p-3 border-2 border-gray-200 rounded-xl cursor-move bg-white hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
+                                                                >
+                                                                    <div className='icon-float w-14 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center mb-2 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ease-out shadow-md group-hover:shadow-lg'>
+                                                                        {connector.icon ? (
+                                                                            <div className='w-10 h-10 flex items-center justify-center'>
+                                                                                {
+                                                                                    connector.icon
+                                                                                }
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className='text-primary-600 text-xs'>
+                                                                                {
+                                                                                    category.icon
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className='text-xs text-gray-800 text-center font-semibold leading-tight group-hover:text-blue-800 group-hover:scale-105 transition-all duration-300 ease-out'>
+                                                                        {
+                                                                            connector.name
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                ) : (
+                                    // Category view: Display as grid
+                                    <div className='grid grid-cols-2 gap-3'>
+                                        {getDisplayedConnectors().map(
+                                            (connector, index) => (
+                                                <div
+                                                    key={connector.id}
+                                                    draggable
+                                                    onDragStart={(e) =>
+                                                        onDragStart(
+                                                            e,
+                                                            connector.type,
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        onConnectorSelect(
+                                                            connector.type,
+                                                        )
+                                                    }
+                                                    className='category-card connector-slide-up flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl cursor-move bg-gradient-to-br from-white to-gray-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
+                                                >
+                                                    <div className='connector-pulse w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group- group-hover:rotate-12 transition-all duration-500 ease-out shadow-lg group-hover:shadow-2xl'>
+                                                        {connector.icon ? (
+                                                            <div className='w-12 h-12 flex items-center justify-center'>
+                                                                {connector.icon}
+                                                            </div>
+                                                        ) : (
+                                                            <span className='text-primary-600 text-sm'>
+                                                                {
+                                                                    CONNECTOR_CATEGORIES[
+                                                                        Object.keys(
+                                                                            CONNECTOR_CATEGORIES,
+                                                                        ).find(
+                                                                            (
+                                                                                key,
+                                                                            ) =>
+                                                                                CONNECTOR_CATEGORIES[
+                                                                                    key as keyof typeof CONNECTOR_CATEGORIES
+                                                                                ].connectors.some(
+                                                                                    (
+                                                                                        c,
+                                                                                    ) =>
+                                                                                        c.id ===
+                                                                                        connector.id,
+                                                                                ),
+                                                                        ) as keyof typeof CONNECTOR_CATEGORIES
+                                                                    ]?.icon
+                                                                }
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className='text-sm text-gray-800 text-center font-bold group-hover:text-blue-800 group- group-hover:tracking-wider transition-all duration-300 ease-out'>
+                                                        {connector.name}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                )}
+
+                                {getDisplayedConnectors().length === 0 && (
+                                    <div className='text-center text-gray-500 py-8'>
+                                        <span>
+                                            {searchQuery.trim()
+                                                ? `No connectors found for "${searchQuery}"`
+                                                : 'No connectors available'}
+                                        </span>
+                                        {searchQuery.trim() && (
+                                            <div className='mt-2'>
+                                                <button
+                                                    onClick={() =>
+                                                        setSearchQuery('')
+                                                    }
+                                                    className='text-primary-600 hover:text-primary-800 text-sm underline'
+                                                >
+                                                    Clear search
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </>
     );

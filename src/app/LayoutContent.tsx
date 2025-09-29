@@ -1,14 +1,17 @@
 'use client';
 
 import {useState, useEffect} from 'react';
+import {usePathname} from 'next/navigation';
 import NavigationSidebar from '@/components/NavigationSidebar';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import AISuggestionsPanel from '@/components/AISuggestionsPanel';
 
 export default function LayoutContent({children}: {children: React.ReactNode}) {
+    const pathname = usePathname();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [isTablet, setIsTablet] = useState(false);
+    const [isCanvasPage, setIsCanvasPage] = useState(false);
 
     // Responsive breakpoint detection for native 80% zoom simulation
     useEffect(() => {
@@ -29,6 +32,23 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
 
         return () => window.removeEventListener('resize', checkScreenSize);
     }, []);
+
+    // Auto-collapse/expand sidebar for pipeline canvas
+    useEffect(() => {
+        const isCanvasRoute = pathname === '/pipelines/canvas';
+        setIsCanvasPage(isCanvasRoute);
+
+        // Only auto-collapse/expand on desktop (not mobile)
+        if (!isMobile) {
+            if (isCanvasRoute) {
+                // Auto-collapse sidebar when entering canvas
+                setSidebarCollapsed(true);
+            } else {
+                // Auto-expand sidebar when leaving canvas
+                setSidebarCollapsed(false);
+            }
+        }
+    }, [pathname, isMobile]);
 
     // Handle escape key to close sidebar on mobile
     useEffect(() => {

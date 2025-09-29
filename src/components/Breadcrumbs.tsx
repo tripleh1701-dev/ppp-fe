@@ -413,7 +413,7 @@ export default function Breadcrumbs({
     if (isMobile) {
         const currentBreadcrumb = breadcrumbs[breadcrumbs.length - 1];
         return (
-            <div className='bg-white border-b border-slate-200 px-3 py-2 lg:hidden'>
+            <div className='bg-white border-b border-slate-200 px-3 py-1 lg:hidden'>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2 min-w-0'>
                         {currentBreadcrumb?.icon && (
@@ -446,7 +446,7 @@ export default function Breadcrumbs({
                         </svg>
                     </button>
                 </div>
-                <div className='mt-1 flex items-center justify-end gap-3'>
+                <div className='mt-0.5 flex items-center justify-end gap-3'>
                     <div className='flex items-center gap-1.5 text-[11px] text-slate-700'>
                         <Icon
                             name='account'
@@ -471,7 +471,7 @@ export default function Breadcrumbs({
     }
 
     return (
-        <div className='bg-white border-b border-slate-200 px-3 py-2 hidden lg:block'>
+        <div className='bg-white border-b border-slate-200 px-3 py-1 hidden lg:block'>
             <div className='flex items-center'>
                 <nav
                     className='flex items-center space-x-1.5'
@@ -589,7 +589,7 @@ export default function Breadcrumbs({
                             <button
                                 ref={accountBtnRef}
                                 onClick={() => setAccountMenuOpen((v) => !v)}
-                                className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
+                                className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
                                 aria-haspopup='listbox'
                                 aria-expanded={accountMenuOpen}
                             >
@@ -620,7 +620,7 @@ export default function Breadcrumbs({
                                     className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
                                     role='listbox'
                                 >
-                                    <ul className='max-h-64 overflow-auto py-2'>
+                                    <ul className='max-h-64 overflow-auto py-1'>
                                         {accounts.map((a) => (
                                             <li key={a.id}>
                                                 <button
@@ -636,7 +636,7 @@ export default function Breadcrumbs({
                                                             false,
                                                         );
                                                     }}
-                                                    className={`w-full text-left px-3 py-2 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
                                                         selectedAccountId ===
                                                         a.id
                                                             ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
@@ -681,7 +681,7 @@ export default function Breadcrumbs({
                             <button
                                 ref={enterpriseBtnRef}
                                 onClick={() => setEnterpriseMenuOpen((v) => !v)}
-                                className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
+                                className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
                                 aria-haspopup='listbox'
                                 aria-expanded={enterpriseMenuOpen}
                             >
@@ -713,7 +713,7 @@ export default function Breadcrumbs({
                                     className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
                                     role='listbox'
                                 >
-                                    <ul className='max-h-64 overflow-auto py-2'>
+                                    <ul className='max-h-64 overflow-auto py-1'>
                                         {enterprises.map((e) => (
                                             <li key={e.id}>
                                                 <button
@@ -730,7 +730,7 @@ export default function Breadcrumbs({
                                                             false,
                                                         );
                                                     }}
-                                                    className={`w-full text-left px-3 py-2 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
                                                         selectedEnterpriseId ===
                                                         e.id
                                                             ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'

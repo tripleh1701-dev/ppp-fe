@@ -79,6 +79,10 @@ const nodeIcons = {
     release_docker: 'docker',
     release_npm: 'npm',
     release_maven: 'maven',
+
+    // Annotation types
+    note: 'stickynote',
+    comment: 'comment',
 };
 
 export default function WorkflowNode({
@@ -163,6 +167,9 @@ export default function WorkflowNode({
           }`
         : data.label;
 
+    // Check if this is an annotation node
+    const isAnnotation = data.type === 'note' || data.type === 'comment';
+
     const handleConfigChange = useCallback(
         (newConfig: CircularToggleConfig) => {
             setCircularConfig(newConfig);
@@ -215,61 +222,85 @@ export default function WorkflowNode({
             />
 
             <Tooltip content={tooltipContent} position='auto'>
-                {/* Minimal Icon Node - SVG Only */}
-                <div
-                    className={`w-12 h-12 flex items-center justify-center transition-all duration-300 hover:scale-110 cursor-pointer ${
-                        selected ? 'scale-105' : ''
-                    }`}
-                >
-                    <Icon name={iconName} size={32} />
-
-                    {/* Status Indicator */}
-                    {data.status && (
+                {/* Different rendering for annotation nodes */}
+                {isAnnotation ? (
+                    <div
+                        className={`${
+                            data.type === 'note'
+                                ? 'w-16 h-16 bg-gradient-to-br from-yellow-200 to-yellow-400'
+                                : 'w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-300'
+                        } flex flex-col items-center justify-center transition-all duration-300 hover:scale-110 cursor-pointer rounded-lg shadow-md ${
+                            selected ? 'scale-105 ring-2 ring-blue-400' : ''
+                        }`}
+                    >
+                        <Icon name={iconName} size={20} />
                         <div
-                            className={`absolute top-0 right-0 w-3 h-3 rounded-full border border-white shadow-sm ${
-                                data.status === 'pending'
-                                    ? 'bg-gray-400'
-                                    : data.status === 'running'
-                                    ? 'bg-blue-500'
-                                    : data.status === 'completed'
-                                    ? 'bg-green-500'
-                                    : data.status === 'failed'
-                                    ? 'bg-red-500'
-                                    : 'bg-gray-400'
+                            className={`text-xs font-semibold mt-1 ${
+                                data.type === 'note'
+                                    ? 'text-yellow-800'
+                                    : 'text-blue-800'
                             }`}
                         >
-                            {data.status === 'running' && (
-                                <div className='w-full h-full rounded-full bg-blue-400 animate-ping absolute inset-0'></div>
-                            )}
-                            {data.status === 'completed' && (
-                                <svg
-                                    className='w-2 h-2 text-white absolute inset-0.5'
-                                    fill='currentColor'
-                                    viewBox='0 0 20 20'
-                                >
-                                    <path
-                                        fillRule='evenodd'
-                                        d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                                        clipRule='evenodd'
-                                    />
-                                </svg>
-                            )}
-                            {data.status === 'failed' && (
-                                <svg
-                                    className='w-2 h-2 text-white absolute inset-0.5'
-                                    fill='currentColor'
-                                    viewBox='0 0 20 20'
-                                >
-                                    <path
-                                        fillRule='evenodd'
-                                        d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
-                                        clipRule='evenodd'
-                                    />
-                                </svg>
-                            )}
+                            {data.label}
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    /* Regular workflow node */
+                    <div
+                        className={`w-12 h-12 flex items-center justify-center transition-all duration-300 hover:scale-110 cursor-pointer ${
+                            selected ? 'scale-105' : ''
+                        }`}
+                    >
+                        <Icon name={iconName} size={32} />
+
+                        {/* Status Indicator */}
+                        {data.status && (
+                            <div
+                                className={`absolute top-0 right-0 w-3 h-3 rounded-full border border-white shadow-sm ${
+                                    data.status === 'pending'
+                                        ? 'bg-gray-400'
+                                        : data.status === 'running'
+                                        ? 'bg-blue-500'
+                                        : data.status === 'completed'
+                                        ? 'bg-green-500'
+                                        : data.status === 'failed'
+                                        ? 'bg-red-500'
+                                        : 'bg-gray-400'
+                                }`}
+                            >
+                                {data.status === 'running' && (
+                                    <div className='w-full h-full rounded-full bg-blue-400 animate-ping absolute inset-0'></div>
+                                )}
+                                {data.status === 'completed' && (
+                                    <svg
+                                        className='w-2 h-2 text-white absolute inset-0.5'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
+                                    >
+                                        <path
+                                            fillRule='evenodd'
+                                            d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
+                                            clipRule='evenodd'
+                                        />
+                                    </svg>
+                                )}
+                                {data.status === 'failed' && (
+                                    <svg
+                                        className='w-2 h-2 text-white absolute inset-0.5'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
+                                    >
+                                        <path
+                                            fillRule='evenodd'
+                                            d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                                            clipRule='evenodd'
+                                        />
+                                    </svg>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </Tooltip>
 
             {/* Circular Toggle Component - Positioned to the right of SVG */}

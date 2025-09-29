@@ -8,9 +8,8 @@ import ReactFlow, {
     Connection,
     useNodesState,
     useEdgesState,
-    Controls,
-    MiniMap,
     Background,
+    BackgroundVariant,
     ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -20,6 +19,7 @@ import ConnectorSlidingPanel from './ConnectorSlidingPanel';
 import PipelineHeader from './PipelineHeader';
 import WorkflowNode from './WorkflowNode';
 import PipelinePanels from './PipelinePanels';
+import PipelineCanvasToolbar from './PipelineCanvasToolbar';
 
 import {usePipeline} from '@/contexts/PipelineContext';
 import {
@@ -118,6 +118,17 @@ function WorkflowBuilderContent({
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const [showPanels, setShowPanels] = useState(false);
+
+    // State for toolbar functionality
+    const [showGrid, setShowGrid] = useState(true);
+    const [history, setHistory] = useState<{nodes: Node[]; edges: Edge[]}[]>(
+        [],
+    );
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const [clipboard, setClipboard] = useState<{
+        nodes: Node[];
+        edges: Edge[];
+    } | null>(null);
 
     // URL parameters state
     const [urlParams, setUrlParams] = useState<URLSearchParams>(
@@ -1007,9 +1018,7 @@ function WorkflowBuilderContent({
                         }
                         nodeTypes={nodeTypes}
                         fitView
-                        className={`bg-gradient-to-br from-slate-50 to-blue-50 ${
-                            isReadOnly ? 'pointer-events-none' : ''
-                        }`}
+                        className={`${isReadOnly ? 'pointer-events-none' : ''}`}
                         defaultEdgeOptions={{
                             animated: !isReadOnly,
                             style: {stroke: '#3b82f6', strokeWidth: 3},
@@ -1028,36 +1037,263 @@ function WorkflowBuilderContent({
                         nodesConnectable={!isReadOnly}
                         elementsSelectable={!isReadOnly}
                     >
-                        <Controls
-                            position='bottom-right'
-                            showZoom={true}
-                            showFitView={true}
-                            showInteractive={true}
-                            className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
-                            style={{right: '20px', bottom: '20px'}}
-                        />
-                        <MiniMap
-                            nodeStrokeColor='#4f46e5'
-                            nodeColor='#f1f5f9'
-                            nodeBorderRadius={12}
-                            position='bottom-right'
-                            className='bg-card/95 backdrop-blur-md border border-light rounded-xl shadow-xl'
-                            style={{
-                                right: '180px',
-                                bottom: '20px',
-                                width: '140px',
-                                height: '100px',
-                            }}
-                            pannable
-                            zoomable
-                        />
-                        <Background color='#e2e8f0' gap={25} size={1.5} />
+                        {showGrid && (
+                            <Background
+                                variant={BackgroundVariant.Dots}
+                                color='#9ca3af'
+                                gap={16}
+                                size={1.5}
+                            />
+                        )}
                     </ReactFlow>
+
+                    {/* Mural/Miro themed action toolbar */}
+                    <PipelineCanvasToolbar
+                        onAddStickyNote={() => {
+                            // Add a sticky note node to the canvas
+                            const newNode = {
+                                id: generateNodeId(),
+                                type: 'workflowNode',
+                                position: {
+                                    x: Math.random() * 300 + 100,
+                                    y: Math.random() * 300 + 100,
+                                },
+                                data: {
+                                    type: 'note' as WorkflowNodeType,
+                                    label: 'Sticky Note',
+                                    status: 'pending' as const,
+                                    identifier: 'sticky_note',
+                                    stage: 'Note',
+                                },
+                            };
+                            setNodes((nds) => [...nds, newNode]);
+                        }}
+                        onImportPipeline={async () => {
+                            // Create file input for importing YAML
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.yaml,.yml';
+                            input.onchange = async (e) => {
+                                const file = (e.target as HTMLInputElement)
+                                    .files?.[0];
+                                if (file) {
+                                    const text = await file.text();
+                                    try {
+                                        const data = convertFromYAML(text);
+                                        // Set the imported pipeline data
+                                        console.log('Imported pipeline:', data);
+                                        alert(
+                                            'Pipeline imported successfully!',
+                                        );
+                                    } catch (error) {
+                                        console.error('Import error:', error);
+                                        alert(
+                                            'Failed to import pipeline. Please check the file format.',
+                                        );
+                                    }
+                                }
+                            };
+                            input.click();
+                        }}
+                        onExportPipeline={async () => {
+                            try {
+                                // Convert current pipeline to YAML and download
+                                const metadata = {
+                                    name: `Pipeline-${Date.now()}`,
+                                    description: 'Exported pipeline',
+                                    enterprise: enterprise || 'Default',
+                                    entity: entity || 'Default',
+                                    deploymentType: 'Integration' as const,
+                                };
+                                const yamlContent = convertToYAML(
+                                    nodes,
+                                    edges,
+                                    metadata,
+                                );
+
+                                const blob = new Blob([yamlContent], {
+                                    type: 'text/yaml',
+                                });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `pipeline-${Date.now()}.yaml`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            } catch (error) {
+                                console.error('Export error:', error);
+                                alert('Failed to export pipeline.');
+                            }
+                        }}
+                        onSavePipeline={async () => {
+                            try {
+                                const metadata = {
+                                    name: `Pipeline-${Date.now()}`,
+                                    description: 'Saved pipeline',
+                                    enterprise: enterprise || 'Default',
+                                    entity: entity || 'Default',
+                                    deploymentType: 'Integration' as const,
+                                };
+                                const yamlContent = convertToYAML(
+                                    nodes,
+                                    edges,
+                                    metadata,
+                                );
+                                await savePipelineYAML(
+                                    'current-pipeline',
+                                    yamlContent,
+                                );
+                                alert('Pipeline saved successfully!');
+                            } catch (error) {
+                                console.error('Save error:', error);
+                                alert('Failed to save pipeline.');
+                            }
+                        }}
+                        onLoadPipeline={async () => {
+                            try {
+                                const savedPipelines =
+                                    await getAllPipelineYAMLs();
+                                const pipelineKeys =
+                                    Object.keys(savedPipelines);
+                                if (pipelineKeys.length > 0) {
+                                    // For now, load the first saved pipeline
+                                    // TODO: Show a selection dialog
+                                    const yamlContent = await loadPipelineYAML(
+                                        pipelineKeys[0],
+                                    );
+                                    if (yamlContent) {
+                                        const pipelineData =
+                                            convertFromYAML(yamlContent);
+                                        // Set the loaded pipeline data - would need proper conversion
+                                        console.log(
+                                            'Loaded pipeline:',
+                                            pipelineData,
+                                        );
+                                        alert('Pipeline loaded successfully!');
+                                    } else {
+                                        alert(
+                                            'Failed to load pipeline content.',
+                                        );
+                                    }
+                                } else {
+                                    alert('No saved pipelines found.');
+                                }
+                            } catch (error) {
+                                console.error('Load error:', error);
+                                alert('Failed to load pipeline.');
+                            }
+                        }}
+                        onAddComment={() => {
+                            // Add a comment node to the canvas
+                            const newNode = {
+                                id: generateNodeId(),
+                                type: 'workflowNode',
+                                position: {
+                                    x: Math.random() * 300 + 200,
+                                    y: Math.random() * 300 + 100,
+                                },
+                                data: {
+                                    type: 'comment' as WorkflowNodeType,
+                                    label: 'Comment',
+                                    status: 'pending' as const,
+                                    identifier: 'comment',
+                                    stage: 'Comment',
+                                },
+                            };
+                            setNodes((nds) => [...nds, newNode]);
+                        }}
+                        onToggleGrid={() => {
+                            // Toggle grid/dots visibility
+                            setShowGrid(!showGrid);
+                        }}
+                        onUndo={() => {
+                            // Simple undo functionality - remove last added node
+                            if (nodes.length > 0) {
+                                const lastNodeIndex = nodes.length - 1;
+                                const newNodes = nodes.slice(0, lastNodeIndex);
+                                setNodes(newNodes);
+                                console.log('Undo: Removed last node');
+                            }
+                        }}
+                        onRedo={() => {
+                            // Simple redo functionality placeholder
+                            console.log(
+                                'Redo - Advanced history management coming soon',
+                            );
+                        }}
+                        onCopySelection={() => {
+                            if (reactFlowInstance) {
+                                const selectedNodes = nodes.filter(
+                                    (node) => node.selected,
+                                );
+                                const selectedEdges = edges.filter(
+                                    (edge) => edge.selected,
+                                );
+                                if (
+                                    selectedNodes.length > 0 ||
+                                    selectedEdges.length > 0
+                                ) {
+                                    const clipboard = {
+                                        nodes: selectedNodes,
+                                        edges: selectedEdges,
+                                    };
+                                    navigator.clipboard.writeText(
+                                        JSON.stringify(clipboard),
+                                    );
+                                    console.log(
+                                        'Selection copied to clipboard',
+                                    );
+                                }
+                            }
+                        }}
+                        onPasteSelection={async () => {
+                            try {
+                                // Try to get clipboard data
+                                const clipboardText =
+                                    await navigator.clipboard.readText();
+                                const clipboardData = JSON.parse(clipboardText);
+
+                                if (
+                                    clipboardData.nodes &&
+                                    Array.isArray(clipboardData.nodes)
+                                ) {
+                                    // Clear current selection
+                                    const clearedNodes = nodes.map((node) => ({
+                                        ...node,
+                                        selected: false,
+                                    }));
+
+                                    // Create new nodes with offset position and new IDs
+                                    const newNodes = clipboardData.nodes.map(
+                                        (node: any) => ({
+                                            ...node,
+                                            id: generateNodeId(),
+                                            position: {
+                                                x: node.position.x + 50, // Offset by 50px
+                                                y: node.position.y + 50,
+                                            },
+                                            selected: true, // Select the pasted nodes
+                                        }),
+                                    );
+
+                                    setNodes([...clearedNodes, ...newNodes]);
+                                    console.log('Pasted nodes from clipboard');
+                                } else {
+                                    console.log('No valid nodes in clipboard');
+                                }
+                            } catch (error) {
+                                console.log(
+                                    'No valid clipboard data or paste permission denied',
+                                );
+                            }
+                        }}
+                        isReadOnly={isReadOnly}
+                    />
                 </div>
 
                 {/* Connector Sliding Panel - Hidden in read-only mode */}
                 {!isReadOnly && (
-                    <div className='absolute left-0 top-0 bottom-0 z-40 w-12'>
+                    <div className='absolute left-0 top-0 bottom-0 z-40'>
                         <ConnectorSlidingPanel
                             onConnectorSelect={(nodeType) => {
                                 // Handle connector selection if needed

@@ -6,6 +6,7 @@ import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
 import SecurityGovernancePanel from './SecurityGovernancePanel';
+import PipelinePanel from './PipelinePanel';
 import {motion} from 'framer-motion';
 
 interface NavigationItem {
@@ -116,6 +117,7 @@ export default function NavigationSidebar({
     const [isAccessControlOpen, setIsAccessControlOpen] = useState(false);
     const [isSecurityGovernanceOpen, setIsSecurityGovernanceOpen] =
         useState(false);
+    const [isPipelineOpen, setIsPipelineOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
     const [currentUser, setCurrentUser] = useState({
         firstName: '',
@@ -236,6 +238,7 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(true);
                 setIsAccessControlOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
+                setIsPipelineOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -243,6 +246,7 @@ export default function NavigationSidebar({
                 setIsAccessControlOpen(true);
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
+                setIsPipelineOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -250,6 +254,15 @@ export default function NavigationSidebar({
                 setIsSecurityGovernanceOpen(true);
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsAccessControlOpen(false);
+                setIsPipelineOpen(false);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            if (item.id === 'pipelines') {
+                setIsPipelineOpen(true);
+                setIsAccountSettingsOpen(false); // <-- close other panels
+                setIsAccessControlOpen(false);
+                setIsSecurityGovernanceOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -257,6 +270,7 @@ export default function NavigationSidebar({
             setIsAccountSettingsOpen(false);
             setIsAccessControlOpen(false);
             setIsSecurityGovernanceOpen(false);
+            setIsPipelineOpen(false);
             handleNavigation(item.href);
         },
         [isMobile, onToggleCollapse, handleNavigation],
@@ -621,6 +635,15 @@ export default function NavigationSidebar({
                 <SecurityGovernancePanel
                     isOpen={isSecurityGovernanceOpen}
                     onClose={() => setIsSecurityGovernanceOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
+            )}
+
+            {/* Pipeline Panel */}
+            {isPipelineOpen && (
+                <PipelinePanel
+                    isOpen={isPipelineOpen}
+                    onClose={() => setIsPipelineOpen(false)}
                     sidebarWidth={isCollapsed ? 48 : 208}
                 />
             )}

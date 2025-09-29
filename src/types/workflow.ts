@@ -34,7 +34,10 @@ export type WorkflowNodeType =
     // Release
     | 'release_docker'
     | 'release_npm'
-    | 'release_maven';
+    | 'release_maven'
+    // Annotations
+    | 'note'
+    | 'comment';
 
 export interface CircularToggleConfig {
     success: {

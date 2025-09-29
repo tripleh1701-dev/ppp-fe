@@ -1416,6 +1416,109 @@ export const SearchIcon = ({className = '', size = 24}: IconProps) => (
     </svg>
 );
 
+// Sticky Note Icon - Yellow sticky note design
+export const StickyNoteIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='sticky-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#FEF08A' />
+                <stop offset='100%' stopColor='#EAB308' />
+            </linearGradient>
+        </defs>
+        {/* Sticky note background */}
+        <path
+            d='M4 4h14l2 2v14a1 1 0 01-1 1H5a1 1 0 01-1-1V4z'
+            fill='url(#sticky-gradient)'
+            stroke='#CA8A04'
+            strokeWidth='1'
+        />
+        {/* Folded corner */}
+        <path
+            d='M18 4v2h2'
+            fill='none'
+            stroke='#CA8A04'
+            strokeWidth='1'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+        {/* Lines on the note */}
+        <line
+            x1='7'
+            y1='9'
+            x2='16'
+            y2='9'
+            stroke='#92400E'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+        />
+        <line
+            x1='7'
+            y1='12'
+            x2='14'
+            y2='12'
+            stroke='#92400E'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+        />
+        <line
+            x1='7'
+            y1='15'
+            x2='15'
+            y2='15'
+            stroke='#92400E'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+        />
+    </svg>
+);
+
+// Comment Icon - Speech bubble design
+export const CommentIcon = ({className = '', size = 24}: IconProps) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        className={className}
+    >
+        <defs>
+            <linearGradient
+                id='comment-gradient'
+                x1='0%'
+                y1='0%'
+                x2='100%'
+                y2='100%'
+            >
+                <stop offset='0%' stopColor='#DBEAFE' />
+                <stop offset='100%' stopColor='#3B82F6' />
+            </linearGradient>
+        </defs>
+        {/* Comment bubble */}
+        <path
+            d='M21 15c0 1.1-.9 2-2 2H7l-4 4V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10z'
+            fill='url(#comment-gradient)'
+            stroke='#2563EB'
+            strokeWidth='1'
+        />
+        {/* Comment dots */}
+        <circle cx='8' cy='10' r='1.5' fill='white' />
+        <circle cx='12' cy='10' r='1.5' fill='white' />
+        <circle cx='16' cy='10' r='1.5' fill='white' />
+    </svg>
+);
+
 // Kubernetes is available; Docker is available
 
 interface IconComponentProps extends IconProps {
@@ -1491,7 +1594,9 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         hierarchy: HierarchyIcon,
         globe: GlobeIcon,
         shield: ShieldIcon,
-        template: TemplateIcon,
+        // Annotation icons
+        stickynote: StickyNoteIcon,
+        comment: CommentIcon,
     };
 
     const IconComponent = icons[name];

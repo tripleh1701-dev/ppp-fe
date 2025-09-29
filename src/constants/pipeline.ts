@@ -76,6 +76,9 @@ export const NODE_LABELS: Record<WorkflowNodeType, string> = {
     release_docker: 'Docker',
     release_npm: 'NPM',
     release_maven: 'Maven',
+    // Annotations
+    note: 'Sticky Note',
+    comment: 'Comment',
 } as const;
 
 // Template flow configurations
