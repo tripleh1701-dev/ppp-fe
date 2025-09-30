@@ -11,6 +11,12 @@ import ReactFlow, {
     Background,
     BackgroundVariant,
     ReactFlowProvider,
+    ReactFlowProps,
+    NodeProps,
+    EdgeProps,
+    NodeChange,
+    EdgeChange,
+    ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -116,11 +122,58 @@ function WorkflowBuilderContent({
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+    const [reactFlowInstance, setReactFlowInstance] =
+        useState<ReactFlowInstance | null>(null);
     const [showPanels, setShowPanels] = useState(false);
 
     // State for toolbar functionality
-    const [showGrid, setShowGrid] = useState(true);
+    type BackgroundType = 'dots' | 'lines' | 'cross' | 'solid';
+    const [backgroundType, setBackgroundType] =
+        useState<BackgroundType>('dots');
+
+    // Handle background type changes
+    useEffect(() => {
+        console.log('Background type changed to:', backgroundType);
+        // Force a refresh of the canvas when background type changes
+        if (reactFlowInstance) {
+            // First, update the background element's visibility
+            const bg = document.querySelector(
+                '.react-flow__background',
+            ) as HTMLElement;
+            if (bg) {
+                bg.style.display =
+                    backgroundType === 'solid' ? 'none' : 'block';
+                bg.style.opacity = backgroundType === 'dots' ? '0.4' : '0.3';
+            }
+
+            // Then, force a re-render by temporarily hiding and showing
+            setTimeout(() => {
+                if (bg) {
+                    const currentDisplay = bg.style.display;
+                    bg.style.display = 'none';
+                    bg.offsetHeight; // Force reflow
+                    bg.style.display = currentDisplay;
+                }
+                // Finally, fit view to ensure everything is properly positioned
+                reactFlowInstance.fitView({padding: 0.1});
+            }, 50);
+        }
+    }, [backgroundType, reactFlowInstance]);
+    type LineStyle = {
+        type: 'smoothstep' | 'straight' | 'bezier';
+        pattern: 'solid' | 'dotted' | 'dashed';
+        thickness: number;
+        animated: boolean;
+        color: string;
+    };
+
+    const [lineStyle, setLineStyle] = useState<LineStyle>({
+        type: 'smoothstep',
+        pattern: 'solid',
+        thickness: 2,
+        animated: true,
+        color: '#3b82f6',
+    });
     const [history, setHistory] = useState<{nodes: Node[]; edges: Edge[]}[]>(
         [],
     );
@@ -403,13 +456,15 @@ function WorkflowBuilderContent({
     const formatCanvas = useCallback(() => {
         if (!reactFlowInstance) return;
 
-        const updatedNodes = nodes.map((node, index) => ({
-            ...node,
-            position: {
-                x: 300 + (index % 3) * 250,
-                y: 100 + Math.floor(index / 3) * 150,
-            },
-        }));
+        const updatedNodes = nodes.map(
+            (node: Node<WorkflowNodeData>, index: number) => ({
+                ...node,
+                position: {
+                    x: 300 + (index % 3) * 250,
+                    y: 100 + Math.floor(index / 3) * 150,
+                },
+            }),
+        );
 
         setNodes(updatedNodes);
 
@@ -533,8 +588,44 @@ function WorkflowBuilderContent({
     );
 
     const onConnect = useCallback(
-        (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges],
+        (params: Edge | Connection) =>
+            setEdges((eds: Edge[]) => {
+                // Remove any suggested connections for these nodes
+                const filteredEdges = eds.filter((edge: Edge) => {
+                    if (edge.data?.suggested) {
+                        return !(
+                            (edge.source === params.source &&
+                                edge.target === params.target) ||
+                            (edge.target === params.source &&
+                                edge.source === params.target)
+                        );
+                    }
+                    return true;
+                });
+
+                // Add the new permanent connection
+                return addEdge(
+                    {
+                        ...params,
+                        type: lineStyle.type,
+                        animated: lineStyle.animated,
+                        style: {
+                            stroke: lineStyle.color,
+                            strokeWidth: lineStyle.thickness,
+                            strokeDasharray:
+                                lineStyle.pattern === 'dotted'
+                                    ? '2,4'
+                                    : lineStyle.pattern === 'dashed'
+                                    ? '6,3'
+                                    : undefined,
+                            filter: 'drop-shadow(0 0 2px rgba(37, 99, 235, 0.3))',
+                        },
+                        className: 'permanent-connection',
+                    },
+                    filteredEdges,
+                );
+            }),
+        [setEdges, lineStyle],
     );
 
     const onDragStart = (
@@ -581,10 +672,17 @@ function WorkflowBuilderContent({
 
             const {nodeType, toolName} = dragData;
 
-            const position = reactFlowInstance.project({
+            // Get the raw position
+            const rawPosition = reactFlowInstance.project({
                 x: event.clientX - reactFlowBounds.left,
                 y: event.clientY - reactFlowBounds.top,
             });
+
+            // Snap to grid
+            const position = {
+                x: Math.round(rawPosition.x / 12) * 12,
+                y: Math.round(rawPosition.y / 12) * 12,
+            };
 
             const newNode: Node<WorkflowNodeData> = {
                 id: generateNodeId(),
@@ -603,7 +701,187 @@ function WorkflowBuilderContent({
                 },
             };
 
-            setNodes((nds) => nds.concat(newNode));
+            // Add the new node
+            setNodes((nds: Node<WorkflowNodeData>[]) => {
+                const updatedNodes = nds.concat(newNode);
+
+                // Define typical pipeline flow connections
+                const pipelineFlow: Record<string, string[]> = {
+                    node_dev: ['plan', 'code'],
+                    node_qa: ['test', 'deploy'],
+                    node_prod: ['deploy', 'release'],
+                    plan: ['code', 'build'],
+                    code: ['build', 'test'],
+                    build: ['test', 'deploy'],
+                    test: ['deploy', 'approval'],
+                    deploy: ['approval', 'release'],
+                    approval: ['release'],
+                    release: [],
+                };
+
+                // Find suitable nodes for auto-connection suggestions
+                const SUGGESTION_RADIUS = 600; // Increased radius for better detection
+                const nodeType = (dragData.nodeType as string).split('_')[0]; // Extract base type (e.g., 'build' from 'build_jenkins')
+
+                // Check for orphaned nodes and suggest connections
+                const orphanedNodes = nds.filter((node) => {
+                    const hasIncomingEdges = edges.some(
+                        (edge) => edge.target === node.id,
+                    );
+                    const hasOutgoingEdges = edges.some(
+                        (edge) => edge.source === node.id,
+                    );
+                    return !hasIncomingEdges || !hasOutgoingEdges;
+                });
+
+                // Get all valid nodes for connection based on pipeline flow
+                const nearbyNodes = nds
+                    .filter((existingNode) => {
+                        // Don't connect to self
+                        if (existingNode.id === newNode.id) return false;
+
+                        const dx = existingNode.position.x - position.x;
+                        const dy = existingNode.position.y - position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        // Get the base type of the existing node
+                        const existingType = (
+                            existingNode.data.type as string
+                        ).split('_')[0];
+
+                        // Check if this connection makes sense in the pipeline flow
+                        const isValidPredecessor =
+                            pipelineFlow[existingType]?.includes(nodeType);
+                        const isValidSuccessor =
+                            pipelineFlow[nodeType]?.includes(existingType);
+
+                        // Check if the node is orphaned
+                        const isNodeOrphaned = orphanedNodes.some(
+                            (node) => node.id === existingNode.id,
+                        );
+
+                        // Prefer nodes that follow the typical pipeline flow or are orphaned
+                        const isPreferredConnection =
+                            isValidPredecessor ||
+                            isValidSuccessor ||
+                            isNodeOrphaned;
+
+                        // For preferred connections, use a larger radius
+                        const effectiveRadius = isPreferredConnection
+                            ? SUGGESTION_RADIUS
+                            : SUGGESTION_RADIUS * 0.5;
+
+                        return distance < effectiveRadius;
+                    })
+                    // Sort by distance and limit to 3 closest nodes
+                    .sort((a, b) => {
+                        const isAOrphaned = orphanedNodes.some(
+                            (node) => node.id === a.id,
+                        );
+                        const isBOrphaned = orphanedNodes.some(
+                            (node) => node.id === b.id,
+                        );
+
+                        // Prioritize orphaned nodes
+                        if (isAOrphaned && !isBOrphaned) return -1;
+                        if (!isAOrphaned && isBOrphaned) return 1;
+
+                        // If both or neither are orphaned, sort by distance
+                        const distA = Math.sqrt(
+                            Math.pow(a.position.x - position.x, 2) +
+                                Math.pow(a.position.y - position.y, 2),
+                        );
+                        const distB = Math.sqrt(
+                            Math.pow(b.position.x - position.x, 2) +
+                                Math.pow(b.position.y - position.y, 2),
+                        );
+                        return distA - distB;
+                    })
+                    .slice(0, 3);
+
+                // Create suggested connections
+                if (nearbyNodes.length > 0) {
+                    const suggestedConnections = nearbyNodes.map((nearNode) => {
+                        // Get base types
+                        const nearType = (nearNode.data.type as string).split(
+                            '_',
+                        )[0];
+
+                        // Check if this node is orphaned
+                        const isOrphaned = orphanedNodes.some(
+                            (node) => node.id === nearNode.id,
+                        );
+
+                        // Determine connection direction based on pipeline flow
+                        const canFlowForward =
+                            pipelineFlow[nearType]?.includes(nodeType);
+                        const canFlowBackward =
+                            pipelineFlow[nodeType]?.includes(nearType);
+
+                        // Prioritize forward flow, but allow backward flow if it's the only option
+                        const isForwardFlow =
+                            canFlowForward || !canFlowBackward;
+
+                        // If the node is orphaned, suggest both incoming and outgoing connections
+                        const shouldSuggestConnection =
+                            isOrphaned || canFlowForward || canFlowBackward;
+
+                        const source = isForwardFlow ? nearNode.id : newNode.id;
+                        const target = isForwardFlow ? newNode.id : nearNode.id;
+
+                        // Create connection with direction-based styling
+                        return {
+                            id: `suggested-${nearNode.id}-${newNode.id}`,
+                            source,
+                            target,
+                            type: 'smoothstep',
+                            animated: true,
+                            style: {
+                                stroke: isOrphaned
+                                    ? '#3b82f6'
+                                    : isForwardFlow
+                                    ? '#60a5fa'
+                                    : '#93c5fd',
+                                strokeWidth: isOrphaned
+                                    ? 4
+                                    : isForwardFlow
+                                    ? 3
+                                    : 2,
+                                strokeDasharray: isOrphaned ? '10,4' : '8,4',
+                                opacity: isOrphaned ? 0.9 : 0.8,
+                                filter: isOrphaned
+                                    ? 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.6))'
+                                    : 'drop-shadow(0 0 3px rgba(96, 165, 250, 0.5))',
+                            },
+                            className: 'suggested-connection',
+                            data: {
+                                suggested: true,
+                                tooltip: isOrphaned
+                                    ? `Suggested: Connect ${
+                                          isForwardFlow
+                                              ? `${nearType} → ${nodeType}`
+                                              : `${nodeType} → ${nearType}`
+                                      }`
+                                    : isForwardFlow
+                                    ? `Connect ${nearType} to ${nodeType}`
+                                    : `Connect ${nodeType} to ${nearType}`,
+                            },
+                        };
+                    });
+
+                    // Add suggested connections
+                    setEdges((eds) => [...eds, ...suggestedConnections]);
+
+                    // Remove suggestions after 5 seconds if not connected
+                    setTimeout(() => {
+                        setEdges((eds) =>
+                            eds.filter((edge) => !edge.data?.suggested),
+                        );
+                    }, 5000);
+                }
+
+                return updatedNodes;
+            });
         },
         [reactFlowInstance, setNodes, nodes.length],
     );
@@ -741,8 +1019,75 @@ function WorkflowBuilderContent({
         return () => setRunPipeline(null);
     }, [setRunPipeline]);
 
+    // Update existing edges when line style changes
+    useEffect(() => {
+        setEdges((eds) =>
+            eds.map((edge) => ({
+                ...edge,
+                type: lineStyle.type,
+                animated: lineStyle.animated,
+                style: {
+                    ...edge.style,
+                    stroke: lineStyle.color,
+                    strokeWidth: lineStyle.thickness,
+                    strokeDasharray:
+                        lineStyle.pattern === 'dotted'
+                            ? '2,4'
+                            : lineStyle.pattern === 'dashed'
+                            ? '6,3'
+                            : undefined,
+                },
+            })),
+        );
+    }, [lineStyle, setEdges]);
+
+    // Add styles for suggested connections
+    const suggestedConnectionStyles = `
+        @keyframes suggestedPulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+        .suggested-connection {
+            animation: suggestedPulse 2s ease-in-out infinite;
+            cursor: pointer;
+            position: relative;
+        }
+        .suggested-connection:hover {
+            filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.8)) !important;
+            opacity: 1 !important;
+        }
+        .suggested-connection::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            top: -30px;
+            transform: translateX(-50%);
+            padding: 4px 8px;
+            background-color: rgba(17, 24, 39, 0.95);
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
+            z-index: 100000;
+        }
+        .suggested-connection:hover::after {
+            opacity: 1;
+        }
+        .permanent-connection {
+            transition: all 0.3s ease-in-out;
+        }
+        .permanent-connection:hover {
+            filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.5)) !important;
+        }
+    `;
+
     return (
         <div className='flex flex-col h-full bg-gray-50'>
+            <style>{suggestedConnectionStyles}</style>
             {/* Pipeline Header - Below Breadcrumbs */}
             <div className='bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0 shadow-sm'>
                 <div className='flex items-center justify-between gap-4'>
@@ -759,9 +1104,9 @@ function WorkflowBuilderContent({
                             <input
                                 type='text'
                                 value={pipelineName}
-                                onChange={(e) =>
-                                    setPipelineName(e.target.value)
-                                }
+                                onChange={(
+                                    e: React.ChangeEvent<HTMLInputElement>,
+                                ) => setPipelineName(e.target.value)}
                                 className='text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                                 placeholder='Enter pipeline name'
                                 disabled={isReadOnly}
@@ -779,9 +1124,9 @@ function WorkflowBuilderContent({
                             </span>
                             <select
                                 value={deploymentType}
-                                onChange={(e) =>
-                                    setDeploymentType(e.target.value)
-                                }
+                                onChange={(
+                                    e: React.ChangeEvent<HTMLSelectElement>,
+                                ) => setDeploymentType(e.target.value)}
                                 className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
                                 disabled={isReadOnly}
                             >
@@ -806,7 +1151,9 @@ function WorkflowBuilderContent({
                             </span>
                             <select
                                 value={entity}
-                                onChange={(e) => setEntity(e.target.value)}
+                                onChange={(
+                                    e: React.ChangeEvent<HTMLSelectElement>,
+                                ) => setEntity(e.target.value)}
                                 className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
                                 disabled={isReadOnly}
                             >
@@ -1001,8 +1348,17 @@ function WorkflowBuilderContent({
             </div>
 
             {/* Canvas Area */}
-            <div className='flex-1 relative bg-gray-50'>
-                <div className='absolute inset-0' ref={reactFlowWrapper}>
+            <div
+                className={`flex-1 relative ${
+                    backgroundType === 'solid' ? 'bg-white' : 'bg-gray-50'
+                }`}
+            >
+                <div
+                    className='absolute inset-0'
+                    ref={reactFlowWrapper}
+                    onDrop={isReadOnly ? undefined : onDrop}
+                    onDragOver={isReadOnly ? undefined : onDragOver}
+                >
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
@@ -1010,53 +1366,117 @@ function WorkflowBuilderContent({
                         onEdgesChange={isReadOnly ? undefined : onEdgesChange}
                         onConnect={isReadOnly ? undefined : onConnect}
                         onInit={setReactFlowInstance}
-                        onDrop={isReadOnly ? undefined : onDrop}
-                        onDragOver={isReadOnly ? undefined : onDragOver}
                         onNodeClick={isReadOnly ? undefined : onNodeClick}
                         onNodeDoubleClick={
                             isReadOnly ? undefined : onNodeDoubleClick
                         }
                         nodeTypes={nodeTypes}
                         fitView
-                        className={`${isReadOnly ? 'pointer-events-none' : ''}`}
+                        nodesDraggable={!isReadOnly}
+                        nodesConnectable={!isReadOnly}
                         defaultEdgeOptions={{
-                            animated: !isReadOnly,
-                            style: {stroke: '#3b82f6', strokeWidth: 3},
+                            type: lineStyle.type,
+                            animated: lineStyle.animated && !isReadOnly,
+                            style: {
+                                stroke: lineStyle.color,
+                                strokeWidth: lineStyle.thickness,
+                                strokeDasharray:
+                                    lineStyle.pattern === 'dotted'
+                                        ? '2,4'
+                                        : lineStyle.pattern === 'dashed'
+                                        ? '6,3'
+                                        : undefined,
+                            },
                         }}
                         snapToGrid={!isReadOnly}
                         snapGrid={[25, 25]}
                         connectionLineStyle={{
-                            stroke: '#3b82f6',
-                            strokeWidth: 3,
-                            strokeDasharray: '5,5',
+                            stroke: lineStyle.color,
+                            strokeWidth: lineStyle.thickness,
+                            strokeDasharray:
+                                lineStyle.pattern === 'dotted'
+                                    ? '2,4'
+                                    : lineStyle.pattern === 'dashed'
+                                    ? '6,3'
+                                    : undefined,
                         }}
                         deleteKeyCode={
                             isReadOnly ? [] : ['Backspace', 'Delete']
                         }
-                        nodesDraggable={!isReadOnly}
-                        nodesConnectable={!isReadOnly}
                         elementsSelectable={!isReadOnly}
                     >
-                        {showGrid && (
-                            <Background
-                                variant={BackgroundVariant.Dots}
-                                color='#9ca3af'
-                                gap={16}
-                                size={1.5}
-                            />
-                        )}
+                        <Background
+                            id='react-flow-background'
+                            variant={
+                                backgroundType === 'dots'
+                                    ? BackgroundVariant.Dots
+                                    : backgroundType === 'lines'
+                                    ? BackgroundVariant.Lines
+                                    : backgroundType === 'cross'
+                                    ? BackgroundVariant.Cross
+                                    : undefined
+                            }
+                            color={
+                                backgroundType === 'solid'
+                                    ? 'transparent'
+                                    : '#475569'
+                            }
+                            gap={
+                                backgroundType === 'dots'
+                                    ? 20
+                                    : backgroundType === 'lines'
+                                    ? 30
+                                    : backgroundType === 'cross'
+                                    ? 30
+                                    : 20
+                            }
+                            size={
+                                backgroundType === 'dots'
+                                    ? 1
+                                    : backgroundType === 'lines'
+                                    ? 1
+                                    : backgroundType === 'cross'
+                                    ? 1
+                                    : 1
+                            }
+                            style={{
+                                display:
+                                    backgroundType === 'solid'
+                                        ? 'none'
+                                        : 'block',
+                                opacity: backgroundType === 'dots' ? 0.4 : 0.3,
+                            }}
+                        />
                     </ReactFlow>
 
                     {/* Mural/Miro themed action toolbar */}
                     <PipelineCanvasToolbar
+                        lineStyle={lineStyle}
+                        backgroundType={backgroundType}
+                        onBackgroundChange={setBackgroundType}
+                        onLineStyleChange={(newStyle) => {
+                            setLineStyle((prev) => ({...prev, ...newStyle}));
+                            // Force a refresh of the edges
+                            setTimeout(() => {
+                                if (reactFlowInstance) {
+                                    reactFlowInstance.fitView();
+                                }
+                            }, 0);
+                        }}
                         onAddStickyNote={() => {
                             // Add a sticky note node to the canvas
                             const newNode = {
                                 id: generateNodeId(),
                                 type: 'workflowNode',
                                 position: {
-                                    x: Math.random() * 300 + 100,
-                                    y: Math.random() * 300 + 100,
+                                    x:
+                                        Math.round(
+                                            (Math.random() * 200 + 100) / 12,
+                                        ) * 12,
+                                    y:
+                                        Math.round(
+                                            (Math.random() * 200 + 100) / 12,
+                                        ) * 12,
                                 },
                                 data: {
                                     type: 'note' as WorkflowNodeType,
@@ -1074,8 +1494,8 @@ function WorkflowBuilderContent({
                             input.type = 'file';
                             input.accept = '.yaml,.yml';
                             input.onchange = async (e) => {
-                                const file = (e.target as HTMLInputElement)
-                                    .files?.[0];
+                                const target = e?.target as HTMLInputElement;
+                                const file = target?.files?.[0];
                                 if (file) {
                                     const text = await file.text();
                                     try {
@@ -1203,8 +1623,10 @@ function WorkflowBuilderContent({
                             setNodes((nds) => [...nds, newNode]);
                         }}
                         onToggleGrid={() => {
-                            // Toggle grid/dots visibility
-                            setShowGrid(!showGrid);
+                            // This is now handled by onBackgroundChange
+                            console.log(
+                                'Grid toggle is now handled by background menu',
+                            );
                         }}
                         onUndo={() => {
                             // Simple undo functionality - remove last added node
