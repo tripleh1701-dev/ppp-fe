@@ -6,6 +6,62 @@ import {Icon} from './Icons';
 
 // CSS animations for connector panel with immediate effects
 const animationStyles = `
+  /* Tooltip Styles */
+  .tooltip-trigger {
+    position: relative;
+  }
+
+  .tooltip-trigger {
+    position: relative;
+    z-index: 100;
+  }
+
+  .tooltip-trigger::before {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    margin-left: -2px;
+    width: 8px;
+    height: 8px;
+    background-color: rgba(17, 24, 39, 0.95);
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100001;
+  }
+
+  .tooltip-trigger::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.5rem 0.75rem;
+    background-color: rgba(17, 24, 39, 0.95);
+    color: white;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform-origin: left;
+    transform: translateY(-50%) translateX(-10px);
+    margin-left: 0.75rem;
+  }
+
+  .tooltip-trigger:hover::before {
+    opacity: 1;
+  }
+
+  .tooltip-trigger:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
   @keyframes connectorFadeIn {
     0% {
       opacity: 0;
@@ -1103,16 +1159,16 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
         <>
             <style dangerouslySetInnerHTML={{__html: animationStyles}} />
             <div
-                className={`relative h-full flex transition-all duration-300 ease-in-out shadow-lg overflow-hidden ${
+                className={`relative h-full flex transition-all duration-300 ease-in-out shadow-lg ${
                     isPanelExpanded
-                        ? 'w-[380px]' // Blue bar (48px) + Expanded content (332px) - Reduced width
+                        ? 'w-[342px]' // Blue bar (48px) + Expanded content (294px) - 10% reduced width
                         : 'w-12' // Just the blue bar
                 }`}
                 style={{}}
             >
                 {/* Blue Bar Section (always visible) */}
                 <div
-                    className='w-12 h-full flex flex-col items-center py-2 flex-shrink-0'
+                    className='w-[48px] h-full flex flex-col items-center justify-center py-6 gap-8 flex-shrink-0'
                     style={{
                         backgroundColor: '#0a1a2f',
                         backgroundImage: 'url(/images/logos/sidebar.png)',
@@ -1123,7 +1179,8 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                 >
                     {/* Show All Button */}
                     <div
-                        className='w-8 h-8 mb-3 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                        className='w-8 h-8 mb-3 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
+                        data-tooltip='Show All Connectors'
                         onClick={() => handleCategoryClick('showAll')}
                     >
                         <div className='group-hover:drop-shadow-lg'>
@@ -1151,13 +1208,12 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                     <div className='w-8 h-px bg-white/30 mb-3'></div>
 
                     {/* Category Icons Stack */}
-                    <div className='flex flex-col space-y-3 mb-3 relative'>
-                        {/* Small click indicator */}
-                        <div className='absolute -left-1 top-0 w-0.5 h-full bg-white/20 rounded-full'></div>
+                    <div className='flex flex-col space-y-5 mb-3 relative'>
                         {/* Node */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('node')}
+                            data-tooltip='Node Environment'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1180,8 +1236,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Plan */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('plan')}
+                            data-tooltip='Plan'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1204,8 +1261,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Code */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('code')}
+                            data-tooltip='Code'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1228,8 +1286,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Build */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('build')}
+                            data-tooltip='Build'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1252,8 +1311,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Test */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('test')}
+                            data-tooltip='Test'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1276,8 +1336,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Deploy */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('deploy')}
+                            data-tooltip='Deploy'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1300,8 +1361,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Approval */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('approval')}
+                            data-tooltip='Approval'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1324,8 +1386,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                         {/* Release */}
                         <div
-                            className='w-8 h-8 text-white/70 hover:text-white  transition-all duration-300 cursor-pointer group relative flex items-center justify-center'
+                            className='w-8 h-8 text-white/70 hover:text-white transition-all duration-300 cursor-pointer group relative flex items-center justify-center tooltip-trigger'
                             onClick={() => handleCategoryClick('release')}
+                            data-tooltip='Release'
                         >
                             <div className='group-hover:drop-shadow-lg'>
                                 {React.cloneElement(
@@ -1351,7 +1414,7 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                     <div className='w-8 h-px bg-white/30 mb-auto'></div>
 
                     {/* Connector Name (Vertically Aligned) */}
-                    <div className='text-white/90 text-xs font-medium transform -rotate-90 whitespace-nowrap flex items-center gap-1 group-hover:scale-105 transition-transform duration-200 mb-4'>
+                    <div className='text-white/90 text-sm font-bold transform -rotate-90 whitespace-nowrap flex items-center gap-1 group-hover:scale-105 transition-transform duration-200 mb-12'>
                         <svg
                             className='w-3 h-3 transform rotate-90'
                             fill='currentColor'
@@ -1496,7 +1559,7 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
 
                 {/* White Section - Connectors (visible when expanded) */}
                 {isPanelExpanded && (
-                    <div className='bg-white shadow-lg w-full flex flex-col h-full'>
+                    <div className='bg-white shadow-lg w-[294px] flex flex-col h-full'>
                         <div className='p-3 h-full flex flex-col'>
                             {/* Header with Close Button */}
                             <div className='flex items-center justify-between mb-3'>
