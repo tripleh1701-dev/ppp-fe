@@ -35,6 +35,51 @@ import {
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 
+// Utility function to generate consistent colors for services across the application
+const getServiceColor = (serviceName: string) => {
+    const key = serviceName.toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+    
+    // Blueish service color palette - consistent across all components
+    const serviceColors = [
+        {
+            bg: 'bg-blue-50',
+            text: 'text-blue-800',
+            border: 'border-blue-200',
+            tone: 'blue' as const,
+        },
+        {
+            bg: 'bg-sky-50',
+            text: 'text-sky-800',
+            border: 'border-sky-200',
+            tone: 'sky' as const,
+        },
+        {
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-800',
+            border: 'border-indigo-200',
+            tone: 'indigo' as const,
+        },
+        {
+            bg: 'bg-cyan-50',
+            text: 'text-cyan-800',
+            border: 'border-cyan-200',
+            tone: 'cyan' as const,
+        },
+        {
+            bg: 'bg-slate-50',
+            text: 'text-slate-800',
+            border: 'border-slate-200',
+            tone: 'slate' as const,
+        },
+    ];
+    
+    return serviceColors[hash % serviceColors.length];
+};
+
 // Chip component for dropdown selections
 const SelectionChip = ({
     label,
@@ -46,15 +91,14 @@ const SelectionChip = ({
     color?: 'blue' | 'green' | 'purple';
 }) => {
     const colorClasses = {
-        blue: 'bg-blue-100 text-blue-800 border-blue-200',
+        blue: 'bg-white text-black',
         green: 'bg-green-100 text-green-800 border-green-200',
         purple: 'bg-purple-100 text-purple-800 border-purple-200',
     };
 
     return (
         <span
-            className={`inline-flex items-center px-2 py-1 text-xs font-medium border ${colorClasses[color]} mr-1 mb-1`}
-            style={{borderRadius: '0px !important'}}
+            className={`inline-flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
         >
             {label}
             <button
@@ -200,6 +244,7 @@ function InlineEditableText({
     value,
     onCommit,
     placeholder,
+    isError = false,
     renderDisplay,
     className,
     dataAttr,
@@ -209,6 +254,7 @@ function InlineEditableText({
     value: string;
     onCommit: (next: string) => void;
     placeholder?: string;
+    isError?: boolean;
     renderDisplay?: (v: string) => React.ReactNode;
     className?: string;
     dataAttr?: string;
@@ -255,7 +301,7 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border border-blue-300 bg-white px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 ${
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
                     className || ''
                 }`}
                 data-inline={dataAttr || undefined}
@@ -284,8 +330,6 @@ function InlineEditableText({
         >
             {renderDisplay ? (
                 renderDisplay(value || '')
-            ) : isEmpty && placeholder ? (
-                <span className='text-slate-400 italic'>{placeholder}</span>
             ) : (
                 value || ''
             )}
@@ -354,7 +398,7 @@ function DropdownOption({
                             if (e.key === 'Escape') handleCancel();
                         }}
                         className='flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500'
-                        placeholder={`Edit ${type} name`}
+                        placeholder=''
                     />
                     <button
                         onClick={handleSave}
@@ -561,6 +605,7 @@ function ServicesMultiSelect({
     value,
     onChange,
     placeholder = 'Select Services',
+    isError = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
     accounts = [],
@@ -568,6 +613,7 @@ function ServicesMultiSelect({
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    isError?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
         action: 'update' | 'delete',
@@ -862,38 +908,8 @@ function ServicesMultiSelect({
                 {selectedServices
                     .slice(0, visibleCount)
                     .map((service, index) => {
-                        // Generate consistent color for each service
-                        const key = service.toLowerCase();
-                        let hash = 0;
-                        for (let i = 0; i < key.length; i++) {
-                            hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-                        }
-                        
-                        // Service color palette (same as in AsyncChipSelect)
-                        const serviceColors = [
-                            {
-                                bg: 'bg-rose-50',
-                                text: 'text-rose-800',
-                                border: 'border-rose-200',
-                            },
-                            {
-                                bg: 'bg-indigo-50',
-                                text: 'text-indigo-800',
-                                border: 'border-indigo-200',
-                            },
-                            {
-                                bg: 'bg-teal-50',
-                                text: 'text-teal-800',
-                                border: 'border-teal-200',
-                            },
-                            {
-                                bg: 'bg-fuchsia-50',
-                                text: 'text-fuchsia-800',
-                                border: 'border-fuchsia-200',
-                            },
-                        ];
-                        
-                        const colorTheme = serviceColors[hash % serviceColors.length];
+                        // Use consistent color function
+                        const colorTheme = getServiceColor(service);
                         
                         return (
                             <motion.span
@@ -909,8 +925,7 @@ function ServicesMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded-sm ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
-                                style={{borderRadius: '0px !important'}}
+                                className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
                                 title={service}
                             >
                                 <span className='flex-1 truncate'>{service}</span>
@@ -938,8 +953,8 @@ function ServicesMultiSelect({
                     </span>
                 )}
                 
-                {/* Show input field when no services selected OR when actively adding more */}
-                {selectedServices.length === 0 || open ? (
+                {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
+                {selectedServices.length === 0 || open || isError ? (
                     <input
                         ref={inputRef}
                         value={query}
@@ -1068,8 +1083,8 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className='text-left px-2 py-0.5 text-[12px] rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 w-full focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
-                        placeholder={selectedServices.length === 0 ? placeholder : 'Type to add more...'}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors`}
+                        placeholder=''
                     />
                 ) : (
                     /* Show "Add more" button when services are selected and not actively typing */
@@ -1082,7 +1097,7 @@ function ServicesMultiSelect({
                                 inputRef.current?.focus();
                             }, 10);
                         }}
-                        className='text-left px-2 py-0.5 text-[12px] rounded border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 w-full transition-colors'
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         + Add more
                     </button>
@@ -1420,7 +1435,7 @@ function ServicesMultiSelect({
                                                                     false,
                                                                 );
                                                         }}
-                                                        placeholder='Enter service name'
+                                                        placeholder=''
                                                         className={`flex-1 rounded border px-2 py-1 text-[12px] ${
                                                             similarMatch
                                                                 ? 'border-amber-400 bg-amber-50'
@@ -1488,6 +1503,7 @@ function AsyncChipSelect({
     value,
     onChange,
     placeholder,
+    isError = false,
     compact,
     onDropdownOptionUpdate,
     onNewItemCreated,
@@ -1500,6 +1516,7 @@ function AsyncChipSelect({
     value?: string;
     onChange: (next?: string) => void;
     placeholder?: string;
+    isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
@@ -1803,7 +1820,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border bg-blue-50 text-blue-800 border-blue-200 rounded-sm'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
                         onClick={(e) => {
@@ -2000,8 +2017,8 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500`}
-                        placeholder={placeholder || 'Type to search...'}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=''
                     />
                 ) : null}
             </div>
@@ -2228,7 +2245,6 @@ interface EnterpriseConfigTableProps {
         | 'actions'
     >;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
@@ -2240,6 +2256,7 @@ interface EnterpriseConfigTableProps {
     hideRowExpansion?: boolean;
     enableInlineEditing?: boolean;
     incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
@@ -2254,6 +2271,8 @@ interface EnterpriseConfigTableProps {
     onShowAllColumns?: () => void;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
+    triggerValidation?: boolean; // Trigger validation highlighting
+    onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
 }
 
 function SortableEnterpriseConfigRow({
@@ -2264,7 +2283,6 @@ function SortableEnterpriseConfigRow({
     cols,
     gridTemplate,
     highlightQuery,
-    onQuickAddRow,
     customColumns = [],
     isExpanded,
     onToggle,
@@ -2293,7 +2311,6 @@ function SortableEnterpriseConfigRow({
     cols: string[];
     gridTemplate: string;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumns?: string[];
     isExpanded: boolean;
     onToggle: (id: string) => void;
@@ -2466,41 +2483,41 @@ function SortableEnterpriseConfigRow({
         tone,
     }: {
         text: string;
-        tone: 'slate' | 'sky' | 'violet' | 'emerald' | 'amber';
+        tone: 'slate' | 'blue' | 'sky' | 'indigo' | 'cyan';
     }) => {
         const toneMap: Record<
             string,
             {bg: string; text: string; border: string; dot: string}
         > = {
+            blue: {
+                bg: 'bg-white',
+                text: 'text-black',
+                border: '',
+                dot: 'bg-blue-400',
+            },
             sky: {
                 bg: 'bg-sky-50',
                 text: 'text-sky-800',
                 border: 'border-sky-200',
                 dot: 'bg-sky-400',
             },
+            indigo: {
+                bg: 'bg-indigo-50',
+                text: 'text-indigo-800',
+                border: 'border-indigo-200',
+                dot: 'bg-indigo-400',
+            },
+            cyan: {
+                bg: 'bg-cyan-50',
+                text: 'text-cyan-800',
+                border: 'border-cyan-200',
+                dot: 'bg-cyan-400',
+            },
             slate: {
-                bg: 'bg-slate-100',
+                bg: 'bg-slate-50',
                 text: 'text-slate-800',
                 border: 'border-slate-200',
                 dot: 'bg-slate-400',
-            },
-            violet: {
-                bg: 'bg-violet-50',
-                text: 'text-violet-800',
-                border: 'border-violet-200',
-                dot: 'bg-violet-400',
-            },
-            emerald: {
-                bg: 'bg-emerald-50',
-                text: 'text-emerald-800',
-                border: 'border-emerald-200',
-                dot: 'bg-emerald-400',
-            },
-            amber: {
-                bg: 'bg-amber-50',
-                text: 'text-amber-800',
-                border: 'border-amber-200',
-                dot: 'bg-amber-400',
             },
         };
         const t = toneMap[tone] || toneMap.slate;
@@ -2510,8 +2527,7 @@ function SortableEnterpriseConfigRow({
                 animate={{scale: 1, opacity: 1}}
                 whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
                 transition={{type: 'spring', stiffness: 480, damping: 30}}
-                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] border max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis ${t.bg} ${t.text} ${t.border}`}
-                style={{borderRadius: '0px !important'}}
+                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis rounded ${t.bg} ${t.text} ${t.border}`}
                 title={text}
             >
                 <span className='truncate'>{text}</span>
@@ -2525,11 +2541,15 @@ function SortableEnterpriseConfigRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 rounded-md overflow-hidden border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} ${
-                isSelected ? 'ring-2 ring-primary-300/60 bg-primary-50/60' : ''
+            className={`w-full grid items-center gap-0 overflow-hidden border border-slate-200 rounded-lg transition-all duration-200 ease-in-out transform-gpu h-10 mb-1 ${
+                isSelected 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
+                    : 'hover:bg-blue-50 hover:shadow-md hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:translate-x-1'
+            } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
+                isSelected ? 'border-blue-300' : 'border-slate-200'
             } ${inFillRange ? 'bg-primary-50/40' : ''} ${
                 isExpanded
-                    ? 'bg-primary-50 border-l-4 border-l-primary-400'
+                    ? 'bg-primary-50'
                     : ''
             } ${
                 compressingRowId === row.id
@@ -2545,6 +2565,7 @@ function SortableEnterpriseConfigRow({
                 willChange: 'transform',
                 display: 'grid',
                 minWidth: '400px', // Ensure table has minimum width
+                borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
                 onSelect(row.id);
@@ -2553,18 +2574,23 @@ function SortableEnterpriseConfigRow({
             {/* Delete Button Column - Always first */}
             <div className='flex items-center justify-center px-1'>
                 {isRowHovered && (
-                    <button
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={(e) => {
                             e.stopPropagation();
                             if (onDeleteClick) {
                                 onDeleteClick(row.id);
                             }
                         }}
-                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-300 ease-out no-drag shadow-sm hover:shadow-lg hover:scale-110 transform active:scale-95'
+                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md transform'
                         title='Delete row'
                     >
                         <svg
-                            className='w-2.5 h-2.5 transition-transform duration-200 group-hover/delete:rotate-180'
+                            className='w-2 h-2 transition-transform duration-200'
                             fill='none'
                             stroke='currentColor'
                             strokeWidth='2.5'
@@ -2574,32 +2600,27 @@ function SortableEnterpriseConfigRow({
                             <path
                                 strokeLinecap='round'
                                 strokeLinejoin='round'
-                                strokeWidth={2}
-                                d='M20 12H4'
+                                d='M6 12h12'
                             />
                         </svg>
-                    </button>
+                    </motion.button>
                 )}
             </div>
             {cols.includes('enterprise') && (
                 <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full ${
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
                         pinFirst
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
                     } ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                    } border-l-4 ${
-                        isSelected ? 'border-l-sky-400' : 'border-l-slate-200'
-                    } ${
-                        isCellMissing(row.id, 'enterprise')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                 >
                     {!hideRowExpansion && (
                         <button
-                            className={`h-5 w-5 rounded text-blue-600 hover:bg-slate-100 ${
+                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 ${
                                 isExpanded ? '' : ''
                             }`}
                             onClick={() => onToggle(row.id)}
@@ -2626,7 +2647,7 @@ function SortableEnterpriseConfigRow({
                         </button>
                     )}
                     <div
-                        className='font-medium text-slate-900 text-[12px] w-full'
+                        className='text-slate-700 text-[12px] w-full'
                         data-row-id={row.id}
                         data-col='enterprise'
                         style={{width: '100%'}}
@@ -2642,7 +2663,8 @@ function SortableEnterpriseConfigRow({
                                         v || '',
                                     );
                                 }}
-                                placeholder='Select Enterprise'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'enterprise')}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate}
                                 onNewItemCreated={onNewItemCreated}
                                 accounts={allRows}
@@ -2666,7 +2688,8 @@ function SortableEnterpriseConfigRow({
                                     );
                                 }}
                                 className='text-[12px]'
-                                placeholder='Enter Enterprise'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'enterprise')}
                                 dataAttr={`${row.id}-enterprise`}
                             />
                         )}
@@ -2676,9 +2699,9 @@ function SortableEnterpriseConfigRow({
             {cols.includes('product') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isCellMissing(row.id, 'product')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='product'
@@ -2691,7 +2714,8 @@ function SortableEnterpriseConfigRow({
                             onChange={(v) =>
                                 onUpdateField(row.id, 'product', v || '')
                             }
-                            placeholder='Select Product'
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'product')}
                             onDropdownOptionUpdate={onDropdownOptionUpdate}
                             onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
@@ -2706,31 +2730,39 @@ function SortableEnterpriseConfigRow({
                             }
                             className='text-[12px]'
                             dataAttr={`product-${row.id}`}
-                            placeholder='Enter Product'
+                            isError={isCellMissing(row.id, 'product')}
+                            placeholder=''
                         />
                     )}
                 </div>
             )}
             {cols.includes('services') && (
                 <div
-                    className={`text-slate-700 text-[12px] min-w-0 truncate px-2 py-1 overflow-hidden max-w-full ${
-                        isCellMissing(row.id, 'services')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                    className={`text-slate-700 text-[12px] border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='services'
                 >
-                    <ServicesMultiSelect
-                        value={row.services || ''}
-                        onChange={(v) =>
-                            onUpdateField(row.id, 'services', v || '')
-                        }
-                        placeholder='Select Services'
-                        onDropdownOptionUpdate={onDropdownOptionUpdate}
-                        onNewItemCreated={onNewItemCreated}
-                        accounts={allRows}
-                    />
+                    <div className={`flex-1 min-w-0 truncate max-w-full overflow-hidden ${
+                        isCellMissing(row.id, 'services')
+                            ? 'ring-2 ring-red-200 rounded'
+                            : ''
+                    }`}>
+                        <ServicesMultiSelect
+                            value={row.services || ''}
+                            onChange={(v) =>
+                                onUpdateField(row.id, 'services', v || '')
+                            }
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'services')}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate}
+                            onNewItemCreated={onNewItemCreated}
+                            accounts={allRows}
+                        />
+                    </div>
                 </div>
             )}
             {/* actions column removed */}
@@ -2759,7 +2791,6 @@ export default function EnterpriseConfigTable({
     hideControls,
     visibleColumns,
     highlightQuery,
-    onQuickAddRow,
     customColumnLabels,
     enableDropdownChips = false,
     dropdownOptions = {},
@@ -2767,30 +2798,66 @@ export default function EnterpriseConfigTable({
     hideRowExpansion = false,
     enableInlineEditing = true,
     incompleteRowIds = [],
+    showValidationErrors = false,
     hasBlankRow = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
     onShowAllColumns,
     compressingRowId = null,
     foldingRowId = null,
+    triggerValidation = false,
+    onValidationComplete,
 }: EnterpriseConfigTableProps) {
-    // Helper function to check if a cell should be highlighted as missing
-    const isCellMissing = (rowId: string, field: string) => {
-        if (!incompleteRowIds.includes(rowId)) return false;
+    // Local validation state to track rows with errors
+    const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
-        const row = localRows.find((r) => r.id === rowId);
-        if (!row) return false;
-
+    // Helper function to check if a field is missing/invalid
+    const isFieldMissing = (row: EnterpriseConfigRow, field: string): boolean => {
         switch (field) {
             case 'enterprise':
-                return !row.enterprise;
+                return !row.enterprise || row.enterprise.trim() === '';
             case 'product':
-                return !row.product;
+                return !row.product || row.product.trim() === '';
             case 'services':
-                return !row.services;
+                return !row.services || row.services.trim() === '';
             default:
                 return false;
         }
+    };
+
+    // Enhanced helper function to check if a cell should be highlighted as missing
+    const isCellMissing = (rowId: string, field: string) => {
+        const row = localRows.find((r) => r.id === rowId);
+        if (!row) return false;
+
+        // Don't highlight validation errors for completely blank new rows
+        // (rows that have no data in any field should be treated as "new" and not show validation errors)
+        const isCompletelyBlank = !row.enterprise?.trim() && !row.product?.trim() && !row.services?.trim();
+        if (isCompletelyBlank) return false;
+
+        // Check if this row has validation errors (either from parent or local validation)
+        const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
+        
+        if (!hasValidationError) return false;
+
+        return isFieldMissing(row, field);
+    };
+
+    // Function to validate all rows and highlight missing fields
+    const validateAndHighlightErrors = () => {
+        const errorRowIds = new Set<string>();
+        
+        localRows.forEach(row => {
+            // Check if any required field is missing
+            if (isFieldMissing(row, 'enterprise') || 
+                isFieldMissing(row, 'product') || 
+                isFieldMissing(row, 'services')) {
+                errorRowIds.add(row.id);
+            }
+        });
+        
+        setValidationErrors(errorRowIds);
+        return errorRowIds;
     };
 
     // Keep a local order for row management. Sync when rows change
@@ -2811,6 +2878,27 @@ export default function EnterpriseConfigTable({
         setLocalRows(cloned);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rows.map((r) => r.id).join(',')]);
+
+    // Effect to trigger validation when requested
+    useEffect(() => {
+        if (triggerValidation) {
+            const errorRowIds = validateAndHighlightErrors();
+            if (onValidationComplete) {
+                onValidationComplete(Array.from(errorRowIds));
+            }
+        }
+    }, [triggerValidation]);
+
+    // Effect to highlight errors when incompleteRowIds changes from parent
+    useEffect(() => {
+        if (showValidationErrors && incompleteRowIds.length > 0) {
+            // Also trigger local validation to ensure all missing fields are highlighted
+            validateAndHighlightErrors();
+        } else {
+            // Clear validation errors when not showing validation or no incomplete rows from parent
+            setValidationErrors(new Set());
+        }
+    }, [incompleteRowIds, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -2943,7 +3031,7 @@ export default function EnterpriseConfigTable({
     }, [visibleColumns, columnOrder]);
 
     const colSizes: Record<string, string> = {
-        deleteButton: '40px', // Space for minus button
+        deleteButton: '8px', // Space for delete button with proper padding
         enterprise: '160px',
         product: '140px',
         services: '300px', // Increased width to show more service chips and Add more button
@@ -2957,21 +3045,25 @@ export default function EnterpriseConfigTable({
     const firstColWidth = '140px'; // enforce fixed width for first column
     const gridTemplate = useMemo(() => {
         // Always include delete button column first with minimum width
-        const deleteCol = `minmax(40px, ${colSizes.deleteButton})`;
+        const deleteCol = `minmax(24px, ${colSizes.deleteButton})`;
         
         const base = cols.map((c) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
             if (dynamicWidth && dynamicWidth > 0) {
-                return `minmax(100px, ${dynamicWidth}px)`;
+                // For columns with sort arrows, ensure minimum width to accommodate arrows and resize handle
+                const minWidth = ['enterprise', 'product', 'services'].includes(c) ? '120px' : '100px';
+                return `minmax(${minWidth}, ${dynamicWidth}px)`;
             }
             // Use default size from colSizes
             const defaultSize = colSizes[c];
+            const minWidth = ['enterprise', 'product', 'services'].includes(c) ? '120px' : '100px';
             if (defaultSize) {
-                return `minmax(100px, ${defaultSize})`;
+                return `minmax(${minWidth}, ${defaultSize})`;
             }
             // Final fallback
-            return 'minmax(100px, 140px)';
+            const fallbackMax = ['enterprise', 'product', 'services'].includes(c) ? '160px' : '140px';
+            return `minmax(${minWidth}, ${fallbackMax})`;
         }).join(' ');
         
         const custom = customColumns.map(() => '110px').join(' ');
@@ -2980,6 +3072,12 @@ export default function EnterpriseConfigTable({
     }, [cols, customColumns, colWidths, colSizes]);
 
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+    const handleDeleteClick = (rowId: string) => {
+        if (onDelete) {
+            onDelete(rowId);
+        }
+    };
 
     // removed fill down state
 
@@ -3068,11 +3166,6 @@ export default function EnterpriseConfigTable({
     };
     
     // Handle delete click - directly call parent's onDelete function
-    const handleDeleteClick = (rowId: string) => {
-        if (onDelete) {
-            onDelete(rowId);
-        }
-    };
     
     const [sortCol, setSortCol] = useState<
         | 'accountName'
@@ -3081,6 +3174,9 @@ export default function EnterpriseConfigTable({
         | 'servicesCount'
         | 'enterpriseName'
         | 'servicesSummary'
+        | 'enterprise'
+        | 'product'
+        | 'services'
         | null
     >(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
@@ -3092,7 +3188,10 @@ export default function EnterpriseConfigTable({
             | 'status'
             | 'servicesCount'
             | 'enterpriseName'
-            | 'servicesSummary',
+            | 'servicesSummary'
+            | 'enterprise'
+            | 'product'
+            | 'services',
     ) => {
         const nextDir: 'asc' | 'desc' =
             sortCol === col && sortDir === 'asc' ? 'desc' : 'asc';
@@ -3265,39 +3364,26 @@ export default function EnterpriseConfigTable({
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white pb-1'>
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white overflow-hidden'>
                                 <div
-                                    className='sticky top-0 z-30 grid w-full overflow-hidden gap-0 px-0 py-2 text-xs font-semibold text-slate-900 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 shadow-sm'
+                                    className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
                                     style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
                                 >
-                                    {/* Delete Button Column Header (Empty) */}
-                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r border-slate-200 min-w-0 overflow-hidden'>
-                                        {/* Freeze/Unfreeze icon */}
-                                        <button
-                                            className='p-1 rounded hover:bg-slate-100 text-blue-600'
-                                            onClick={() =>
-                                                setPinFirst((v) => !v)
-                                            }
-                                            title={
-                                                pinFirst
-                                                    ? 'Unfreeze column'
-                                                    : 'Freeze column'
-                                            }
-                                        >
-                                            {pinFirst ? (
-                                                <Pin className='w-3.5 h-3.5' />
-                                            ) : (
-                                                <PinOff className='w-3.5 h-3.5' />
-                                            )}
-                                        </button>
+                                    {/* Delete Button Column Header */}
+                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                        {/* Empty header for delete column */}
                                     </div>
                                     
                                     {cols.map((c, idx) => (
                                         <div
                                             key={c}
-                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-slate-50 transition-colors duration-150 group min-w-0 overflow-hidden ${idx < cols.length - 1 ? 'border-r border-slate-200' : ''} ${
+                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${idx < cols.length - 1 ? 'border-r-2 border-slate-400' : ''} ${
+                                                idx === 0 
+                                                    ? 'border-l-0' 
+                                                    : ''
+                                            } ${
                                                 idx === 0 && pinFirst
-                                                    ? 'sticky left-0 z-20 bg-sky-50/80 backdrop-blur-sm border-l-4 border-l-slate-200 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] after:content-[" "] after:absolute after:top-0 after:right-0 after:h-full after:w-px after:bg-slate-200'
+                                                    ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
                                             }`}
                                         >
@@ -3309,6 +3395,9 @@ export default function EnterpriseConfigTable({
                                                 'accountName',
                                                 'email',
                                                 'enterpriseName',
+                                                'enterprise',
+                                                'product',
+                                                'services',
                                             ].includes(c) && (
                                                 <button
                                                     onClick={() =>
@@ -3342,10 +3431,10 @@ export default function EnterpriseConfigTable({
                                                     onMouseDown={(e) =>
                                                         startResize(c, e)
                                                     }
-                                                    className='absolute -right-0.5 top-0 h-full w-3 cursor-col-resize z-20 flex items-center justify-center group/resize'
+                                                    className='absolute -right-0.5 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize'
                                                     title='Resize column'
                                                 >
-                                                    <div className='h-4 w-1 bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover/resize:opacity-60 hover:opacity-100 transition-opacity duration-150' />
+                                                    <div className='h-4 w-1 bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover:opacity-90 hover:opacity-100 transition-opacity duration-150' />
                                                 </div>
                                             )}
                                             {c === 'accountName' && (
@@ -3370,7 +3459,7 @@ export default function EnterpriseConfigTable({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <div className='space-y-0 divide-y divide-slate-200'>
+                        <div className='overflow-hidden mt-2'>
                             {displayItems.map((r, idx) => (
                                 <React.Fragment key={r.id}>
                                     <SortableEnterpriseConfigRow
@@ -3382,7 +3471,6 @@ export default function EnterpriseConfigTable({
                                         highlightQuery={highlightQuery}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
-                                        onQuickAddRow={onQuickAddRow}
                                         customColumns={customColumns}
                                         pinFirst={pinFirst}
                                         firstColWidth={firstColWidth}
@@ -3420,7 +3508,7 @@ export default function EnterpriseConfigTable({
                             ))}
                         </div>
                     ) : (
-                        <div className='space-y-4'>
+                        <div className='space-y-4 mt-2'>
                             {Object.entries(groupedItems).map(([groupName, groupRows]) => (
                                 <div key={groupName} className='border border-slate-200 rounded-lg overflow-x-hidden'>
                                     {/* Group Header */}
@@ -3434,7 +3522,7 @@ export default function EnterpriseConfigTable({
                                     </div>
                                     
                                     {/* Group Rows */}
-                                    <div className='divide-y divide-slate-200'>
+                                    <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
                                             <React.Fragment key={r.id}>
                                                 <SortableEnterpriseConfigRow
@@ -3446,7 +3534,6 @@ export default function EnterpriseConfigTable({
                                                     highlightQuery={highlightQuery}
                                                     onEdit={onEdit}
                                                     onDelete={onDelete}
-                                                    onQuickAddRow={onQuickAddRow}
                                                     customColumns={customColumns}
                                                     pinFirst={pinFirst}
                                                     firstColWidth={firstColWidth}
@@ -3489,82 +3576,6 @@ export default function EnterpriseConfigTable({
                     )}
                 </div>
                 
-                {/* Add new row section - styled exactly like data rows */}
-                {onQuickAddRow && (
-                    <div 
-                        className={`w-full grid items-center gap-0 rounded-md border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${
-                            displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                        }`}
-                        style={{
-                            gridTemplateColumns: gridTemplate,
-                            willChange: 'transform',
-                            display: 'grid',
-                            minWidth: '400px',
-                        }}
-                    >
-                        {/* Delete/Action Column with + icon - clickable */}
-                        <div className='flex items-center justify-center px-1'>
-                            <button
-                                onClick={onQuickAddRow}
-                                className='group/add flex items-center justify-center w-4 h-4 text-blue-500 hover:text-white border border-blue-300 hover:border-blue-500 bg-white hover:bg-blue-500 rounded-full transition-all duration-300 ease-out shadow-sm hover:shadow-lg hover:scale-110 transform active:scale-95'
-                                title='Add new row'
-                            >
-                                <svg
-                                    className='w-2.5 h-2.5 transition-transform duration-200 group-hover/add:rotate-90'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    strokeWidth='2.5'
-                                    viewBox='0 0 24 24'
-                                    xmlns='http://www.w3.org/2000/svg'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M12 4v16m8-8H4'
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        {/* Enterprise column with "Add row" text - not clickable, styled like data row */}
-                        {cols.includes('enterprise') && (
-                            <div
-                                className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 min-w-0 overflow-hidden max-w-full ${
-                                    pinFirst
-                                        ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
-                                        : ''
-                                } ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                } border-l-4 border-l-slate-200`}
-                            >
-                                <span className='text-blue-500 text-sm font-normal'>Add row</span>
-                            </div>
-                        )}
-                        
-                        {/* Product column - empty */}
-                        {cols.includes('product') && (
-                            <div
-                                className={`text-slate-700 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1 overflow-hidden max-w-full ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                }`}
-                            >
-                                {/* Empty */}
-                            </div>
-                        )}
-                        
-                        {/* Services column - empty */}
-                        {cols.includes('services') && (
-                            <div
-                                className={`text-slate-700 text-[12px] min-w-0 truncate px-2 py-1 overflow-hidden max-w-full ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                }`}
-                            >
-                                {/* Empty */}
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
             )}
         </div>
