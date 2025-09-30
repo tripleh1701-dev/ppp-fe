@@ -59,6 +59,7 @@ export default function EnterpriseConfiguration() {
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
     const [showValidationModal, setShowValidationModal] = useState(false);
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
     const [validationMessage, setValidationMessage] = useState('');
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(
         null,
@@ -111,7 +112,7 @@ export default function EnterpriseConfiguration() {
     const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
     const [sortOpen, setSortOpen] = useState(false);
     const [sortColumn, setSortColumn] = useState('');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
     const [hideOpen, setHideOpen] = useState(false);
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
@@ -249,8 +250,8 @@ export default function EnterpriseConfiguration() {
             });
         }
 
-        // Apply sorting
-        if (sortColumn) {
+        // Apply sorting only when both column and direction are explicitly set
+        if (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc')) {
             filtered.sort((a, b) => {
                 let valueA = '';
                 let valueB = '';
@@ -281,7 +282,13 @@ export default function EnterpriseConfiguration() {
         }
 
         return filtered;
-    }, [enterpriseConfigs, appliedSearchTerm, activeFilters, sortColumn, sortDirection]);
+    }, [
+        enterpriseConfigs, 
+        appliedSearchTerm, 
+        activeFilters, 
+        // Create a stable sort key that only changes when both column and direction are set
+        sortColumn && sortDirection ? `${sortColumn}-${sortDirection}` : ''
+    ]);
 
     // Helper functions for filter management
     const applyFilters = (filters: Record<string, any>) => {
@@ -311,7 +318,7 @@ export default function EnterpriseConfiguration() {
 
     const clearSorting = () => {
         setSortColumn('');
-        setSortDirection('asc');
+        setSortDirection('');
     };
 
     const clearAllFilters = () => {
@@ -843,26 +850,6 @@ export default function EnterpriseConfiguration() {
         }
     };
 
-    // Function to check for incomplete rows
-    const getIncompleteRows = () => {
-        return enterpriseConfigs
-            .filter((config) => {
-                const isTemporary = String(config.id).startsWith('tmp-');
-                if (!isTemporary) return false; // Only check temporary rows
-
-                const hasEnterprise = config.enterprise;
-                const hasProduct = config.product;
-                const hasServices = config.services;
-
-                // Row is incomplete if it has some data but not all required fields
-                const hasAnyData = hasEnterprise || hasProduct || hasServices;
-                const hasAllData = hasEnterprise && hasProduct && hasServices;
-
-                return hasAnyData && !hasAllData;
-            })
-            .map((config) => config.id);
-    };
-
     // Function to check if there's a completely blank row
     const hasBlankRow = () => {
         return enterpriseConfigs.some((config) => {
@@ -889,21 +876,31 @@ export default function EnterpriseConfiguration() {
             !String(config.id).startsWith('tmp-')
         );
 
-        // Check for incomplete temporary rows
+        // Check for incomplete temporary rows (exclude completely blank rows)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
+            // Don't include completely blank rows (new rows that haven't been touched)
+            const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
             return !hasEnterprise || !hasProduct || !hasServices;
         });
 
-        // Check for incomplete existing rows
+        // Check for incomplete existing rows (exclude completely blank rows)
         const incompleteExistingRows = existingRows.filter((config: any) => {
             const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
+            // Don't include completely blank rows (existing rows shouldn't be blank, but just in case)
+            const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
             return !hasEnterprise || !hasProduct || !hasServices;
         });
 
@@ -968,6 +965,26 @@ export default function EnterpriseConfiguration() {
             return config;
         });
     }, [enterpriseConfigs, pendingLocalChanges]);
+
+    // Function to check for incomplete rows
+    const getIncompleteRows = () => {
+        const effectiveConfigs = getEffectiveEnterpriseConfigs();
+        
+        return effectiveConfigs
+            .filter((config: any) => {
+                const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+                const hasProduct = (config.product || config.productName)?.trim();
+                const hasServices = (config.services || config.serviceName)?.trim();
+
+                // Don't include completely blank rows (new rows that haven't been touched)
+                const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+                if (isCompletelyBlank) return false;
+
+                // Row is incomplete if it has some data but not all required fields
+                return !hasEnterprise || !hasProduct || !hasServices;
+            })
+            .map((config: any) => config.id);
+    };
 
     const debouncedAutoSave = async () => {
         console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
@@ -1388,6 +1405,7 @@ export default function EnterpriseConfiguration() {
             let message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(missingFields).join(', ')}`;
             
             setValidationMessage(message);
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
             setShowValidationModal(true);
             return;
         }
@@ -1422,8 +1440,10 @@ export default function EnterpriseConfiguration() {
             
             if (savedCount > 0) {
                 showBlueNotification(`Successfully saved ${savedCount} entries.`);
+                setShowValidationErrors(false); // Clear validation errors on successful save
             } else if (hasPendingChanges) {
                 showBlueNotification('Pending changes saved successfully.');
+                setShowValidationErrors(false); // Clear validation errors on successful save
             } else {
                 showBlueNotification('No complete entries to save.');
             }
@@ -1521,7 +1541,7 @@ export default function EnterpriseConfiguration() {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [enterpriseConfigs, getIncompleteRows]);
+    }, [enterpriseConfigs]);
 
     // Add test functions (temporary for debugging)
     if (typeof window !== 'undefined') {
@@ -1947,6 +1967,7 @@ export default function EnterpriseConfiguration() {
                                 const validation = validateIncompleteRows();
                                 if (validation.hasIncomplete) {
                                     setValidationMessage(validation.message);
+                                    setShowValidationErrors(true); // Enable red border highlighting for validation errors
                                     setShowValidationModal(true);
                                     return;
                                 }
@@ -2013,15 +2034,19 @@ export default function EnterpriseConfiguration() {
                                 </div>
                                 <input
                                     type='text'
-                                    placeholder='Search Enterprise, Product, Services'
+                                    placeholder='Global Search'
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setAppliedSearchTerm(e.target.value);
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             setAppliedSearchTerm(searchTerm);
                                         }
                                     }}
-                                    className='block w-full pl-10 pr-3 py-2.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-600 text-base placeholder:text-base'
+                                    className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
+                                    style={{ fontSize: '14px' }}
                                 />
                                 {appliedSearchTerm && (
                                     <button
@@ -2089,68 +2114,73 @@ export default function EnterpriseConfiguration() {
                                             Clear All
                                         </button>
                                     </div>
-                                    <div className='p-4'>
-                                        {/* Enterprise Filter */}
-                                        <div className='mb-3'>
-                                            <label className='block text-xs font-medium text-gray-600 mb-1'>
-                                                Enterprise:
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={filterForm.enterprise}
-                                                onChange={(e) =>
-                                                    setFilterForm({
-                                                        ...filterForm,
-                                                        enterprise:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                placeholder='Search by enterprise...'
-                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
-                                            />
-                                        </div>
+                                    <div className='p-3'>
+                                        <div className='space-y-3'>
+                                            {/* Enterprise Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Enterprise
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.enterprise}
+                                                        onChange={(e) =>
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                enterprise:
+                                                                    e.target.value,
+                                                            })
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
 
-                                        {/* Product Filter */}
-                                        <div className='mb-3'>
-                                            <label className='block text-xs font-medium text-gray-600 mb-1'>
-                                                Product:
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={filterForm.product}
-                                                onChange={(e) =>
-                                                    setFilterForm({
-                                                        ...filterForm,
-                                                        product: e.target.value,
-                                                    })
-                                                }
-                                                placeholder='Search by product...'
-                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
-                                            />
-                                        </div>
+                                            {/* Product Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Product
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.product}
+                                                        onChange={(e) =>
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                product: e.target.value,
+                                                            })
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
 
-                                        {/* Services Filter */}
-                                        <div className='mb-4'>
-                                            <label className='block text-xs font-medium text-gray-600 mb-1'>
-                                                Services:
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={filterForm.services}
-                                                onChange={(e) =>
-                                                    setFilterForm({
-                                                        ...filterForm,
-                                                        services:
-                                                            e.target.value,
-                                                    })
-                                                }
-                                                placeholder='Search by services (comma-separated)...'
-                                                className='w-full p-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-600'
-                                            />
+                                            {/* Services Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Services
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.services}
+                                                        onChange={(e) =>
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                services:
+                                                                    e.target.value,
+                                                            })
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Apply Button */}
-                                        <div className='flex justify-end'>
+                                        <div className='flex justify-end mt-4'>
                                             <button
                                                 onClick={handleApplyFilters}
                                                 className='px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded font-medium transition-colors shadow-sm'
@@ -2167,7 +2197,7 @@ export default function EnterpriseConfiguration() {
                         <div ref={sortRef} className='relative'>
                             <button
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    sortOpen || !!sortColumn
+                                    sortOpen || (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc'))
                                         ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
                                         : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
                                 }`}
@@ -2184,7 +2214,7 @@ export default function EnterpriseConfiguration() {
                                         : 'group-hover:rotate-180'
                                 }`} />
                                 <span className='text-sm'>Sort</span>
-                                {!!sortColumn && (
+                                {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
                                     <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
                                 )}
                                 <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
@@ -2217,13 +2247,11 @@ export default function EnterpriseConfiguration() {
                                                         onChange={(e) => {
                                                             const newColumn = e.target.value;
                                                             setSortColumn(newColumn);
-                                                            // If a column is selected, auto-apply the sort
-                                                            if (newColumn) {
-                                                                applySorting(newColumn, sortDirection);
-                                                            }
+                                                            // Don't apply sorting here - wait for direction selection
                                                         }}
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
+                                                        <option value=''>Select column...</option>
                                                         {allCols.map((col) => (
                                                             <option key={col} value={col}>
                                                                 {columnLabels[col]}
@@ -2242,15 +2270,16 @@ export default function EnterpriseConfiguration() {
                                                     <select
                                                         value={sortDirection}
                                                         onChange={(e) => {
-                                                            const newDirection = e.target.value as 'asc' | 'desc';
+                                                            const newDirection = e.target.value as 'asc' | 'desc' | '';
                                                             setSortDirection(newDirection);
-                                                            // If a column is already selected, auto-apply the sort
-                                                            if (sortColumn) {
+                                                            // Only apply sorting if both column and valid direction are selected
+                                                            if (sortColumn && (newDirection === 'asc' || newDirection === 'desc')) {
                                                                 applySorting(sortColumn, newDirection);
                                                             }
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
+                                                        <option value=''>Select direction...</option>
                                                         <option value='asc'>Ascending</option>
                                                         <option value='desc'>Descending</option>
                                                     </select>
@@ -2259,7 +2288,7 @@ export default function EnterpriseConfiguration() {
 
 
                                             {/* Current Sort Display */}
-                                            {sortColumn && (
+                                            {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
                                                 <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
                                                     <span className='font-medium text-blue-800'>
                                                         {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
@@ -2299,15 +2328,22 @@ export default function EnterpriseConfiguration() {
                                             Displayed Columns
                                         </div>
                                     </div>
-                                    <div className='p-2 space-y-2'>
-                                        <input
-                                            value={hideQuery}
-                                            onChange={(e) =>
-                                                setHideQuery(e.target.value)
-                                            }
-                                            placeholder='Search columns'
-                                            className='w-full bg-white border border-blue-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                                        />
+                                    <div className='p-3'>
+                                        <div className='space-y-3'>
+                                            <div>
+                                                <div className='relative'>
+                                                    <input
+                                                        value={hideQuery}
+                                                        onChange={(e) =>
+                                                            setHideQuery(e.target.value)
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Columns List */}
                                         <div className='max-h-40 overflow-auto divide-y divide-light'>
                                             {allCols
                                                 .filter((c) =>
@@ -2405,21 +2441,30 @@ export default function EnterpriseConfiguration() {
                                             Group by
                                         </div>
                                     </div>
-                                    <div className='p-2 space-y-2'>
-                                        <select
-                                            value={ActiveGroupLabel}
-                                            onChange={(e) =>
-                                                setGroupByFromLabel(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className='w-full bg-white border border-blue-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                                        >
-                                            <option>None</option>
-                                            <option>Enterprise</option>
-                                            <option>Product</option>
-                                            <option>Services</option>
-                                        </select>
+                                    <div className='p-3'>
+                                        <div className='space-y-3'>
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Group by
+                                                </label>
+                                                <div className='relative'>
+                                                    <select
+                                                        value={ActiveGroupLabel}
+                                                        onChange={(e) =>
+                                                            setGroupByFromLabel(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    >
+                                                        <option>None</option>
+                                                        <option>Enterprise</option>
+                                                        <option>Product</option>
+                                                        <option>Services</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -2615,6 +2660,7 @@ export default function EnterpriseConfiguration() {
                                     }
                                     onNewItemCreated={handleNewItemCreated}
                                     incompleteRowIds={getIncompleteRows()}
+                                    showValidationErrors={showValidationErrors}
                                     hasBlankRow={hasBlankRow()}
                                     compressingRowId={compressingRowId}
                                     foldingRowId={foldingRowId}
@@ -2735,6 +2781,20 @@ export default function EnterpriseConfiguration() {
                                                         console.log(
                                                             '✅ All required fields filled, starting 10-second auto-save timer...',
                                                         );
+                                                        
+                                                        // Clear validation errors for this row since it's now complete
+                                                        if (showValidationErrors) {
+                                                            const currentIncompleteRows = getIncompleteRows();
+                                                            if (!currentIncompleteRows.includes(rowId)) {
+                                                                // This row is no longer incomplete, check if all rows are complete
+                                                                const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
+                                                                if (remainingIncompleteRows.length === 0) {
+                                                                    // All rows are now complete, clear validation errors
+                                                                    setShowValidationErrors(false);
+                                                                }
+                                                            }
+                                                        }
+                                                        
                                                         debouncedAutoSave();
                                                     } else {
                                                         console.log(
@@ -2847,6 +2907,20 @@ export default function EnterpriseConfiguration() {
                                                     // Only trigger auto-save if all fields are complete
                                                     if (hasEnterprise && hasProduct && hasServices) {
                                                         console.log('🔄 Triggering auto-save timer for complete existing record:', rowId);
+                                                        
+                                                        // Clear validation errors for this row since it's now complete
+                                                        if (showValidationErrors) {
+                                                            const currentIncompleteRows = getIncompleteRows();
+                                                            if (!currentIncompleteRows.includes(rowId)) {
+                                                                // This row is no longer incomplete, check if all rows are complete
+                                                                const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
+                                                                if (remainingIncompleteRows.length === 0) {
+                                                                    // All rows are now complete, clear validation errors
+                                                                    setShowValidationErrors(false);
+                                                                }
+                                                            }
+                                                        }
+                                                        
                                                         // Add to modified records set
                                                         setModifiedExistingRecords(prev => {
                                                             const newSet = new Set(prev);
@@ -3325,70 +3399,6 @@ export default function EnterpriseConfiguration() {
                                     highlightQuery={searchTerm}
                                     groupByExternal={groupByProp}
                                     onShowAllColumns={showAllColumns}
-                                    onQuickAddRow={async () => {
-                                        console.log('🔄 Add row clicked - current state:', {
-                                            configsLength: enterpriseConfigs.length,
-                                            hasBlank: hasBlankRow(),
-                                            configs: enterpriseConfigs.map(c => ({ id: c.id, isEmpty: !c.enterprise && !c.product && !c.services }))
-                                        });
-
-                                        // Check if there's already a blank row
-                                        if (hasBlankRow()) {
-                                            console.log('⚠️ Blank row already exists, showing notification');
-                                            showBlueNotification(
-                                                'Please complete the existing blank row before adding a new one.',
-                                            );
-                                            return;
-                                        }
-
-                                        // Check for incomplete rows before adding new row
-                                        const validation = validateIncompleteRows();
-                                        if (validation.hasIncomplete) {
-                                            console.log('⚠️ Incomplete rows found, showing validation modal');
-                                            setValidationMessage(validation.message);
-                                            setShowValidationModal(true);
-                                            return;
-                                        }
-
-                                        const newId = `tmp-${Date.now()}`;
-                                        const blank = {
-                                            id: newId,
-                                            enterprise: '',
-                                            product: '',
-                                            services: '',
-                                        } as any;
-                                        
-                                        console.log('✅ Adding new blank row:', { newId, blank });
-                                        
-                                        // Use functional update to ensure we get latest state
-                                        setEnterpriseConfigs((prev) => {
-                                            console.log('📝 State update - prev length:', prev.length);
-                                            const newConfigs = [...prev, blank];
-                                            
-                                            // Set display order for the new row (should be at the end)
-                                            const newDisplayOrder = prev.length; // Next position after current rows
-                                            displayOrderRef.current.set(newId, newDisplayOrder);
-                                            console.log(`📍 Set display order ${newDisplayOrder} for new row ${newId}`);
-                                            
-                                            console.log('📝 State update - new length:', newConfigs.length);
-                                            return newConfigs;
-                                        });
-                                        
-                                        // Smooth scroll to the new row for visibility
-                                        setTimeout(() => {
-                                            const el = document.querySelector(
-                                                `[data-config-id="${newId}"]`,
-                                            );
-                                            if (el) {
-                                                el.scrollIntoView({
-                                                    behavior: 'smooth',
-                                                    block: 'center',
-                                                });
-                                            } else {
-                                                console.log('⚠️ Could not find element to scroll to:', newId);
-                                            }
-                                        }, 100); // Increased timeout slightly
-                                    }}
                                 />
                             </div>
                         )}
@@ -3481,7 +3491,12 @@ export default function EnterpriseConfiguration() {
                     <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
                         <div
                             className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
-                            onClick={() => setShowValidationModal(false)}
+                            onClick={() => {
+                                setShowValidationModal(false);
+                                setShowValidationErrors(true);
+                                // Force re-render by updating table version
+                                setTableVersion(prev => prev + 1);
+                            }}
                         ></div>
 
                         <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
@@ -3515,7 +3530,12 @@ export default function EnterpriseConfiguration() {
                             <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
                                 <button
                                     type='button'
-                                    onClick={() => setShowValidationModal(false)}
+                                    onClick={() => {
+                                        setShowValidationModal(false);
+                                        setShowValidationErrors(true);
+                                        // Force re-render by updating table version
+                                        setTableVersion(prev => prev + 1);
+                                    }}
                                     className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
                                 >
                                     OK

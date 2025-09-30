@@ -2950,3 +2950,16 @@ a {
 .animate-scaleIn {
     animation: scaleIn 120ms ease-out;
 }
+
+/* Custom search placeholder styles - HIGH SPECIFICITY */
+.search-placeholder::placeholder,
+input.search-placeholder::placeholder,
+div .search-placeholder::placeholder,
+* .search-placeholder::placeholder,
+.search-placeholder[placeholder]::placeholder {
+    color: #6b7280 !important;
+    font-weight: 400 !important;
+    font-style: italic !important;
+    opacity: 0.7 !important;
+    font-size: 12px !important;
+}
