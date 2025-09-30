@@ -2,6 +2,7 @@
 
 import {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import ConfirmModal from '@/components/ConfirmModal';
+import ConnectorDetailsPanel from '@/components/ConnectorDetailsPanel';
 import {motion, AnimatePresence} from 'framer-motion';
 // @ts-ignore
 import * as XLSX from 'xlsx';
@@ -649,17 +650,30 @@ function CreateConnectorSidebar({
     isOpen,
     onClose,
     onSave,
+    onConnectorSelect,
+    shouldResetSelection,
 }: {
     isOpen: boolean;
     onClose: () => void;
     onSave: (connector: Partial<ConnectorRecord>) => void;
+    onConnectorSelect: (connector: any) => void;
+    shouldResetSelection?: boolean;
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedConnector, setSelectedConnector] = useState<any>(null);
 
+    // Reset selection when requested (e.g., when details panel is closed)
+    useEffect(() => {
+        if (shouldResetSelection) {
+            setSelectedConnector(null);
+        }
+    }, [shouldResetSelection]);
+
     const handleConnectorSelect = (connector: any) => {
         console.log('🔗 Connector selected:', connector.name);
         setSelectedConnector(connector);
+        // Notify parent component to open the connector details panel
+        onConnectorSelect(connector);
     };
 
     const handleConnectorSave = () => {
@@ -1187,154 +1201,13 @@ function CreateConnectorSidebar({
                         )}
                     </motion.div>
 
-                    {/* Progressive Sidebar for Connector Configuration */}
-                    <AnimatePresence>
-                        {selectedConnector && (
-                            <motion.div
-                                initial={{x: '100%'}}
-                                animate={{x: 0}}
-                                exit={{x: '100%'}}
-                                transition={{
-                                    type: 'spring',
-                                    damping: 25,
-                                    stiffness: 200,
-                                }}
-                                className='fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-[70] flex flex-col border-l border-gray-200'
-                            >
-                                {/* Header with frame.svg only */}
-                                <div className='relative bg-white border-b border-gray-200 p-6'>
-                                    <div className='absolute inset-0 opacity-20'>
-                                        <img
-                                            src='/images/logos/frame.svg'
-                                            alt='Frame'
-                                            className='w-full h-full object-cover'
-                                        />
-                                    </div>
-                                    <div className='relative flex items-center justify-between'>
-                                        <div className='flex items-center space-x-3'>
-                                            <div className='w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center'>
-                                                {selectedConnector.icon}
-                                            </div>
-                                            <div>
-                                                <h2 className='text-xl font-bold text-gray-900'>
-                                                    {selectedConnector.name}{' '}
-                                                    Configuration
-                                                </h2>
-                                                <p className='text-gray-600 text-sm'>
-                                                    Configure connector settings
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() =>
-                                                setSelectedConnector(null)
-                                            }
-                                            className='p-2 hover:bg-gray-100 rounded-full transition-colors'
-                                        >
-                                            <XMarkIcon className='w-5 h-5 text-gray-600' />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Configuration Form */}
-                                <div className='flex-1 p-6 overflow-y-auto'>
-                                    <div className='space-y-6'>
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                Connector Name
-                                            </label>
-                                            <input
-                                                type='text'
-                                                value={selectedConnector.name}
-                                                readOnly
-                                                className='w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600'
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                Description
-                                            </label>
-                                            <textarea
-                                                rows={3}
-                                                placeholder='Enter connector description'
-                                                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                Connection URL
-                                            </label>
-                                            <input
-                                                type='url'
-                                                placeholder='https://api.example.com'
-                                                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                Authentication
-                                            </label>
-                                            <select className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'>
-                                                <option value=''>
-                                                    Select authentication type
-                                                </option>
-                                                <option value='api_key'>
-                                                    API Key
-                                                </option>
-                                                <option value='oauth'>
-                                                    OAuth 2.0
-                                                </option>
-                                                <option value='basic'>
-                                                    Basic Auth
-                                                </option>
-                                                <option value='token'>
-                                                    Bearer Token
-                                                </option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className='block text-sm font-medium text-gray-700 mb-2'>
-                                                Status
-                                            </label>
-                                            <select className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'>
-                                                <option value='active'>
-                                                    Active
-                                                </option>
-                                                <option value='inactive'>
-                                                    Inactive
-                                                </option>
-                                                <option value='pending'>
-                                                    Pending
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Footer */}
-                                <div className='p-6 border-t border-gray-200 flex justify-between space-x-3'>
-                                    <button
-                                        onClick={() =>
-                                            setSelectedConnector(null)
-                                        }
-                                        className='px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                                    >
-                                        Back
-                                    </button>
-                                    <button
-                                        onClick={handleConnectorSave}
-                                        className='px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                                    >
-                                        Save Configuration
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {/* Progressive Sidebar for Connector Configuration - Using ConnectorDetailsPanel */}
+                    <ConnectorDetailsPanel
+                        isOpen={!!selectedConnector}
+                        onClose={() => setSelectedConnector(null)}
+                        connector={selectedConnector}
+                        sidebarWidth={0} // No main sidebar on this page
+                    />
                 </>
             )}
         </AnimatePresence>
@@ -1347,6 +1220,10 @@ export default function Connectors() {
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [showSearchBar, setShowSearchBar] = useState(false);
     const [showCreateSidebar, setShowCreateSidebar] = useState(false);
+    const [showConnectorDetails, setShowConnectorDetails] = useState(false);
+    const [selectedConnectorForDetails, setSelectedConnectorForDetails] =
+        useState<any>(null);
+    const [shouldResetSelection, setShouldResetSelection] = useState(false);
     const [saveNotifications, setSaveNotifications] = useState<
         Array<{id: string; message: string; timestamp: number}>
     >([]);
@@ -1396,6 +1273,15 @@ export default function Connectors() {
     const handleCreateConnector = useCallback(() => {
         console.log('➕ Opening create connector sidebar...');
         setShowCreateSidebar(true);
+    }, []);
+
+    // Handle connector selection from create sidebar
+    const handleConnectorSelect = useCallback((connector: any) => {
+        console.log('🔗 Connector selected for configuration:', connector.name);
+        setSelectedConnectorForDetails(connector);
+        setShowConnectorDetails(true);
+        // Keep the create sidebar open but collapsed (showing only icons)
+        // setShowCreateSidebar(false); // Remove this to keep sidebar visible in collapsed state
     }, []);
 
     // Handle save connector
@@ -1630,6 +1516,22 @@ export default function Connectors() {
                 isOpen={showCreateSidebar}
                 onClose={() => setShowCreateSidebar(false)}
                 onSave={handleSaveConnector}
+                onConnectorSelect={handleConnectorSelect}
+                shouldResetSelection={shouldResetSelection}
+            />
+
+            {/* Connector Details Panel */}
+            <ConnectorDetailsPanel
+                isOpen={showConnectorDetails}
+                onClose={() => {
+                    setShowConnectorDetails(false);
+                    setSelectedConnectorForDetails(null);
+                    // Reset the selection in the create sidebar to expand it back
+                    setShouldResetSelection(true);
+                    setTimeout(() => setShouldResetSelection(false), 100); // Reset the flag
+                }}
+                connector={selectedConnectorForDetails}
+                sidebarWidth={0} // No main sidebar on this page
             />
 
             {/* Delete Confirmation Modal */}
