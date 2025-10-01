@@ -982,11 +982,12 @@ export default function EnterpriseConfiguration() {
                 const hasProduct = (config.product || config.productName)?.trim();
                 const hasServices = (config.services || config.serviceName)?.trim();
 
-                // Don't include completely blank rows (new rows that haven't been touched)
+                // When validation errors are being shown, include completely blank rows for highlighting
+                // Otherwise, don't include completely blank rows (new rows that haven't been touched)
                 const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
-                if (isCompletelyBlank) return false;
+                if (isCompletelyBlank && !showValidationErrors) return false;
 
-                // Row is incomplete if it has some data but not all required fields
+                // Row is incomplete if it has some data but not all required fields, OR if it's completely blank and validation is active
                 return !hasEnterprise || !hasProduct || !hasServices;
             })
             .map((config: any) => config.id);
@@ -1341,7 +1342,7 @@ export default function EnterpriseConfiguration() {
             !String(config.id).startsWith('tmp-')
         );
 
-        // Check for incomplete temporary rows
+        // Check for incomplete temporary rows (including completely blank ones)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
@@ -1350,7 +1351,7 @@ export default function EnterpriseConfiguration() {
             return !hasEnterprise || !hasProduct || !hasServices;
         });
 
-        // Check for incomplete existing rows
+        // Check for incomplete existing rows (including completely blank ones)
         const incompleteExistingRows = existingRows.filter((config: any) => {
             const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
@@ -2038,6 +2039,12 @@ export default function EnterpriseConfiguration() {
             // Apply stable sorting to maintain display order
             return sortConfigsByDisplayOrder(updated);
         });
+        
+        // Clear validation errors when adding a new row to ensure new rows start with normal styling
+        if (showValidationErrors) {
+            setShowValidationErrors(false);
+        }
+        
         console.log('➕ Added new blank row:', newId);
         
         // Scroll to bottom where the new row is rendered
@@ -2199,7 +2206,7 @@ export default function EnterpriseConfiguration() {
                                                 onClick={handleApplyFilters}
                                                 className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
                                             >
-                                                Apply Filters
+                                                Apply
                                             </button>
                                         </div>
                                     </div>
@@ -2523,9 +2530,6 @@ export default function EnterpriseConfiguration() {
                                     <div className='p-3'>
                                         <div className='space-y-3'>
                                             <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Group by
-                                                </label>
                                                 <div className='relative'>
                                                     <select
                                                         value={ActiveGroupLabel}
@@ -2745,6 +2749,8 @@ export default function EnterpriseConfiguration() {
                                     hasBlankRow={hasBlankRow()}
                                     compressingRowId={compressingRowId}
                                     foldingRowId={foldingRowId}
+                                    externalSortColumn={sortColumn}
+                                    externalSortDirection={sortDirection as 'asc' | 'desc' | ''}
                                     onUpdateField={async (
                                         rowId,
                                         field,
