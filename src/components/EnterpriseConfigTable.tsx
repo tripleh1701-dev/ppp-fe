@@ -1666,7 +1666,56 @@ function AsyncChipSelect({
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
-    // Inline adder inside dropdown (no separate portal positioning)
+    const [dropdownPosition, setDropdownPosition] = React.useState<'below' | 'above'>('below');
+    const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    // Portal-based dropdown to avoid table clipping
+
+    // Function to calculate optimal dropdown position
+    const calculateDropdownPosition = React.useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+        
+        // Calculate portal position
+        const width = Math.max(250, Math.min(400, containerRect.width));
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, containerRect.left));
+        
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        let top;
+        if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+        } else {
+            setDropdownPosition('above');
+            top = Math.max(8, containerRect.top - dropdownHeight - 4);
+        }
+        
+        setDropdownPortalPos({ top, left, width });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above' });
+    }, []);
+
+    // Calculate position when dropdown opens
+    React.useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            // Recalculate on scroll or resize
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
 
     // Separate function to load all options (called once when dropdown opens)
     const loadAllOptions = React.useCallback(async () => {
@@ -2155,18 +2204,44 @@ function AsyncChipSelect({
                 ) : null}
             </div>
             
-            {/* Full Autocomplete Dropdown */}
-            {open && (
-                <div className='absolute top-full left-0 right-0 z-[99999] mt-1'>
+            {/* Full Autocomplete Dropdown - Portal Based */}
+            {open && dropdownPortalPos && 
+                createPortal(
                     <div 
                         ref={dropdownRef}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl backdrop-blur-sm max-h-[300px] overflow-y-auto overflow-x-hidden w-full'
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60 overflow-y-auto overflow-x-hidden no-horizontal-scrollbar relative'
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPortalPos.top,
+                            left: dropdownPortalPos.left,
+                            width: dropdownPortalPos.width,
+                        }}
                     >
-                        <div className='py-2'>
+                        {/* Enhanced pointer/arrow pointing to the input field */}
+                        <div className={`absolute left-6 z-[10000] ${
+                            dropdownPosition === 'above' 
+                                ? '-bottom-2' 
+                                : '-top-2'
+                        }`}>
+                            {/* Main pointer */}
+                            <div className={`w-0 h-0 ${
+                                dropdownPosition === 'above' 
+                                    ? 'border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' 
+                                    : 'border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-white'
+                            }`}></div>
+                            {/* Border shadow */}
+                            <div className={`absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 ${
+                                dropdownPosition === 'above' 
+                                    ? '-translate-y-[1px] border-l-[9px] border-r-[9px] border-t-[9px] border-l-transparent border-r-transparent border-t-slate-200' 
+                                    : 'translate-y-[1px] border-l-[9px] border-r-[9px] border-b-[9px] border-l-transparent border-r-transparent border-b-slate-200'
+                            } -z-10`}></div>
+                        </div>
+                        <div className='py-1 text-[12px] min-w-0'>
                             {loading ? (
-                                <div className='px-3 py-2 text-slate-500 flex items-center gap-2'>
-                                    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
-                                    Loading options...
+                                <div className='px-3 py-2 text-slate-500'>
+                                    Loading…
                                 </div>
                             ) : (
                                 (() => {
@@ -2353,9 +2428,9 @@ function AsyncChipSelect({
                                 })()
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
