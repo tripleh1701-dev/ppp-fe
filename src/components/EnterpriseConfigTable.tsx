@@ -969,7 +969,7 @@ function ServicesMultiSelect({
                                 e.stopPropagation();
                                 setShowMoreServices(!showMoreServices);
                             }}
-                            className='inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] leading-[12px] border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors'
+                            className='inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
                         >
                             +{selectedServices.length - visibleCount}
                         </button>
@@ -1159,7 +1159,7 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
                         placeholder=''
                     />
                 ) : (
@@ -1979,14 +1979,55 @@ function AsyncChipSelect({
                                     if (nextCol) {
                                         // Find the next column in the same row
                                         const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="${nextCol}"]`);
-                                        const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
                                         
-                                        if (nextInput) {
-                                            // Use requestAnimationFrame to ensure DOM is updated
-                                            requestAnimationFrame(() => {
-                                                nextInput.focus();
-                                                nextInput.click();
+                                        if (nextCol === 'services') {
+                                            // For Services column, we need to handle both input and button cases
+                                            let nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            const addMoreButton = nextColDiv?.querySelector('button') as HTMLButtonElement;
+                                            
+                                            console.log('Navigating to Services field:', {
+                                                nextColDiv: !!nextColDiv,
+                                                nextInput: !!nextInput,
+                                                addMoreButton: !!addMoreButton,
+                                                rowId: currentRowId
                                             });
+                                            
+                                            if (!nextInput && addMoreButton) {
+                                                // If no input visible, click the "Add more" button to show input
+                                                console.log('Clicking Add more button to show Services input');
+                                                addMoreButton.click();
+                                                // Wait for the input to appear and then focus it
+                                                setTimeout(() => {
+                                                    nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                                    console.log('After clicking button, input found:', !!nextInput);
+                                                    if (nextInput) {
+                                                        nextInput.focus();
+                                                        nextInput.click();
+                                                        console.log('Services input focused successfully');
+                                                    }
+                                                }, 100); // Increased timeout for better reliability
+                                            } else if (nextInput) {
+                                                // Input is already visible, focus it
+                                                console.log('Services input already visible, focusing');
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                    console.log('Services input focused directly');
+                                                });
+                                            } else {
+                                                console.log('Could not find Services input or button');
+                                            }
+                                        } else {
+                                            // For other columns, just find the input
+                                            const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            
+                                            if (nextInput) {
+                                                // Use requestAnimationFrame to ensure DOM is updated
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -2049,6 +2090,10 @@ function AsyncChipSelect({
                                     }
                                 }
                             } else if (e.key === 'Tab') {
+                                // Always handle Tab with our custom navigation
+                                e.preventDefault(); // Always prevent default Tab behavior
+                                e.stopPropagation(); // Stop event bubbling
+                                
                                 if (query.trim()) {
                                     // Check for exact match in all options when Tab is pressed
                                     const exactMatch = allOptions.find(opt => 
@@ -2056,9 +2101,6 @@ function AsyncChipSelect({
                                     );
                                     
                                     if (exactMatch) {
-                                        e.preventDefault(); // Prevent default Tab behavior
-                                        e.stopPropagation(); // Stop event bubbling
-                                        
                                         // Set the value first
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
@@ -2068,14 +2110,22 @@ function AsyncChipSelect({
                                         // Navigate to next field
                                         navigateToNextField(e.target as HTMLInputElement);
                                     } else {
-                                        // No exact match found - prevent Tab and show message to use Add button or Enter
-                                        e.preventDefault(); // Prevent default Tab behavior
-                                        e.stopPropagation(); // Stop event bubbling
-                                        console.log('Tab blocked: Please press Enter or click Add button to create new entry, or change the value');
-                                        // Keep focus on current field
+                                        // No exact match found - commit the current query value and move to next field
+                                        console.log('Tab: Moving to next field and committing current query value:', query.trim());
+                                        
+                                        // Commit the current query value (even if it doesn't match existing options)
+                                        onChange(query.trim());
+                                        setCurrent(query.trim());
+                                        setQuery('');
+                                        setOpen(false);
+                                        
+                                        navigateToNextField(e.target as HTMLInputElement);
                                     }
+                                } else {
+                                    // Empty field - just navigate to next field
+                                    setOpen(false);
+                                    navigateToNextField(e.target as HTMLInputElement);
                                 }
-                                // If no query (empty field), allow normal Tab behavior - don't prevent default
                             } else if (e.key === 'Escape') {
                                 setOpen(false);
                                 setQuery('');
@@ -2356,6 +2406,8 @@ interface EnterpriseConfigTableProps {
     triggerValidation?: boolean; // Trigger validation highlighting
     onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
     onAddNewRow?: () => void; // Callback to add a new row
+    externalSortColumn?: string; // External sort column from parent
+    externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
 }
 
 function SortableEnterpriseConfigRow({
@@ -2829,23 +2881,17 @@ function SortableEnterpriseConfigRow({
                     data-row-id={row.id}
                     data-col='services'
                 >
-                    <div className={`flex-1 min-w-0 truncate max-w-full overflow-hidden ${
-                        isCellMissing(row.id, 'services')
-                            ? 'ring-2 ring-red-200 rounded'
-                            : ''
-                    }`}>
-                        <ServicesMultiSelect
-                            value={row.services || ''}
-                            onChange={(v) =>
-                                onUpdateField(row.id, 'services', v || '')
-                            }
-                            placeholder=''
-                            isError={isCellMissing(row.id, 'services')}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate}
-                            onNewItemCreated={onNewItemCreated}
-                            accounts={allRows}
-                        />
-                    </div>
+                    <ServicesMultiSelect
+                        value={row.services || ''}
+                        onChange={(v) =>
+                            onUpdateField(row.id, 'services', v || '')
+                        }
+                        placeholder=''
+                        isError={isCellMissing(row.id, 'services')}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate}
+                        onNewItemCreated={onNewItemCreated}
+                        accounts={allRows}
+                    />
                 </div>
             )}
             {/* actions column removed */}
@@ -2891,6 +2937,8 @@ export default function EnterpriseConfigTable({
     triggerValidation = false,
     onValidationComplete,
     onAddNewRow,
+    externalSortColumn,
+    externalSortDirection,
 }: EnterpriseConfigTableProps) {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -2914,16 +2962,19 @@ export default function EnterpriseConfigTable({
         const row = localRows.find((r) => r.id === rowId);
         if (!row) return false;
 
-        // Don't highlight validation errors for completely blank new rows
-        // (rows that have no data in any field should be treated as "new" and not show validation errors)
-        const isCompletelyBlank = !row.enterprise?.trim() && !row.product?.trim() && !row.services?.trim();
-        if (isCompletelyBlank) return false;
+        // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
+        // This prevents new rows from inheriting validation styling from previous validation sessions
+        if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
+            return false;
+        }
 
         // Check if this row has validation errors (either from parent or local validation)
         const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
         
         if (!hasValidationError) return false;
 
+        // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
+        // including completely blank rows
         return isFieldMissing(row, field);
     };
 
@@ -3251,7 +3302,8 @@ export default function EnterpriseConfigTable({
     
     // Handle delete click - directly call parent's onDelete function
     
-    const [sortCol, setSortCol] = useState<
+    // Use external sort state if provided, otherwise fall back to internal state
+    const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
         | 'email'
         | 'status'
@@ -3263,7 +3315,11 @@ export default function EnterpriseConfigTable({
         | 'services'
         | null
     >(null);
-    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+    const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc' | null>(null);
+
+    // Use external sort state if available, otherwise use internal state
+    const sortCol = externalSortColumn || internalSortCol;
+    const sortDir = externalSortDirection || internalSortDir;
 
     const toggleSort = (
         col:
@@ -3277,10 +3333,13 @@ export default function EnterpriseConfigTable({
             | 'product'
             | 'services',
     ) => {
-        const nextDir: 'asc' | 'desc' =
-            sortCol === col && sortDir === 'asc' ? 'desc' : 'asc';
-        setSortCol(col);
-        setSortDir(nextDir);
+        // Only use internal sort when external sort is not provided
+        if (!externalSortColumn && !externalSortDirection) {
+            const nextDir: 'asc' | 'desc' =
+                internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc';
+            setInternalSortCol(col);
+            setInternalSortDir(nextDir);
+        }
     };
 
     const displayItems = useMemo(() => {
@@ -3490,21 +3549,19 @@ export default function EnterpriseConfigTable({
                                                     className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-6 top-1/2 -translate-y-1/2'}`}
                                                 >
                                                     <ArrowUp
-                                                        className={`w-4 h-4 ${
-                                                            sortCol ===
-                                                                (c as any) &&
+                                                        className={`w-4 h-4 transition-all duration-200 ${
+                                                            sortCol === c &&
                                                             sortDir === 'asc'
-                                                                ? 'text-blue-600'
-                                                                : 'text-slate-500'
+                                                                ? 'text-blue-600 font-bold drop-shadow-sm'
+                                                                : 'text-slate-400 hover:text-slate-600'
                                                         }`}
                                                     />
                                                     <ArrowDown
-                                                        className={`w-4 h-4 ${
-                                                            sortCol ===
-                                                                (c as any) &&
+                                                        className={`w-4 h-4 transition-all duration-200 ${
+                                                            sortCol === c &&
                                                             sortDir === 'desc'
-                                                                ? 'text-blue-600'
-                                                                : 'text-slate-500'
+                                                                ? 'text-blue-600 font-bold drop-shadow-sm'
+                                                                : 'text-slate-400 hover:text-slate-600'
                                                         }`}
                                                     />
                                                 </button>
