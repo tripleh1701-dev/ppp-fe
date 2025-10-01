@@ -634,6 +634,13 @@ function ServicesMultiSelect({
     const [loading, setLoading] = React.useState(false);
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
+    const [showMoreServices, setShowMoreServices] = React.useState(false);
+    const [moreServicesPos, setMoreServicesPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    const moreServicesRef = React.useRef<HTMLButtonElement>(null);
 
     // Helper function to check if a service is in use
     const isServiceInUse = React.useCallback(
@@ -676,14 +683,14 @@ function ServicesMultiSelect({
             if (typeof window === 'undefined') return;
             const width = window.innerWidth;
             if (width >= 1280) {
-                // xl screens
-                setVisibleCount(4);
+                // xl screens - show 5 chips to utilize the increased column width
+                setVisibleCount(5);
             } else if (width >= 768) {
-                // md screens
-                setVisibleCount(3);
+                // md screens - show 4 chips
+                setVisibleCount(4);
             } else {
-                // sm screens
-                setVisibleCount(2);
+                // sm screens - show 3 chips
+                setVisibleCount(3);
             }
         };
 
@@ -730,6 +737,20 @@ function ServicesMultiSelect({
         }
     }, [open, loadOptions]);
 
+    // Position the more services dropdown
+    React.useEffect(() => {
+        if (showMoreServices && moreServicesRef.current) {
+            const rect = moreServicesRef.current.getBoundingClientRect();
+            const width = Math.max(200, rect.width);
+            const left = Math.max(
+                8,
+                Math.min(window.innerWidth - width - 8, rect.left),
+            );
+            const top = Math.min(window.innerHeight - 16, rect.bottom + 8);
+            setMoreServicesPos({top, left, width});
+        }
+    }, [showMoreServices]);
+
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
@@ -739,6 +760,7 @@ function ServicesMultiSelect({
                 setOpen(false);
                 setShowAdder(false);
                 setAdding('');
+                setShowMoreServices(false);
             }
         };
         document.addEventListener('click', onDoc, true);
@@ -901,10 +923,9 @@ function ServicesMultiSelect({
     return (
         <div
             ref={containerRef}
-            className='relative min-w-0 flex items-center gap-1 group/item'
-            style={{maxWidth: '100%'}}
+            className='relative flex items-center gap-1 group/item'
         >
-            <div className='flex items-center gap-1 min-w-0 overflow-hidden'>
+            <div className='flex items-center gap-1'>
                 {selectedServices
                     .slice(0, visibleCount)
                     .map((service, index) => {
@@ -925,10 +946,10 @@ function ServicesMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
                                 title={service}
                             >
-                                <span className='flex-1 truncate'>{service}</span>
+                                <span className='flex-1'>{service}</span>
                                 <button
                                     onClick={() => removeService(service)}
                                     className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded-sm'
@@ -941,16 +962,70 @@ function ServicesMultiSelect({
                         );
                     })}
                 {selectedServices.length > visibleCount && (
-                    <span
-                        className='inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] leading-[12px] border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-help'
-                        title={`+${
-                            selectedServices.length - visibleCount
-                        } more: ${selectedServices
-                            .slice(visibleCount)
-                            .join(', ')}`}
-                    >
-                        +{selectedServices.length - visibleCount}
-                    </span>
+                    <div className='relative'>
+                        <button
+                            ref={moreServicesRef}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowMoreServices(!showMoreServices);
+                            }}
+                            className='inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] leading-[12px] border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors'
+                        >
+                            +{selectedServices.length - visibleCount}
+                        </button>
+                        
+                        {/* Dropdown for additional services */}
+                        {showMoreServices && moreServicesPos && 
+                            createPortal(
+                                <div
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                        position: 'fixed',
+                                        top: moreServicesPos.top,
+                                        left: moreServicesPos.left,
+                                        width: moreServicesPos.width,
+                                    }}
+                                >
+                                    <div className='p-3'>
+                                        <div className='text-xs font-medium text-slate-700 mb-2'>
+                                            Additional Services ({selectedServices.length - visibleCount})
+                                        </div>
+                                        <div className='space-y-1 max-h-32 overflow-y-auto'>
+                                            {selectedServices.slice(visibleCount).map((service, idx) => {
+                                                const colorTheme = getServiceColor(service);
+                                                return (
+                                                    <div 
+                                                        key={`additional-${idx}`}
+                                                        className='flex items-center justify-between group/additional'
+                                                    >
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}>
+                                                            {service}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                removeService(service);
+                                                                // Close dropdown if no more additional services
+                                                                if (selectedServices.length - 1 <= visibleCount) {
+                                                                    setShowMoreServices(false);
+                                                                }
+                                                            }}
+                                                            className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                            aria-label='Remove'
+                                                        >
+                                                            <X className='h-3 w-3 text-slate-500' />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>,
+                                document.body
+                            )
+                        }
+                    </div>
                 )}
                 
                 {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
@@ -964,6 +1039,7 @@ function ServicesMultiSelect({
                         }}
                         onFocus={() => {
                             setOpen(true);
+                            setShowMoreServices(false); // Close the more services dropdown
                         }}
                         onKeyDown={async (e) => {
                             // Helper function to navigate to next row's enterprise field
@@ -1092,6 +1168,7 @@ function ServicesMultiSelect({
                         onClick={() => {
                             setOpen(true);
                             setQuery('');
+                            setShowMoreServices(false); // Close the more services dropdown
                             // Focus the input field when "Add more" is clicked
                             setTimeout(() => {
                                 inputRef.current?.focus();
@@ -1873,8 +1950,13 @@ function AsyncChipSelect({
                             }
                         }}
                         onFocus={() => {
-                            // Don't automatically open dropdown on focus - only open when user starts typing
-                            // This prevents the unwanted list from showing in the background
+                            // Open dropdown on focus to show available options immediately
+                            setOpen(true);
+                            
+                            // Load options if not already loaded
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
+                            }
                         }}
                         onKeyDown={async (e) => {
                             // Helper function to navigate to next field
@@ -2273,6 +2355,7 @@ interface EnterpriseConfigTableProps {
     foldingRowId?: string | null;
     triggerValidation?: boolean; // Trigger validation highlighting
     onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
+    onAddNewRow?: () => void; // Callback to add a new row
 }
 
 function SortableEnterpriseConfigRow({
@@ -2541,7 +2624,7 @@ function SortableEnterpriseConfigRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 overflow-hidden border border-slate-200 rounded-lg transition-all duration-200 ease-in-out transform-gpu h-10 mb-1 ${
+            className={`w-full grid items-center gap-0 overflow-hidden border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected 
                     ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
                     : 'hover:bg-blue-50 hover:shadow-md hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:translate-x-1'
@@ -2738,7 +2821,7 @@ function SortableEnterpriseConfigRow({
             )}
             {cols.includes('services') && (
                 <div
-                    className={`text-slate-700 text-[12px] border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] px-2 py-1 ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
@@ -2807,6 +2890,7 @@ export default function EnterpriseConfigTable({
     foldingRowId = null,
     triggerValidation = false,
     onValidationComplete,
+    onAddNewRow,
 }: EnterpriseConfigTableProps) {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -3032,9 +3116,9 @@ export default function EnterpriseConfigTable({
 
     const colSizes: Record<string, string> = {
         deleteButton: '8px', // Space for delete button with proper padding
-        enterprise: '160px',
-        product: '140px',
-        services: '300px', // Increased width to show more service chips and Add more button
+        enterprise: '180px', // Reduced width from 220px
+        product: '200px', // Kept the same increased width for better content display
+        services: '800px', // Significantly increased width to extend Services column till the end
     };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -3377,7 +3461,7 @@ export default function EnterpriseConfigTable({
                                     {cols.map((c, idx) => (
                                         <div
                                             key={c}
-                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${idx < cols.length - 1 ? 'border-r-2 border-slate-400' : ''} ${
+                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
                                                 idx === 0 
                                                     ? 'border-l-0' 
                                                     : ''
@@ -3403,24 +3487,24 @@ export default function EnterpriseConfigTable({
                                                     onClick={() =>
                                                         toggleSort(c as any)
                                                     }
-                                                    className='inline-flex items-center -mr-1'
+                                                    className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-6 top-1/2 -translate-y-1/2'}`}
                                                 >
                                                     <ArrowUp
-                                                        className={`w-3 h-3 ${
+                                                        className={`w-4 h-4 ${
                                                             sortCol ===
                                                                 (c as any) &&
                                                             sortDir === 'asc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
+                                                                ? 'text-blue-600'
+                                                                : 'text-slate-500'
                                                         }`}
                                                     />
                                                     <ArrowDown
-                                                        className={`w-3 h-3 ${
+                                                        className={`w-4 h-4 ${
                                                             sortCol ===
                                                                 (c as any) &&
                                                             sortDir === 'desc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
+                                                                ? 'text-blue-600'
+                                                                : 'text-slate-500'
                                                         }`}
                                                     />
                                                 </button>
@@ -3431,10 +3515,10 @@ export default function EnterpriseConfigTable({
                                                     onMouseDown={(e) =>
                                                         startResize(c, e)
                                                     }
-                                                    className='absolute -right-0.5 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize'
+                                                    className='absolute -right-px top-0 h-full w-4 cursor-col-resize z-30 flex items-center justify-center group/resize'
                                                     title='Resize column'
                                                 >
-                                                    <div className='h-4 w-1 bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover:opacity-90 hover:opacity-100 transition-opacity duration-150' />
+                                                    <div className='h-8 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-100 hover:opacity-100 transition-opacity duration-150 shadow-sm' />
                                                 </div>
                                             )}
                                             {c === 'accountName' && (
@@ -3506,6 +3590,28 @@ export default function EnterpriseConfigTable({
                                     )}
                                 </React.Fragment>
                             ))}
+                            
+                            {/* Add New Row Button */}
+                            {onAddNewRow && (
+                                <div 
+                                    className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                    onClick={onAddNewRow}
+                                >
+                                    {/* Empty delete button space */}
+                                    <div className='flex items-center justify-center px-2 py-1'>
+                                        {/* No delete icon for add row */}
+                                    </div>
+                                    
+                                    {/* Add new row content spanning all columns */}
+                                    <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                        <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                        </svg>
+                                        <span className='italic'>Add New Row</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className='space-y-4 mt-2'>
@@ -3572,6 +3678,30 @@ export default function EnterpriseConfigTable({
                                     </div>
                                 </div>
                             ))}
+                            
+                            {/* Add New Row Button for grouped view */}
+                            {onAddNewRow && (
+                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                    <div 
+                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                        style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                        onClick={onAddNewRow}
+                                    >
+                                        {/* Empty delete button space */}
+                                        <div className='flex items-center justify-center px-2 py-1'>
+                                            {/* No delete icon for add row */}
+                                        </div>
+                                        
+                                        {/* Add new row content spanning all columns */}
+                                        <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                            </svg>
+                                            <span className='italic'>Add New Row</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

@@ -68,18 +68,51 @@
     }
 }
 
-/* Wave progress animation for Save button */
-@keyframes wave {
+/* Progress bar animation for Save button autosave countdown */
+@keyframes progressBar {
     0% {
-        transform: translateX(-100%) skewX(-15deg);
-        opacity: 0.6;
-    }
-    50% {
-        opacity: 0.8;
+        width: 0%;
     }
     100% {
-        transform: translateX(200%) skewX(-15deg);
-        opacity: 0.6;
+        width: 100%;
+    }
+}
+
+/* Notification positioning above Save button - extreme right without AI panel overlap */
+.notification-above-save {
+    right: 320px; /* Space for expanded AI panel (300px) + margin (20px) */
+}
+
+/* When AI panel is collapsed (64px width) - move to extreme right */
+.notification-above-save.ai-panel-collapsed {
+    right: 84px; /* Space for collapsed AI panel (64px) + margin (20px) */
+}
+
+/* Responsive positioning for notification */
+@media (max-width: 1400px) {
+    .notification-above-save {
+        right: 320px;
+    }
+    .notification-above-save.ai-panel-collapsed {
+        right: 84px; /* Space for collapsed AI panel (64px) + margin (20px) */
+    }
+}
+
+@media (max-width: 1200px) {
+    .notification-above-save,
+    .notification-above-save.ai-panel-collapsed {
+        right: 24px;
+        max-width: 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    .notification-above-save,
+    .notification-above-save.ai-panel-collapsed {
+        right: 16px;
+        left: 16px;
+        max-width: none;
+        width: auto;
     }
 }
 
