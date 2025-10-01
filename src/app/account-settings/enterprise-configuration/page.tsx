@@ -91,6 +91,9 @@ export default function EnterpriseConfiguration() {
     // State to track user's pending local changes that haven't been saved yet
     const [pendingLocalChanges, setPendingLocalChanges] = useState<Record<string, any>>({});
 
+    // State to track AI panel collapse state for notification positioning
+    const [isAIPanelCollapsed, setIsAIPanelCollapsed] = useState(false);
+
     // Row animation states
     const [compressingRowId, setCompressingRowId] = useState<string | null>(
         null,
@@ -135,6 +138,7 @@ export default function EnterpriseConfiguration() {
 
     // Helper function to show notifications
     const showBlueNotification = (message: string, duration: number = 3000) => {
+        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
         setNotificationMessage(message);
         setShowNotification(true);
         setTimeout(() => {
@@ -765,13 +769,15 @@ export default function EnterpriseConfiguration() {
                     const newId = (createdLinkage as any).id;
                     
                     // Update the config with the real ID from the backend
-                    setEnterpriseConfigs((prev) =>
-                        prev.map((cfg) =>
+                    setEnterpriseConfigs((prev) => {
+                        const updated = prev.map((cfg) =>
                             cfg.id === tempRowId
                                 ? {...cfg, id: newId}
                                 : cfg,
-                        ),
-                    );
+                        );
+                        // Apply stable sorting to maintain display order
+                        return sortConfigsByDisplayOrder(updated);
+                    });
 
                     // Update display order reference with the new ID
                     if (oldDisplayOrder !== undefined) {
@@ -1543,6 +1549,64 @@ export default function EnterpriseConfiguration() {
         };
     }, [enterpriseConfigs]);
 
+    // Effect to detect AI panel collapse state by observing its width
+    useEffect(() => {
+        const detectAIPanelState = () => {
+            // Look for the AI panel by finding the motion.div with width animations
+            const aiPanel = document.querySelector('[class*="w-\\[300px\\]"], [class*="w-16"]') as HTMLElement;
+            if (aiPanel) {
+                const computedStyle = window.getComputedStyle(aiPanel);
+                const width = parseInt(computedStyle.width);
+                const isCollapsed = width <= 80; // 64px + some margin for safety
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel width detected:', width, 'Collapsed:', isCollapsed);
+            }
+        };
+
+        // Create a ResizeObserver to watch for AI panel width changes
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                const isCollapsed = width <= 80;
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel resized to:', width, 'Collapsed:', isCollapsed);
+            }
+        });
+
+        // Find and observe the AI panel
+        const findAndObserveAIPanel = () => {
+            // Look for the AI panel container
+            const aiPanelContainer = document.querySelector('.order-1.lg\\:order-2') as HTMLElement;
+            if (aiPanelContainer) {
+                const aiPanel = aiPanelContainer.querySelector('div') as HTMLElement;
+                if (aiPanel) {
+                    resizeObserver.observe(aiPanel);
+                    detectAIPanelState(); // Initial detection
+                    console.log('🤖 AI Panel observer attached');
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Try to find the panel immediately
+        if (!findAndObserveAIPanel()) {
+            // If not found, try again after a short delay
+            const timeoutId = setTimeout(() => {
+                findAndObserveAIPanel();
+            }, 500);
+
+            return () => {
+                clearTimeout(timeoutId);
+                resizeObserver.disconnect();
+            };
+        }
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, []);
+
     // Add test functions (temporary for debugging)
     if (typeof window !== 'undefined') {
         (window as any).testLinkageCreation = testManualLinkageCreation;
@@ -1554,7 +1618,11 @@ export default function EnterpriseConfiguration() {
                 product: '',
                 services: '',
             } as any;
-            setEnterpriseConfigs((prev) => [...prev, testRow]);
+            setEnterpriseConfigs((prev) => {
+                const updated = [...prev, testRow];
+                // Apply stable sorting to maintain display order
+                return sortConfigsByDisplayOrder(updated);
+            });
             console.log('🧪 Added test row:', newId);
         };
         (window as any).testAutoSave = (tempRowId?: string) => {
@@ -1691,7 +1759,8 @@ export default function EnterpriseConfiguration() {
             console.log(
                 `📊 Updated ${updatedCount} table rows for ${type} ${action}`,
             );
-            return updatedConfigs;
+            // Apply stable sorting to maintain display order
+            return sortConfigsByDisplayOrder(updatedConfigs);
         });
 
         // Force table re-render by incrementing version
@@ -1893,9 +1962,11 @@ export default function EnterpriseConfiguration() {
             );
 
             // Remove from local state
-            setEnterpriseConfigs((prev) =>
-                prev.filter((config) => config.id !== pendingDeleteRowId),
-            );
+            setEnterpriseConfigs((prev) => {
+                const updated = prev.filter((config) => config.id !== pendingDeleteRowId);
+                // Apply stable sorting to maintain display order
+                return sortConfigsByDisplayOrder(updated);
+            });
 
             console.log('✅ Enterprise linkage deleted successfully');
 
@@ -1922,6 +1993,62 @@ export default function EnterpriseConfiguration() {
         setPendingDeleteRowId(null);
     };
 
+    // Reusable function to add new row (used by both toolbar button and table add row button)
+    const handleAddNewRow = () => {
+        console.log('➕ Add new row requested');
+        
+        // Clear any pending autosave to prevent blank rows from being saved
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setAutoSaveCountdown(null);
+        setIsAutoSaving(false);
+        
+        // Check if there's already a blank row
+        if (hasBlankRow()) {
+            showBlueNotification(
+                'Please complete the existing blank row before adding a new one.',
+            );
+            return;
+        }
+
+        // Check for incomplete rows before adding new row
+        const validation = validateIncompleteRows();
+        if (validation.hasIncomplete) {
+            setValidationMessage(validation.message);
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
+            setShowValidationModal(true);
+            return;
+        }
+
+        const newId = `tmp-${Date.now()}`;
+        const blank = {
+            id: newId,
+            enterprise: '',
+            product: '',
+            services: '',
+        } as any;
+        setEnterpriseConfigs((prev) => {
+            const updated = [...prev, blank];
+            // Apply stable sorting to maintain display order
+            return sortConfigsByDisplayOrder(updated);
+        });
+        console.log('➕ Added new blank row:', newId);
+        
+        // Scroll to bottom where the new row is rendered
+        setTimeout(() => {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth',
+            });
+        }, 100);
+    };
+
     return (
         <div className='h-full bg-secondary flex flex-col'>
             {/* Header Section */}
@@ -1942,53 +2069,7 @@ export default function EnterpriseConfiguration() {
                     <div className='flex items-center gap-3 flex-wrap'>
                         {/* Create New Enterprise Button */}
                         <button
-                            onClick={() => {
-                                // Clear any pending autosave to prevent blank rows from being saved
-                                if (autoSaveTimerRef.current) {
-                                    clearTimeout(autoSaveTimerRef.current);
-                                    autoSaveTimerRef.current = null;
-                                }
-                                if (countdownIntervalRef.current) {
-                                    clearInterval(countdownIntervalRef.current);
-                                    countdownIntervalRef.current = null;
-                                }
-                                setAutoSaveCountdown(null);
-                                setIsAutoSaving(false);
-                                
-                                // Check if there's already a blank row
-                                if (hasBlankRow()) {
-                                    showBlueNotification(
-                                        'Please complete the existing blank row before adding a new one.',
-                                    );
-                                    return;
-                                }
-
-                                // Check for incomplete rows before adding new row
-                                const validation = validateIncompleteRows();
-                                if (validation.hasIncomplete) {
-                                    setValidationMessage(validation.message);
-                                    setShowValidationErrors(true); // Enable red border highlighting for validation errors
-                                    setShowValidationModal(true);
-                                    return;
-                                }
-
-                                const newId = `tmp-${Date.now()}`;
-                                const blank = {
-                                    id: newId,
-                                    enterprise: '',
-                                    product: '',
-                                    services: '',
-                                } as any;
-                                setEnterpriseConfigs((prev) => [...prev, blank]);
-                                console.log('➕ Added new blank row:', newId);
-                                // scroll to bottom where the new row is rendered
-                                setTimeout(() => {
-                                    window.scrollTo({
-                                        top: document.body.scrollHeight,
-                                        behavior: 'smooth',
-                                    });
-                                }, 0);
-                            }}
+                            onClick={handleAddNewRow}
                             disabled={isLoading}
                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm ${
                                 isLoading
@@ -2103,19 +2184,27 @@ export default function EnterpriseConfiguration() {
                             {/* Filter Dropdown */}
                             {filterVisible && (
                                 <div className='absolute top-full mt-2 left-0 bg-card text-primary shadow-xl border border-blue-200 rounded-lg z-50 min-w-80'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='flex items-center justify-between px-3 py-1.5 border-b border-blue-200'>
                                         <div className='text-xs font-semibold'>
                                             Filters
                                         </div>
-                                        <button
-                                            onClick={handleClearFilters}
-                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
-                                        >
-                                            Clear All
-                                        </button>
+                                        <div className='flex items-center gap-2'>
+                                            <button
+                                                onClick={handleClearFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear All
+                                            </button>
+                                            <button
+                                                onClick={handleApplyFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Apply Filters
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className='p-3'>
-                                        <div className='space-y-3'>
+                                    <div className='p-2'>
+                                        <div className='space-y-2'>
                                             {/* Enterprise Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
@@ -2132,7 +2221,7 @@ export default function EnterpriseConfiguration() {
                                                                     e.target.value,
                                                             })
                                                         }
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                 </div>
                                             </div>
@@ -2152,7 +2241,7 @@ export default function EnterpriseConfiguration() {
                                                                 product: e.target.value,
                                                             })
                                                         }
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                 </div>
                                             </div>
@@ -2173,20 +2262,10 @@ export default function EnterpriseConfiguration() {
                                                                     e.target.value,
                                                             })
                                                         }
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        {/* Apply Button */}
-                                        <div className='flex justify-end mt-4'>
-                                            <button
-                                                onClick={handleApplyFilters}
-                                                className='px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded font-medium transition-colors shadow-sm'
-                                            >
-                                                Apply Filters
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -2358,7 +2437,7 @@ export default function EnterpriseConfiguration() {
                                                         key={c}
                                                         className='flex items-center justify-between py-1.5'
                                                     >
-                                                        <span className='text-xs capitalize'>
+                                                        <span className='text-sm capitalize'>
                                                             {c ===
                                                             'enterprise'
                                                                 ? 'Enterprise'
@@ -2485,19 +2564,21 @@ export default function EnterpriseConfiguration() {
                             }`}
                             title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
                         >
-                            {/* Wave progress animation for auto-save countdown */}
+                            {/* Progress bar animation for auto-save countdown */}
                             {autoSaveCountdown && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-200 via-blue-400 to-blue-600 animate-[wave_2s_ease-in-out_infinite]"></div>
+                                <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
+                                        style={{
+                                            width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
+                                        }}
+                                    ></div>
+                                </div>
                             )}
                             
                             {/* Auto-save success wave animation */}
                             {showAutoSaveSuccess && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
-                            )}
-                            
-                            {/* Countdown ring animation */}
-                            {autoSaveCountdown && (
-                                <div className="absolute inset-0 border-2 border-white/40 rounded-md animate-pulse"></div>
                             )}
                             
                             {isAutoSaving ? (
@@ -2690,16 +2771,18 @@ export default function EnterpriseConfiguration() {
                                         }));
 
                                         // Also update main state for immediate responsiveness (but this may get overwritten)
-                                        setEnterpriseConfigs((prev) =>
-                                            prev.map((config) =>
+                                        setEnterpriseConfigs((prev) => {
+                                            const updated = prev.map((config) =>
                                                 config.id === rowId
                                                     ? {
                                                           ...config,
                                                           [field]: value,
                                                       }
                                                     : config,
-                                            ),
-                                        );
+                                            );
+                                            // Maintain display order during updates
+                                            return sortConfigsByDisplayOrder(updated);
+                                        });
 
                                         // Update local state immediately for responsiveness
                                         try {
@@ -3145,8 +3228,8 @@ export default function EnterpriseConfiguration() {
 
                                                                 // Update local state: merge into duplicate and remove current
                                                                 setEnterpriseConfigs(
-                                                                    (prev) =>
-                                                                        prev
+                                                                    (prev) => {
+                                                                        const updated = prev
                                                                             .map(
                                                                                 (
                                                                                     cfg,
@@ -3172,7 +3255,10 @@ export default function EnterpriseConfiguration() {
                                                                                 ) =>
                                                                                     cfg.id !==
                                                                                     rowId,
-                                                                            ),
+                                                                            );
+                                                                        // Apply stable sorting to maintain display order
+                                                                        return sortConfigsByDisplayOrder(updated);
+                                                                    }
                                                                 );
 
                                                                 console.log(
@@ -3399,6 +3485,7 @@ export default function EnterpriseConfiguration() {
                                     highlightQuery={searchTerm}
                                     groupByExternal={groupByProp}
                                     onShowAllColumns={showAllColumns}
+                                    onAddNewRow={handleAddNewRow}
                                 />
                             </div>
                         )}
@@ -3634,16 +3721,23 @@ export default function EnterpriseConfiguration() {
                 </div>
             )}
 
-            {/* Blue-themed Notification Component */}
+            {/* Blue-themed Notification Component - Positioned above Save button */}
             {showNotification && (
                 <motion.div
                     initial={{opacity: 0, y: -50, scale: 0.9}}
                     animate={{opacity: 1, y: 0, scale: 1}}
                     exit={{opacity: 0, y: -50, scale: 0.9}}
                     transition={{duration: 0.3, ease: 'easeOut'}}
-                    className='fixed top-4 right-4 z-50 max-w-md'
+                    className={`fixed z-50 max-w-sm notification-above-save ${isAIPanelCollapsed ? 'ai-panel-collapsed' : ''}`}
+                    style={{
+                        // Position well above the toolbar with significant spacing
+                        // Header height (~80px) + more gap above toolbar (40px)
+                        top: '40px'
+                    }}
                 >
-                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg overflow-hidden'>
+                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
+                        {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
+                        <div className='absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-100'></div>
                         <div className='p-4'>
                             <div className='flex items-start'>
                                 <div className='flex-shrink-0'>
