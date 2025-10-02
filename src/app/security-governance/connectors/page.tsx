@@ -723,8 +723,8 @@ function CreateConnectorSidebar({
                     <motion.div
                         initial={{x: '100%'}}
                         animate={{
-                            x: selectedConnector ? '-500px' : 0,
-                            width: selectedConnector ? '80px' : '500px',
+                            x: 0,
+                            width: '500px',
                         }}
                         exit={{x: '100%'}}
                         transition={{
@@ -734,7 +734,7 @@ function CreateConnectorSidebar({
                         }}
                         className='fixed right-0 top-0 h-full bg-white shadow-2xl z-50 flex flex-col'
                         style={{
-                            width: selectedConnector ? '80px' : '500px',
+                            width: '500px',
                         }}
                     >
                         {/* Header with frame.svg background */}

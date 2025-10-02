@@ -9,6 +9,8 @@ type LineStyle = {
     thickness: number;
     animated: boolean;
     color: string;
+    showArrow: boolean;
+    arrowPosition: 'start' | 'end' | 'both';
 };
 
 interface PipelineCanvasToolbarProps {
@@ -399,8 +401,8 @@ export default function PipelineCanvasToolbar({
 
         // Line Style Button
         {
-            id: 'line-style',
-            label: 'Line Style',
+            id: 'connector-properties',
+            label: 'Connector Properties',
             icon: (
                 <svg
                     className='w-5 h-5'
@@ -476,36 +478,36 @@ export default function PipelineCanvasToolbar({
         return acc;
     }, {} as Record<string, typeof toolbarButtons>);
 
-    type LineStyleOption<T> = {
+    type ConnectorStyleOption<T> = {
         value: T;
         label: string;
-        icon: string;
+        icon?: React.ReactNode;
     };
 
-    type LineStyleControl<T> = {
+    type ConnectorStyleControl<T> = {
         id: string;
         label: string;
-        options: LineStyleOption<T>[];
+        options: ConnectorStyleOption<T>[];
         current: T;
         onChange: (value: T) => void;
     };
 
     // Line style buttons
     const colors = [
-        '#3b82f6', // blue
-        '#10b981', // green
-        '#f59e0b', // yellow
-        '#ef4444', // red
-        '#8b5cf6', // purple
-        '#ec4899', // pink
-        '#6b7280', // gray
-        '#000000', // black
+        '#2563eb', // bright blue
+        '#16a34a', // bright green
+        '#ea580c', // bright orange
+        '#dc2626', // bright red
+        '#7c3aed', // bright purple
+        '#db2777', // bright pink
+        '#475569', // slate
+        '#18181b', // zinc
     ];
 
-    const lineStyleButtons: LineStyleControl<any>[] = [
+    const connectorStyleButtons: ConnectorStyleControl<any>[] = [
         {
-            id: 'line-type',
-            label: 'Line Type',
+            id: 'connector-type',
+            label: 'Type',
             options: [
                 {value: 'straight', label: 'Straight', icon: '─'},
                 {value: 'smoothstep', label: 'Smooth', icon: '⟿'},
@@ -516,8 +518,8 @@ export default function PipelineCanvasToolbar({
                 onLineStyleChange?.({type: value}),
         },
         {
-            id: 'line-pattern',
-            label: 'Line Pattern',
+            id: 'connector-pattern',
+            label: 'Pattern',
             options: [
                 {value: 'solid', label: 'Solid', icon: '━'},
                 {value: 'dashed', label: 'Dashed', icon: '┄'},
@@ -528,8 +530,8 @@ export default function PipelineCanvasToolbar({
                 onLineStyleChange?.({pattern: value}),
         },
         {
-            id: 'line-thickness',
-            label: 'Line Thickness',
+            id: 'connector-thickness',
+            label: 'Thickness',
             options: [
                 {value: 1, label: 'Thin', icon: '─'},
                 {value: 2, label: 'Medium', icon: '━'},
@@ -540,7 +542,23 @@ export default function PipelineCanvasToolbar({
                 onLineStyleChange?.({thickness: value}),
         },
         {
-            id: 'line-animated',
+            id: 'connector-arrow',
+            label: 'Arrow',
+            options: [
+                {value: 'none', label: 'None', icon: '─'},
+                {value: 'end', label: 'End', icon: '→'},
+                {value: 'start', label: 'Start', icon: '←'},
+                {value: 'both', label: 'Both', icon: '↔'},
+            ],
+            current: lineStyle?.arrowPosition || 'end',
+            onChange: (value: 'none' | 'start' | 'end' | 'both') =>
+                onLineStyleChange?.({
+                    showArrow: value !== 'none',
+                    arrowPosition: value === 'none' ? 'end' : value,
+                }),
+        },
+        {
+            id: 'connector-animated',
             label: 'Animation',
             options: [
                 {value: true, label: 'Animated', icon: '⇢'},
@@ -551,8 +569,8 @@ export default function PipelineCanvasToolbar({
                 onLineStyleChange?.({animated: value}),
         },
         {
-            id: 'line-color',
-            label: 'Line Color',
+            id: 'connector-color',
+            label: 'Color',
             options: colors.map((color) => ({
                 value: color,
                 label: color,
@@ -568,7 +586,7 @@ export default function PipelineCanvasToolbar({
         'annotation',
         'edit',
         'pipeline',
-        'line-style',
+        'connector-properties',
         'view',
     ];
 
@@ -596,7 +614,8 @@ export default function PipelineCanvasToolbar({
                                             onClick={button.onClick}
                                             disabled={button.disabled}
                                             data-line-style-button={
-                                                button.id === 'line-style'
+                                                button.id ===
+                                                'connector-properties'
                                                     ? 'true'
                                                     : undefined
                                             }
@@ -798,57 +817,74 @@ export default function PipelineCanvasToolbar({
                             }}
                         >
                             <div className='flex flex-col space-y-3'>
-                                {lineStyleButtons.map((control) => (
-                                    <div key={control.id}>
-                                        <div className='text-xs text-gray-500 mb-1.5 font-medium'>
-                                            {control.label}
-                                        </div>
-                                        <div className='flex flex-wrap gap-1'>
-                                            {control.options.map((option) => (
-                                                <button
-                                                    key={String(option.value)}
-                                                    data-line-style-option='true'
-                                                    onClick={() => {
-                                                        // Type-safe way to handle different value types
-                                                        switch (control.id) {
-                                                            case 'line-type':
-                                                                control.onChange(
-                                                                    option.value as
-                                                                        | 'straight'
-                                                                        | 'smoothstep'
-                                                                        | 'bezier',
-                                                                );
-                                                                break;
-                                                            case 'line-pattern':
-                                                                control.onChange(
-                                                                    option.value as
-                                                                        | 'solid'
-                                                                        | 'dotted'
-                                                                        | 'dashed',
-                                                                );
-                                                                break;
-                                                            case 'line-thickness':
-                                                                control.onChange(
-                                                                    option.value as number,
-                                                                );
-                                                                break;
-                                                            case 'line-animated':
-                                                                control.onChange(
-                                                                    option.value as boolean,
-                                                                );
-                                                                break;
-                                                            case 'line-color':
-                                                                control.onChange(
-                                                                    option.value as string,
-                                                                );
-                                                                break;
-                                                        }
-                                                    }}
-                                                    className={`
+                                {connectorStyleButtons.map(
+                                    (control: ConnectorStyleControl<any>) => (
+                                        <div key={control.id}>
+                                            <div className='text-xs text-gray-500 mb-1.5 font-medium'>
+                                                {control.label}
+                                            </div>
+                                            <div className='flex flex-wrap gap-1'>
+                                                {control.options.map(
+                                                    (
+                                                        option: ConnectorStyleOption<any>,
+                                                    ) => (
+                                                        <button
+                                                            key={String(
+                                                                option.value,
+                                                            )}
+                                                            data-connector-style-option='true'
+                                                            onClick={() => {
+                                                                // Type-safe way to handle different value types
+                                                                switch (
+                                                                    control.id
+                                                                ) {
+                                                                    case 'connector-type':
+                                                                        control.onChange(
+                                                                            option.value as
+                                                                                | 'straight'
+                                                                                | 'smoothstep'
+                                                                                | 'bezier',
+                                                                        );
+                                                                        break;
+                                                                    case 'connector-pattern':
+                                                                        control.onChange(
+                                                                            option.value as
+                                                                                | 'solid'
+                                                                                | 'dotted'
+                                                                                | 'dashed',
+                                                                        );
+                                                                        break;
+                                                                    case 'connector-thickness':
+                                                                        control.onChange(
+                                                                            option.value as number,
+                                                                        );
+                                                                        break;
+                                                                    case 'connector-arrow':
+                                                                        control.onChange(
+                                                                            option.value as
+                                                                                | 'none'
+                                                                                | 'start'
+                                                                                | 'end'
+                                                                                | 'both',
+                                                                        );
+                                                                        break;
+                                                                    case 'connector-animated':
+                                                                        control.onChange(
+                                                                            option.value as boolean,
+                                                                        );
+                                                                        break;
+                                                                    case 'connector-color':
+                                                                        control.onChange(
+                                                                            option.value as string,
+                                                                        );
+                                                                        break;
+                                                                }
+                                                            }}
+                                                            className={`
                                                         ${
                                                             control.id ===
-                                                            'line-color'
-                                                                ? 'w-6 h-6'
+                                                            'connector-color'
+                                                                ? 'w-8 h-8 shadow-lg hover:shadow-xl'
                                                                 : 'flex-1 px-2 py-1.5'
                                                         }
                                                         rounded-lg text-sm font-medium
@@ -857,39 +893,42 @@ export default function PipelineCanvasToolbar({
                                                             control.current ===
                                                             option.value
                                                                 ? control.id ===
-                                                                  'line-color'
-                                                                    ? 'ring-2 ring-offset-2 ring-blue-500 scale-110'
+                                                                  'connector-color'
+                                                                    ? 'ring-4 ring-offset-2 ring-blue-500 scale-110'
                                                                     : 'bg-blue-500 text-white shadow-md scale-105'
                                                                 : control.id ===
-                                                                  'line-color'
-                                                                ? 'hover:scale-110'
+                                                                  'connector-color'
+                                                                ? 'hover:scale-110 hover:ring-2 hover:ring-offset-1 hover:ring-blue-300'
                                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-105'
                                                         }
                                                     `}
-                                                    title={option.label}
-                                                    style={
-                                                        control.id ===
-                                                        'line-color'
-                                                            ? {
-                                                                  backgroundColor:
-                                                                      option.value,
-                                                                  color:
-                                                                      option.value ===
-                                                                      '#000000'
-                                                                          ? '#ffffff'
-                                                                          : '#000000',
-                                                              }
-                                                            : undefined
-                                                    }
-                                                >
-                                                    {control.id === 'line-color'
-                                                        ? null
-                                                        : option.icon}
-                                                </button>
-                                            ))}
+                                                            title={option.label}
+                                                            style={
+                                                                control.id ===
+                                                                'connector-color'
+                                                                    ? {
+                                                                          backgroundColor:
+                                                                              option.value,
+                                                                          color:
+                                                                              option.value ===
+                                                                              '#18181b'
+                                                                                  ? '#ffffff'
+                                                                                  : '#000000',
+                                                                      }
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            {control.id ===
+                                                            'connector-color'
+                                                                ? null
+                                                                : option.icon}
+                                                        </button>
+                                                    ),
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ),
+                                )}
                             </div>
                         </div>
                     )}

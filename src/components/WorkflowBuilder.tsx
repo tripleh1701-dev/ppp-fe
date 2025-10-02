@@ -17,6 +17,7 @@ import ReactFlow, {
     NodeChange,
     EdgeChange,
     ReactFlowInstance,
+    MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -165,14 +166,18 @@ function WorkflowBuilderContent({
         thickness: number;
         animated: boolean;
         color: string;
+        showArrow: boolean;
+        arrowPosition: 'start' | 'end' | 'both';
     };
 
     const [lineStyle, setLineStyle] = useState<LineStyle>({
-        type: 'smoothstep',
-        pattern: 'solid',
-        thickness: 2,
-        animated: true,
-        color: '#3b82f6',
+        type: 'smoothstep', // smooth type
+        pattern: 'solid', // solid pattern
+        thickness: 1, // thin thickness
+        animated: false, // static animation
+        color: '#3b82f6', // default blue color
+        showArrow: true, // show arrow
+        arrowPosition: 'end', // arrow at end
     });
     const [history, setHistory] = useState<{nodes: Node[]; edges: Edge[]}[]>(
         [],
@@ -456,23 +461,156 @@ function WorkflowBuilderContent({
     const formatCanvas = useCallback(() => {
         if (!reactFlowInstance) return;
 
-        const updatedNodes = nodes.map(
-            (node: Node<WorkflowNodeData>, index: number) => ({
+        // Get viewport dimensions
+        const {width} = reactFlowWrapper.current?.getBoundingClientRect() || {
+            width: 1000,
+        };
+        const centerX = width / 2;
+
+        // Create a map to store node dependencies
+        const incomingEdges = new Map<string, string[]>();
+        const outgoingEdges = new Map<string, string[]>();
+        const nodeLevels = new Map<string, number>();
+
+        // Initialize edge maps
+        nodes.forEach((node) => {
+            incomingEdges.set(node.id, []);
+            outgoingEdges.set(node.id, []);
+        });
+
+        // Build edge relationships
+        edges.forEach((edge) => {
+            const sourceOutgoing = outgoingEdges.get(edge.source) || [];
+            sourceOutgoing.push(edge.target);
+            outgoingEdges.set(edge.source, sourceOutgoing);
+
+            const targetIncoming = incomingEdges.get(edge.target) || [];
+            targetIncoming.push(edge.source);
+            incomingEdges.set(edge.target, targetIncoming);
+        });
+
+        // Find root nodes (no incoming edges)
+        const rootNodes = nodes
+            .filter((node) => (incomingEdges.get(node.id) || []).length === 0)
+            .map((node) => node.id);
+
+        // If no root nodes found, use nodes with fewest incoming edges
+        if (rootNodes.length === 0) {
+            let minIncoming = Infinity;
+            nodes.forEach((node) => {
+                const incoming = incomingEdges.get(node.id)?.length || 0;
+                minIncoming = Math.min(minIncoming, incoming);
+            });
+            nodes.forEach((node) => {
+                if ((incomingEdges.get(node.id)?.length || 0) === minIncoming) {
+                    rootNodes.push(node.id);
+                }
+            });
+        }
+
+        // Calculate node levels using topological sort
+        const visited = new Set<string>();
+        const visiting = new Set<string>();
+
+        const visit = (nodeId: string, level: number = 0) => {
+            if (visiting.has(nodeId)) return; // Skip if in current path (cycle)
+            if (visited.has(nodeId)) {
+                // Update level if this node is reached through a longer path
+                const currentLevel = nodeLevels.get(nodeId) || 0;
+                nodeLevels.set(nodeId, Math.max(currentLevel, level));
+                return;
+            }
+
+            visiting.add(nodeId);
+            nodeLevels.set(nodeId, level);
+
+            // Visit all children
+            const children = outgoingEdges.get(nodeId) || [];
+            children.forEach((childId) => {
+                visit(childId, level + 1);
+            });
+
+            visiting.delete(nodeId);
+            visited.add(nodeId);
+        };
+
+        // Process all root nodes
+        rootNodes.forEach((nodeId) => visit(nodeId));
+
+        // Handle any disconnected nodes or cycles
+        nodes.forEach((node) => {
+            if (!visited.has(node.id)) {
+                const maxLevel = Math.max(
+                    ...Array.from(nodeLevels.values()),
+                    -1,
+                );
+                visit(node.id, maxLevel + 1);
+            }
+        });
+
+        // Group nodes by level
+        const nodesByLevel = new Map<number, string[]>();
+        nodeLevels.forEach((level, nodeId) => {
+            const nodesInLevel = nodesByLevel.get(level) || [];
+            nodesInLevel.push(nodeId);
+            nodesByLevel.set(level, nodesInLevel);
+        });
+
+        // Calculate positions with better spacing
+        const verticalGap = 200; // Space between levels
+        const horizontalGap = 250; // Space between nodes in the same level
+        const startY = 100;
+
+        const updatedNodes = nodes.map((node) => {
+            const level = nodeLevels.get(node.id) || 0;
+            const nodesInLevel = nodesByLevel.get(level) || [];
+            const indexInLevel = nodesInLevel.indexOf(node.id);
+            const totalNodesInLevel = nodesInLevel.length;
+
+            // Center nodes horizontally within their level
+            const levelWidth = (totalNodesInLevel - 1) * horizontalGap;
+            const startX = centerX - levelWidth / 2;
+            const x = startX + indexInLevel * horizontalGap;
+
+            return {
                 ...node,
                 position: {
-                    x: 300 + (index % 3) * 250,
-                    y: 100 + Math.floor(index / 3) * 150,
+                    x,
+                    y: startY + level * verticalGap,
                 },
-            }),
-        );
+                style: {
+                    ...node.style,
+                    zIndex: 1,
+                },
+            };
+        });
 
         setNodes(updatedNodes);
 
+        // Update edges to be smoother
+        const updatedEdges = edges.map((edge) => ({
+            ...edge,
+            type: lineStyle.type,
+            animated: lineStyle.animated,
+            style: {
+                ...edge.style,
+                strokeWidth: lineStyle.thickness,
+                stroke: lineStyle.color,
+                strokeDasharray:
+                    lineStyle.pattern === 'dotted'
+                        ? '2,4'
+                        : lineStyle.pattern === 'dashed'
+                        ? '6,3'
+                        : undefined,
+            },
+        }));
+        setEdges(updatedEdges);
+
         // Auto-fit view after formatting
         setTimeout(() => {
-            reactFlowInstance.fitView({padding: 0.1});
+            reactFlowInstance.fitView({padding: 0.2});
         }, 100);
-    }, [nodes, setNodes, reactFlowInstance]);
+    }, [nodes, edges, setNodes, setEdges, reactFlowInstance, lineStyle]);
 
     // Handle copy from template using YAML
     const handleCopyFromTemplate = useCallback(
@@ -705,180 +843,7 @@ function WorkflowBuilderContent({
             setNodes((nds: Node<WorkflowNodeData>[]) => {
                 const updatedNodes = nds.concat(newNode);
 
-                // Define typical pipeline flow connections
-                const pipelineFlow: Record<string, string[]> = {
-                    node_dev: ['plan', 'code'],
-                    node_qa: ['test', 'deploy'],
-                    node_prod: ['deploy', 'release'],
-                    plan: ['code', 'build'],
-                    code: ['build', 'test'],
-                    build: ['test', 'deploy'],
-                    test: ['deploy', 'approval'],
-                    deploy: ['approval', 'release'],
-                    approval: ['release'],
-                    release: [],
-                };
-
-                // Find suitable nodes for auto-connection suggestions
-                const SUGGESTION_RADIUS = 600; // Increased radius for better detection
-                const nodeType = (dragData.nodeType as string).split('_')[0]; // Extract base type (e.g., 'build' from 'build_jenkins')
-
-                // Check for orphaned nodes and suggest connections
-                const orphanedNodes = nds.filter((node) => {
-                    const hasIncomingEdges = edges.some(
-                        (edge) => edge.target === node.id,
-                    );
-                    const hasOutgoingEdges = edges.some(
-                        (edge) => edge.source === node.id,
-                    );
-                    return !hasIncomingEdges || !hasOutgoingEdges;
-                });
-
-                // Get all valid nodes for connection based on pipeline flow
-                const nearbyNodes = nds
-                    .filter((existingNode) => {
-                        // Don't connect to self
-                        if (existingNode.id === newNode.id) return false;
-
-                        const dx = existingNode.position.x - position.x;
-                        const dy = existingNode.position.y - position.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-
-                        // Get the base type of the existing node
-                        const existingType = (
-                            existingNode.data.type as string
-                        ).split('_')[0];
-
-                        // Check if this connection makes sense in the pipeline flow
-                        const isValidPredecessor =
-                            pipelineFlow[existingType]?.includes(nodeType);
-                        const isValidSuccessor =
-                            pipelineFlow[nodeType]?.includes(existingType);
-
-                        // Check if the node is orphaned
-                        const isNodeOrphaned = orphanedNodes.some(
-                            (node) => node.id === existingNode.id,
-                        );
-
-                        // Prefer nodes that follow the typical pipeline flow or are orphaned
-                        const isPreferredConnection =
-                            isValidPredecessor ||
-                            isValidSuccessor ||
-                            isNodeOrphaned;
-
-                        // For preferred connections, use a larger radius
-                        const effectiveRadius = isPreferredConnection
-                            ? SUGGESTION_RADIUS
-                            : SUGGESTION_RADIUS * 0.5;
-
-                        return distance < effectiveRadius;
-                    })
-                    // Sort by distance and limit to 3 closest nodes
-                    .sort((a, b) => {
-                        const isAOrphaned = orphanedNodes.some(
-                            (node) => node.id === a.id,
-                        );
-                        const isBOrphaned = orphanedNodes.some(
-                            (node) => node.id === b.id,
-                        );
-
-                        // Prioritize orphaned nodes
-                        if (isAOrphaned && !isBOrphaned) return -1;
-                        if (!isAOrphaned && isBOrphaned) return 1;
-
-                        // If both or neither are orphaned, sort by distance
-                        const distA = Math.sqrt(
-                            Math.pow(a.position.x - position.x, 2) +
-                                Math.pow(a.position.y - position.y, 2),
-                        );
-                        const distB = Math.sqrt(
-                            Math.pow(b.position.x - position.x, 2) +
-                                Math.pow(b.position.y - position.y, 2),
-                        );
-                        return distA - distB;
-                    })
-                    .slice(0, 3);
-
-                // Create suggested connections
-                if (nearbyNodes.length > 0) {
-                    const suggestedConnections = nearbyNodes.map((nearNode) => {
-                        // Get base types
-                        const nearType = (nearNode.data.type as string).split(
-                            '_',
-                        )[0];
-
-                        // Check if this node is orphaned
-                        const isOrphaned = orphanedNodes.some(
-                            (node) => node.id === nearNode.id,
-                        );
-
-                        // Determine connection direction based on pipeline flow
-                        const canFlowForward =
-                            pipelineFlow[nearType]?.includes(nodeType);
-                        const canFlowBackward =
-                            pipelineFlow[nodeType]?.includes(nearType);
-
-                        // Prioritize forward flow, but allow backward flow if it's the only option
-                        const isForwardFlow =
-                            canFlowForward || !canFlowBackward;
-
-                        // If the node is orphaned, suggest both incoming and outgoing connections
-                        const shouldSuggestConnection =
-                            isOrphaned || canFlowForward || canFlowBackward;
-
-                        const source = isForwardFlow ? nearNode.id : newNode.id;
-                        const target = isForwardFlow ? newNode.id : nearNode.id;
-
-                        // Create connection with direction-based styling
-                        return {
-                            id: `suggested-${nearNode.id}-${newNode.id}`,
-                            source,
-                            target,
-                            type: 'smoothstep',
-                            animated: true,
-                            style: {
-                                stroke: isOrphaned
-                                    ? '#3b82f6'
-                                    : isForwardFlow
-                                    ? '#60a5fa'
-                                    : '#93c5fd',
-                                strokeWidth: isOrphaned
-                                    ? 4
-                                    : isForwardFlow
-                                    ? 3
-                                    : 2,
-                                strokeDasharray: isOrphaned ? '10,4' : '8,4',
-                                opacity: isOrphaned ? 0.9 : 0.8,
-                                filter: isOrphaned
-                                    ? 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.6))'
-                                    : 'drop-shadow(0 0 3px rgba(96, 165, 250, 0.5))',
-                            },
-                            className: 'suggested-connection',
-                            data: {
-                                suggested: true,
-                                tooltip: isOrphaned
-                                    ? `Suggested: Connect ${
-                                          isForwardFlow
-                                              ? `${nearType} → ${nodeType}`
-                                              : `${nodeType} → ${nearType}`
-                                      }`
-                                    : isForwardFlow
-                                    ? `Connect ${nearType} to ${nodeType}`
-                                    : `Connect ${nodeType} to ${nearType}`,
-                            },
-                        };
-                    });
-
-                    // Add suggested connections
-                    setEdges((eds) => [...eds, ...suggestedConnections]);
-
-                    // Remove suggestions after 5 seconds if not connected
-                    setTimeout(() => {
-                        setEdges((eds) =>
-                            eds.filter((edge) => !edge.data?.suggested),
-                        );
-                    }, 5000);
-                }
+                // No auto-connect suggestions - just add the new node
 
                 return updatedNodes;
             });
@@ -1037,46 +1002,89 @@ function WorkflowBuilderContent({
                             ? '6,3'
                             : undefined,
                 },
+                markerEnd:
+                    lineStyle.showArrow &&
+                    (lineStyle.arrowPosition === 'end' ||
+                        lineStyle.arrowPosition === 'both')
+                        ? {
+                              type: MarkerType.Arrow,
+                              color: lineStyle.color,
+                              width: 8,
+                              height: 8,
+                              strokeWidth: 2,
+                              className: 'modern-arrow',
+                          }
+                        : undefined,
+                markerStart:
+                    lineStyle.showArrow &&
+                    (lineStyle.arrowPosition === 'start' ||
+                        lineStyle.arrowPosition === 'both')
+                        ? {
+                              type: MarkerType.Arrow,
+                              color: lineStyle.color,
+                              width: 8,
+                              height: 8,
+                              strokeWidth: 2,
+                              className: 'modern-arrow',
+                          }
+                        : undefined,
             })),
         );
     }, [lineStyle, setEdges]);
 
     // Add styles for suggested connections
-    const suggestedConnectionStyles = `
-        @keyframes suggestedPulse {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
+    const modernArrowStyles = `
+        @keyframes glowPulse {
+            0% { filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4)); }
+            50% { filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6)); }
+            100% { filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.4)); }
         }
-        .suggested-connection {
-            animation: suggestedPulse 2s ease-in-out infinite;
-            cursor: pointer;
-            position: relative;
+        @keyframes arrowFloat {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(2px); }
+            100% { transform: translateX(0); }
         }
-        .suggested-connection:hover {
-            filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.8)) !important;
-            opacity: 1 !important;
+        .react-flow__edge {
+            transition: all 0.3s ease;
         }
-        .suggested-connection::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            left: 50%;
-            top: -30px;
-            transform: translateX(-50%);
-            padding: 4px 8px;
-            background-color: rgba(17, 24, 39, 0.95);
-            color: white;
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            pointer-events: none;
-            z-index: 100000;
+        .react-flow__edge:hover {
+            animation: glowPulse 1.5s infinite;
         }
-        .suggested-connection:hover::after {
-            opacity: 1;
+        .react-flow__edge.selected {
+            animation: glowPulse 1.5s infinite;
         }
+        .react-flow__edge-path {
+            transition: all 0.3s ease;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .react-flow__edge:hover .react-flow__edge-path {
+            stroke-width: 2.5px;
+        }
+        .react-flow__edge.selected .react-flow__edge-path {
+            stroke-width: 2.5px;
+        }
+        .react-flow__arrowhead {
+            transition: all 0.3s ease;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: currentColor;
+            stroke: none;
+            filter: drop-shadow(0 0 1px rgba(59, 130, 246, 0.3));
+        }
+        .react-flow__edge:hover .react-flow__arrowhead {
+            transform: scale(1.05);
+            animation: arrowFloat 1.2s ease-in-out infinite;
+            filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.5));
+        }
+        .react-flow__edge.selected .react-flow__arrowhead {
+            transform: scale(1.05);
+            animation: arrowFloat 1.2s ease-in-out infinite;
+            filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.5));
+        }
+    `;
+
+    const connectionStyles = `
         .permanent-connection {
             transition: all 0.3s ease-in-out;
         }
@@ -1087,7 +1095,7 @@ function WorkflowBuilderContent({
 
     return (
         <div className='flex flex-col h-full bg-gray-50'>
-            <style>{suggestedConnectionStyles}</style>
+            <style>{modernArrowStyles + connectionStyles}</style>
             {/* Pipeline Header - Below Breadcrumbs */}
             <div className='bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0 shadow-sm'>
                 <div className='flex items-center justify-between gap-4'>
@@ -1375,18 +1383,39 @@ function WorkflowBuilderContent({
                         nodesDraggable={!isReadOnly}
                         nodesConnectable={!isReadOnly}
                         defaultEdgeOptions={{
-                            type: lineStyle.type,
-                            animated: lineStyle.animated && !isReadOnly,
+                            type: 'smoothstep',
+                            animated: false,
                             style: {
-                                stroke: lineStyle.color,
-                                strokeWidth: lineStyle.thickness,
-                                strokeDasharray:
-                                    lineStyle.pattern === 'dotted'
-                                        ? '2,4'
-                                        : lineStyle.pattern === 'dashed'
-                                        ? '6,3'
-                                        : undefined,
+                                stroke: '#3b82f6',
+                                strokeWidth: 1,
+                                strokeDasharray: undefined,
                             },
+                            markerEnd:
+                                lineStyle.showArrow &&
+                                (lineStyle.arrowPosition === 'end' ||
+                                    lineStyle.arrowPosition === 'both')
+                                    ? {
+                                          type: MarkerType.Arrow,
+                                          color: lineStyle.color,
+                                          width: 8,
+                                          height: 8,
+                                          strokeWidth: 2,
+                                          className: 'modern-arrow',
+                                      }
+                                    : undefined,
+                            markerStart:
+                                lineStyle.showArrow &&
+                                (lineStyle.arrowPosition === 'start' ||
+                                    lineStyle.arrowPosition === 'both')
+                                    ? {
+                                          type: MarkerType.Arrow,
+                                          color: lineStyle.color,
+                                          width: 8,
+                                          height: 8,
+                                          strokeWidth: 2,
+                                          className: 'modern-arrow',
+                                      }
+                                    : undefined,
                         }}
                         snapToGrid={!isReadOnly}
                         snapGrid={[25, 25]}
@@ -1399,6 +1428,13 @@ function WorkflowBuilderContent({
                                     : lineStyle.pattern === 'dashed'
                                     ? '6,3'
                                     : undefined,
+                            markerEnd: {
+                                type: MarkerType.Arrow,
+                                color: lineStyle.color,
+                                width: 8,
+                                height: 8,
+                                strokeWidth: 2,
+                            },
                         }}
                         deleteKeyCode={
                             isReadOnly ? [] : ['Backspace', 'Delete']

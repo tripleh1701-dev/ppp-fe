@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState} from 'react';
-import {XMarkIcon} from '@heroicons/react/24/outline';
+import {XMarkIcon, InformationCircleIcon} from '@heroicons/react/24/outline';
 
 interface ConnectorDetailsPanelProps {
     isOpen: boolean;
@@ -23,7 +23,44 @@ interface ConnectorField {
     value?: string;
     placeholder?: string;
     options?: string[];
+    help?: string;
 }
+
+interface ConnectorStep {
+    step: number;
+    title: string;
+    description: string;
+    help?: {
+        title: string;
+        content: string;
+        note?: string;
+        sections?: Array<{
+            title: string;
+            content: string | string[];
+        }>;
+    };
+    fields?: ConnectorField[];
+    getFields?: (formData: Record<string, string>) => ConnectorField[];
+    showValidation?: boolean;
+}
+
+type ConnectorStepType = {
+    step: number;
+    title: string;
+    description: string;
+    help?: {
+        title: string;
+        content: string;
+        note?: string;
+        sections?: Array<{
+            title: string;
+            content: string | string[];
+        }>;
+    };
+    fields?: ConnectorField[];
+    getFields?: (formData: Record<string, string>) => ConnectorField[];
+    showValidation?: boolean;
+};
 
 // Background illustration for the connector
 const ConnectorBg = ({connectorType}: {connectorType: string}) => {
@@ -100,6 +137,24 @@ const ConnectorBg = ({connectorType}: {connectorType: string}) => {
 };
 
 // Configuration steps for different connectors
+// Success notification component
+const SuccessNotification = ({message}: {message: string}) => (
+    <div className='fixed top-4 right-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slideIn'>
+        <svg
+            className='w-5 h-5 text-emerald-500'
+            fill='currentColor'
+            viewBox='0 0 20 20'
+        >
+            <path
+                fillRule='evenodd'
+                d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                clipRule='evenodd'
+            />
+        </svg>
+        {message}
+    </div>
+);
+
 const getConnectorSteps = (connectorType: string) => {
     switch (connectorType) {
         case 'jira':
@@ -155,45 +210,209 @@ const getConnectorSteps = (connectorType: string) => {
                     step: 1,
                     title: 'Overview',
                     description: 'Basic connector information and settings',
+                    help: {
+                        title: 'What is the Git connector?',
+                        content:
+                            'The Harness Git connector is a platform-agnostic connector that you can use to connect to any Git account or repo. Learn more',
+                        note: "Whenever possible, you should use the platform-specific code repo connectors, such as the GitHub connector or GitLab connector. Use the Git connector only if Harness doesn't have a platform-specific connector for your SCM provider.",
+                    },
                     fields: [
                         {
                             label: 'Name',
                             type: 'text',
-                            value: 'GitHubConn',
                             required: true,
+                            help: 'Enter a name that identifies this connector',
                         },
                         {
                             label: 'Description',
                             type: 'text',
-                            value: 'GitHub Connector',
+                            optional: true,
+                            help: 'Brief description of the connector',
                         },
-                        {label: 'Tags', type: 'text', value: 'GitHubConnTag'},
+                        {
+                            label: 'Tags',
+                            type: 'text',
+                            optional: true,
+                            help: 'Add tags to organize and categorize this connector',
+                        },
                     ] as ConnectorField[],
                 },
                 {
                     step: 2,
                     title: 'Details',
-                    description: 'Authentication and connection details',
-                    fields: [
-                        {
-                            label: 'GitHub URL',
-                            type: 'url',
-                            placeholder: 'Type here',
-                            required: true,
-                        },
-                        {
-                            label: 'Credential Name',
-                            type: 'text',
-                            placeholder: 'Type here',
-                            required: true,
-                        },
-                    ] as ConnectorField[],
+                    description: 'Connection and authentication details',
+                    getFields: (formData: Record<string, string>) => {
+                        const urlType = formData['URL Type'] || 'Account';
+                        const isSSH = formData['Connection Type'] === 'SSH';
+
+                        return [
+                            {
+                                label: 'URL Type',
+                                type: 'radio',
+                                options: ['Account', 'Repository'],
+                                required: true,
+                                help: 'Enter the URL for the GitHub account or repository that you want to connect to.\n\nGitHub Repository URL: Enter the complete URL to the GitHub repository, such as https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git or git@github.com:YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git.\n\nGitHub Account URL: only the account-identifying portion of the GitHub URL, such as https://github.com/YOUR_ACCOUNT_NAME/, https://github.com, git@github.com:YOUR_ACCOUNT_NAME/, or git@github.com. Do not include a repo name.',
+                                value: urlType,
+                            },
+                            {
+                                label: 'Connection Type',
+                                type: 'radio',
+                                options: ['HTTP', 'SSH'],
+                                required: true,
+                                help: 'Choose how to authenticate with GitHub:\n\nHTTP: Use username and personal access token (PAT)\nSSH: Use SSH key authentication',
+                                value: formData['Connection Type'] || 'HTTP',
+                            },
+                            ...(urlType === 'Account'
+                                ? [
+                                      {
+                                          label: 'GitHub Account URL',
+                                          type: 'text',
+                                          placeholder: isSSH
+                                              ? 'git@github.com'
+                                              : 'https://github.com',
+                                          required: true,
+                                          help: 'Enter your GitHub account URL',
+                                          value:
+                                              formData['GitHub Account URL'] ||
+                                              '',
+                                      },
+                                      {
+                                          label: 'Test Repository',
+                                          type: 'text',
+                                          placeholder: '',
+                                          required: true,
+                                          help: 'Please provide a repository to test the credentials. This is required just for checking connectivity. The connector will still be created at account level.',
+                                          value:
+                                              formData['Test Repository'] || '',
+                                      },
+                                  ]
+                                : [
+                                      {
+                                          label: 'GitHub Repository URL',
+                                          type: 'text',
+                                          placeholder: isSSH
+                                              ? 'git@github.com:YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git'
+                                              : 'https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git',
+                                          required: true,
+                                          help: isSSH
+                                              ? 'Enter the SSH URL in the format: git@github.com:ACCOUNT/REPO.git'
+                                              : 'Enter the complete URL to the GitHub repository',
+                                          value:
+                                              formData[
+                                                  'GitHub Repository URL'
+                                              ] || '',
+                                      },
+                                  ]),
+                        ];
+                    },
                 },
                 {
                     step: 3,
+                    title: 'Credentials',
+                    description: 'Authentication credentials',
+                    help: {
+                        title: 'How do I authenticate with Git?',
+                        content:
+                            'For SSH connections, you must use SSH key authentication.',
+                        sections: [
+                            {
+                                title: 'SSH Key',
+                                content:
+                                    'Enter your SSH private key or select a secret containing the key.',
+                            },
+                        ],
+                    },
+                    getFields: (formData: Record<string, string>) => {
+                        const isSSH = formData['Connection Type'] === 'SSH';
+                        const baseFields = [
+                            {
+                                label: 'Enable API access (recommended)',
+                                type: 'checkbox',
+                                help: 'API Access is required for using "Git Experience", for creation of Git based triggers, Webhooks management and updating Git statuses',
+                                value:
+                                    formData[
+                                        'Enable API access (recommended)'
+                                    ] || false,
+                            },
+                        ];
+
+                        if (isSSH) {
+                            return [
+                                {
+                                    label: 'Authentication',
+                                    type: 'label',
+                                    value: 'SSH Key',
+                                    required: true,
+                                },
+                                {
+                                    label: 'SSH Key',
+                                    type: 'secret',
+                                    placeholder: 'Create or Select a Secret',
+                                    required: true,
+                                    help: 'Enter your SSH private key or select a secret containing the key',
+                                    value: formData['SSH Key'] || '',
+                                },
+                                ...baseFields,
+                            ] as ConnectorField[];
+                        }
+
+                        return [
+                            {
+                                label: 'Authentication',
+                                type: 'select',
+                                options: ['Username and Token'],
+                                required: true,
+                                help: 'Select authentication method',
+                                value:
+                                    formData['Authentication'] ||
+                                    'Username and Token',
+                            },
+                            {
+                                label: 'Username',
+                                type: 'text',
+                                placeholder: 'Enter your GitHub username',
+                                required: true,
+                                help: 'Enter your GitHub username',
+                                value: formData['Username'] || '',
+                            },
+                            {
+                                label: 'Personal Access Token',
+                                type: 'secret',
+                                placeholder: 'Create or Select a Secret',
+                                required: true,
+                                help: 'Enter your GitHub personal access token',
+                                value: formData['Personal Access Token'] || '',
+                            },
+                            ...baseFields,
+                        ] as ConnectorField[];
+                    },
+                },
+                {
+                    step: 4,
                     title: 'Connection Test',
-                    description: 'Test the connection and validate settings',
+                    description: 'Validate Git authentication and permissions',
+                    help: {
+                        title: 'Connector Test',
+                        content:
+                            'Harness uses a delegate to test the connector by establishing network connectivity and authentication.',
+                        sections: [
+                            {
+                                title: 'Network Connectivity',
+                                content:
+                                    'Network connectivity ensures that a Harness delegate can reach the target resource.',
+                            },
+                            {
+                                title: 'The delegate needs',
+                                content: [
+                                    'API/SSH/HTTPS access to the resources required by this connector.',
+                                    'HTTPS port 443 outbound from the delegate to Harness.',
+                                    'HTTP/2 for gRPC (gRPC Remote Procedure Calls).',
+                                ],
+                            },
+                        ],
+                    },
                     fields: [] as ConnectorField[],
+                    showValidation: true,
                 },
             ];
         case 'gitlab':
@@ -665,6 +884,56 @@ const getConnectorSteps = (connectorType: string) => {
     }
 };
 
+// Add keyframe animations for the step indicators
+const styles = `
+    @keyframes checkmark {
+        0% {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.2);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 0.5;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 0.2;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 0.5;
+        }
+    }
+
+    @keyframes slideIn {
+        0% {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        100% {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+`;
+
+// Add styles to the document
+if (typeof document !== 'undefined') {
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+}
+
 export default function ConnectorDetailsPanel({
     isOpen,
     onClose,
@@ -673,28 +942,153 @@ export default function ConnectorDetailsPanel({
 }: ConnectorDetailsPanelProps) {
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState<Record<string, string>>({});
+    const [isValidating, setIsValidating] = useState(false);
+    const [showSuccessNotification, setShowSuccessNotification] =
+        useState(false);
+    const [validationProgress, setValidationProgress] = useState(0);
+    const [validationError, setValidationError] = useState<{
+        title: string;
+        message: string;
+        details?: string;
+    } | null>(null);
+
+    // Function to test connection with actual credentials
+    const validateConnection = async () => {
+        console.log('Starting validation...');
+        setIsValidating(true);
+        setValidationProgress(0);
+        setValidationError(null);
+        setShowSuccessNotification(false);
+
+        try {
+            // Start validation
+            setValidationProgress(20);
+            console.log('Progress: 20%');
+
+            // Get URL and credentials based on connection type
+            const isSSH = formData['Connection Type'] === 'SSH';
+            const isAccount = formData['URL Type'] === 'Account';
+            const url = isAccount
+                ? formData['GitHub Account URL']
+                : formData['GitHub Repository URL'];
+
+            console.log('Form data:', formData);
+            setValidationProgress(40);
+            console.log('Progress: 40%');
+
+            // Validate credentials
+            let success = false;
+            try {
+                const requestData = {
+                    type: isSSH ? 'ssh' : 'http',
+                    url: url,
+                    ...(isSSH
+                        ? {
+                              sshKey: formData['SSH Key'],
+                          }
+                        : {
+                              username: formData['Username'],
+                              token: formData['Personal Access Token'],
+                          }),
+                    enableApi: formData['Enable API access (recommended)'],
+                };
+                console.log('Sending connection test request:', requestData);
+
+                const response = await fetch(
+                    'http://localhost:4000/api/github/test-connection',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(requestData),
+                    },
+                );
+
+                const responseData = await response.json();
+                console.log('Response from server:', responseData);
+
+                if (!response.ok) {
+                    throw responseData;
+                }
+
+                // Always set success state if we get here
+                setValidationProgress(100);
+                setShowSuccessNotification(true);
+                success = true;
+                console.log('Setting success notification to true');
+                setTimeout(() => {
+                    console.log('Hiding success notification');
+                    setShowSuccessNotification(false);
+                }, 3000);
+            } catch (error: any) {
+                console.error('Inner validation error:', error);
+                setValidationError(error);
+                setValidationProgress(0);
+                setIsValidating(false);
+                throw error; // Re-throw to be caught by outer catch
+            }
+        } catch (error: any) {
+            console.error('Outer validation error:', error);
+            setValidationError({
+                title: error.title || 'Connection Failed',
+                message: error.message || 'Failed to validate connection',
+                details: error.details || JSON.stringify(error, null, 2),
+            });
+            setValidationProgress(0);
+        } finally {
+            console.log(
+                'Validation complete. isValidating:',
+                isValidating,
+                'validationError:',
+                validationError,
+                'showSuccessNotification:',
+                showSuccessNotification,
+            );
+            setIsValidating(false);
+        }
+    };
 
     if (!connector) return null;
 
-    const steps = getConnectorSteps(connector.id);
+    const steps = getConnectorSteps(connector.id) as ConnectorStepType[];
     const currentStepData = steps.find((s) => s.step === currentStep);
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({...prev, [field]: value}));
     };
 
-    const handleSaveAndContinue = () => {
+    const handleSaveAndContinue = async () => {
         if (currentStep < steps.length) {
+            // Move to next step
             setCurrentStep(currentStep + 1);
         } else {
-            // Final save
-            console.log('Saving connector configuration:', formData);
+            // On the final step, close the panel
             onClose();
         }
     };
 
     return (
         <>
+            {/* Success Notification */}
+            {showSuccessNotification && (
+                <div className='fixed top-4 right-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slideIn'>
+                    <svg
+                        className='w-5 h-5 text-emerald-500'
+                        fill='currentColor'
+                        viewBox='0 0 20 20'
+                    >
+                        <path
+                            fillRule='evenodd'
+                            d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                            clipRule='evenodd'
+                        />
+                    </svg>
+                    GitHub connection successful!
+                </div>
+            )}
+
             {/* Backdrop - covers entire screen */}
             <div
                 className={`fixed inset-0 bg-black transition-opacity duration-300 z-40 ${
@@ -705,19 +1099,19 @@ export default function ConnectorDetailsPanel({
 
             {/* Connector Details Panel - Progressive sliding from right to left */}
             <div
-                className={`fixed top-0 right-0 h-full bg-white shadow-2xl transform transition-all duration-300 ease-in-out z-50 border-l border-slate-200 flex ${
+                className={`fixed top-0 right-0 h-full bg-white shadow-2xl transform transition-all duration-300 ease-in-out z-50 flex ${
                     isOpen
                         ? 'translate-x-0 opacity-100'
                         : 'translate-x-full opacity-0 pointer-events-none'
                 }`}
                 style={{
-                    width: '550px', // Further reduced width for maximum compactness
+                    width: '800px', // Increased width for better readability
                 }}
                 aria-hidden={!isOpen}
             >
                 {/* Left Sidebar Navigation */}
                 <div
-                    className='w-56 flex flex-col relative'
+                    className='w-80 flex flex-col relative'
                     style={{
                         backgroundColor: '#0a1a2f',
                         backgroundImage: 'url(/images/logos/sidebar.png)',
@@ -727,9 +1121,9 @@ export default function ConnectorDetailsPanel({
                     }}
                 >
                     {/* Header with Logo and Title */}
-                    <div className='p-6 border-b border-blue-700'>
+                    <div className='p-6 border-b border-opacity-20 border-white'>
                         <div className='flex items-center gap-3'>
-                            <div className='w-10 h-10 flex items-center justify-center bg-blue-600 rounded-lg'>
+                            <div className='w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300'>
                                 {connector.icon}
                             </div>
                             <div>
@@ -763,28 +1157,51 @@ export default function ConnectorDetailsPanel({
                                         }
                                     >
                                         <div
-                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-200 ${
+                                            className={`relative w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${
                                                 step.step === currentStep
-                                                    ? 'bg-blue-500 text-white border-blue-400'
+                                                    ? 'bg-blue-500 text-white border-blue-400 shadow-lg shadow-blue-500/30'
                                                     : step.step < currentStep
-                                                    ? 'bg-blue-600 text-white border-blue-500'
+                                                    ? 'bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-500/30'
                                                     : 'bg-transparent text-blue-400 border-blue-600'
                                             }`}
                                         >
                                             {step.step < currentStep ? (
-                                                <svg
-                                                    className='w-4 h-4'
-                                                    fill='currentColor'
-                                                    viewBox='0 0 20 20'
-                                                >
-                                                    <path
-                                                        fillRule='evenodd'
-                                                        d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                                                        clipRule='evenodd'
-                                                    />
-                                                </svg>
+                                                <>
+                                                    <svg
+                                                        className='w-5 h-5 animate-[checkmark_0.4s_ease-in-out_forwards]'
+                                                        fill='none'
+                                                        stroke='currentColor'
+                                                        viewBox='0 0 24 24'
+                                                    >
+                                                        <path
+                                                            strokeLinecap='round'
+                                                            strokeLinejoin='round'
+                                                            strokeWidth={3}
+                                                            d='M5 13l4 4L19 7'
+                                                        >
+                                                            <animate
+                                                                attributeName='stroke-dasharray'
+                                                                from='0 28 28'
+                                                                to='28 28 28'
+                                                                dur='0.4s'
+                                                                fill='freeze'
+                                                            />
+                                                        </path>
+                                                    </svg>
+                                                    <div className='absolute inset-0 rounded-full border-2 border-emerald-400'>
+                                                        <div className='absolute inset-0 rounded-full border-4 border-emerald-500 animate-[pulse_2s_ease-in-out_infinite]'></div>
+                                                    </div>
+                                                </>
                                             ) : (
-                                                step.step
+                                                <>
+                                                    {step.step}
+                                                    {step.step ===
+                                                        currentStep && (
+                                                        <div className='absolute inset-0 rounded-full border-2 border-blue-400'>
+                                                            <div className='absolute inset-0 rounded-full border-4 border-blue-500 animate-[pulse_2s_ease-in-out_infinite]'></div>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                         <div className='flex-1'>
@@ -832,56 +1249,292 @@ export default function ConnectorDetailsPanel({
                         {currentStepData && (
                             <div className='space-y-6 max-w-2xl'>
                                 {/* Step-specific content */}
-                                {currentStep === 3 ? (
-                                    // Connection Test Step
+                                {currentStepData?.showValidation ? (
+                                    // Connection Test Step with Validation
                                     <div className='space-y-6'>
-                                        <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                                        {/* URL Display */}
+                                        <div className='text-sm text-slate-600'>
+                                            <span className='font-medium'>
+                                                URL:{' '}
+                                            </span>
+                                            {formData['URL Type'] === 'Account'
+                                                ? formData['GitHub Account URL']
+                                                : formData[
+                                                      'GitHub Repository URL'
+                                                  ]}
+                                        </div>
+
+                                        {/* Status Box */}
+                                        <div
+                                            className={`border rounded-lg p-4 ${
+                                                validationError
+                                                    ? 'bg-red-50 border-red-200'
+                                                    : showSuccessNotification
+                                                    ? 'bg-green-50 border-green-200'
+                                                    : 'bg-blue-50 border-blue-200'
+                                            }`}
+                                        >
                                             <div className='flex items-center space-x-3'>
-                                                <div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center'>
-                                                    <svg
-                                                        className='w-4 h-4 text-blue-600'
-                                                        fill='currentColor'
-                                                        viewBox='0 0 20 20'
-                                                    >
-                                                        <path
-                                                            fillRule='evenodd'
-                                                            d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-                                                            clipRule='evenodd'
-                                                        />
-                                                    </svg>
+                                                <div
+                                                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                        validationError
+                                                            ? 'bg-red-100'
+                                                            : showSuccessNotification
+                                                            ? 'bg-green-100'
+                                                            : 'bg-blue-100'
+                                                    }`}
+                                                >
+                                                    {isValidating ? (
+                                                        <svg
+                                                            className='w-5 h-5 text-blue-600 animate-spin'
+                                                            fill='none'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <circle
+                                                                className='opacity-25'
+                                                                cx='12'
+                                                                cy='12'
+                                                                r='10'
+                                                                stroke='currentColor'
+                                                                strokeWidth='4'
+                                                            ></circle>
+                                                            <path
+                                                                className='opacity-75'
+                                                                fill='currentColor'
+                                                                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                                            ></path>
+                                                        </svg>
+                                                    ) : validationError ? (
+                                                        <svg
+                                                            className='w-5 h-5 text-red-600'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                                            />
+                                                        </svg>
+                                                    ) : showSuccessNotification ? (
+                                                        <svg
+                                                            className='w-5 h-5 text-green-600'
+                                                            fill='currentColor'
+                                                            viewBox='0 0 20 20'
+                                                        >
+                                                            <path
+                                                                fillRule='evenodd'
+                                                                d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                                                                clipRule='evenodd'
+                                                            />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg
+                                                            className='w-5 h-5 text-blue-600'
+                                                            fill='currentColor'
+                                                            viewBox='0 0 20 20'
+                                                        >
+                                                            <path
+                                                                fillRule='evenodd'
+                                                                d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                                                                clipRule='evenodd'
+                                                            />
+                                                        </svg>
+                                                    )}
                                                 </div>
                                                 <div>
-                                                    <h4 className='font-medium text-blue-800'>
-                                                        Ready to Test Connection
+                                                    <h4
+                                                        className={`font-medium ${
+                                                            validationError
+                                                                ? 'text-red-800'
+                                                                : showSuccessNotification
+                                                                ? 'text-green-800'
+                                                                : 'text-blue-800'
+                                                        }`}
+                                                    >
+                                                        {isValidating
+                                                            ? 'Validating GitHub authentication and permissions'
+                                                            : validationError
+                                                            ? validationError.title
+                                                            : showSuccessNotification
+                                                            ? 'Connection Successful'
+                                                            : 'Ready to Test Connection'}
                                                     </h4>
-                                                    <p className='text-sm text-blue-600'>
-                                                        Click the button below
-                                                        to test your
-                                                        configuration
+                                                    <p
+                                                        className={`text-sm ${
+                                                            validationError
+                                                                ? 'text-red-600'
+                                                                : showSuccessNotification
+                                                                ? 'text-green-600'
+                                                                : 'text-blue-600'
+                                                        }`}
+                                                    >
+                                                        {isValidating
+                                                            ? `Validating... ${validationProgress}%`
+                                                            : validationError
+                                                            ? validationError.message
+                                                            : showSuccessNotification
+                                                            ? 'GitHub connection validated successfully'
+                                                            : 'Click the button below to test your configuration'}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <button className='w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium'>
-                                            Test Connection
-                                        </button>
+                                        {/* Progress Bar */}
+                                        {isValidating && (
+                                            <div className='w-full bg-gray-200 rounded-full h-2.5'>
+                                                <div
+                                                    className='bg-blue-600 h-2.5 rounded-full transition-all duration-300'
+                                                    style={{
+                                                        width: `${validationProgress}%`,
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        )}
+
+                                        {/* Error Details */}
+                                        {validationError?.details && (
+                                            <div className='bg-slate-50 rounded-lg p-4 font-mono text-sm whitespace-pre overflow-x-auto'>
+                                                {validationError.details}
+                                            </div>
+                                        )}
+
+                                        {/* Action Buttons */}
+                                        <div className='flex gap-3'>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log(
+                                                        'Test Connection button clicked',
+                                                        formData,
+                                                    );
+                                                    try {
+                                                        await validateConnection();
+                                                        console.log(
+                                                            'Validation completed successfully',
+                                                        );
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Validation failed:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                                disabled={isValidating}
+                                                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 ${
+                                                    isValidating
+                                                        ? 'bg-gray-400 cursor-not-allowed'
+                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                            >
+                                                {isValidating
+                                                    ? 'Validating...'
+                                                    : 'Test Connection'}
+                                            </button>
+                                            {validationError && (
+                                                <>
+                                                    <button
+                                                        onClick={() =>
+                                                            setCurrentStep(3)
+                                                        }
+                                                        className='flex-1 py-3 px-4 rounded-lg font-medium border border-blue-600 text-blue-600 hover:bg-blue-50 transition-all duration-200'
+                                                    >
+                                                        Edit Credentials
+                                                    </button>
+                                                    <button className='flex-1 py-3 px-4 rounded-lg font-medium text-blue-600 hover:bg-slate-50 transition-all duration-200'>
+                                                        View permissions
+                                                        required
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     // Form Fields
                                     <div className='space-y-6'>
-                                        {currentStepData.fields.map(
-                                            (field, index) => (
+                                        {(currentStepData?.getFields
+                                            ? currentStepData.getFields(
+                                                  formData,
+                                              )
+                                            : currentStepData?.fields || []
+                                        ).map(
+                                            (
+                                                field: ConnectorField,
+                                                index: number,
+                                            ) => (
                                                 <div key={index}>
-                                                    <label className='block text-sm font-medium text-slate-700 mb-2'>
-                                                        {field.label}{' '}
-                                                        {field.required && (
-                                                            <span className='text-red-500'>
-                                                                *
-                                                            </span>
+                                                    <div className='flex items-center gap-1 mb-2'>
+                                                        <label className='block text-sm font-medium text-slate-700'>
+                                                            {field.label}{' '}
+                                                            {field.required && (
+                                                                <span className='text-red-500'>
+                                                                    *
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                        {field.help && (
+                                                            <div className='relative group'>
+                                                                <InformationCircleIcon className='w-4 h-4 text-slate-400 cursor-help' />
+                                                                <div className='absolute left-0 bottom-full mb-2 w-80 p-3 bg-slate-800 text-white text-sm rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-pre-wrap'>
+                                                                    {field.help}
+                                                                </div>
+                                                            </div>
                                                         )}
-                                                    </label>
-                                                    {field.type === 'select' ? (
+                                                    </div>
+                                                    {field.type === 'radio' ? (
+                                                        <div className='flex gap-6'>
+                                                            {field.options?.map(
+                                                                (option) => (
+                                                                    <label
+                                                                        key={
+                                                                            option
+                                                                        }
+                                                                        className='flex items-center gap-2 cursor-pointer'
+                                                                    >
+                                                                        <div className='relative flex items-center justify-center w-5 h-5'>
+                                                                            <input
+                                                                                type='radio'
+                                                                                name={
+                                                                                    field.label
+                                                                                }
+                                                                                value={
+                                                                                    option
+                                                                                }
+                                                                                checked={
+                                                                                    formData[
+                                                                                        field
+                                                                                            .label
+                                                                                    ] ===
+                                                                                    option
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    handleInputChange(
+                                                                                        field.label,
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                className='w-5 h-5 border-2 border-slate-300 rounded-full appearance-none cursor-pointer checked:border-blue-500 checked:border-[6px] transition-all duration-200'
+                                                                            />
+                                                                        </div>
+                                                                        <span className='text-slate-700'>
+                                                                            {
+                                                                                option
+                                                                            }
+                                                                        </span>
+                                                                    </label>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    ) : field.type ===
+                                                      'select' ? (
                                                         <select
                                                             className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base'
                                                             value={
@@ -992,7 +1645,7 @@ export default function ConnectorDetailsPanel({
                                     className='px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium'
                                 >
                                     {currentStep === steps.length
-                                        ? 'Save & Continue'
+                                        ? 'Finish'
                                         : 'Next'}
                                 </button>
                             </div>

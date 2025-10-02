@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState} from 'react';
+import React, {useState, useRef, useCallback, useEffect} from 'react';
 import {WorkflowNodeType} from '@/types/workflow';
 import {Icon} from './Icons';
 
@@ -1111,6 +1111,30 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
         null,
     );
     const [isPanelExpanded, setIsPanelExpanded] = useState(false);
+    const autoCloseTimerRef = useRef<NodeJS.Timeout>();
+
+    // Function to reset the auto-close timer
+    const resetAutoCloseTimer = useCallback(() => {
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+        }
+
+        if (isPanelExpanded) {
+            autoCloseTimerRef.current = setTimeout(() => {
+                setIsPanelExpanded(false);
+            }, 7000); // 7 seconds
+        }
+    }, [isPanelExpanded]);
+
+    // Start the timer when panel expands
+    useEffect(() => {
+        resetAutoCloseTimer();
+        return () => {
+            if (autoCloseTimerRef.current) {
+                clearTimeout(autoCloseTimerRef.current);
+            }
+        };
+    }, [isPanelExpanded, resetAutoCloseTimer]);
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleCategoryClick = (categoryKey: string) => {
@@ -1164,6 +1188,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                         ? 'w-[342px]' // Blue bar (48px) + Expanded content (294px) - 10% reduced width
                         : 'w-12' // Just the blue bar
                 }`}
+                onMouseMove={resetAutoCloseTimer}
+                onMouseDown={resetAutoCloseTimer}
+                onClick={resetAutoCloseTimer}
                 style={{}}
             >
                 {/* Blue Bar Section (always visible) */}
