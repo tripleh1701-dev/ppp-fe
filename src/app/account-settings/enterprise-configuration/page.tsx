@@ -185,6 +185,25 @@ export default function EnterpriseConfiguration() {
         };
     }, [filterVisible, sortOpen, hideOpen, groupOpen]);
 
+    // Listen for sort changes from the EnterpriseConfigTable
+    useEffect(() => {
+        const handleTableSortChange = (event: CustomEvent) => {
+            const { column, direction } = event.detail;
+            
+            // Update the Sort panel state to reflect the table's sort change
+            setSortColumn(column);
+            setSortDirection(direction);
+        };
+
+        // Add event listener for custom enterprise table sort events
+        document.addEventListener('enterpriseTableSortChange', handleTableSortChange as EventListener);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('enterpriseTableSortChange', handleTableSortChange as EventListener);
+        };
+    }, []);
+
     // Helper function to toggle a specific dialog (closes others)
     const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'group') => {
         closeAllDialogs();
@@ -323,6 +342,10 @@ export default function EnterpriseConfiguration() {
     const clearSorting = () => {
         setSortColumn('');
         setSortDirection('');
+        
+        // Dispatch custom event to clear table sorting
+        const clearEvent = new CustomEvent('clearTableSorting');
+        window.dispatchEvent(clearEvent);
     };
 
     const clearAllFilters = () => {
@@ -2729,7 +2752,6 @@ export default function EnterpriseConfiguration() {
                         ) : (
                             <div className='flex-1 overflow-auto'>
                                 <EnterpriseConfigTable
-                                    key={`table-v${tableVersion}-sort-${sortColumn}-${sortDirection}`}
                                     // title='Account Details'
                                     hideRowExpansion={true}
                                     customColumnLabels={{

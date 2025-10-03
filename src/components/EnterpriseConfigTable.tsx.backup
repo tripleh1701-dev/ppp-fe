@@ -35,6 +35,51 @@ import {
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 
+// Utility function to generate consistent colors for services across the application
+const getServiceColor = (serviceName: string) => {
+    const key = serviceName.toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+    
+    // Blueish service color palette - consistent across all components
+    const serviceColors = [
+        {
+            bg: 'bg-blue-50',
+            text: 'text-blue-800',
+            border: 'border-blue-200',
+            tone: 'blue' as const,
+        },
+        {
+            bg: 'bg-sky-50',
+            text: 'text-sky-800',
+            border: 'border-sky-200',
+            tone: 'sky' as const,
+        },
+        {
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-800',
+            border: 'border-indigo-200',
+            tone: 'indigo' as const,
+        },
+        {
+            bg: 'bg-cyan-50',
+            text: 'text-cyan-800',
+            border: 'border-cyan-200',
+            tone: 'cyan' as const,
+        },
+        {
+            bg: 'bg-slate-50',
+            text: 'text-slate-800',
+            border: 'border-slate-200',
+            tone: 'slate' as const,
+        },
+    ];
+    
+    return serviceColors[hash % serviceColors.length];
+};
+
 // Chip component for dropdown selections
 const SelectionChip = ({
     label,
@@ -46,15 +91,14 @@ const SelectionChip = ({
     color?: 'blue' | 'green' | 'purple';
 }) => {
     const colorClasses = {
-        blue: 'bg-blue-100 text-blue-800 border-blue-200',
+        blue: 'bg-white text-black',
         green: 'bg-green-100 text-green-800 border-green-200',
         purple: 'bg-purple-100 text-purple-800 border-purple-200',
     };
 
     return (
         <span
-            className={`inline-flex items-center px-2 py-1 text-xs font-medium border ${colorClasses[color]} mr-1 mb-1`}
-            style={{borderRadius: '0px !important'}}
+            className={`inline-flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
         >
             {label}
             <button
@@ -121,7 +165,6 @@ const ChipDropdown = ({
                     <div className='flex flex-wrap gap-1'>
                         {selectedOptions.map((option) => (
                             <SelectionChip
-                                key={option.id}
                                 label={option.name}
                                 color={color}
                                 onRemove={() => onDeselect(option.id)}
@@ -140,7 +183,7 @@ const ChipDropdown = ({
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                             className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
                             autoFocus
                         />
@@ -200,6 +243,7 @@ function InlineEditableText({
     value,
     onCommit,
     placeholder,
+    isError = false,
     renderDisplay,
     className,
     dataAttr,
@@ -209,6 +253,7 @@ function InlineEditableText({
     value: string;
     onCommit: (next: string) => void;
     placeholder?: string;
+    isError?: boolean;
     renderDisplay?: (v: string) => React.ReactNode;
     className?: string;
     dataAttr?: string;
@@ -240,9 +285,9 @@ function InlineEditableText({
             <input
                 ref={inputRef}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
                 onBlur={commit}
-                onKeyDown={(e) => {
+                onKeyDown={(e: any) => {
                     if (e.key === 'Enter') commit();
                     if (e.key === 'Escape') cancel();
                     if (e.key === 'Tab') {
@@ -255,7 +300,7 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border border-blue-300 bg-white px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 ${
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
                     className || ''
                 }`}
                 data-inline={dataAttr || undefined}
@@ -272,7 +317,7 @@ function InlineEditableText({
             title={(value || '').toString()}
             data-inline={dataAttr || undefined}
             tabIndex={0}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     setEditing(true);
@@ -284,8 +329,6 @@ function InlineEditableText({
         >
             {renderDisplay ? (
                 renderDisplay(value || '')
-            ) : isEmpty && placeholder ? (
-                <span className='text-slate-400 italic'>{placeholder}</span>
             ) : (
                 value || ''
             )}
@@ -348,13 +391,13 @@ function DropdownOption({
                     <input
                         ref={inputRef}
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
+                        onChange={(e: any) => setEditValue(e.target.value)}
+                        onKeyDown={(e: any) => {
                             if (e.key === 'Enter') handleSave();
                             if (e.key === 'Escape') handleCancel();
                         }}
                         className='flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500'
-                        placeholder={`Edit ${type} name`}
+                        placeholder=''
                     />
                     <button
                         onClick={handleSave}
@@ -429,7 +472,7 @@ function DropdownOption({
                 className='absolute top-1 right-1 flex gap-1'
             >
                 <button
-                    onClick={(e) => {
+                    onClick={(e: any) => {
                         e.stopPropagation();
                         setIsEditing(true);
                     }}
@@ -451,7 +494,7 @@ function DropdownOption({
                     </svg>
                 </button>
                 <motion.button
-                    onClick={(e) => {
+                    onClick={(e: any) => {
                         e.stopPropagation();
                         if (isInUse) {
                             alert(
@@ -561,6 +604,7 @@ function ServicesMultiSelect({
     value,
     onChange,
     placeholder = 'Select Services',
+    isError = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
     accounts = [],
@@ -568,6 +612,7 @@ function ServicesMultiSelect({
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    isError?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
         action: 'update' | 'delete',
@@ -588,6 +633,13 @@ function ServicesMultiSelect({
     const [loading, setLoading] = React.useState(false);
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
+    const [showMoreServices, setShowMoreServices] = React.useState(false);
+    const [moreServicesPos, setMoreServicesPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    const moreServicesRef = React.useRef<HTMLButtonElement>(null);
 
     // Helper function to check if a service is in use
     const isServiceInUse = React.useCallback(
@@ -629,15 +681,16 @@ function ServicesMultiSelect({
         const updateVisibleCount = () => {
             if (typeof window === 'undefined') return;
             const width = window.innerWidth;
+            // Restrict to maximum 5 chips regardless of screen size, with count indicator for additional chips
             if (width >= 1280) {
-                // xl screens
-                setVisibleCount(4);
+                // xl and larger screens - show 5 chips maximum
+                setVisibleCount(5);
             } else if (width >= 768) {
-                // md screens
-                setVisibleCount(3);
+                // md screens - show 4 chips
+                setVisibleCount(4);
             } else {
-                // sm screens
-                setVisibleCount(2);
+                // sm screens - show 3 chips
+                setVisibleCount(3);
             }
         };
 
@@ -684,6 +737,20 @@ function ServicesMultiSelect({
         }
     }, [open, loadOptions]);
 
+    // Position the more services dropdown
+    React.useEffect(() => {
+        if (showMoreServices && moreServicesRef.current) {
+            const rect = moreServicesRef.current.getBoundingClientRect();
+            const width = Math.max(200, rect.width);
+            const left = Math.max(
+                8,
+                Math.min(window.innerWidth - width - 8, rect.left),
+            );
+            const top = Math.min(window.innerHeight - 16, rect.bottom + 8);
+            setMoreServicesPos({top, left, width});
+        }
+    }, [showMoreServices]);
+
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
@@ -693,6 +760,7 @@ function ServicesMultiSelect({
                 setOpen(false);
                 setShowAdder(false);
                 setAdding('');
+                setShowMoreServices(false);
             }
         };
         document.addEventListener('click', onDoc, true);
@@ -855,45 +923,14 @@ function ServicesMultiSelect({
     return (
         <div
             ref={containerRef}
-            className='relative min-w-0 flex items-center gap-1 group/item'
-            style={{maxWidth: '100%'}}
+            className='relative flex items-center gap-1 group/item'
         >
-            <div className='flex items-center gap-1 min-w-0 overflow-hidden'>
+            <div className='flex items-center gap-1'>
                 {selectedServices
                     .slice(0, visibleCount)
                     .map((service, index) => {
-                        // Generate consistent color for each service
-                        const key = service.toLowerCase();
-                        let hash = 0;
-                        for (let i = 0; i < key.length; i++) {
-                            hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-                        }
-                        
-                        // Service color palette (same as in AsyncChipSelect)
-                        const serviceColors = [
-                            {
-                                bg: 'bg-rose-50',
-                                text: 'text-rose-800',
-                                border: 'border-rose-200',
-                            },
-                            {
-                                bg: 'bg-indigo-50',
-                                text: 'text-indigo-800',
-                                border: 'border-indigo-200',
-                            },
-                            {
-                                bg: 'bg-teal-50',
-                                text: 'text-teal-800',
-                                border: 'border-teal-200',
-                            },
-                            {
-                                bg: 'bg-fuchsia-50',
-                                text: 'text-fuchsia-800',
-                                border: 'border-fuchsia-200',
-                            },
-                        ];
-                        
-                        const colorTheme = serviceColors[hash % serviceColors.length];
+                        // Use consistent color function
+                        const colorTheme = getServiceColor(service);
                         
                         return (
                             <motion.span
@@ -909,48 +946,102 @@ function ServicesMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded-sm ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
-                                style={{borderRadius: '0px !important'}}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
                                 title={service}
                             >
-                                <span className='flex-1 truncate'>{service}</span>
+                                <span className='flex-1'>{service}</span>
                                 <button
                                     onClick={() => removeService(service)}
                                     className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded-sm'
                                     aria-label='Remove'
                                     style={{minWidth: '20px', minHeight: '20px'}}
                                 >
-                                    <X className='h-3 w-3' />
+                                    <X size={12} />
                                 </button>
                             </motion.span>
                         );
                     })}
                 {selectedServices.length > visibleCount && (
-                    <span
-                        className='inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] leading-[12px] border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-help'
-                        title={`+${
-                            selectedServices.length - visibleCount
-                        } more: ${selectedServices
-                            .slice(visibleCount)
-                            .join(', ')}`}
-                    >
-                        +{selectedServices.length - visibleCount}
-                    </span>
+                    <div className='relative'>
+                        <button
+                            ref={moreServicesRef}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                setShowMoreServices(!showMoreServices);
+                            }}
+                            className='inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
+                        >
+                            +{selectedServices.length - visibleCount}
+                        </button>
+                        
+                        {/* Dropdown for additional services */}
+                        {showMoreServices && moreServicesPos && 
+                            createPortal(
+                                <div
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) => e.stopPropagation()}
+                                    onClick={(e: any) => e.stopPropagation()}
+                                    style={{
+                                        position: 'fixed',
+                                        top: moreServicesPos.top,
+                                        left: moreServicesPos.left,
+                                        width: moreServicesPos.width,
+                                    }}
+                                >
+                                    <div className='p-3'>
+                                        <div className='text-xs font-medium text-slate-700 mb-2'>
+                                            Additional Services ({selectedServices.length - visibleCount})
+                                        </div>
+                                        <div className='space-y-1 max-h-32 overflow-y-auto'>
+                                            {selectedServices.slice(visibleCount).map((service, idx) => {
+                                                const colorTheme = getServiceColor(service);
+                                                return (
+                                                    <div 
+                                                        key={`additional-${idx}`}
+                                                        className='flex items-center justify-between group/additional'
+                                                    >
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}>
+                                                            {service}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                removeService(service);
+                                                                // Close dropdown if no more additional services
+                                                                if (selectedServices.length - 1 <= visibleCount) {
+                                                                    setShowMoreServices(false);
+                                                                }
+                                                            }}
+                                                            className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                            aria-label='Remove'
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>,
+                                document.body
+                            )
+                        }
+                    </div>
                 )}
                 
-                {/* Show input field when no services selected OR when actively adding more */}
-                {selectedServices.length === 0 || open ? (
+                {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
+                {selectedServices.length === 0 || open || isError ? (
                     <input
                         ref={inputRef}
                         value={query}
-                        onChange={(e) => {
+                        onChange={(e: any) => {
                             setQuery(e.target.value);
                             setOpen(true);
                         }}
                         onFocus={() => {
                             setOpen(true);
+                            setShowMoreServices(false); // Close the more services dropdown
                         }}
-                        onKeyDown={async (e) => {
+                        onKeyDown={async (e: any) => {
                             // Helper function to navigate to next row's enterprise field
                             const navigateToNextRow = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
@@ -1068,8 +1159,8 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className='text-left px-2 py-0.5 text-[12px] rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 w-full focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
-                        placeholder={selectedServices.length === 0 ? placeholder : 'Type to add more...'}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        placeholder=''
                     />
                 ) : (
                     /* Show "Add more" button when services are selected and not actively typing */
@@ -1077,26 +1168,27 @@ function ServicesMultiSelect({
                         onClick={() => {
                             setOpen(true);
                             setQuery('');
+                            setShowMoreServices(false); // Close the more services dropdown
                             // Focus the input field when "Add more" is clicked
                             setTimeout(() => {
                                 inputRef.current?.focus();
                             }, 10);
                         }}
-                        className='text-left px-2 py-0.5 text-[12px] rounded border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 w-full transition-colors'
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         + Add more
                     </button>
                 )}
             </div>
 
-            {open && query.trim() &&
+            {open &&
                 dropdownPos &&
                 createPortal(
                     <div
                         ref={dropdownRef}
                         className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
                         style={{
                             position: 'fixed',
                             top: dropdownPos.top,
@@ -1177,7 +1269,7 @@ function ServicesMultiSelect({
                                                 className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
                                             >
                                                 <div className='flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'>
-                                                    <Plus className='h-3 w-3' />
+                                                    <Plus size={12} />
                                                 </div>
                                                 <div className='flex-1'>
                                                     <span className='text-sm text-blue-600 font-medium'>
@@ -1226,7 +1318,6 @@ function ServicesMultiSelect({
 
                                         return (
                                             <DropdownOption
-                                                key={opt.id}
                                                 option={opt}
                                                 tone={tone}
                                                 type='service'
@@ -1365,7 +1456,7 @@ function ServicesMultiSelect({
                                     }}
                                     className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
                                 >
-                                    <Plus className='h-3.5 w-3.5' />
+                                    <Plus size={14} />
                                     <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
                                         Add new service
                                     </span>
@@ -1401,12 +1492,12 @@ function ServicesMultiSelect({
                                                             damping: 28,
                                                         }}
                                                         value={adding}
-                                                        onChange={(e) =>
+                                                        onChange={(e: any) =>
                                                             setAdding(
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        onKeyDown={(e) => {
+                                                        onKeyDown={(e: any) => {
                                                             if (
                                                                 e.key ===
                                                                 'Enter'
@@ -1420,7 +1511,7 @@ function ServicesMultiSelect({
                                                                     false,
                                                                 );
                                                         }}
-                                                        placeholder='Enter service name'
+                                                        placeholder=''
                                                         className={`flex-1 rounded border px-2 py-1 text-[12px] ${
                                                             similarMatch
                                                                 ? 'border-amber-400 bg-amber-50'
@@ -1488,6 +1579,7 @@ function AsyncChipSelect({
     value,
     onChange,
     placeholder,
+    isError = false,
     compact,
     onDropdownOptionUpdate,
     onNewItemCreated,
@@ -1500,6 +1592,7 @@ function AsyncChipSelect({
     value?: string;
     onChange: (next?: string) => void;
     placeholder?: string;
+    isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
@@ -1572,7 +1665,56 @@ function AsyncChipSelect({
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
-    // Inline adder inside dropdown (no separate portal positioning)
+    const [dropdownPosition, setDropdownPosition] = React.useState<'below' | 'above'>('below');
+    const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    // Portal-based dropdown to avoid table clipping
+
+    // Function to calculate optimal dropdown position
+    const calculateDropdownPosition = React.useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+        
+        // Calculate portal position
+        const width = Math.max(250, Math.min(400, containerRect.width));
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, containerRect.left));
+        
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        let top;
+        if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+        } else {
+            setDropdownPosition('above');
+            top = Math.max(8, containerRect.top - dropdownHeight - 4);
+        }
+        
+        setDropdownPortalPos({ top, left, width });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above' });
+    }, []);
+
+    // Calculate position when dropdown opens
+    React.useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            // Recalculate on scroll or resize
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
 
     // Separate function to load all options (called once when dropdown opens)
     const loadAllOptions = React.useCallback(async () => {
@@ -1580,26 +1722,34 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
             
+            console.log(`Loading options for type: ${type}`);
+            
             if (type === 'product') {
+                console.log('Calling API: /api/products');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/products',
                 ) || [];
             } else if (type === 'service') {
+                console.log('Calling API: /api/services');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/services',
                 ) || [];
             } else if (type === 'template') {
+                console.log('Calling API: /api/products (for template)');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/products',
                 ) || [];
             } else {
+                console.log('Calling API: /api/enterprises');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/enterprises',
                 ) || [];
             }
             
+            console.log(`API call successful for ${type}, got ${allData.length} items:`, allData);
             setAllOptions(allData);
-        } catch (_e) {
+        } catch (error) {
+            console.error(`API call failed for ${type}:`, error);
             setAllOptions([]);
         } finally {
             setLoading(false);
@@ -1747,6 +1897,7 @@ function AsyncChipSelect({
                 }
             }
         } catch (error: any) {
+            console.error(`Failed to create ${type}:`, error);
             // Handle duplicate error from backend
             if (
                 error?.message?.includes('already exists') ||
@@ -1794,10 +1945,10 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border bg-blue-50 text-blue-800 border-blue-200 rounded-sm'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                             const target = e.target as HTMLElement;
                             if (!target.closest('button')) {
                                 setQuery(current || value || '');
@@ -1807,7 +1958,7 @@ function AsyncChipSelect({
                     >
                         <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
                         <button
-                            onClick={(e) => {
+                            onClick={(e: any) => {
                                 e.stopPropagation();
                                 e.preventDefault();
                                 onChange('');
@@ -1818,7 +1969,7 @@ function AsyncChipSelect({
                             aria-label='Remove'
                             style={{minWidth: '20px', minHeight: '20px'}}
                         >
-                            <X className='h-3 w-3' />
+                            <X size={12} />
                         </button>
                     </motion.span>
                 )}
@@ -1827,102 +1978,35 @@ function AsyncChipSelect({
                 {(!current && !value) || open ? (
                     <input
                         ref={inputRef}
-                        value={query || current || value || ''}
-                        onChange={(e) => {
-                            setQuery(e.target.value);
-                            if (e.target.value.trim()) {
-                                setOpen(true);
-                            } else {
-                                setOpen(false);
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+                            
+                            // Always open dropdown when typing
+                            setOpen(true);
+                            
+                            // Load options if not already loaded
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
                             }
-                            if (!e.target.value.trim()) {
+                            
+                            // Clear current selection if user clears the input completely
+                            if (newValue === '') {
                                 onChange('');
                                 setCurrent('');
                             }
                         }}
                         onFocus={() => {
-                            setQuery(current || value || '');
-                        }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500`}
-                        placeholder={placeholder || 'Type to search...'}
-                    />
-                ) : null}
-            </div>
-            
-            {/* Dropdown - temporarily disabled for debugging */}
-            {false && open && query.trim() && (
-                <div>Dropdown placeholder</div>
-            )}
-        </div>
-    );
-            <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
-                {/* Show selected value as chip when there's a value and not actively typing */}
-                {(current || value) && !open && (
-                    <motion.span
-                        initial={{scale: 0.95, opacity: 0}}
-                        animate={{scale: 1, opacity: 1}}
-                        whileHover={{
-                            y: -1,
-                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
-                        }}
-                        transition={{
-                            type: 'spring',
-                            stiffness: 480,
-                            damping: 30,
-                        }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border bg-blue-50 text-blue-800 border-blue-200 rounded-sm'
-                        style={{width: '100%', minWidth: '100%'}}
-                        title={current || value}
-                        onClick={(e) => {
-                            // Only open dropdown if clicking on the text, not the X button
-                            const target = e.target as HTMLElement;
-                            if (!target.closest('button')) {
-                                setQuery(current || value || '');
-                                setOpen(true);
+                            // Open dropdown on focus to show available options immediately
+                            setOpen(true);
+                            
+                            // Load options if not already loaded
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
                             }
                         }}
-                    >
-                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                console.log('X button clicked'); // Debug log
-                                onChange('');
-                                setCurrent('');
-                                setQuery('');
-                            }}
-                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
-                            aria-label='Remove'
-                            style={{minWidth: '20px', minHeight: '20px'}}
-                        >
-                            <X className='h-3 w-3' />
-                        </button>
-                    </motion.span>
-                )}
-                
-                {/* Show input when no value selected or actively typing */}
-                {(!current && !value) || open ? (
-                    <input
-                        ref={inputRef}
-                        value={query || current || value || ''}
-                        onChange={(e) => {
-                            setQuery(e.target.value);
-                            if (e.target.value.trim()) {
-                                setOpen(true);
-                            } else {
-                                setOpen(false);
-                            }
-                            if (!e.target.value.trim()) {
-                                onChange('');
-                                setCurrent('');
-                            }
-                        }}
-                        onFocus={() => {
-                            setQuery(current || value || '');
-                            // Don't automatically open dropdown on focus
-                        }}
-                        onKeyDown={async (e) => {
+                        onKeyDown={async (e: any) => {
                             // Helper function to navigate to next field
                             const navigateToNextField = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
@@ -1943,14 +2027,55 @@ function AsyncChipSelect({
                                     if (nextCol) {
                                         // Find the next column in the same row
                                         const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="${nextCol}"]`);
-                                        const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
                                         
-                                        if (nextInput) {
-                                            // Use requestAnimationFrame to ensure DOM is updated
-                                            requestAnimationFrame(() => {
-                                                nextInput.focus();
-                                                nextInput.click();
+                                        if (nextCol === 'services') {
+                                            // For Services column, we need to handle both input and button cases
+                                            let nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            const addMoreButton = nextColDiv?.querySelector('button') as HTMLButtonElement;
+                                            
+                                            console.log('Navigating to Services field:', {
+                                                nextColDiv: !!nextColDiv,
+                                                nextInput: !!nextInput,
+                                                addMoreButton: !!addMoreButton,
+                                                rowId: currentRowId
                                             });
+                                            
+                                            if (!nextInput && addMoreButton) {
+                                                // If no input visible, click the "Add more" button to show input
+                                                console.log('Clicking Add more button to show Services input');
+                                                addMoreButton.click();
+                                                // Wait for the input to appear and then focus it
+                                                setTimeout(() => {
+                                                    nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                                    console.log('After clicking button, input found:', !!nextInput);
+                                                    if (nextInput) {
+                                                        nextInput.focus();
+                                                        nextInput.click();
+                                                        console.log('Services input focused successfully');
+                                                    }
+                                                }, 100); // Increased timeout for better reliability
+                                            } else if (nextInput) {
+                                                // Input is already visible, focus it
+                                                console.log('Services input already visible, focusing');
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                    console.log('Services input focused directly');
+                                                });
+                                            } else {
+                                                console.log('Could not find Services input or button');
+                                            }
+                                        } else {
+                                            // For other columns, just find the input
+                                            const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            
+                                            if (nextInput) {
+                                                // Use requestAnimationFrame to ensure DOM is updated
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -2013,6 +2138,10 @@ function AsyncChipSelect({
                                     }
                                 }
                             } else if (e.key === 'Tab') {
+                                // Always handle Tab with our custom navigation
+                                e.preventDefault(); // Always prevent default Tab behavior
+                                e.stopPropagation(); // Stop event bubbling
+                                
                                 if (query.trim()) {
                                     // Check for exact match in all options when Tab is pressed
                                     const exactMatch = allOptions.find(opt => 
@@ -2020,9 +2149,6 @@ function AsyncChipSelect({
                                     );
                                     
                                     if (exactMatch) {
-                                        e.preventDefault(); // Prevent default Tab behavior
-                                        e.stopPropagation(); // Stop event bubbling
-                                        
                                         // Set the value first
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
@@ -2032,14 +2158,22 @@ function AsyncChipSelect({
                                         // Navigate to next field
                                         navigateToNextField(e.target as HTMLInputElement);
                                     } else {
-                                        // No exact match found - prevent Tab and show message to use Add button or Enter
-                                        e.preventDefault(); // Prevent default Tab behavior
-                                        e.stopPropagation(); // Stop event bubbling
-                                        console.log('Tab blocked: Please press Enter or click Add button to create new entry, or change the value');
-                                        // Keep focus on current field
+                                        // No exact match found - commit the current query value and move to next field
+                                        console.log('Tab: Moving to next field and committing current query value:', query.trim());
+                                        
+                                        // Commit the current query value (even if it doesn't match existing options)
+                                        onChange(query.trim());
+                                        setCurrent(query.trim());
+                                        setQuery('');
+                                        setOpen(false);
+                                        
+                                        navigateToNextField(e.target as HTMLInputElement);
                                     }
+                                } else {
+                                    // Empty field - just navigate to next field
+                                    setOpen(false);
+                                    navigateToNextField(e.target as HTMLInputElement);
                                 }
-                                // If no query (empty field), allow normal Tab behavior - don't prevent default
                             } else if (e.key === 'Escape') {
                                 setOpen(false);
                                 setQuery('');
@@ -2063,30 +2197,239 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500`}
-                        placeholder={placeholder || 'Type to search...'}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=''
                     />
                 ) : null}
             </div>
             
-            {/* Dropdown - temporarily simplified */}
-            {open && query.trim() && (
-                <div className='absolute top-full left-0 right-0 z-[9999] mt-1'>
-                    <div className='rounded-xl border border-slate-200 bg-white shadow-2xl backdrop-blur-sm max-h-[200px] overflow-y-auto overflow-x-hidden w-full'>
-                        <div className='py-1'>
+            {/* Full Autocomplete Dropdown - Portal Based */}
+            {open && dropdownPortalPos && 
+                createPortal(
+                    <div 
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60 overflow-y-auto overflow-x-hidden no-horizontal-scrollbar relative'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPortalPos.top,
+                            left: dropdownPortalPos.left,
+                            width: dropdownPortalPos.width,
+                        }}
+                    >
+                        {/* Enhanced pointer/arrow pointing to the input field */}
+                        <div className={`absolute left-6 z-[10000] ${
+                            dropdownPosition === 'above' 
+                                ? '-bottom-2' 
+                                : '-top-2'
+                        }`}>
+                            {/* Main pointer */}
+                            <div className={`w-0 h-0 ${
+                                dropdownPosition === 'above' 
+                                    ? 'border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' 
+                                    : 'border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-white'
+                            }`}></div>
+                            {/* Border shadow */}
+                            <div className={`absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 ${
+                                dropdownPosition === 'above' 
+                                    ? '-translate-y-[1px] border-l-[9px] border-r-[9px] border-t-[9px] border-l-transparent border-r-transparent border-t-slate-200' 
+                                    : 'translate-y-[1px] border-l-[9px] border-r-[9px] border-b-[9px] border-l-transparent border-r-transparent border-b-slate-200'
+                            } -z-10`}></div>
+                        </div>
+                        <div className='py-1 text-[12px] min-w-0'>
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
                                 </div>
                             ) : (
-                                <div className='px-3 py-2 text-slate-500 text-center'>
-                                    Dropdown temporarily disabled for debugging
-                                </div>
+                                (() => {
+                                    // Filter options that match the query (show all if no query)
+                                    const filteredOptions = query.trim() 
+                                        ? options.filter(opt => 
+                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                            opt.name.toLowerCase().includes(query.toLowerCase())
+                                        ).sort((a, b) => {
+                                            const aLower = a.name.toLowerCase();
+                                            const bLower = b.name.toLowerCase();
+                                            const queryLower = query.toLowerCase();
+                                            
+                                            // Prioritize starts with matches
+                                            const aStartsWith = aLower.startsWith(queryLower);
+                                            const bStartsWith = bLower.startsWith(queryLower);
+                                            
+                                            if (aStartsWith && !bStartsWith) return -1;
+                                            if (bStartsWith && !aStartsWith) return 1;
+                                            
+                                            return aLower.localeCompare(bLower);
+                                        })
+                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                    
+                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
+                                    
+                                    // Check if query exactly matches an existing option
+                                    const exactMatch = query.trim() ? options.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    ) : null;
+                                    
+                                    const showCreateNew = query.trim() && !exactMatch;
+
+                                    return (
+                                        <div className='space-y-1'>
+                                            {/* Show existing matching options */}
+                                            {filteredOptions.length > 0 && (
+                                                <div className='space-y-1 px-2'>
+                                                    {filteredOptions.map((opt, idx) => (
+                                                        <motion.button
+                                                            key={opt.id}
+                                                            initial={{ opacity: 0, y: -2 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: idx * 0.03 }}
+                                                            onClick={() => {
+                                                                onChange(opt.name);
+                                                                setCurrent(opt.name);
+                                                                setQuery('');
+                                                                setOpen(false);
+                                                            }}
+                                                            className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-150 group'
+                                                        >
+                                                            <div className='flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 transition-colors'>
+                                                                {type === 'enterprise' ? (
+                                                                    <Building2 size={16} />
+                                                                ) : type === 'product' ? (
+                                                                    <Package size={16} />
+                                                                ) : (
+                                                                    <Globe size={16} />
+                                                                )}
+                                                            </div>
+                                                            <div className='flex-1'>
+                                                                <span className='text-sm font-medium text-slate-900 group-hover:text-blue-900'>
+                                                                    {opt.name}
+                                                                </span>
+                                                                <div className='text-xs text-slate-500 group-hover:text-blue-600'>
+                                                                    Select existing {type}
+                                                                </div>
+                                                            </div>
+                                                            <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
+                                                                <div className='w-2 h-2 rounded-full bg-blue-500'></div>
+                                                            </div>
+                                                        </motion.button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show separator if both existing options and create new option exist */}
+                                            {filteredOptions.length > 0 && showCreateNew && (
+                                                <div className='px-4 py-1'>
+                                                    <div className='h-px bg-slate-200'></div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show "Create New" option */}
+                                            {showCreateNew && (
+                                                <div className='px-2'>
+                                                    <motion.button
+                                                        initial={{ opacity: 0, scale: 0.98 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        onClick={async () => {
+                                                            try {
+                                                                let created: { id: string; name: string; } | null = null;
+                                                                
+                                                                if (type === 'enterprise') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/enterprises', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                } else if (type === 'product') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/products', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                } else if (type === 'service') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/services', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                }
+                                                                
+                                                                if (created) {
+                                                                    // Update options list
+                                                                    setOptions((prev) => [...prev, created!]);
+                                                                    setAllOptions((prev) => [...prev, created!]);
+                                                                    
+                                                                    // Set the new value
+                                                                    onChange(created.name);
+                                                                    setCurrent(created.name);
+                                                                    setQuery('');
+                                                                    setOpen(false);
+                                                                    
+                                                                    // Notify parent component
+                                                                    if (onNewItemCreated) {
+                                                                        const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
+                                                                        onNewItemCreated(dropdownType, created);
+                                                                    }
+                                                                }
+                                                            } catch (error) {
+                                                                console.log(`API creation failed for ${type}, creating local entry`);
+                                                                
+                                                                // Fallback: create a local entry when API fails
+                                                                const newId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                                                                const created = { id: newId, name: query.trim() };
+                                                                
+                                                                // Update options list
+                                                                setOptions((prev) => [...prev, created]);
+                                                                setAllOptions((prev) => [...prev, created]);
+                                                                
+                                                                // Set the new value
+                                                                onChange(created.name);
+                                                                setCurrent(created.name);
+                                                                setQuery('');
+                                                                setOpen(false);
+                                                                
+                                                                // Notify parent component
+                                                                if (onNewItemCreated) {
+                                                                    const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
+                                                                    onNewItemCreated(dropdownType, created);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 transition-all duration-150 group'
+                                                    >
+                                                        <div className='flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 group-hover:bg-blue-600 transition-colors shadow-sm'>
+                                                            <Plus size={16} />
+                                                        </div>
+                                                        <div className='flex-1'>
+                                                            <span className='text-sm font-medium text-blue-700 group-hover:text-blue-800'>
+                                                                Create &quot;{query.trim()}&quot;
+                                                            </span>
+                                                            <div className='text-xs text-blue-600 group-hover:text-blue-700'>
+                                                                Add new {type} to database
+                                                            </div>
+                                                        </div>
+                                                        <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
+                                                            <div className='px-2 py-1 bg-blue-100 rounded-full'>
+                                                                <span className='text-xs font-medium text-blue-700'>New</span>
+                                                            </div>
+                                                        </div>
+                                                    </motion.button>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show "No results" message */}
+                                            {filteredOptions.length === 0 && !showCreateNew && (
+                                                <div className='px-4 py-6 text-center text-slate-500'>
+                                                    {query.trim() ? (
+                                                        <div className='text-sm'>No {type}s found matching &quot;{query}&quot;</div>
+                                                    ) : (
+                                                        <div className='text-sm'>No {type}s available</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
@@ -2108,7 +2451,6 @@ interface EnterpriseConfigTableProps {
         | 'actions'
     >;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
@@ -2120,6 +2462,7 @@ interface EnterpriseConfigTableProps {
     hideRowExpansion?: boolean;
     enableInlineEditing?: boolean;
     incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
@@ -2134,6 +2477,12 @@ interface EnterpriseConfigTableProps {
     onShowAllColumns?: () => void;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
+    triggerValidation?: boolean; // Trigger validation highlighting
+    onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
+    onAddNewRow?: () => void; // Callback to add a new row
+    externalSortColumn?: string; // External sort column from parent
+    externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
+    isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
 }
 
 function SortableEnterpriseConfigRow({
@@ -2144,7 +2493,6 @@ function SortableEnterpriseConfigRow({
     cols,
     gridTemplate,
     highlightQuery,
-    onQuickAddRow,
     customColumns = [],
     isExpanded,
     onToggle,
@@ -2173,7 +2521,6 @@ function SortableEnterpriseConfigRow({
     cols: string[];
     gridTemplate: string;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumns?: string[];
     isExpanded: boolean;
     onToggle: (id: string) => void;
@@ -2346,41 +2693,41 @@ function SortableEnterpriseConfigRow({
         tone,
     }: {
         text: string;
-        tone: 'slate' | 'sky' | 'violet' | 'emerald' | 'amber';
+        tone: 'slate' | 'blue' | 'sky' | 'indigo' | 'cyan';
     }) => {
         const toneMap: Record<
             string,
             {bg: string; text: string; border: string; dot: string}
         > = {
+            blue: {
+                bg: 'bg-white',
+                text: 'text-black',
+                border: '',
+                dot: 'bg-blue-400',
+            },
             sky: {
                 bg: 'bg-sky-50',
                 text: 'text-sky-800',
                 border: 'border-sky-200',
                 dot: 'bg-sky-400',
             },
+            indigo: {
+                bg: 'bg-indigo-50',
+                text: 'text-indigo-800',
+                border: 'border-indigo-200',
+                dot: 'bg-indigo-400',
+            },
+            cyan: {
+                bg: 'bg-cyan-50',
+                text: 'text-cyan-800',
+                border: 'border-cyan-200',
+                dot: 'bg-cyan-400',
+            },
             slate: {
-                bg: 'bg-slate-100',
+                bg: 'bg-slate-50',
                 text: 'text-slate-800',
                 border: 'border-slate-200',
                 dot: 'bg-slate-400',
-            },
-            violet: {
-                bg: 'bg-violet-50',
-                text: 'text-violet-800',
-                border: 'border-violet-200',
-                dot: 'bg-violet-400',
-            },
-            emerald: {
-                bg: 'bg-emerald-50',
-                text: 'text-emerald-800',
-                border: 'border-emerald-200',
-                dot: 'bg-emerald-400',
-            },
-            amber: {
-                bg: 'bg-amber-50',
-                text: 'text-amber-800',
-                border: 'border-amber-200',
-                dot: 'bg-amber-400',
             },
         };
         const t = toneMap[tone] || toneMap.slate;
@@ -2390,8 +2737,7 @@ function SortableEnterpriseConfigRow({
                 animate={{scale: 1, opacity: 1}}
                 whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
                 transition={{type: 'spring', stiffness: 480, damping: 30}}
-                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] border max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis ${t.bg} ${t.text} ${t.border}`}
-                style={{borderRadius: '0px !important'}}
+                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis rounded ${t.bg} ${t.text} ${t.border}`}
                 title={text}
             >
                 <span className='truncate'>{text}</span>
@@ -2405,11 +2751,15 @@ function SortableEnterpriseConfigRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 rounded-md overflow-hidden border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} ${
-                isSelected ? 'ring-2 ring-primary-300/60 bg-primary-50/60' : ''
+            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+                isSelected 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
+                    : 'hover:bg-blue-50 hover:shadow-md hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:translate-x-1'
+            } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
+                isSelected ? 'border-blue-300' : 'border-slate-200'
             } ${inFillRange ? 'bg-primary-50/40' : ''} ${
                 isExpanded
-                    ? 'bg-primary-50 border-l-4 border-l-primary-400'
+                    ? 'bg-primary-50'
                     : ''
             } ${
                 compressingRowId === row.id
@@ -2424,7 +2774,9 @@ function SortableEnterpriseConfigRow({
                 gridTemplateColumns: gridTemplate,
                 willChange: 'transform',
                 display: 'grid',
-                minWidth: '400px', // Ensure table has minimum width
+                minWidth: 'max-content',
+                width: '100%',
+                borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
                 onSelect(row.id);
@@ -2433,18 +2785,23 @@ function SortableEnterpriseConfigRow({
             {/* Delete Button Column - Always first */}
             <div className='flex items-center justify-center px-1'>
                 {isRowHovered && (
-                    <button
-                        onClick={(e) => {
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e: any) => {
                             e.stopPropagation();
                             if (onDeleteClick) {
                                 onDeleteClick(row.id);
                             }
                         }}
-                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-300 ease-out no-drag shadow-sm hover:shadow-lg hover:scale-110 transform active:scale-95'
+                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md transform'
                         title='Delete row'
                     >
                         <svg
-                            className='w-2.5 h-2.5 transition-transform duration-200 group-hover/delete:rotate-180'
+                            className='w-2 h-2 transition-transform duration-200'
                             fill='none'
                             stroke='currentColor'
                             strokeWidth='2.5'
@@ -2454,32 +2811,27 @@ function SortableEnterpriseConfigRow({
                             <path
                                 strokeLinecap='round'
                                 strokeLinejoin='round'
-                                strokeWidth={2}
-                                d='M20 12H4'
+                                d='M6 12h12'
                             />
                         </svg>
-                    </button>
+                    </motion.button>
                 )}
             </div>
             {cols.includes('enterprise') && (
                 <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full ${
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
                         pinFirst
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
                     } ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                    } border-l-4 ${
-                        isSelected ? 'border-l-sky-400' : 'border-l-slate-200'
-                    } ${
-                        isCellMissing(row.id, 'enterprise')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                 >
                     {!hideRowExpansion && (
                         <button
-                            className={`h-5 w-5 rounded text-blue-600 hover:bg-slate-100 ${
+                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 ${
                                 isExpanded ? '' : ''
                             }`}
                             onClick={() => onToggle(row.id)}
@@ -2496,17 +2848,13 @@ function SortableEnterpriseConfigRow({
                                 className='inline-flex'
                             >
                                 <ChevronRight
-                                    className={`h-4 w-4 transition-all duration-150 ${
-                                        isExpanded
-                                            ? 'opacity-100 text-sky-600'
-                                            : 'opacity-0 group-hover:opacity-100'
-                                    }`}
+                                    size={16}
                                 />
                             </motion.span>
                         </button>
                     )}
                     <div
-                        className='font-medium text-slate-900 text-[12px] w-full'
+                        className='text-slate-700 text-[12px] w-full'
                         data-row-id={row.id}
                         data-col='enterprise'
                         style={{width: '100%'}}
@@ -2522,7 +2870,8 @@ function SortableEnterpriseConfigRow({
                                         v || '',
                                     );
                                 }}
-                                placeholder='Select Enterprise'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'enterprise')}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate}
                                 onNewItemCreated={onNewItemCreated}
                                 accounts={allRows}
@@ -2546,9 +2895,9 @@ function SortableEnterpriseConfigRow({
                                     );
                                 }}
                                 className='text-[12px]'
-                                placeholder='Enter Enterprise'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'enterprise')}
                                 dataAttr={`${row.id}-enterprise`}
-                                {...createTabNavigation('enterprise')}
                             />
                         )}
                     </div>
@@ -2557,9 +2906,9 @@ function SortableEnterpriseConfigRow({
             {cols.includes('product') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isCellMissing(row.id, 'product')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='product'
@@ -2572,7 +2921,8 @@ function SortableEnterpriseConfigRow({
                             onChange={(v) =>
                                 onUpdateField(row.id, 'product', v || '')
                             }
-                            placeholder='Select Product'
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'product')}
                             onDropdownOptionUpdate={onDropdownOptionUpdate}
                             onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
@@ -2587,28 +2937,35 @@ function SortableEnterpriseConfigRow({
                             }
                             className='text-[12px]'
                             dataAttr={`product-${row.id}`}
-                            placeholder='Enter Product'
-                            {...createTabNavigation('product')}
+                            isError={isCellMissing(row.id, 'product')}
+                            placeholder=''
                         />
                     )}
                 </div>
             )}
             {cols.includes('services') && (
                 <div
-                    className={`text-slate-700 text-[12px] min-w-0 truncate px-2 py-1 overflow-hidden max-w-full ${
-                        isCellMissing(row.id, 'services')
-                            ? 'bg-red-50 border-red-200 ring-1 ring-red-300'
-                            : ''
+                    className={`text-slate-700 text-[12px] px-2 py-1 w-full ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='services'
+                    style={{ 
+                        borderRight: 'none', 
+                        width: '100%', 
+                        minWidth: '500px', // Increased minimum width to ensure content visibility when scrolled
+                        maxWidth: 'none' // Ensure no max width constraint
+                    }}
                 >
                     <ServicesMultiSelect
                         value={row.services || ''}
                         onChange={(v) =>
                             onUpdateField(row.id, 'services', v || '')
                         }
-                        placeholder='Select Services'
+                        placeholder=''
+                        isError={isCellMissing(row.id, 'services')}
                         onDropdownOptionUpdate={onDropdownOptionUpdate}
                         onNewItemCreated={onNewItemCreated}
                         accounts={allRows}
@@ -2641,7 +2998,6 @@ export default function EnterpriseConfigTable({
     hideControls,
     visibleColumns,
     highlightQuery,
-    onQuickAddRow,
     customColumnLabels,
     enableDropdownChips = false,
     dropdownOptions = {},
@@ -2649,30 +3005,73 @@ export default function EnterpriseConfigTable({
     hideRowExpansion = false,
     enableInlineEditing = true,
     incompleteRowIds = [],
+    showValidationErrors = false,
     hasBlankRow = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
     onShowAllColumns,
     compressingRowId = null,
     foldingRowId = null,
+    triggerValidation = false,
+    onValidationComplete,
+    onAddNewRow,
+    externalSortColumn,
+    externalSortDirection,
+    isAIInsightsPanelOpen = false,
 }: EnterpriseConfigTableProps) {
-    // Helper function to check if a cell should be highlighted as missing
-    const isCellMissing = (rowId: string, field: string) => {
-        if (!incompleteRowIds.includes(rowId)) return false;
+    // Local validation state to track rows with errors
+    const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
-        const row = localRows.find((r) => r.id === rowId);
-        if (!row) return false;
-
+    // Helper function to check if a field is missing/invalid
+    const isFieldMissing = (row: EnterpriseConfigRow, field: string): boolean => {
         switch (field) {
             case 'enterprise':
-                return !row.enterprise;
+                return !row.enterprise || row.enterprise.trim() === '';
             case 'product':
-                return !row.product;
+                return !row.product || row.product.trim() === '';
             case 'services':
-                return !row.services;
+                return !row.services || row.services.trim() === '';
             default:
                 return false;
         }
+    };
+
+    // Enhanced helper function to check if a cell should be highlighted as missing
+    const isCellMissing = (rowId: string, field: string) => {
+        const row = localRows.find((r) => r.id === rowId);
+        if (!row) return false;
+
+        // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
+        // This prevents new rows from inheriting validation styling from previous validation sessions
+        if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
+            return false;
+        }
+
+        // Check if this row has validation errors (either from parent or local validation)
+        const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
+        
+        if (!hasValidationError) return false;
+
+        // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
+        // including completely blank rows
+        return isFieldMissing(row, field);
+    };
+
+    // Function to validate all rows and highlight missing fields
+    const validateAndHighlightErrors = () => {
+        const errorRowIds = new Set<string>();
+        
+        localRows.forEach(row => {
+            // Check if any required field is missing
+            if (isFieldMissing(row, 'enterprise') || 
+                isFieldMissing(row, 'product') || 
+                isFieldMissing(row, 'services')) {
+                errorRowIds.add(row.id);
+            }
+        });
+        
+        setValidationErrors(errorRowIds);
+        return errorRowIds;
     };
 
     // Keep a local order for row management. Sync when rows change
@@ -2693,6 +3092,27 @@ export default function EnterpriseConfigTable({
         setLocalRows(cloned);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rows.map((r) => r.id).join(',')]);
+
+    // Effect to trigger validation when requested
+    useEffect(() => {
+        if (triggerValidation) {
+            const errorRowIds = validateAndHighlightErrors();
+            if (onValidationComplete) {
+                onValidationComplete(Array.from(errorRowIds));
+            }
+        }
+    }, [triggerValidation]);
+
+    // Effect to highlight errors when incompleteRowIds changes from parent
+    useEffect(() => {
+        if (showValidationErrors && incompleteRowIds.length > 0) {
+            // Also trigger local validation to ensure all missing fields are highlighted
+            validateAndHighlightErrors();
+        } else {
+            // Clear validation errors when not showing validation or no incomplete rows from parent
+            setValidationErrors(new Set());
+        }
+    }, [incompleteRowIds, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -2825,10 +3245,10 @@ export default function EnterpriseConfigTable({
     }, [visibleColumns, columnOrder]);
 
     const colSizes: Record<string, string> = {
-        deleteButton: '40px', // Space for minus button
-        enterprise: '160px',
-        product: '140px',
-        services: '300px', // Increased width to show more service chips and Add more button
+        deleteButton: '8px', // Space for delete button with proper padding
+        enterprise: '160px', // Slightly reduced to give more space to Services
+        product: '220px', // Increased width to prevent text wrapping in Product column
+        services: '1fr', // Use all remaining space for Services column
     };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -2838,36 +3258,78 @@ export default function EnterpriseConfigTable({
     const [pinFirst, setPinFirst] = useState(true);
     const firstColWidth = '140px'; // enforce fixed width for first column
     const gridTemplate = useMemo(() => {
-        // Always include delete button column first with minimum width
-        const deleteCol = `minmax(40px, ${colSizes.deleteButton})`;
+        // Always include delete button column first with fixed width
+        const deleteCol = '32px'; // Fixed width for delete button
         
-        const base = cols.map((c) => {
+        const base = cols.map((c, index) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
+            
+            // Define minimum and maximum widths per column
+            const constraints = {
+                enterprise: { min: 120, max: 300 },
+                product: { min: 140, max: 350 },
+                services: { min: 400, max: Infinity } // Increased minimum to ensure content visibility
+            };
+            
+            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 100, max: 250 };
+            
             if (dynamicWidth && dynamicWidth > 0) {
-                return `minmax(100px, ${dynamicWidth}px)`;
+                // For Services column, use minmax to fill remaining space
+                if (c === 'services') {
+                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
+                }
+                // Clamp the dynamic width within constraints for other columns
+                const clampedWidth = Math.max(
+                    columnConstraints.min, 
+                    Math.min(columnConstraints.max, dynamicWidth)
+                );
+                return `${clampedWidth}px`;
             }
-            // Use default size from colSizes
+            
+            // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
-                return `minmax(100px, ${defaultSize})`;
+                // For Services column, use flexible sizing to fill remaining space
+                if (c === 'services' && defaultSize === '1fr') {
+                    return `minmax(${columnConstraints.min}px, 1fr)`;
+                }
+                const numericSize = parseInt(defaultSize.replace('px', ''));
+                if (!isNaN(numericSize)) {
+                    const clampedSize = Math.max(
+                        columnConstraints.min,
+                        Math.min(columnConstraints.max, numericSize)
+                    );
+                    return `${clampedSize}px`;
+                }
+                return defaultSize;
             }
-            // Final fallback
-            return 'minmax(100px, 140px)';
-        }).join(' ');
+            
+            // Final fallback - Services gets remaining space
+            if (c === 'services') {
+                return `minmax(${columnConstraints.min}px, 1fr)`;
+            }
+            return `${columnConstraints.min}px`;
+        });
         
-        const custom = customColumns.map(() => '110px').join(' ');
-        const parts = [deleteCol, base, custom].filter(Boolean);
+        const custom = customColumns.map(() => '110px');
+        const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
     }, [cols, customColumns, colWidths, colSizes]);
 
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
+    const handleDeleteClick = (rowId: string) => {
+        if (onDelete) {
+            onDelete(rowId);
+        }
+    };
+
     // removed fill down state
 
     const startResize = (
         colKey: string,
-        e: React.MouseEvent<HTMLDivElement>,
+        e: any,
     ) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2878,29 +3340,142 @@ export default function EnterpriseConfigTable({
         const startX = e.clientX;
         const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
         
+        // Define column-specific constraints
+        const constraints = {
+            enterprise: { min: 120, max: 250 }, // Reduced max to prevent over-expansion
+            product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
+            services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
+        };
+        
+        const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
+        
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
         
+        // Add resize indicator
+        const resizeIndicator = document.createElement('div');
+        resizeIndicator.className = 'fixed top-0 bottom-0 w-0.5 bg-blue-500 z-50 pointer-events-none';
+        resizeIndicator.style.left = `${startX}px`;
+        document.body.appendChild(resizeIndicator);
+        
         const onMove = (ev: MouseEvent) => {
             ev.preventDefault();
             const delta = ev.clientX - startX;
-            const newWidth = Math.max(100, Math.min(400, startWidth + delta)); // Min 100px, Max 400px
+            const newWidth = Math.max(
+                columnConstraints.min, 
+                Math.min(columnConstraints.max, startWidth + delta)
+            );
             
-            setColWidths((prev) => {
-                const newColWidths = {
-                    ...prev,
-                    [colKey]: newWidth
-                };
-                // Force re-render by updating state
-                return newColWidths;
-            });
+            // Update resize indicator position
+            const newX = startX + (newWidth - startWidth);
+            resizeIndicator.style.left = `${newX}px`;
+            
+            setColWidths((prev) => ({
+                ...prev,
+                [colKey]: newWidth
+            }));
+            
+            // Trigger scroll check during resize to detect Services column visibility
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is getting hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 10);
         };
         
         const onUp = () => {
             // Remove visual feedback
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            
+            // Remove resize indicator
+            if (resizeIndicator.parentNode) {
+                resizeIndicator.parentNode.removeChild(resizeIndicator);
+            }
+            
+            // Final check for scrollbar need after resize is complete
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 50);
             
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
@@ -2950,22 +3525,25 @@ export default function EnterpriseConfigTable({
     };
     
     // Handle delete click - directly call parent's onDelete function
-    const handleDeleteClick = (rowId: string) => {
-        if (onDelete) {
-            onDelete(rowId);
-        }
-    };
     
-    const [sortCol, setSortCol] = useState<
+    // Use external sort state if provided, otherwise fall back to internal state
+    const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
         | 'email'
         | 'status'
         | 'servicesCount'
         | 'enterpriseName'
         | 'servicesSummary'
+        | 'enterprise'
+        | 'product'
+        | 'services'
         | null
     >(null);
-    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+    const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc' | null>(null);
+
+    // Use external sort state if available, otherwise use internal state
+    const sortCol = externalSortColumn || internalSortCol;
+    const sortDir = externalSortDirection || internalSortDir;
 
     const toggleSort = (
         col:
@@ -2974,12 +3552,18 @@ export default function EnterpriseConfigTable({
             | 'status'
             | 'servicesCount'
             | 'enterpriseName'
-            | 'servicesSummary',
+            | 'servicesSummary'
+            | 'enterprise'
+            | 'product'
+            | 'services',
     ) => {
-        const nextDir: 'asc' | 'desc' =
-            sortCol === col && sortDir === 'asc' ? 'desc' : 'asc';
-        setSortCol(col);
-        setSortDir(nextDir);
+        // Only use internal sort when external sort is not provided
+        if (!externalSortColumn && !externalSortDirection) {
+            const nextDir: 'asc' | 'desc' =
+                internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc';
+            setInternalSortCol(col);
+            setInternalSortDir(nextDir);
+        }
     };
 
     const displayItems = useMemo(() => {
@@ -3059,8 +3643,168 @@ export default function EnterpriseConfigTable({
         return sortedGroups;
     }, [displayItems, groupBy]);
 
+    // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
+    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    
+    useEffect(() => {
+        const checkScrollNeed = () => {
+            if (!tableContainerRef.current) return;
+            
+            // Get current zoom level
+            const currentZoom = window.devicePixelRatio || 1;
+            const baseZoom = 1;
+            const zoomFactor = currentZoom / baseZoom;
+            
+            // Get viewport dimensions accounting for AI insights panel
+            const viewportWidth = window.innerWidth;
+            const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
+            const availableWidth = viewportWidth - aiPanelWidth;
+            
+            // Check if content width exceeds container width
+            const contentWidth = tableContainerRef.current.scrollWidth;
+            const containerWidth = tableContainerRef.current.clientWidth;
+            
+            // Enhanced zoom-based detection
+            const isZoomedIn = zoomFactor > 1.1; // 10% zoom threshold
+            const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0; // Show scrollbar earlier when zoomed
+            
+            // Additional check: if Services column is getting squeezed or hidden
+            const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+            let servicesContentHidden = false;
+            
+            if (servicesColumns.length > 0) {
+                servicesColumns.forEach(serviceCol => {
+                    const serviceElement = serviceCol as HTMLElement;
+                    const serviceRect = serviceElement.getBoundingClientRect();
+                    const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                    
+                    // Adjust threshold based on zoom and AI panel state
+                    let widthThreshold = 500; // Increased base threshold for better content visibility
+                    if (isZoomedIn) widthThreshold += 50; // More space needed when zoomed
+                    if (isAIInsightsPanelOpen) widthThreshold += 50; // More space needed when AI panel is open
+                    
+                    // Check if Services column is partially or fully hidden on the right or too narrow for content
+                    if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                        servicesContentHidden = true;
+                    }
+                    
+                    // Also check if Services content is truncated (chips being cut off)
+                    const servicesContent = serviceElement.querySelector('.inline-flex');
+                    if (servicesContent) {
+                        const contentRect = servicesContent.getBoundingClientRect();
+                        if (contentRect.right > serviceRect.right - 10) { // 10px buffer
+                            servicesContentHidden = true;
+                        }
+                    }
+                });
+            }
+            
+            // Show scrollbar based on multiple factors:
+            // 1. Content exceeds container width
+            // 2. Services content is hidden
+            // 3. Zoom level requires it
+            // 4. AI insights panel reduces available space
+            const needsScrollbar = 
+                (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                servicesContentHidden ||
+                (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+            
+            setShouldShowHorizontalScroll(needsScrollbar);
+        };
+        
+        // Check on mount and when table structure changes
+        checkScrollNeed();
+        
+        // Use ResizeObserver for better performance
+        const resizeObserver = new ResizeObserver(() => {
+            setTimeout(checkScrollNeed, 50); // Small delay to allow layout to settle
+        });
+        
+        // Use MutationObserver to detect when Services content changes
+        const mutationObserver = new MutationObserver((mutations) => {
+            let shouldCheck = false;
+            mutations.forEach((mutation) => {
+                // Check if Services column content changed
+                if (mutation.target instanceof Element) {
+                    const servicesCol = mutation.target.closest('[data-col="services"]');
+                    if (servicesCol) {
+                        shouldCheck = true;
+                    }
+                }
+            });
+            if (shouldCheck) {
+                setTimeout(checkScrollNeed, 100);
+            }
+        });
+        
+        if (tableContainerRef.current) {
+            resizeObserver.observe(tableContainerRef.current);
+            mutationObserver.observe(tableContainerRef.current, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            
+            // Also observe all column cells for resize changes
+            const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
+            columnCells.forEach(cell => {
+                if (cell instanceof Element) {
+                    resizeObserver.observe(cell);
+                }
+            });
+        }
+        
+        // Also listen for window resize (zoom changes)
+        window.addEventListener('resize', checkScrollNeed);
+        
+        // Listen for zoom via keyboard shortcuts and mouse wheel
+        const handleKeyZoom = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
+                setTimeout(checkScrollNeed, 100);
+            }
+        };
+        
+        const handleWheelZoom = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                setTimeout(checkScrollNeed, 100);
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyZoom);
+        window.addEventListener('wheel', handleWheelZoom, { passive: true });
+        
+        return () => {
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+            window.removeEventListener('resize', checkScrollNeed);
+            window.removeEventListener('keydown', handleKeyZoom);
+            window.removeEventListener('wheel', handleWheelZoom);
+        };
+    }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
+    
     return (
         <div className='w-full compact-table safari-tight'>
+            {/* Using browser default scrollbars only */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                    /* Ensure consistent scrollbar positioning */
+                    div[role="table"] {
+                        position: relative;
+                        overflow-y: visible !important;
+                    }
+                    /* Prevent any nested containers from showing horizontal scrollbars */
+                    div[role="table"] * {
+                        overflow-x: visible !important;
+                    }
+                    /* Ensure the table content doesn't create its own scrollbars */
+                    .rounded-xl {
+                        overflow-x: visible !important;
+                    }
+                `
+            }} />
             <div className='flex items-center justify-between mb-2'>
                 <h3 className='text-sm font-semibold text-slate-800'>
                     {title ?? 'Enterprise Configuration Details'}
@@ -3120,8 +3864,19 @@ export default function EnterpriseConfigTable({
                     </div>
                 </div>
             ) : (
-                <div role='table' className='p-0 overflow-x-auto'>
-                <div className='w-full relative'>
+                <div 
+                    ref={tableContainerRef}
+                    role='table' 
+                    className='p-0 w-full'
+                    style={{
+                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
+                        overflowY: 'visible'
+                    }}
+                >
+                <div className='w-full relative' style={{ 
+                    minWidth: 'max(100%, 1200px)',
+                    width: '100%' 
+                }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
                             enterprise: 'Enterprise',
@@ -3137,51 +3892,46 @@ export default function EnterpriseConfigTable({
 
                         const iconFor: Record<string, React.ReactNode> = {
                             enterprise: (
-                                <Building2 className='h-3.5 w-3.5 text-blue-600' />
+                                <Building2 size={14} />
                             ),
                             product: (
-                                <Package className='h-3.5 w-3.5 text-blue-600' />
+                                <Package size={14} />
                             ),
                             services: (
-                                <Globe className='h-3.5 w-3.5 text-blue-600' />
+                                <Globe size={14} />
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white pb-1'>
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ minWidth: 'fit-content', width: '100%' }}>
                                 <div
-                                    className='sticky top-0 z-30 grid w-full overflow-hidden gap-0 px-0 py-2 text-xs font-semibold text-slate-900 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 shadow-sm'
-                                    style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                    className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%',
+                                        display: 'grid'
+                                    }}
                                 >
-                                    {/* Delete Button Column Header (Empty) */}
-                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r border-slate-200 min-w-0 overflow-hidden'>
-                                        {/* Freeze/Unfreeze icon */}
-                                        <button
-                                            className='p-1 rounded hover:bg-slate-100 text-blue-600'
-                                            onClick={() =>
-                                                setPinFirst((v) => !v)
-                                            }
-                                            title={
-                                                pinFirst
-                                                    ? 'Unfreeze column'
-                                                    : 'Freeze column'
-                                            }
-                                        >
-                                            {pinFirst ? (
-                                                <Pin className='w-3.5 h-3.5' />
-                                            ) : (
-                                                <PinOff className='w-3.5 h-3.5' />
-                                            )}
-                                        </button>
+                                    {/* Delete Button Column Header */}
+                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                        {/* Empty header for delete column */}
                                     </div>
                                     
                                     {cols.map((c, idx) => (
                                         <div
                                             key={c}
-                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-slate-50 transition-colors duration-150 group min-w-0 overflow-hidden ${idx < cols.length - 1 ? 'border-r border-slate-200' : ''} ${
-                                                idx === 0 && pinFirst
-                                                    ? 'sticky left-0 z-20 bg-sky-50/80 backdrop-blur-sm border-l-4 border-l-slate-200 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] after:content-[" "] after:absolute after:top-0 after:right-0 after:h-full after:w-px after:bg-slate-200'
+                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
+                                                idx === 0 
+                                                    ? 'border-l-0' 
                                                     : ''
+                                            } ${
+                                                idx === 0 && pinFirst
+                                                    ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                    : ''
+                                            } ${
+                                                c === 'services' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for Services column
                                             }`}
+                                            style={c === 'services' ? { minWidth: '500px' } : undefined} // Ensure minimum width for Services header
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
@@ -3191,43 +3941,34 @@ export default function EnterpriseConfigTable({
                                                 'accountName',
                                                 'email',
                                                 'enterpriseName',
+                                                'enterprise',
+                                                'product',
+                                                'services',
                                             ].includes(c) && (
                                                 <button
                                                     onClick={() =>
                                                         toggleSort(c as any)
                                                     }
-                                                    className='inline-flex items-center -mr-1'
+                                                    className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-6 top-1/2 -translate-y-1/2'}`}
                                                 >
                                                     <ArrowUp
-                                                        className={`w-3 h-3 ${
-                                                            sortCol ===
-                                                                (c as any) &&
-                                                            sortDir === 'asc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
-                                                        }`}
+                                                        size={16}
                                                     />
                                                     <ArrowDown
-                                                        className={`w-3 h-3 ${
-                                                            sortCol ===
-                                                                (c as any) &&
-                                                            sortDir === 'desc'
-                                                                ? 'text-sky-600'
-                                                                : 'text-slate-400'
-                                                        }`}
+                                                        size={16}
                                                     />
                                                 </button>
                                             )}
-                                            {/* Only show resize handle for columns that are not the last one */}
-                                            {idx < cols.length - 1 && (
+                                            {/* Show resize handle for resizable columns but not for Services (last column) */}
+                                            {['enterprise', 'product'].includes(c) && (
                                                 <div
-                                                    onMouseDown={(e) =>
+                                                    onMouseDown={(e: any) =>
                                                         startResize(c, e)
                                                     }
-                                                    className='absolute -right-0.5 top-0 h-full w-3 cursor-col-resize z-20 flex items-center justify-center group/resize'
-                                                    title='Resize column'
+                                                    className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                    title={`Resize ${labelFor[c] || c} column`}
                                                 >
-                                                    <div className='h-4 w-1 bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover/resize:opacity-60 hover:opacity-100 transition-opacity duration-150' />
+                                                    <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
                                             {c === 'accountName' && (
@@ -3252,11 +3993,10 @@ export default function EnterpriseConfigTable({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <div className='space-y-0 divide-y divide-slate-200'>
+                        <div className='mt-2'>
                             {displayItems.map((r, idx) => (
-                                <React.Fragment key={r.id}>
+                                <div key={r.id}>
                                     <SortableEnterpriseConfigRow
-                                        key={r.id}
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -3264,7 +4004,6 @@ export default function EnterpriseConfigTable({
                                         highlightQuery={highlightQuery}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
-                                        onQuickAddRow={onQuickAddRow}
                                         customColumns={customColumns}
                                         pinFirst={pinFirst}
                                         firstColWidth={firstColWidth}
@@ -3298,13 +4037,39 @@ export default function EnterpriseConfigTable({
                                             </div>
                                         </div>
                                     )}
-                                </React.Fragment>
+                                </div>
                             ))}
+                            
+                            {/* Add New Row Button */}
+                            {onAddNewRow && (
+                                <div 
+                                    className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%'
+                                    }}
+                                    onClick={onAddNewRow}
+                                >
+                                    {/* Empty delete button space */}
+                                    <div className='flex items-center justify-center px-2 py-1'>
+                                        {/* No delete icon for add row */}
+                                    </div>
+                                    
+                                    {/* Add new row content spanning all columns */}
+                                    <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                        <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                        </svg>
+                                        <span className='italic'>Add New Row</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className='space-y-4'>
+                        <div className='space-y-4 mt-2'>
                             {Object.entries(groupedItems).map(([groupName, groupRows]) => (
-                                <div key={groupName} className='border border-slate-200 rounded-lg overflow-hidden'>
+                                <div key={groupName} className='border border-slate-200 rounded-lg'>
                                     {/* Group Header */}
                                     <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
                                         <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
@@ -3316,11 +4081,10 @@ export default function EnterpriseConfigTable({
                                     </div>
                                     
                                     {/* Group Rows */}
-                                    <div className='divide-y divide-slate-200'>
+                                    <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
-                                            <React.Fragment key={r.id}>
+                                            <div key={r.id}>
                                                 <SortableEnterpriseConfigRow
-                                                    key={r.id}
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
@@ -3328,7 +4092,6 @@ export default function EnterpriseConfigTable({
                                                     highlightQuery={highlightQuery}
                                                     onEdit={onEdit}
                                                     onDelete={onDelete}
-                                                    onQuickAddRow={onQuickAddRow}
                                                     customColumns={customColumns}
                                                     pinFirst={pinFirst}
                                                     firstColWidth={firstColWidth}
@@ -3362,92 +4125,42 @@ export default function EnterpriseConfigTable({
                                                         </div>
                                                     </div>
                                                 )}
-                                            </React.Fragment>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                             ))}
+                            
+                            {/* Add New Row Button for grouped view */}
+                            {onAddNewRow && (
+                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                    <div 
+                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                        style={{
+                                            gridTemplateColumns: gridTemplate, 
+                                            minWidth: 'max-content',
+                                            width: '100%'
+                                        }}
+                                        onClick={onAddNewRow}
+                                    >
+                                        {/* Empty delete button space */}
+                                        <div className='flex items-center justify-center px-2 py-1'>
+                                            {/* No delete icon for add row */}
+                                        </div>
+                                        
+                                        {/* Add new row content spanning all columns */}
+                                        <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                            </svg>
+                                            <span className='italic'>Add New Row</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-                
-                {/* Add new row section - styled exactly like data rows */}
-                {onQuickAddRow && (
-                    <div 
-                        className={`w-full grid items-center gap-0 rounded-md overflow-hidden border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200 ${
-                            displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                        }`}
-                        style={{
-                            gridTemplateColumns: gridTemplate,
-                            willChange: 'transform',
-                            display: 'grid',
-                            minWidth: '400px',
-                        }}
-                    >
-                        {/* Delete/Action Column with + icon - clickable */}
-                        <div className='flex items-center justify-center px-1'>
-                            <button
-                                onClick={onQuickAddRow}
-                                className='group/add flex items-center justify-center w-4 h-4 text-blue-500 hover:text-white border border-blue-300 hover:border-blue-500 bg-white hover:bg-blue-500 rounded-full transition-all duration-300 ease-out shadow-sm hover:shadow-lg hover:scale-110 transform active:scale-95'
-                                title='Add new row'
-                            >
-                                <svg
-                                    className='w-2.5 h-2.5 transition-transform duration-200 group-hover/add:rotate-90'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    strokeWidth='2.5'
-                                    viewBox='0 0 24 24'
-                                    xmlns='http://www.w3.org/2000/svg'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M12 4v16m8-8H4'
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        {/* Enterprise column with "Add row" text - not clickable, styled like data row */}
-                        {cols.includes('enterprise') && (
-                            <div
-                                className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 min-w-0 overflow-hidden max-w-full ${
-                                    pinFirst
-                                        ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
-                                        : ''
-                                } ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                } border-l-4 border-l-slate-200`}
-                            >
-                                <span className='text-blue-500 text-sm font-normal'>Add row</span>
-                            </div>
-                        )}
-                        
-                        {/* Product column - empty */}
-                        {cols.includes('product') && (
-                            <div
-                                className={`text-slate-700 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1 overflow-hidden max-w-full ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                }`}
-                            >
-                                {/* Empty */}
-                            </div>
-                        )}
-                        
-                        {/* Services column - empty */}
-                        {cols.includes('services') && (
-                            <div
-                                className={`text-slate-700 text-[12px] min-w-0 truncate px-2 py-1 overflow-hidden max-w-full ${
-                                    displayItems.length % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                                }`}
-                            >
-                                {/* Empty */}
-                            </div>
-                        )}
                     </div>
-                )}
-            </div>
+                </div>
             )}
         </div>
     );
