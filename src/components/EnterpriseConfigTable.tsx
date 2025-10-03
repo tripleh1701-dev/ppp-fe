@@ -165,7 +165,6 @@ const ChipDropdown = ({
                     <div className='flex flex-wrap gap-1'>
                         {selectedOptions.map((option) => (
                             <SelectionChip
-                                key={option.id}
                                 label={option.name}
                                 color={color}
                                 onRemove={() => onDeselect(option.id)}
@@ -184,7 +183,7 @@ const ChipDropdown = ({
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                             className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
                             autoFocus
                         />
@@ -286,9 +285,9 @@ function InlineEditableText({
             <input
                 ref={inputRef}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
                 onBlur={commit}
-                onKeyDown={(e) => {
+                onKeyDown={(e: any) => {
                     if (e.key === 'Enter') commit();
                     if (e.key === 'Escape') cancel();
                     if (e.key === 'Tab') {
@@ -318,7 +317,7 @@ function InlineEditableText({
             title={(value || '').toString()}
             data-inline={dataAttr || undefined}
             tabIndex={0}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     setEditing(true);
@@ -392,8 +391,8 @@ function DropdownOption({
                     <input
                         ref={inputRef}
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
+                        onChange={(e: any) => setEditValue(e.target.value)}
+                        onKeyDown={(e: any) => {
                             if (e.key === 'Enter') handleSave();
                             if (e.key === 'Escape') handleCancel();
                         }}
@@ -473,7 +472,7 @@ function DropdownOption({
                 className='absolute top-1 right-1 flex gap-1'
             >
                 <button
-                    onClick={(e) => {
+                    onClick={(e: any) => {
                         e.stopPropagation();
                         setIsEditing(true);
                     }}
@@ -495,7 +494,7 @@ function DropdownOption({
                     </svg>
                 </button>
                 <motion.button
-                    onClick={(e) => {
+                    onClick={(e: any) => {
                         e.stopPropagation();
                         if (isInUse) {
                             alert(
@@ -676,22 +675,14 @@ function ServicesMultiSelect({
     }, [value]);
 
     // Responsive display logic
-    const [visibleCount, setVisibleCount] = React.useState(2);
+    // Show maximum 4 value chips, with count indicator for additional chips
+    const [visibleCount, setVisibleCount] = React.useState(4);
 
     React.useEffect(() => {
         const updateVisibleCount = () => {
             if (typeof window === 'undefined') return;
-            const width = window.innerWidth;
-            if (width >= 1280) {
-                // xl screens - show 5 chips to utilize the increased column width
-                setVisibleCount(5);
-            } else if (width >= 768) {
-                // md screens - show 4 chips
-                setVisibleCount(4);
-            } else {
-                // sm screens - show 3 chips
-                setVisibleCount(3);
-            }
+            // Always show maximum 4 chips regardless of screen size
+            setVisibleCount(4);
         };
 
         updateVisibleCount();
@@ -727,12 +718,21 @@ function ServicesMultiSelect({
         loadOptions();
         const rect = containerRef.current?.getBoundingClientRect();
         if (rect && typeof window !== 'undefined') {
+            // Find table container for better positioning
+            const tableContainer = containerRef.current?.closest('[role="table"]') || 
+                                  containerRef.current?.closest('.overflow-auto') ||
+                                  document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+            
             const width = 256;
-            const left = Math.max(
-                8,
-                Math.min(window.innerWidth - width - 8, rect.left),
-            );
-            const top = Math.min(window.innerHeight - 16, rect.bottom + 8);
+            // Constrain within table bounds
+            const tableRightBound = tableRect.right - width - 16;
+            const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
+            const minLeft = Math.max(tableRect.left + 16, 16);
+            const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
+            
+            const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
             setDropdownPos({top, left, width});
         }
     }, [open, loadOptions]);
@@ -741,12 +741,27 @@ function ServicesMultiSelect({
     React.useEffect(() => {
         if (showMoreServices && moreServicesRef.current) {
             const rect = moreServicesRef.current.getBoundingClientRect();
-            const width = Math.max(200, rect.width);
-            const left = Math.max(
-                8,
-                Math.min(window.innerWidth - width - 8, rect.left),
-            );
-            const top = Math.min(window.innerHeight - 16, rect.bottom + 8);
+            
+            // Find the table container to ensure dropdown stays within table bounds
+            const tableContainer = moreServicesRef.current.closest('[role="table"]') || 
+                                  moreServicesRef.current.closest('.overflow-auto') ||
+                                  document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+            
+            // Calculate width with stricter table container constraints
+            const maxWidth = Math.min(280, tableRect.width * 0.4, window.innerWidth * 0.3);
+            const width = Math.max(180, Math.min(maxWidth, rect.width));
+            
+            // Ensure dropdown stays strictly within table container horizontally
+            const idealLeft = rect.left;
+            const tableRightBound = tableRect.right - width - 16; // More margin from table edge
+            const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
+            const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
+            const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+            
+            // Ensure dropdown stays within both table and viewport vertically
+            const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
             setMoreServicesPos({top, left, width});
         }
     }, [showMoreServices]);
@@ -946,7 +961,7 @@ function ServicesMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
                                 title={service}
                             >
                                 <span className='flex-1'>{service}</span>
@@ -956,7 +971,7 @@ function ServicesMultiSelect({
                                     aria-label='Remove'
                                     style={{minWidth: '20px', minHeight: '20px'}}
                                 >
-                                    <X className='h-3 w-3' />
+                                    <X size={12} />
                                 </button>
                             </motion.span>
                         );
@@ -965,7 +980,7 @@ function ServicesMultiSelect({
                     <div className='relative'>
                         <button
                             ref={moreServicesRef}
-                            onClick={(e) => {
+                            onClick={(e: any) => {
                                 e.stopPropagation();
                                 setShowMoreServices(!showMoreServices);
                             }}
@@ -979,13 +994,14 @@ function ServicesMultiSelect({
                             createPortal(
                                 <div
                                     className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e: any) => e.stopPropagation()}
+                                    onClick={(e: any) => e.stopPropagation()}
                                     style={{
                                         position: 'fixed',
-                                        top: moreServicesPos.top,
-                                        left: moreServicesPos.left,
-                                        width: moreServicesPos.width,
+                                        top: Math.min(moreServicesPos.top, window.innerHeight - 200),
+                                        left: Math.min(moreServicesPos.left, window.innerWidth - 250),
+                                        width: Math.min(moreServicesPos.width, 240),
+                                        maxWidth: '240px'
                                     }}
                                 >
                                     <div className='p-3'>
@@ -1014,7 +1030,7 @@ function ServicesMultiSelect({
                                                             className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
                                                             aria-label='Remove'
                                                         >
-                                                            <X className='h-3 w-3 text-slate-500' />
+                                                            <X size={12} />
                                                         </button>
                                                     </div>
                                                 );
@@ -1033,7 +1049,7 @@ function ServicesMultiSelect({
                     <input
                         ref={inputRef}
                         value={query}
-                        onChange={(e) => {
+                        onChange={(e: any) => {
                             setQuery(e.target.value);
                             setOpen(true);
                         }}
@@ -1041,7 +1057,7 @@ function ServicesMultiSelect({
                             setOpen(true);
                             setShowMoreServices(false); // Close the more services dropdown
                         }}
-                        onKeyDown={async (e) => {
+                        onKeyDown={async (e: any) => {
                             // Helper function to navigate to next row's enterprise field
                             const navigateToNextRow = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
@@ -1159,7 +1175,7 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
                         placeholder=''
                     />
                 ) : (
@@ -1187,13 +1203,14 @@ function ServicesMultiSelect({
                     <div
                         ref={dropdownRef}
                         className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
                         style={{
                             position: 'fixed',
                             top: dropdownPos.top,
                             left: dropdownPos.left,
                             width: dropdownPos.width,
+                            maxWidth: '300px'
                         }}
                     >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
@@ -1269,7 +1286,7 @@ function ServicesMultiSelect({
                                                 className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
                                             >
                                                 <div className='flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'>
-                                                    <Plus className='h-3 w-3' />
+                                                    <Plus size={12} />
                                                 </div>
                                                 <div className='flex-1'>
                                                     <span className='text-sm text-blue-600 font-medium'>
@@ -1318,7 +1335,6 @@ function ServicesMultiSelect({
 
                                         return (
                                             <DropdownOption
-                                                key={opt.id}
                                                 option={opt}
                                                 tone={tone}
                                                 type='service'
@@ -1457,7 +1473,7 @@ function ServicesMultiSelect({
                                     }}
                                     className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
                                 >
-                                    <Plus className='h-3.5 w-3.5' />
+                                    <Plus size={14} />
                                     <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
                                         Add new service
                                     </span>
@@ -1493,12 +1509,12 @@ function ServicesMultiSelect({
                                                             damping: 28,
                                                         }}
                                                         value={adding}
-                                                        onChange={(e) =>
+                                                        onChange={(e: any) =>
                                                             setAdding(
                                                                 e.target.value,
                                                             )
                                                         }
-                                                        onKeyDown={(e) => {
+                                                        onKeyDown={(e: any) => {
                                                             if (
                                                                 e.key ===
                                                                 'Enter'
@@ -1680,26 +1696,52 @@ function AsyncChipSelect({
         
         const containerRect = containerRef.current.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
         const dropdownHeight = 300; // Max height of dropdown
         const spaceBelow = viewportHeight - containerRect.bottom;
         const spaceAbove = containerRect.top;
         
-        // Calculate portal position
-        const width = Math.max(250, Math.min(400, containerRect.width));
-        const left = Math.max(8, Math.min(window.innerWidth - width - 8, containerRect.left));
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer = containerRef.current.closest('.compact-table') ||
+                              containerRef.current.closest('[role="table"]') || 
+                              containerRef.current.closest('.rounded-xl') ||
+                              containerRef.current.closest('.overflow-auto') ||
+                              containerRef.current.closest('.w-full.compact-table') ||
+                              document.querySelector('.compact-table') ||
+                              document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+        
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(120, tableRect.width - 64, viewportWidth - 64); // Reduced to match dropdown width
+        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+        
+        // Ensure dropdown stays within table container horizontally with more padding
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32); // More padding
+        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
         
         // Prefer below if there's enough space, otherwise use above if there's more space above
         let top;
         if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
             setDropdownPosition('below');
             top = containerRect.bottom + 4;
+            // Ensure it doesn't go below table bounds
+            if (top + dropdownHeight > tableRect.bottom) {
+                top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
+                setDropdownPosition('above');
+            }
         } else {
             setDropdownPosition('above');
-            top = Math.max(8, containerRect.top - dropdownHeight - 4);
+            top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
         }
         
+        // Final constraint to ensure dropdown is within table bounds
+        top = Math.max(top, tableRect.top + 10);
+        top = Math.min(top, tableRect.bottom - 100);
+        
         setDropdownPortalPos({ top, left, width });
-        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above' });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above', tableRect });
     }, []);
 
     // Calculate position when dropdown opens
@@ -1949,7 +1991,7 @@ function AsyncChipSelect({
                         className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                             const target = e.target as HTMLElement;
                             if (!target.closest('button')) {
                                 setQuery(current || value || '');
@@ -1959,7 +2001,7 @@ function AsyncChipSelect({
                     >
                         <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
                         <button
-                            onClick={(e) => {
+                            onClick={(e: any) => {
                                 e.stopPropagation();
                                 e.preventDefault();
                                 onChange('');
@@ -1970,7 +2012,7 @@ function AsyncChipSelect({
                             aria-label='Remove'
                             style={{minWidth: '20px', minHeight: '20px'}}
                         >
-                            <X className='h-3 w-3' />
+                            <X size={12} />
                         </button>
                     </motion.span>
                 )}
@@ -1980,7 +2022,7 @@ function AsyncChipSelect({
                     <input
                         ref={inputRef}
                         value={query}
-                        onChange={(e) => {
+                        onChange={(e: any) => {
                             const newValue = e.target.value;
                             setQuery(newValue);
                             
@@ -2007,7 +2049,7 @@ function AsyncChipSelect({
                                 loadAllOptions();
                             }
                         }}
-                        onKeyDown={async (e) => {
+                        onKeyDown={async (e: any) => {
                             // Helper function to navigate to next field
                             const navigateToNextField = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
@@ -2205,40 +2247,23 @@ function AsyncChipSelect({
             </div>
             
             {/* Full Autocomplete Dropdown - Portal Based */}
-            {open && dropdownPortalPos && 
-                createPortal(
-                    <div 
-                        ref={dropdownRef}
-                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60 overflow-y-auto overflow-x-hidden no-horizontal-scrollbar relative'
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            position: 'fixed',
-                            top: dropdownPortalPos.top,
-                            left: dropdownPortalPos.left,
-                            width: dropdownPortalPos.width,
-                        }}
-                    >
-                        {/* Enhanced pointer/arrow pointing to the input field */}
-                        <div className={`absolute left-6 z-[10000] ${
-                            dropdownPosition === 'above' 
-                                ? '-bottom-2' 
-                                : '-top-2'
-                        }`}>
-                            {/* Main pointer */}
-                            <div className={`w-0 h-0 ${
-                                dropdownPosition === 'above' 
-                                    ? 'border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-white' 
-                                    : 'border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-white'
-                            }`}></div>
-                            {/* Border shadow */}
-                            <div className={`absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0 ${
-                                dropdownPosition === 'above' 
-                                    ? '-translate-y-[1px] border-l-[9px] border-r-[9px] border-t-[9px] border-l-transparent border-r-transparent border-t-slate-200' 
-                                    : 'translate-y-[1px] border-l-[9px] border-r-[9px] border-b-[9px] border-l-transparent border-r-transparent border-b-slate-200'
-                            } -z-10`}></div>
-                        </div>
-                        <div className='py-1 text-[12px] min-w-0'>
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: `${Math.min(dropdownPortalPos.width, 180)}px`,
+                        maxWidth: '180px',
+                        minWidth: '140px'
+                    }}
+                >
+                        <div className='py-1'>
+                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
@@ -2276,62 +2301,31 @@ function AsyncChipSelect({
                                     const showCreateNew = query.trim() && !exactMatch;
 
                                     return (
-                                        <div className='space-y-1'>
+                                        <div>
                                             {/* Show existing matching options */}
                                             {filteredOptions.length > 0 && (
-                                                <div className='space-y-1 px-2'>
+                                                <div>
                                                     {filteredOptions.map((opt, idx) => (
-                                                        <motion.button
+                                                        <div
                                                             key={opt.id}
-                                                            initial={{ opacity: 0, y: -2 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: idx * 0.03 }}
                                                             onClick={() => {
                                                                 onChange(opt.name);
                                                                 setCurrent(opt.name);
                                                                 setQuery('');
                                                                 setOpen(false);
                                                             }}
-                                                            className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-150 group'
+                                                            className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
                                                         >
-                                                            <div className='flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 transition-colors'>
-                                                                {type === 'enterprise' ? (
-                                                                    <Building2 className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                ) : type === 'product' ? (
-                                                                    <Package className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                ) : (
-                                                                    <Globe className='h-4 w-4 text-slate-600 group-hover:text-blue-600' />
-                                                                )}
-                                                            </div>
-                                                            <div className='flex-1'>
-                                                                <span className='text-sm font-medium text-slate-900 group-hover:text-blue-900'>
-                                                                    {opt.name}
-                                                                </span>
-                                                                <div className='text-xs text-slate-500 group-hover:text-blue-600'>
-                                                                    Select existing {type}
-                                                                </div>
-                                                            </div>
-                                                            <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
-                                                                <div className='w-2 h-2 rounded-full bg-blue-500'></div>
-                                                            </div>
-                                                        </motion.button>
+                                                            {opt.name}
+                                                        </div>
                                                     ))}
-                                                </div>
-                                            )}
-                                            
-                                            {/* Show separator if both existing options and create new option exist */}
-                                            {filteredOptions.length > 0 && showCreateNew && (
-                                                <div className='px-4 py-1'>
-                                                    <div className='h-px bg-slate-200'></div>
                                                 </div>
                                             )}
                                             
                                             {/* Show "Create New" option */}
                                             {showCreateNew && (
-                                                <div className='px-2'>
-                                                    <motion.button
-                                                        initial={{ opacity: 0, scale: 0.98 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
+                                                <div className='border-t border-slate-200'>
+                                                    <button
                                                         onClick={async () => {
                                                             try {
                                                                 let created: { id: string; name: string; } | null = null;
@@ -2391,35 +2385,20 @@ function AsyncChipSelect({
                                                                 }
                                                             }
                                                         }}
-                                                        className='w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 transition-all duration-150 group'
+                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
                                                     >
-                                                        <div className='flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 group-hover:bg-blue-600 transition-colors shadow-sm'>
-                                                            <Plus className='h-4 w-4 text-white' />
-                                                        </div>
-                                                        <div className='flex-1'>
-                                                            <span className='text-sm font-medium text-blue-700 group-hover:text-blue-800'>
-                                                                Create &quot;{query.trim()}&quot;
-                                                            </span>
-                                                            <div className='text-xs text-blue-600 group-hover:text-blue-700'>
-                                                                Add new {type} to database
-                                                            </div>
-                                                        </div>
-                                                        <div className='opacity-0 group-hover:opacity-100 transition-opacity'>
-                                                            <div className='px-2 py-1 bg-blue-100 rounded-full'>
-                                                                <span className='text-xs font-medium text-blue-700'>New</span>
-                                                            </div>
-                                                        </div>
-                                                    </motion.button>
+                                                        + Create "{query.trim()}"
+                                                    </button>
                                                 </div>
                                             )}
                                             
                                             {/* Show "No results" message */}
                                             {filteredOptions.length === 0 && !showCreateNew && (
-                                                <div className='px-4 py-6 text-center text-slate-500'>
+                                                <div className='px-3 py-2 text-center text-sm text-slate-500'>
                                                     {query.trim() ? (
-                                                        <div className='text-sm'>No {type}s found matching &quot;{query}&quot;</div>
+                                                        <div>No {type}s found matching "{query}"</div>
                                                     ) : (
-                                                        <div className='text-sm'>No {type}s available</div>
+                                                        <div>No {type}s available</div>
                                                     )}
                                                 </div>
                                             )}
@@ -2428,9 +2407,11 @@ function AsyncChipSelect({
                                 })()
                             )}
                         </div>
-                    </div>,
-                    document.body,
-                )}
+                    </div>
+                </div>,
+                document.body
+            )
+        }
         </div>
     );
 }
@@ -2483,6 +2464,8 @@ interface EnterpriseConfigTableProps {
     onAddNewRow?: () => void; // Callback to add a new row
     externalSortColumn?: string; // External sort column from parent
     externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
+    onSortChange?: (column: string, direction: 'asc' | 'desc') => void; // Callback when sort changes from column headers
+    isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
 }
 
 function SortableEnterpriseConfigRow({
@@ -2506,6 +2489,7 @@ function SortableEnterpriseConfigRow({
     firstColWidth,
     hideRowExpansion = false,
     enableDropdownChips = false,
+    shouldShowHorizontalScroll = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
     isCellMissing = () => false,
@@ -2534,6 +2518,7 @@ function SortableEnterpriseConfigRow({
     firstColWidth?: string;
     hideRowExpansion?: boolean;
     enableDropdownChips?: boolean;
+    shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
         type: 'enterprises' | 'products' | 'services',
         action: 'update' | 'delete',
@@ -2751,10 +2736,10 @@ function SortableEnterpriseConfigRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 overflow-hidden border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected 
                     ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
-                    : 'hover:bg-blue-50 hover:shadow-md hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:translate-x-1'
+                    : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
                 isSelected ? 'border-blue-300' : 'border-slate-200'
             } ${inFillRange ? 'bg-primary-50/40' : ''} ${
@@ -2774,7 +2759,10 @@ function SortableEnterpriseConfigRow({
                 gridTemplateColumns: gridTemplate,
                 willChange: 'transform',
                 display: 'grid',
-                minWidth: '400px', // Ensure table has minimum width
+                minWidth: 'max-content',
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden',
                 borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
@@ -2790,7 +2778,7 @@ function SortableEnterpriseConfigRow({
                         exit={{ opacity: 0, scale: 0.8 }}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                             e.stopPropagation();
                             if (onDeleteClick) {
                                 onDeleteClick(row.id);
@@ -2819,7 +2807,7 @@ function SortableEnterpriseConfigRow({
             {cols.includes('enterprise') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
-                        pinFirst
+                        pinFirst && !shouldShowHorizontalScroll
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
                     } ${
@@ -2847,11 +2835,7 @@ function SortableEnterpriseConfigRow({
                                 className='inline-flex'
                             >
                                 <ChevronRight
-                                    className={`h-4 w-4 transition-all duration-150 ${
-                                        isExpanded
-                                            ? 'opacity-100 text-sky-600'
-                                            : 'opacity-0 group-hover:opacity-100'
-                                    }`}
+                                    size={16}
                                 />
                             </motion.span>
                         </button>
@@ -2948,13 +2932,19 @@ function SortableEnterpriseConfigRow({
             )}
             {cols.includes('services') && (
                 <div
-                    className={`text-slate-700 text-[12px] px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] px-2 py-1 w-full ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='services'
+                    style={{ 
+                        borderRight: 'none', 
+                        width: '100%', 
+                        minWidth: '500px', // Increased minimum width to ensure content visibility when scrolled
+                        maxWidth: 'none' // Ensure no max width constraint
+                    }}
                 >
                     <ServicesMultiSelect
                         value={row.services || ''}
@@ -3014,6 +3004,8 @@ export default function EnterpriseConfigTable({
     onAddNewRow,
     externalSortColumn,
     externalSortDirection,
+    onSortChange,
+    isAIInsightsPanelOpen = false,
 }: EnterpriseConfigTableProps) {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -3242,9 +3234,9 @@ export default function EnterpriseConfigTable({
 
     const colSizes: Record<string, string> = {
         deleteButton: '8px', // Space for delete button with proper padding
-        enterprise: '180px', // Reduced width from 220px
-        product: '200px', // Kept the same increased width for better content display
-        services: '800px', // Significantly increased width to extend Services column till the end
+        enterprise: '180px', // Reduced width to give more space for Services column
+        product: '200px', // Further reduced width for product names
+        services: 'minmax(600px, 1fr)', // Increased minimum width to 600px for more space
     };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -3254,30 +3246,62 @@ export default function EnterpriseConfigTable({
     const [pinFirst, setPinFirst] = useState(true);
     const firstColWidth = '140px'; // enforce fixed width for first column
     const gridTemplate = useMemo(() => {
-        // Always include delete button column first with minimum width
-        const deleteCol = `minmax(24px, ${colSizes.deleteButton})`;
+        // Always include delete button column first with fixed width
+        const deleteCol = '32px'; // Fixed width for delete button
         
-        const base = cols.map((c) => {
+        const base = cols.map((c, index) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
+            
+            // Define minimum and maximum widths per column
+            const constraints = {
+                enterprise: { min: 140, max: 250 }, // Increased min width to prevent arrow overlap
+                product: { min: 140, max: 280 }, // Reduced max width to prevent overflow
+                services: { min: 400, max: Infinity } // Increased minimum to ensure content visibility
+            };
+            
+            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 100, max: 250 };
+            
             if (dynamicWidth && dynamicWidth > 0) {
-                // For columns with sort arrows, ensure minimum width to accommodate arrows and resize handle
-                const minWidth = ['enterprise', 'product', 'services'].includes(c) ? '120px' : '100px';
-                return `minmax(${minWidth}, ${dynamicWidth}px)`;
+                // For Services column, use minmax to fill remaining space
+                if (c === 'services') {
+                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
+                }
+                // Clamp the dynamic width within constraints for other columns
+                const clampedWidth = Math.max(
+                    columnConstraints.min, 
+                    Math.min(columnConstraints.max, dynamicWidth)
+                );
+                return `${clampedWidth}px`;
             }
-            // Use default size from colSizes
+            
+            // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
-            const minWidth = ['enterprise', 'product', 'services'].includes(c) ? '120px' : '100px';
             if (defaultSize) {
-                return `minmax(${minWidth}, ${defaultSize})`;
+                // For Services column, use flexible sizing to fill remaining space
+                if (c === 'services' && defaultSize === '1fr') {
+                    return `minmax(${columnConstraints.min}px, 1fr)`;
+                }
+                const numericSize = parseInt(defaultSize.replace('px', ''));
+                if (!isNaN(numericSize)) {
+                    const clampedSize = Math.max(
+                        columnConstraints.min,
+                        Math.min(columnConstraints.max, numericSize)
+                    );
+                    return `${clampedSize}px`;
+                }
+                return defaultSize;
             }
-            // Final fallback
-            const fallbackMax = ['enterprise', 'product', 'services'].includes(c) ? '160px' : '140px';
-            return `minmax(${minWidth}, ${fallbackMax})`;
-        }).join(' ');
+            
+            // Final fallback - Services gets remaining space
+            if (c === 'services') {
+                return `minmax(${columnConstraints.min}px, 1fr)`;
+            }
+            return `${columnConstraints.min}px`;
+        });
         
-        const custom = customColumns.map(() => '110px').join(' ');
-        const parts = [deleteCol, base, custom].filter(Boolean);
+        const custom = customColumns.map(() => '110px');
+        const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
     }, [cols, customColumns, colWidths, colSizes]);
 
@@ -3293,7 +3317,7 @@ export default function EnterpriseConfigTable({
 
     const startResize = (
         colKey: string,
-        e: React.MouseEvent<HTMLDivElement>,
+        e: any,
     ) => {
         e.preventDefault();
         e.stopPropagation();
@@ -3304,29 +3328,142 @@ export default function EnterpriseConfigTable({
         const startX = e.clientX;
         const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
         
+        // Define column-specific constraints
+        const constraints = {
+            enterprise: { min: 140, max: 250 }, // Increased min to prevent arrow overlap
+            product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
+            services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
+        };
+        
+        const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
+        
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
         
+        // Add resize indicator
+        const resizeIndicator = document.createElement('div');
+        resizeIndicator.className = 'fixed top-0 bottom-0 w-0.5 bg-blue-500 z-50 pointer-events-none';
+        resizeIndicator.style.left = `${startX}px`;
+        document.body.appendChild(resizeIndicator);
+        
         const onMove = (ev: MouseEvent) => {
             ev.preventDefault();
             const delta = ev.clientX - startX;
-            const newWidth = Math.max(100, Math.min(400, startWidth + delta)); // Min 100px, Max 400px
+            const newWidth = Math.max(
+                columnConstraints.min, 
+                Math.min(columnConstraints.max, startWidth + delta)
+            );
             
-            setColWidths((prev) => {
-                const newColWidths = {
-                    ...prev,
-                    [colKey]: newWidth
-                };
-                // Force re-render by updating state
-                return newColWidths;
-            });
+            // Update resize indicator position
+            const newX = startX + (newWidth - startWidth);
+            resizeIndicator.style.left = `${newX}px`;
+            
+            setColWidths((prev) => ({
+                ...prev,
+                [colKey]: newWidth
+            }));
+            
+            // Trigger scroll check during resize to detect Services column visibility
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is getting hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 10);
         };
         
         const onUp = () => {
             // Remove visual feedback
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            
+            // Remove resize indicator
+            if (resizeIndicator.parentNode) {
+                resizeIndicator.parentNode.removeChild(resizeIndicator);
+            }
+            
+            // Final check for scrollbar need after resize is complete
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 50);
             
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
@@ -3392,6 +3529,20 @@ export default function EnterpriseConfigTable({
     >(null);
     const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc' | null>(null);
 
+    // Listen for clear sorting events from parent component
+    useEffect(() => {
+        const handleClearSorting = () => {
+            setInternalSortCol(null);
+            setInternalSortDir(null);
+        };
+        
+        window.addEventListener('clearTableSorting', handleClearSorting);
+        
+        return () => {
+            window.removeEventListener('clearTableSorting', handleClearSorting);
+        };
+    }, []);
+
     // Use external sort state if available, otherwise use internal state
     const sortCol = externalSortColumn || internalSortCol;
     const sortDir = externalSortDirection || internalSortDir;
@@ -3407,14 +3558,54 @@ export default function EnterpriseConfigTable({
             | 'enterprise'
             | 'product'
             | 'services',
+        direction?: 'asc' | 'desc'
     ) => {
-        // Only use internal sort when external sort is not provided
-        if (!externalSortColumn && !externalSortDirection) {
-            const nextDir: 'asc' | 'desc' =
-                internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc';
+        let nextDir: 'asc' | 'desc';
+        
+        // Check if external sorting is actively being used (both props provided and not empty)
+        const isExternalSorting = externalSortColumn && externalSortDirection;
+        
+        if (isExternalSorting) {
+            // When external sort is actively controlled, use external state for calculation
+            nextDir = direction || 
+                (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
+            
+            // Notify parent to update external sort state
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
+        } else {
+            // When using internal sort (including first time with no sorting)
+            nextDir = direction ||
+                (internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc');
+            
+            // Update internal state first (this actually sorts the table)
             setInternalSortCol(col);
             setInternalSortDir(nextDir);
+            
+            // Then notify parent to update Sort panel (for toolbar sync)
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
         }
+        
+        // Always dispatch custom event for parent component to listen to
+        notifyParentSortChange(col, nextDir);
+    };
+
+    // Function to notify parent component about sort changes via custom event
+    const notifyParentSortChange = (column: string, direction: 'asc' | 'desc') => {
+        // Dispatch a custom event that the parent can listen to
+        const event = new CustomEvent('enterpriseTableSortChange', {
+            detail: {
+                column,
+                direction
+            },
+            bubbles: true
+        });
+        
+        // Dispatch the event from the document to ensure it reaches the parent
+        document.dispatchEvent(event);
     };
 
     const displayItems = useMemo(() => {
@@ -3494,8 +3685,269 @@ export default function EnterpriseConfigTable({
         return sortedGroups;
     }, [displayItems, groupBy]);
 
+    // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
+    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    
+    useEffect(() => {
+        const checkScrollNeed = () => {
+            if (!tableContainerRef.current) return;
+            
+            // Get current zoom level
+            const currentZoom = window.devicePixelRatio || 1;
+            const baseZoom = 1;
+            const zoomFactor = currentZoom / baseZoom;
+            
+            // Get viewport dimensions accounting for AI insights panel
+            const viewportWidth = window.innerWidth;
+            const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
+            const availableWidth = viewportWidth - aiPanelWidth;
+            
+            // Check if content width exceeds container width with a larger buffer for hover effects
+            const contentWidth = tableContainerRef.current.scrollWidth;
+            const containerWidth = tableContainerRef.current.clientWidth;
+            
+            // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
+            const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
+            
+            // Only show scrollbar when content genuinely exceeds container accounting for hover effects
+            const isContentOverflowing = contentWidth > containerWidth + hoverBuffer;
+            
+            // Check if Services column content is actually being cut off
+            const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+            let servicesContentHidden = false;
+            
+            if (servicesColumns.length > 0) {
+                servicesColumns.forEach(serviceCol => {
+                    const serviceElement = serviceCol as HTMLElement;
+                    const serviceRect = serviceElement.getBoundingClientRect();
+                    const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                    
+                    // More reasonable threshold - minimum 300px for services content
+                    const minServicesWidth = 300;
+                    const bufferZone = 15; // Additional buffer for hover effects
+                    
+                    // Only trigger if Services column is actually cut off or too narrow to display content properly
+                    if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
+                        // Additional check: see if there's actually content being cut off
+                        const servicesChips = serviceElement.querySelectorAll('.inline-flex');
+                        if (servicesChips.length > 0) {
+                            servicesChips.forEach(chip => {
+                                const chipRect = chip.getBoundingClientRect();
+                                // Account for hover effects in chip positioning
+                                if (chipRect.right > serviceRect.right - bufferZone) {
+                                    servicesContentHidden = true;
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Show scrollbar only when there's genuine overflow or content is being cut off
+            const needsScrollbar = isContentOverflowing || servicesContentHidden;
+            
+            // Debug logging (remove in production)
+            console.log('Scroll Check:', {
+                contentWidth,
+                containerWidth,
+                hoverBuffer,
+                isContentOverflowing,
+                servicesContentHidden,
+                needsScrollbar
+            });
+            
+            setShouldShowHorizontalScroll(needsScrollbar);
+        };
+        
+        // Check on mount and when table structure changes
+        let scrollCheckTimeout: NodeJS.Timeout;
+        const debouncedScrollCheck = () => {
+            clearTimeout(scrollCheckTimeout);
+            scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
+        };
+        
+        checkScrollNeed();
+        
+        // Use ResizeObserver for better performance
+        const resizeObserver = new ResizeObserver(() => {
+            debouncedScrollCheck(); // Use debounced version
+        });
+        
+        // Use MutationObserver to detect when Services content changes
+        const mutationObserver = new MutationObserver((mutations) => {
+            let shouldCheck = false;
+            mutations.forEach((mutation) => {
+                // Check if Services column content changed
+                if (mutation.target instanceof Element) {
+                    const servicesCol = mutation.target.closest('[data-col="services"]');
+                    if (servicesCol) {
+                        shouldCheck = true;
+                    }
+                }
+            });
+            if (shouldCheck) {
+                debouncedScrollCheck(); // Use debounced version
+            }
+        });
+        
+        if (tableContainerRef.current) {
+            resizeObserver.observe(tableContainerRef.current);
+            mutationObserver.observe(tableContainerRef.current, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            
+            // Also observe all column cells for resize changes
+            const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
+            columnCells.forEach(cell => {
+                if (cell instanceof Element) {
+                    resizeObserver.observe(cell);
+                }
+            });
+        }
+        
+        // Also listen for window resize (zoom changes)
+        window.addEventListener('resize', debouncedScrollCheck);
+        
+        // Listen for zoom via keyboard shortcuts and mouse wheel
+        const handleKeyZoom = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
+                debouncedScrollCheck();
+            }
+        };
+        
+        const handleWheelZoom = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                debouncedScrollCheck();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyZoom);
+        window.addEventListener('wheel', handleWheelZoom, { passive: true });
+        
+        return () => {
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+            window.removeEventListener('resize', debouncedScrollCheck);
+            window.removeEventListener('keydown', handleKeyZoom);
+            window.removeEventListener('wheel', handleWheelZoom);
+            clearTimeout(scrollCheckTimeout);
+        };
+    }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
+    
     return (
         <div className='w-full compact-table safari-tight'>
+            {/* Using browser default scrollbars only */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                    /* Table container with proper scrolling */
+                    div[role="table"] {
+                        position: relative;
+                        overflow-y: visible;
+                        overflow-x: ${shouldShowHorizontalScroll ? 'auto' : 'hidden'};
+                    }
+                    
+                    /* Prevent horizontal scrollbars on table cells and headers (except services) */
+                    [data-col]:not([data-col="services"]) {
+                        overflow-x: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    
+                    /* Specifically prevent scrollbars in column headers */
+                    .bg-slate-50[data-col] {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    /* Header row should not have scrollbars */
+                    .bg-slate-50 > div {
+                        overflow: hidden !important;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    /* Ensure header content fits properly */
+                    .bg-slate-50 .relative {
+                        overflow: hidden;
+                        min-width: 0;
+                    }
+                    
+                    /* Ensure proper grid layout */
+                    .grid {
+                        display: grid;
+                    }
+                    
+                    /* Services column should allow content display within bounds */
+                    [data-col="services"] {
+                        overflow: visible;
+                        white-space: normal;
+                        text-overflow: unset;
+                        position: relative;
+                        max-width: 600px;
+                    }
+                    
+                    /* Services column chips should display full text */
+                    [data-col="services"] .inline-flex {
+                        white-space: nowrap;
+                        text-overflow: unset;
+                        overflow: visible;
+                        min-width: max-content;
+                        flex-shrink: 0;
+                    }
+                    
+                    /* Services column chip text should not be truncated */
+                    [data-col="services"] .inline-flex span {
+                        white-space: nowrap;
+                        overflow: visible;
+                        text-overflow: unset;
+                    }
+                    
+                    /* Services column container should wrap content */
+                    [data-col="services"] > div {
+                        white-space: normal;
+                        overflow: visible;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        position: relative;
+                        max-width: 100%;
+                    }
+                    
+                    /* Ensure dropdowns within Services column stay within bounds */
+                    [data-col="services"] .absolute {
+                        max-width: 100%;
+                        right: auto !important;
+                    }
+                    }
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        max-width: 100%;
+                        box-sizing: border-box;
+                    }
+                    
+                    /* Ensure dropdowns don't extend beyond table container */
+                    .z-\\[9999\\] {
+                        max-width: calc(100vw - 32px) !important;
+                        max-height: calc(100vh - 100px) !important;
+                        overflow: auto !important;
+                    }
+                    
+                    /* Table container should contain overflow */
+                    [role="table"] {
+                        position: relative;
+                        contain: layout style;
+                    }
+                    
+                    /* Hide any scrollbars that might appear in header elements */
+                    .bg-slate-50 {
+                        overflow: hidden;
+                    }
+                `
+            }} />
             <div className='flex items-center justify-between mb-2'>
                 <h3 className='text-sm font-semibold text-slate-800'>
                     {title ?? 'Enterprise Configuration Details'}
@@ -3555,8 +4007,21 @@ export default function EnterpriseConfigTable({
                     </div>
                 </div>
             ) : (
-                <div role='table' className='p-0 overflow-x-auto'>
-                <div className='w-full relative'>
+                <div 
+                    ref={tableContainerRef}
+                    role='table' 
+                    className='p-0 w-full'
+                    style={{
+                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
+                        overflowY: 'visible',
+                        maxWidth: '100%',
+                        boxSizing: 'border-box'
+                    }}
+                >
+                <div className='w-full relative' style={{ 
+                    minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
+                    width: '100%' 
+                }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
                             enterprise: 'Enterprise',
@@ -3572,20 +4037,30 @@ export default function EnterpriseConfigTable({
 
                         const iconFor: Record<string, React.ReactNode> = {
                             enterprise: (
-                                <Building2 className='h-3.5 w-3.5 text-blue-600' />
+                                <Building2 size={14} />
                             ),
                             product: (
-                                <Package className='h-3.5 w-3.5 text-blue-600' />
+                                <Package size={14} />
                             ),
                             services: (
-                                <Globe className='h-3.5 w-3.5 text-blue-600' />
+                                <Globe size={14} />
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white overflow-hidden'>
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
+                                minWidth: 'fit-content', 
+                                width: '100%',
+                                maxWidth: '100%',
+                                overflow: 'hidden' // Ensure content doesn't escape the container
+                            }}>
                                 <div
                                     className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
-                                    style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%',
+                                        display: 'grid'
+                                    }}
                                 >
                                     {/* Delete Button Column Header */}
                                     <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
@@ -3600,10 +4075,13 @@ export default function EnterpriseConfigTable({
                                                     ? 'border-l-0' 
                                                     : ''
                                             } ${
-                                                idx === 0 && pinFirst
+                                                idx === 0 && pinFirst && !shouldShowHorizontalScroll
                                                     ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
+                                            } ${
+                                                c === 'services' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for Services column
                                             }`}
+                                            style={c === 'services' ? { minWidth: '600px' } : undefined} // Match Services column minimum width
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
@@ -3617,40 +4095,35 @@ export default function EnterpriseConfigTable({
                                                 'product',
                                                 'services',
                                             ].includes(c) && (
-                                                <button
-                                                    onClick={() =>
-                                                        toggleSort(c as any)
-                                                    }
-                                                    className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-6 top-1/2 -translate-y-1/2'}`}
-                                                >
-                                                    <ArrowUp
-                                                        className={`w-4 h-4 transition-all duration-200 ${
-                                                            sortCol === c &&
-                                                            sortDir === 'asc'
-                                                                ? 'text-blue-600 font-bold drop-shadow-sm'
-                                                                : 'text-slate-400 hover:text-slate-600'
-                                                        }`}
-                                                    />
-                                                    <ArrowDown
-                                                        className={`w-4 h-4 transition-all duration-200 ${
-                                                            sortCol === c &&
-                                                            sortDir === 'desc'
-                                                                ? 'text-blue-600 font-bold drop-shadow-sm'
-                                                                : 'text-slate-400 hover:text-slate-600'
-                                                        }`}
-                                                    />
-                                                </button>
+                                                <div className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                    <button
+                                                        onClick={() => toggleSort(c as any, 'asc')}
+                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                    >
+                                                        <ArrowUp
+                                                            size={sortCol === c && sortDir === 'asc' ? 20 : 16}
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleSort(c as any, 'desc')}
+                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                    >
+                                                        <ArrowDown
+                                                            size={sortCol === c && sortDir === 'desc' ? 20 : 16}
+                                                        />
+                                                    </button>
+                                                </div>
                                             )}
-                                            {/* Only show resize handle for columns that are not the last one */}
-                                            {idx < cols.length - 1 && (
+                                            {/* Show resize handle for resizable columns but not for Services (last column) */}
+                                            {['enterprise', 'product'].includes(c) && (
                                                 <div
-                                                    onMouseDown={(e) =>
+                                                    onMouseDown={(e: any) =>
                                                         startResize(c, e)
                                                     }
-                                                    className='absolute -right-px top-0 h-full w-4 cursor-col-resize z-30 flex items-center justify-center group/resize'
-                                                    title='Resize column'
+                                                    className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                    title={`Resize ${labelFor[c] || c} column`}
                                                 >
-                                                    <div className='h-8 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-100 hover:opacity-100 transition-opacity duration-150 shadow-sm' />
+                                                    <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
                                             {c === 'accountName' && (
@@ -3675,11 +4148,10 @@ export default function EnterpriseConfigTable({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <div className='overflow-hidden mt-2'>
+                        <div className='mt-2'>
                             {displayItems.map((r, idx) => (
-                                <React.Fragment key={r.id}>
+                                <div key={r.id}>
                                     <SortableEnterpriseConfigRow
-                                        key={r.id}
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -3711,6 +4183,7 @@ export default function EnterpriseConfigTable({
                                         onStartFill={() => {}}
                                         inFillRange={false}
                                         onDeleteClick={handleDeleteClick}
+                                        shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
@@ -3720,14 +4193,18 @@ export default function EnterpriseConfigTable({
                                             </div>
                                         </div>
                                     )}
-                                </React.Fragment>
+                                </div>
                             ))}
                             
                             {/* Add New Row Button */}
                             {onAddNewRow && (
                                 <div 
                                     className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
-                                    style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%'
+                                    }}
                                     onClick={onAddNewRow}
                                 >
                                     {/* Empty delete button space */}
@@ -3748,7 +4225,7 @@ export default function EnterpriseConfigTable({
                     ) : (
                         <div className='space-y-4 mt-2'>
                             {Object.entries(groupedItems).map(([groupName, groupRows]) => (
-                                <div key={groupName} className='border border-slate-200 rounded-lg overflow-x-hidden'>
+                                <div key={groupName} className='border border-slate-200 rounded-lg'>
                                     {/* Group Header */}
                                     <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
                                         <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
@@ -3762,9 +4239,8 @@ export default function EnterpriseConfigTable({
                                     {/* Group Rows */}
                                     <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
-                                            <React.Fragment key={r.id}>
+                                            <div key={r.id}>
                                                 <SortableEnterpriseConfigRow
-                                                    key={r.id}
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
@@ -3796,6 +4272,7 @@ export default function EnterpriseConfigTable({
                                                     onStartFill={() => {}}
                                                     inFillRange={false}
                                                     onDeleteClick={handleDeleteClick}
+                                                    shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                 />
                                                 {expandedRows.has(r.id) && (
                                                     <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
@@ -3805,7 +4282,7 @@ export default function EnterpriseConfigTable({
                                                         </div>
                                                     </div>
                                                 )}
-                                            </React.Fragment>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
@@ -3816,7 +4293,11 @@ export default function EnterpriseConfigTable({
                                 <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
                                     <div 
                                         className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
-                                        style={{gridTemplateColumns: gridTemplate, minWidth: '400px'}}
+                                        style={{
+                                            gridTemplateColumns: gridTemplate, 
+                                            minWidth: 'max-content',
+                                            width: '100%'
+                                        }}
                                         onClick={onAddNewRow}
                                     >
                                         {/* Empty delete button space */}
@@ -3836,9 +4317,8 @@ export default function EnterpriseConfigTable({
                             )}
                         </div>
                     )}
+                    </div>
                 </div>
-                
-            </div>
             )}
         </div>
     );
