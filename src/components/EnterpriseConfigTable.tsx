@@ -300,7 +300,7 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
                     className || ''
                 }`}
                 data-inline={dataAttr || undefined}
@@ -310,7 +310,7 @@ function InlineEditableText({
     const isEmpty = !value || value.length === 0;
     return (
         <span
-            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
+            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 bg-white hover:ring-2 hover:ring-blue-400 hover:bg-white/95 cursor-text relative z-20 transition-all duration-150 ${
                 className || ''
             }`}
             onClick={() => setEditing(true)}
@@ -1175,7 +1175,7 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        className={`w-32 text-left px-2 py-1 text-[12px] rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
                         placeholder=''
                     />
                 ) : (
@@ -1190,7 +1190,7 @@ function ServicesMultiSelect({
                                 inputRef.current?.focus();
                             }, 10);
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         + Add more
                     </button>
@@ -1988,7 +1988,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm hover:bg-slate-50 cursor-text transition-colors'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
                         onClick={(e: any) => {
@@ -2240,7 +2240,7 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        className={`w-full text-left px-2 ${sizeClass} rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} transition-colors`}
                         placeholder=''
                     />
                 ) : null}
@@ -2387,7 +2387,7 @@ function AsyncChipSelect({
                                                         }}
                                                         className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
                                                     >
-                                                        + Create "{query.trim()}"
+                                                        + Create &quot;{query.trim()}&quot;
                                                     </button>
                                                 </div>
                                             )}
@@ -2396,7 +2396,7 @@ function AsyncChipSelect({
                                             {filteredOptions.length === 0 && !showCreateNew && (
                                                 <div className='px-3 py-2 text-center text-sm text-slate-500'>
                                                     {query.trim() ? (
-                                                        <div>No {type}s found matching "{query}"</div>
+                                                        <div>No {type}s found matching &quot;{query}&quot;</div>
                                                     ) : (
                                                         <div>No {type}s available</div>
                                                     )}
@@ -2738,7 +2738,7 @@ function SortableEnterpriseConfigRow({
             onMouseLeave={() => setIsRowHovered(false)}
             className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected 
-                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200 border-l-4 border-l-blue-500' 
                     : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
                 isSelected ? 'border-blue-300' : 'border-slate-200'
@@ -2806,7 +2806,7 @@ function SortableEnterpriseConfigRow({
             </div>
             {cols.includes('enterprise') && (
                 <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
+                    className={`group flex items-center border-r border-slate-200 pl-1 pr-1 py-1 w-full ${
                         pinFirst && !shouldShowHorizontalScroll
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
@@ -2818,7 +2818,7 @@ function SortableEnterpriseConfigRow({
                 >
                     {!hideRowExpansion && (
                         <button
-                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 ${
+                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 flex-shrink-0 mr-1 ${
                                 isExpanded ? '' : ''
                             }`}
                             onClick={() => onToggle(row.id)}
@@ -2841,10 +2841,10 @@ function SortableEnterpriseConfigRow({
                         </button>
                     )}
                     <div
-                        className='text-slate-700 text-[12px] w-full'
+                        className='text-slate-700 text-[12px] w-full relative flex-1'
                         data-row-id={row.id}
                         data-col='enterprise'
-                        style={{width: '100%'}}
+                        style={{width: '100%', paddingLeft: '4px', paddingRight: '4px'}}
                     >
                         {enableDropdownChips ? (
                             <AsyncChipSelect
@@ -2892,7 +2892,7 @@ function SortableEnterpriseConfigRow({
             )}
             {cols.includes('product') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 relative ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
@@ -4050,8 +4050,7 @@ export default function EnterpriseConfigTable({
                             <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
                                 minWidth: 'fit-content', 
                                 width: '100%',
-                                maxWidth: '100%',
-                                overflow: 'hidden' // Ensure content doesn't escape the container
+                                maxWidth: '100%'
                             }}>
                                 <div
                                     className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
@@ -4237,7 +4236,7 @@ export default function EnterpriseConfigTable({
                                     </div>
                                     
                                     {/* Group Rows */}
-                                    <div className='border-b border-slate-200 overflow-hidden'>
+                                    <div className='border-b border-slate-200'>
                                         {groupRows.map((r, idx) => (
                                             <div key={r.id}>
                                                 <SortableEnterpriseConfigRow
