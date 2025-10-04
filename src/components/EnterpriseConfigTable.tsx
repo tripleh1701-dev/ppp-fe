@@ -165,6 +165,7 @@ const ChipDropdown = ({
                     <div className='flex flex-wrap gap-1'>
                         {selectedOptions.map((option) => (
                             <SelectionChip
+                                key={option.id}
                                 label={option.name}
                                 color={color}
                                 onRemove={() => onDeselect(option.id)}
@@ -300,7 +301,7 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
                     className || ''
                 }`}
                 data-inline={dataAttr || undefined}
@@ -310,7 +311,7 @@ function InlineEditableText({
     const isEmpty = !value || value.length === 0;
     return (
         <span
-            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 bg-white hover:ring-2 hover:ring-blue-400 hover:bg-white/95 cursor-text relative z-20 transition-all duration-150 ${
+            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
                 className || ''
             }`}
             onClick={() => setEditing(true)}
@@ -1175,7 +1176,7 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className={`w-32 text-left px-2 py-1 text-[12px] rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
                         placeholder=''
                     />
                 ) : (
@@ -1190,7 +1191,7 @@ function ServicesMultiSelect({
                                 inputRef.current?.focus();
                             }, 10);
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         + Add more
                     </button>
@@ -1335,6 +1336,7 @@ function ServicesMultiSelect({
 
                                         return (
                                             <DropdownOption
+                                                key={opt.id}
                                                 option={opt}
                                                 tone={tone}
                                                 type='service'
@@ -1988,7 +1990,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm hover:bg-slate-50 cursor-text transition-colors'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
                         onClick={(e: any) => {
@@ -2240,7 +2242,7 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-1 ring-inset ring-red-300' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} transition-colors`}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
                         placeholder=''
                     />
                 ) : null}
@@ -2738,7 +2740,7 @@ function SortableEnterpriseConfigRow({
             onMouseLeave={() => setIsRowHovered(false)}
             className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected 
-                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200 border-l-4 border-l-blue-500' 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
                     : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
                 isSelected ? 'border-blue-300' : 'border-slate-200'
@@ -2806,7 +2808,7 @@ function SortableEnterpriseConfigRow({
             </div>
             {cols.includes('enterprise') && (
                 <div
-                    className={`group flex items-center border-r border-slate-200 pl-1 pr-1 py-1 w-full ${
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
                         pinFirst && !shouldShowHorizontalScroll
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
@@ -2818,7 +2820,7 @@ function SortableEnterpriseConfigRow({
                 >
                     {!hideRowExpansion && (
                         <button
-                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 flex-shrink-0 mr-1 ${
+                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 ${
                                 isExpanded ? '' : ''
                             }`}
                             onClick={() => onToggle(row.id)}
@@ -2841,10 +2843,10 @@ function SortableEnterpriseConfigRow({
                         </button>
                     )}
                     <div
-                        className='text-slate-700 text-[12px] w-full relative flex-1'
+                        className='text-slate-700 text-[12px] w-full'
                         data-row-id={row.id}
                         data-col='enterprise'
-                        style={{width: '100%', paddingLeft: '4px', paddingRight: '4px'}}
+                        style={{width: '100%'}}
                     >
                         {enableDropdownChips ? (
                             <AsyncChipSelect
@@ -2892,7 +2894,7 @@ function SortableEnterpriseConfigRow({
             )}
             {cols.includes('product') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 relative ${
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
@@ -3340,13 +3342,7 @@ export default function EnterpriseConfigTable({
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        
-        // Add resize indicator
-        const resizeIndicator = document.createElement('div');
-        resizeIndicator.className = 'fixed top-0 bottom-0 w-0.5 bg-blue-500 z-50 pointer-events-none';
-        resizeIndicator.style.left = `${startX}px`;
-        document.body.appendChild(resizeIndicator);
-        
+
         const onMove = (ev: MouseEvent) => {
             ev.preventDefault();
             const delta = ev.clientX - startX;
@@ -3354,10 +3350,6 @@ export default function EnterpriseConfigTable({
                 columnConstraints.min, 
                 Math.min(columnConstraints.max, startWidth + delta)
             );
-            
-            // Update resize indicator position
-            const newX = startX + (newWidth - startWidth);
-            resizeIndicator.style.left = `${newX}px`;
             
             setColWidths((prev) => ({
                 ...prev,
@@ -3414,12 +3406,7 @@ export default function EnterpriseConfigTable({
             // Remove visual feedback
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            
-            // Remove resize indicator
-            if (resizeIndicator.parentNode) {
-                resizeIndicator.parentNode.removeChild(resizeIndicator);
-            }
-            
+
             // Final check for scrollbar need after resize is complete
             setTimeout(() => {
                 if (tableContainerRef.current) {
@@ -4050,7 +4037,8 @@ export default function EnterpriseConfigTable({
                             <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
                                 minWidth: 'fit-content', 
                                 width: '100%',
-                                maxWidth: '100%'
+                                maxWidth: '100%',
+                                overflow: 'hidden' // Ensure content doesn't escape the container
                             }}>
                                 <div
                                     className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
@@ -4236,7 +4224,7 @@ export default function EnterpriseConfigTable({
                                     </div>
                                     
                                     {/* Group Rows */}
-                                    <div className='border-b border-slate-200'>
+                                    <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
                                             <div key={r.id}>
                                                 <SortableEnterpriseConfigRow
