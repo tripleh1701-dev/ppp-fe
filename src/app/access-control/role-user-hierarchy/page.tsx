@@ -889,17 +889,17 @@ export default function RoleUserHierarchy() {
     const getNodeIconColor = (type: string) => {
         switch (type) {
             case 'organization':
-                return 'bg-purple-100 text-purple-600';
+                return 'bg-blue-100 text-blue-600';
             case 'group':
                 return 'bg-blue-100 text-blue-600';
             case 'user':
                 return 'bg-green-100 text-green-600';
             case 'role':
-                return 'bg-orange-100 text-orange-600';
+                return 'bg-cyan-100 text-cyan-600';
             case 'permission':
-                return 'bg-yellow-100 text-yellow-600';
+                return 'bg-sky-100 text-sky-600';
             case 'service':
-                return 'bg-indigo-100 text-indigo-600';
+                return 'bg-blue-100 text-blue-600';
             default:
                 return 'bg-slate-100 text-slate-600';
         }
@@ -909,17 +909,17 @@ export default function RoleUserHierarchy() {
     const getNodeTextColor = (type: string) => {
         switch (type) {
             case 'organization':
-                return 'text-purple-900';
+                return 'text-blue-900';
             case 'group':
                 return 'text-blue-900';
             case 'user':
                 return 'text-green-900';
             case 'role':
-                return 'text-orange-900';
+                return 'text-cyan-900';
             case 'permission':
-                return 'text-yellow-900';
+                return 'text-sky-900';
             case 'service':
-                return 'text-indigo-900';
+                return 'text-blue-900';
             default:
                 return 'text-slate-900';
         }
@@ -1243,7 +1243,7 @@ export default function RoleUserHierarchy() {
                                                                                 className={`bg-white border rounded-md cursor-pointer transition-all duration-200 ${
                                                                                     childNode.type ===
                                                                                     'role'
-                                                                                        ? 'border-orange-200 hover:border-orange-300 hover:bg-orange-50/30'
+                                                                                        ? 'border-cyan-200 hover:border-cyan-300 hover:bg-cyan-50/30'
                                                                                         : 'border-green-200 hover:border-green-300 hover:bg-green-50/30'
                                                                                 }`}
                                                                             >
@@ -1253,7 +1253,7 @@ export default function RoleUserHierarchy() {
                                                                                             className={`p-1 rounded ${
                                                                                                 childNode.type ===
                                                                                                 'role'
-                                                                                                    ? 'bg-orange-100'
+                                                                                                    ? 'bg-cyan-100'
                                                                                                     : 'bg-green-100'
                                                                                             }`}
                                                                                         >
@@ -1273,7 +1273,7 @@ export default function RoleUserHierarchy() {
                                                                                                 className={`text-xs ${
                                                                                                     childNode.type ===
                                                                                                     'role'
-                                                                                                        ? 'text-orange-600'
+                                                                                                        ? 'text-cyan-600'
                                                                                                         : 'text-green-600'
                                                                                                 }`}
                                                                                             >
@@ -1412,7 +1412,7 @@ export default function RoleUserHierarchy() {
             <div className='bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-200/60 p-6 mb-6'>
                 <div className='flex items-center justify-between mb-6'>
                     <div className='flex items-center gap-4'>
-                        <div className='p-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl'>
+                        <div className='p-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl'>
                             <BuildingOfficeIcon className='h-6 w-6 text-white' />
                         </div>
                         <div>
@@ -1450,7 +1450,7 @@ export default function RoleUserHierarchy() {
                                 }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
                                     displayMode === mode.key
-                                        ? 'bg-white text-purple-600 shadow-md'
+                                        ? 'bg-white text-blue-600 shadow-md'
                                         : 'text-slate-600 hover:text-slate-900'
                                 }`}
                             >

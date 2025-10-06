@@ -22,6 +22,7 @@ import {
     LockOpenIcon,
     KeyIcon,
     InformationCircleIcon,
+    BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import {api} from '@/utils/api';
 import {
@@ -32,6 +33,7 @@ import {
 import {getActiveUserGroups} from '@/utils/dynamicData';
 import {UserGroup} from '@/constants/formOptions';
 import userService from '@/services/userService';
+import {useSelectedAccount} from '@/hooks/useSelectedAccount';
 
 interface UserRecord {
     id: string;
@@ -187,6 +189,9 @@ function ToolbarTrashButton({
 }
 
 export default function ManageUsers() {
+    // Get selected account from breadcrumb
+    const selectedAccount = useSelectedAccount();
+
     const [users, setUsers] = useState<UserRecord[]>([]);
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -210,6 +215,17 @@ export default function ManageUsers() {
     >([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    // Auto-save timer states (like enterprise configuration)
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
+        null,
+    );
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const tableDataRef = useRef<any[]>([]);
+    const modifiedUsersRef = useRef<Set<string>>(new Set());
+
     // API optimization states
     const [pendingSaves, setPendingSaves] = useState(new Set<string>());
     const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
@@ -227,6 +243,14 @@ export default function ManageUsers() {
     const [convertedIds, setConvertedIds] = useState<Record<string, string>>(
         {},
     );
+
+    // Track last saved data per user to prevent duplicate saves
+    const lastSavedDataRef = useRef<Record<string, string>>({});
+
+    // Update ref to track current tableData state
+    useEffect(() => {
+        tableDataRef.current = tableData;
+    }, [tableData]);
 
     // Function to show save notification
     const showSaveNotification = useCallback(
@@ -762,18 +786,62 @@ export default function ManageUsers() {
         }
     };
 
+    // Track the latest request to prevent race conditions
+    const loadUsersRequestId = useRef(0);
+
     // Reusable function to load users from backend
     const loadUsers = useCallback(
         async (showLoader = true) => {
             try {
                 if (showLoader) setLoading(true);
-                console.log('🔄 Loading users from RBAC API...');
 
-                // Use RBAC API service
-                const usersData = await accessControlApi.listUsers({
-                    limit: 1000,
+                // Increment request ID to track this specific request
+                const currentRequestId = ++loadUsersRequestId.current;
+
+                console.log('🔍 LOADING USERS WITH ACCOUNT CONTEXT:', {
+                    requestId: currentRequestId,
+                    selectedAccount_id: selectedAccount.id,
+                    selectedAccount_name: selectedAccount.name,
+                    selectedAccount_isSystiva: selectedAccount.isSystiva,
+                    localStorage_id:
+                        typeof window !== 'undefined'
+                            ? localStorage.getItem('selectedAccountId')
+                            : null,
+                    localStorage_name:
+                        typeof window !== 'undefined'
+                            ? localStorage.getItem('selectedAccountName')
+                            : null,
                 });
-                console.log('✅ Users data received:', usersData);
+
+                // Use RBAC API service with account filtering
+                // If Systiva is selected, pass null to fetch from Systiva table
+                const apiOptions = {
+                    limit: 1000,
+                    accountId: selectedAccount.isSystiva
+                        ? null
+                        : selectedAccount.id,
+                    accountName: selectedAccount.isSystiva
+                        ? null
+                        : selectedAccount.name,
+                };
+
+                console.log('📤 API OPTIONS:', apiOptions);
+
+                const usersData = await accessControlApi.listUsers(apiOptions);
+
+                // Check if this is still the latest request
+                if (currentRequestId !== loadUsersRequestId.current) {
+                    console.log(
+                        `⚠️ Ignoring stale response (request ${currentRequestId}, current is ${loadUsersRequestId.current})`,
+                    );
+                    return;
+                }
+
+                console.log('📥 RECEIVED USERS DATA:', {
+                    requestId: currentRequestId,
+                    count: usersData?.length || 0,
+                    firstUser: usersData?.[0],
+                });
 
                 // Handle direct array response from your API
                 if (Array.isArray(usersData) && usersData.length >= 0) {
@@ -890,8 +958,24 @@ export default function ManageUsers() {
                 if (showLoader) setLoading(false);
             }
         },
-        [accessControlApi, getCachedUserGroups],
+        [
+            accessControlApi,
+            getCachedUserGroups,
+            selectedAccount.id,
+            selectedAccount.name,
+        ],
     );
+
+    // Reload users when account changes
+    useEffect(() => {
+        console.log('🔄 Account changed, reloading users...', {
+            accountId: selectedAccount.id,
+            accountName: selectedAccount.name,
+            isSystiva: selectedAccount.isSystiva,
+        });
+        loadUsers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedAccount.id, selectedAccount.name]);
 
     useEffect(() => {
         loadUsers();
@@ -1111,7 +1195,134 @@ export default function ManageUsers() {
         };
     }, [filterVisible, sortVisible, groupByVisible, hideColumnsVisible]);
 
-    // Auto-save function with debouncing
+    // Debounced auto-save function (10-second timer with countdown)
+    const debouncedAutoSave = useCallback(async () => {
+        console.log(
+            '🕐 debouncedAutoSave called - clearing existing timer and starting new one',
+        );
+
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+
+        // Start countdown
+        setAutoSaveCountdown(10);
+
+        // Countdown interval
+        const countdownInterval = setInterval(() => {
+            setAutoSaveCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(countdownInterval);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        const timer = setTimeout(async () => {
+            try {
+                console.log(
+                    '🔥 10-second timer triggered - starting auto-save process',
+                );
+                setIsAutoSaving(true);
+                setAutoSaveCountdown(null);
+                if (countdownIntervalRef.current) {
+                    clearInterval(countdownIntervalRef.current);
+                }
+
+                // Get all users that need to be saved (temp users with complete data)
+                const usersToSave = tableDataRef.current.filter((user) => {
+                    const isTemp =
+                        user.id.toString().startsWith('temp-') ||
+                        user.id.toString().startsWith('item-') ||
+                        isNaN(parseInt(user.id.toString(), 10));
+
+                    if (!isTemp) return false;
+
+                    // Check if user has all required fields
+                    const hasFirstName = user.firstName?.trim();
+                    const hasLastName = user.lastName?.trim();
+                    const hasValidEmail =
+                        user.emailAddress &&
+                        user.emailAddress.includes('@') &&
+                        user.emailAddress.includes('.') &&
+                        user.emailAddress.length > 6 &&
+                        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
+                            user.emailAddress,
+                        ) &&
+                        !user.emailAddress.endsWith('@') &&
+                        !user.emailAddress.includes('@.');
+
+                    const isComplete =
+                        hasFirstName && hasLastName && hasValidEmail;
+
+                    if (isTemp && !isComplete) {
+                        console.log(
+                            `🚫 Skipping incomplete temporary user ${user.id}:`,
+                            {
+                                hasFirstName: !!hasFirstName,
+                                hasLastName: !!hasLastName,
+                                hasValidEmail: !!hasValidEmail,
+                                firstNameValue: user.firstName,
+                                lastNameValue: user.lastName,
+                                emailValue: user.emailAddress,
+                            },
+                        );
+                    }
+
+                    return isComplete;
+                });
+
+                console.log(
+                    `📊 Found ${usersToSave.length} complete users to auto-save`,
+                );
+
+                if (usersToSave.length > 0) {
+                    console.log(
+                        '💾 Auto-saving users after 10 seconds of inactivity...',
+                        usersToSave.map((u) => u.id),
+                    );
+
+                    for (const user of usersToSave) {
+                        await autoSaveUser(user, true);
+                    }
+
+                    // Show success animation
+                    console.log('✨ Showing auto-save success animation');
+                    setShowAutoSaveSuccess(true);
+
+                    const message = `✅ Auto-saved ${usersToSave.length} user(s)`;
+                    showSaveNotification('Users', 'auto-saved');
+
+                    setTimeout(() => {
+                        console.log('✨ Hiding auto-save success animation');
+                        setShowAutoSaveSuccess(false);
+                    }, 3000);
+
+                    console.log(
+                        `✅ Auto-saved ${usersToSave.length} users successfully`,
+                    );
+                } else {
+                    console.log('ℹ️ No users found to auto-save');
+                }
+            } catch (error) {
+                console.error('❌ Auto-save failed:', error);
+            } finally {
+                setIsAutoSaving(false);
+            }
+        }, 10000); // 10 seconds delay
+
+        autoSaveTimerRef.current = timer;
+        console.log('⏰ Auto-save timer set for 10 seconds');
+    }, [showSaveNotification]);
+
+    // Auto-save individual user function
     const autoSaveUser = useCallback(
         async (userData: any, isNewUser: boolean = false) => {
             const userId = userData.id;
@@ -1121,219 +1332,225 @@ export default function ManageUsers() {
                 } ${userData.lastName} (${userId})`,
             );
 
-            // Clear existing timeout for this user
-            if (autoSaveTimeouts[userId]) {
-                clearTimeout(autoSaveTimeouts[userId]);
+            // Check if this exact data was already saved to prevent duplicate saves
+            const dataSignature = JSON.stringify({
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                emailAddress: userData.emailAddress,
+                status: userData.status,
+                startDate: userData.startDate,
+                endDate: userData.endDate,
+            });
+
+            if (lastSavedDataRef.current[userId] === dataSignature) {
+                console.log(
+                    `⏭️ User ${userId} data unchanged, skipping duplicate save`,
+                );
+                return;
             }
 
             // Set saving state
             setSavingStates((prev) => ({...prev, [userId]: 'saving'}));
 
-            // Create debounced save function
-            const timeoutId = setTimeout(async () => {
-                try {
-                    console.log('🔄 Processing auto-save for user:', {
+            // Immediate save without setTimeout
+            try {
+                console.log('🔄 Processing auto-save for user:', {
+                    userId,
+                    isNewUser,
+                    userData: {
+                        id: userData.id,
+                        firstName: userData.firstName,
+                        lastName: userData.lastName,
+                        emailAddress: userData.emailAddress,
+                        status: userData.status,
+                    },
+                });
+
+                // Transform data to backend format
+                const backendData =
+                    userService.transformToBackendFormat(userData);
+
+                console.log('📤 Backend data to be sent:', backendData);
+
+                if (
+                    isNewUser ||
+                    userData.id.toString().startsWith('temp-') ||
+                    userData.id.toString().startsWith('item-') ||
+                    isNaN(parseInt(userData.id.toString(), 10))
+                ) {
+                    // Validate required fields before creating user
+                    const hasRequiredFields =
+                        userData.firstName &&
+                        userData.firstName.trim() &&
+                        userData.lastName &&
+                        userData.lastName.trim() &&
+                        userData.emailAddress &&
+                        userData.emailAddress.trim() &&
+                        userData.emailAddress.includes('@');
+
+                    if (!hasRequiredFields) {
+                        console.log(
+                            '⚠️ Skipping auto-save: Required fields missing',
+                            {
+                                firstName: userData.firstName,
+                                lastName: userData.lastName,
+                                emailAddress: userData.emailAddress,
+                            },
+                        );
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [userId]: 'error',
+                        }));
+                        return;
+                    }
+
+                    // Create new user
+                    console.log('🆕 Auto-saving new user:', backendData);
+                    const response = await userService.createUser(
+                        backendData as any,
+                    );
+
+                    // Handle different response formats
+                    const responseData = (response as any).data || response;
+                    const userId_new = responseData.id;
+
+                    if (userId_new) {
+                        // Update the user ID with the real backend ID
+                        setTableData((prevData) =>
+                            prevData.map((user) =>
+                                user.id === userId
+                                    ? {
+                                          ...user,
+                                          id: userId_new.toString(),
+                                      }
+                                    : user,
+                            ),
+                        );
+
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [userId_new.toString()]: 'saved',
+                        }));
+
+                        // Show save notification
+                        const userName = `${userData.firstName || 'Unknown'} ${
+                            userData.lastName || 'User'
+                        }`;
+                        console.log(`🎉 Created user: ${userName}`);
+                        showSaveNotification(userName, 'created');
+
+                        // Store the saved data signature
+                        lastSavedDataRef.current[userId_new.toString()] =
+                            JSON.stringify({
+                                firstName: userData.firstName,
+                                lastName: userData.lastName,
+                                emailAddress: userData.emailAddress,
+                                status: userData.status,
+                                startDate: userData.startDate,
+                                endDate: userData.endDate,
+                            });
+
+                        // Invalidate cache for the new user
+                        invalidateUserGroupsCache(userId_new.toString());
+
+                        // Don't auto-refresh after save to prevent infinite loop
+                        // User can manually refresh if needed
+                        setLastRefreshTime(Date.now());
+
+                        // Clear the temp ID from saving states
+                        setSavingStates((prev) => {
+                            const newStates = {...prev};
+                            delete newStates[userId];
+                            return newStates;
+                        });
+
+                        console.log(
+                            '✅ New user created successfully:',
+                            userId_new,
+                        );
+                    }
+                } else {
+                    // Update existing user
+                    console.log(
+                        '🔄 Auto-saving existing user:',
                         userId,
-                        isNewUser,
-                        userData: {
-                            id: userData.id,
+                        backendData,
+                    );
+
+                    // Validate userId before converting to number
+                    const numericUserId = parseInt(userId.toString(), 10);
+                    if (isNaN(numericUserId)) {
+                        console.error('❌ Invalid user ID for update:', userId);
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [userId]: 'error',
+                        }));
+                        return;
+                    }
+
+                    const response = await userService.updateUser(
+                        numericUserId,
+                        backendData as any,
+                    );
+
+                    // Handle different response formats
+                    const responseData = (response as any).data || response;
+
+                    if (responseData) {
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [userId]: 'saved',
+                        }));
+
+                        // Show save notification
+                        const userName = `${userData.firstName || 'Unknown'} ${
+                            userData.lastName || 'User'
+                        }`;
+                        console.log(`💾 Updated user: ${userName}`);
+                        showSaveNotification(userName, 'updated');
+
+                        // Store the saved data signature
+                        lastSavedDataRef.current[userId] = JSON.stringify({
                             firstName: userData.firstName,
                             lastName: userData.lastName,
                             emailAddress: userData.emailAddress,
                             status: userData.status,
-                        },
-                    });
+                            startDate: userData.startDate,
+                            endDate: userData.endDate,
+                        });
 
-                    // Transform data to backend format
-                    const backendData =
-                        userService.transformToBackendFormat(userData);
+                        // Invalidate cache for the updated user
+                        invalidateUserGroupsCache(userId);
 
-                    console.log('📤 Backend data to be sent:', backendData);
+                        // Don't auto-refresh after save to prevent infinite loop
+                        // User can manually refresh if needed
+                        setLastRefreshTime(Date.now());
 
-                    if (
-                        isNewUser ||
-                        userData.id.toString().startsWith('temp-') ||
-                        userData.id.toString().startsWith('item-') ||
-                        isNaN(parseInt(userData.id.toString(), 10))
-                    ) {
-                        // Validate required fields before creating user
-                        const hasRequiredFields =
-                            userData.firstName &&
-                            userData.firstName.trim() &&
-                            userData.lastName &&
-                            userData.lastName.trim() &&
-                            userData.emailAddress &&
-                            userData.emailAddress.trim() &&
-                            userData.emailAddress.includes('@');
-
-                        if (!hasRequiredFields) {
-                            console.log(
-                                '⚠️ Skipping auto-save: Required fields missing',
-                                {
-                                    firstName: userData.firstName,
-                                    lastName: userData.lastName,
-                                    emailAddress: userData.emailAddress,
-                                },
-                            );
-                            setSavingStates((prev) => ({
-                                ...prev,
-                                [userId]: 'error',
-                            }));
-                            return;
-                        }
-
-                        // Create new user
-                        console.log('🆕 Auto-saving new user:', backendData);
-                        const response = await userService.createUser(
-                            backendData as any,
-                        );
-
-                        // Handle different response formats
-                        const responseData = (response as any).data || response;
-                        const userId_new = responseData.id;
-
-                        if (userId_new) {
-                            // Update the user ID with the real backend ID
-                            setTableData((prevData) =>
-                                prevData.map((user) =>
-                                    user.id === userId
-                                        ? {
-                                              ...user,
-                                              id: userId_new.toString(),
-                                          }
-                                        : user,
-                                ),
-                            );
-
-                            setSavingStates((prev) => ({
-                                ...prev,
-                                [userId_new.toString()]: 'saved',
-                            }));
-
-                            // Show save notification
-                            const userName = `${
-                                userData.firstName || 'Unknown'
-                            } ${userData.lastName || 'User'}`;
-                            console.log(`🎉 Created user: ${userName}`);
-                            showSaveNotification(userName, 'created');
-
-                            // Invalidate cache for the new user
-                            invalidateUserGroupsCache(userId_new.toString());
-
-                            // Delay refresh to batch multiple saves
-                            setTimeout(() => {
-                                const now = Date.now();
-                                if (now - lastRefreshTime > 2000) {
-                                    // Only refresh if 2+ seconds since last refresh
-                                    setRefreshTrigger((prev) => prev + 1);
-                                    setLastRefreshTime(now);
-                                }
-                            }, 1000);
-
-                            // Clear the temp ID from saving states
-                            setSavingStates((prev) => {
-                                const newStates = {...prev};
-                                delete newStates[userId];
-                                return newStates;
-                            });
-
-                            console.log(
-                                '✅ New user created successfully:',
-                                userId_new,
-                            );
-                        }
-                    } else {
-                        // Update existing user
-                        console.log(
-                            '🔄 Auto-saving existing user:',
-                            userId,
-                            backendData,
-                        );
-
-                        // Validate userId before converting to number
-                        const numericUserId = parseInt(userId.toString(), 10);
-                        if (isNaN(numericUserId)) {
-                            console.error(
-                                '❌ Invalid user ID for update:',
-                                userId,
-                            );
-                            setSavingStates((prev) => ({
-                                ...prev,
-                                [userId]: 'error',
-                            }));
-                            return;
-                        }
-
-                        const response = await userService.updateUser(
-                            numericUserId,
-                            backendData as any,
-                        );
-
-                        // Handle different response formats
-                        const responseData = (response as any).data || response;
-
-                        if (responseData) {
-                            setSavingStates((prev) => ({
-                                ...prev,
-                                [userId]: 'saved',
-                            }));
-
-                            // Show save notification
-                            const userName = `${
-                                userData.firstName || 'Unknown'
-                            } ${userData.lastName || 'User'}`;
-                            console.log(`💾 Updated user: ${userName}`);
-                            showSaveNotification(userName, 'updated');
-
-                            // Invalidate cache for the updated user
-                            invalidateUserGroupsCache(userId);
-
-                            // Delay refresh to batch multiple saves
-                            setTimeout(() => {
-                                const now = Date.now();
-                                if (now - lastRefreshTime > 2000) {
-                                    // Only refresh if 2+ seconds since last refresh
-                                    setRefreshTrigger((prev) => prev + 1);
-                                    setLastRefreshTime(now);
-                                }
-                            }, 1000);
-
-                            console.log(
-                                '✅ User updated successfully:',
-                                userId,
-                            );
-                        }
+                        console.log('✅ User updated successfully:', userId);
                     }
-
-                    // Clear saved state after 2 seconds
-                    setTimeout(() => {
-                        setSavingStates((prev) => {
-                            const newStates = {...prev};
-                            delete newStates[userId];
-                            return newStates;
-                        });
-                    }, 2000);
-                } catch (error) {
-                    console.error(
-                        '❌ Auto-save failed for user:',
-                        userId,
-                        error,
-                    );
-                    setSavingStates((prev) => ({...prev, [userId]: 'error'}));
-
-                    // Clear error state after 5 seconds
-                    setTimeout(() => {
-                        setSavingStates((prev) => {
-                            const newStates = {...prev};
-                            delete newStates[userId];
-                            return newStates;
-                        });
-                    }, 5000);
                 }
-            }, 1000); // 1 second debounce
 
-            // Store the timeout ID
-            setAutoSaveTimeouts((prev) => ({...prev, [userId]: timeoutId}));
+                // Clear saved state after 2 seconds
+                setTimeout(() => {
+                    setSavingStates((prev) => {
+                        const newStates = {...prev};
+                        delete newStates[userId];
+                        return newStates;
+                    });
+                }, 2000);
+            } catch (error) {
+                console.error('❌ Auto-save failed for user:', userId, error);
+                setSavingStates((prev) => ({...prev, [userId]: 'error'}));
+
+                // Clear error state after 5 seconds
+                setTimeout(() => {
+                    setSavingStates((prev) => {
+                        const newStates = {...prev};
+                        delete newStates[userId];
+                        return newStates;
+                    });
+                }, 5000);
+            }
         },
         [
             autoSaveTimeouts,
@@ -1343,73 +1560,120 @@ export default function ManageUsers() {
         ],
     );
 
-    // Enhanced onDataChange with auto-save
+    // Enhanced onDataChange with 10-second debounced auto-save
     const handleDataChange = useCallback(
         (newData: any[]) => {
             console.log(
                 '🚀 HANDLE_DATA_CHANGE CALLED!',
                 'This function is being triggered',
             );
-            console.log('📝 Data changed, processing auto-save...', {
-                newDataLength: newData.length,
-                newData: newData.map((u) => ({
-                    id: u.id,
-                    firstName: u.firstName,
-                    lastName: u.lastName,
-                    emailAddress: u.emailAddress,
-                })),
-            });
+            console.log(
+                '📝 Data changed, starting 10-second auto-save timer...',
+                {
+                    newDataLength: newData.length,
+                    newData: newData.map((u) => ({
+                        id: u.id,
+                        firstName: u.firstName,
+                        lastName: u.lastName,
+                        emailAddress: u.emailAddress,
+                    })),
+                },
+            );
+
+            // Check if data has actually changed to prevent infinite loops
+            const hasChanged =
+                JSON.stringify(newData) !== JSON.stringify(tableData);
+            if (!hasChanged) {
+                console.log('⏭️ Data unchanged, skipping auto-save timer');
+                return;
+            }
 
             // Update table data immediately for UI responsiveness
             setTableData(newData);
 
-            // Find changed users and auto-save them
-            newData.forEach((user, index) => {
-                const isNewUser =
-                    user.id.toString().startsWith('temp-') ||
-                    user.id.toString().startsWith('item-') ||
-                    !user.id ||
-                    isNaN(parseInt(user.id.toString(), 10));
-                // Only auto-save if we have meaningful data
-                const hasBasicInfo = user.firstName && user.lastName;
-                const hasValidEmail =
-                    user.emailAddress &&
-                    user.emailAddress.includes('@') &&
-                    user.emailAddress.includes('.') &&
-                    user.emailAddress.length > 6 &&
-                    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
-                        user.emailAddress,
-                    ) &&
-                    !user.emailAddress.endsWith('@') &&
-                    !user.emailAddress.includes('@.');
-                const shouldAutoSave = hasBasicInfo && hasValidEmail;
+            // CRITICAL: Also update the ref so autosave and manual save can access the latest data
+            tableDataRef.current = newData;
+            console.log('✅ Updated tableDataRef.current with new data');
 
-                console.log(`🔍 User ${index}:`, {
-                    id: user.id,
-                    idType: typeof user.id,
-                    isNewUser,
-                    shouldAutoSave,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    emailAddress: user.emailAddress,
-                    isNumericId: !isNaN(parseInt(user.id.toString(), 10)),
-                    parsedId: parseInt(user.id.toString(), 10),
-                });
-
-                if (shouldAutoSave) {
-                    console.log(
-                        `💾 Auto-saving: ${user.firstName} ${user.lastName} (${user.id})`,
-                    );
-                    autoSaveUser(user, isNewUser);
-                } else {
-                    console.log(
-                        `⏭️ Skipping save for ${user.firstName} ${user.lastName} - invalid email: ${user.emailAddress}`,
-                    );
-                }
-            });
+            // Trigger debounced auto-save timer (10 seconds)
+            debouncedAutoSave();
         },
-        [autoSaveUser],
+        [tableData, debouncedAutoSave],
     );
+
+    // Manual Save All function
+    const handleSaveAll = async () => {
+        console.log(
+            '💾 Save button clicked - manually saving all unsaved users',
+        );
+
+        // Clear auto-save timer since user is manually saving
+        if (autoSaveTimerRef.current) {
+            console.log('🛑 Manual save clicked - clearing auto-save timer');
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            setAutoSaveCountdown(null);
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+
+        // Get all temp users with complete data
+        const usersToSave = tableDataRef.current.filter((user) => {
+            const isTemp =
+                user.id.toString().startsWith('temp-') ||
+                user.id.toString().startsWith('item-') ||
+                isNaN(parseInt(user.id.toString(), 10));
+
+            if (!isTemp) return false;
+
+            const hasFirstName = user.firstName?.trim();
+            const hasLastName = user.lastName?.trim();
+            const hasValidEmail =
+                user.emailAddress &&
+                user.emailAddress.includes('@') &&
+                user.emailAddress.includes('.') &&
+                user.emailAddress.length > 6 &&
+                /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
+                    user.emailAddress,
+                ) &&
+                !user.emailAddress.endsWith('@') &&
+                !user.emailAddress.includes('@.');
+
+            return hasFirstName && hasLastName && hasValidEmail;
+        });
+
+        console.log(`📊 Found ${usersToSave.length} users to save manually`);
+
+        if (usersToSave.length === 0) {
+            showSaveNotification('No unsaved users to save', 'info');
+            return;
+        }
+
+        setIsAutoSaving(true);
+
+        try {
+            for (const user of usersToSave) {
+                await autoSaveUser(user, true);
+            }
+
+            // Show success animation
+            setShowAutoSaveSuccess(true);
+            showSaveNotification(`${usersToSave.length} user(s)`, 'saved');
+
+            setTimeout(() => {
+                setShowAutoSaveSuccess(false);
+            }, 3000);
+
+            console.log(
+                `✅ Manually saved ${usersToSave.length} users successfully`,
+            );
+        } catch (error) {
+            console.error('❌ Manual save failed:', error);
+        } finally {
+            setIsAutoSaving(false);
+        }
+    };
 
     // Cleanup timeouts on unmount
     useEffect(() => {
@@ -1417,6 +1681,12 @@ export default function ManageUsers() {
             Object.values(autoSaveTimeouts).forEach((timeout) => {
                 if (timeout) clearTimeout(timeout);
             });
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
         };
     }, [autoSaveTimeouts]);
 
@@ -2229,6 +2499,79 @@ export default function ManageUsers() {
                     >
                         <PlusIcon className='h-5 w-5 mr-2' />
                         Create New user
+                    </button>
+
+                    {/* Save Button with countdown timer */}
+                    <button
+                        onClick={handleSaveAll}
+                        disabled={isAutoSaving}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                            isAutoSaving
+                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                : showAutoSaveSuccess
+                                ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                : autoSaveCountdown
+                                ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                        }`}
+                    >
+                        {/* Animated saving icon */}
+                        {isAutoSaving && (
+                            <svg
+                                className='animate-spin h-4 w-4 text-white'
+                                xmlns='http://www.w3.org/2000/svg'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                            >
+                                <circle
+                                    className='opacity-25'
+                                    cx='12'
+                                    cy='12'
+                                    r='10'
+                                    stroke='currentColor'
+                                    strokeWidth='4'
+                                ></circle>
+                                <path
+                                    className='opacity-75'
+                                    fill='currentColor'
+                                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                ></path>
+                            </svg>
+                        )}
+
+                        {/* Save icon or checkmark */}
+                        {!isAutoSaving && (
+                            <>
+                                {showAutoSaveSuccess ? (
+                                    <svg
+                                        className='h-4 w-4'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M5 13l4 4L19 7'
+                                        />
+                                    </svg>
+                                ) : (
+                                    <BookmarkIcon className='h-4 w-4' />
+                                )}
+                            </>
+                        )}
+
+                        {/* Button text with countdown */}
+                        <span className='font-medium'>
+                            {isAutoSaving
+                                ? 'Saving...'
+                                : showAutoSaveSuccess
+                                ? 'Saved!'
+                                : autoSaveCountdown
+                                ? `Auto-save in ${autoSaveCountdown}s`
+                                : 'Save'}
+                        </span>
                     </button>
 
                     <ToolbarTrashButton onClick={() => {}} />
@@ -4091,7 +4434,7 @@ export default function ManageUsers() {
                                                         hasChanges
                                                     ) {
                                                         console.log(
-                                                            `🔄 Processing save for: ${
+                                                            `🔄 Data change detected for: ${
                                                                 updatedUser.firstName
                                                             } ${
                                                                 updatedUser.lastName
@@ -4101,12 +4444,10 @@ export default function ManageUsers() {
                                                                 isNewUser
                                                                     ? 'NEW'
                                                                     : 'UPDATE'
-                                                            }`,
+                                                            } - Will be saved by 10-second timer or manual Save button`,
                                                         );
-                                                        autoSaveUser(
-                                                            updatedUser,
-                                                            isNewUser,
-                                                        );
+                                                        // Don't call autoSaveUser here - let the debounced timer handle it
+                                                        // The handleDataChange callback will trigger the 10-second countdown
                                                     }
                                                 }
                                             },

@@ -24,6 +24,7 @@ import tableConfig from '../../config/tableConfig';
 import AssignUserGroupsTable from '../AssignUserGroups/AssignUserGroupsTable';
 import UserManagementButtons from '../UserManagementButtons';
 import SimpleSlidingPanels from '../SimpleSlidingPanels';
+import {useSelectedAccount} from '../../hooks/useSelectedAccount';
 
 // Column type definitions for the add column modal
 const COLUMN_TYPES = [
@@ -1174,6 +1175,21 @@ const renderMainTableColumnCell = (
                         : toggleConfig.InactiveLabel || 'INACTIVE'}
                 </div>
             );
+
+        case 'custom':
+            // Handle custom renderers passed via config.customRenderers
+            if (column.customRenderer && actions?.customRenderers) {
+                const customRenderer =
+                    actions.customRenderers[column.customRenderer];
+                if (customRenderer && typeof customRenderer === 'function') {
+                    console.log(
+                        `🎨 Rendering custom column: ${column.id} with renderer: ${column.customRenderer}`,
+                    );
+                    return customRenderer(value, item);
+                }
+            }
+            // Fallback to displaying the value as text
+            return <span className='task-text'>{value || ''}</span>;
 
         default:
             return isEditing ? (
@@ -2501,6 +2517,9 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
     // Use provided config - no fallback to reduce bundle size
     const configToUse = config;
 
+    // Get selected account from breadcrumb
+    const selectedAccount = useSelectedAccount();
+
     const {
         tableName,
         subitemTableCount,
@@ -2583,9 +2602,23 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
             try {
                 setLoading(true);
                 setError(null);
-                console.log('🔄 Fetching users from API...');
 
-                const response = await fetch('http://localhost:4000/api/users');
+                // Build query string with account parameters
+                const params = new URLSearchParams();
+                if (selectedAccount.id) {
+                    params.append('accountId', selectedAccount.id);
+                }
+                if (selectedAccount.name) {
+                    params.append('accountName', selectedAccount.name);
+                }
+                const queryString = params.toString();
+                const apiBase =
+                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                const url = queryString
+                    ? `${apiBase}/api/users?${queryString}`
+                    : `${apiBase}/api/users`;
+
+                const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(
                         `Failed to fetch users: ${response.status} ${response.statusText}`,
@@ -2593,7 +2626,6 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
                 }
 
                 const userData = await response.json();
-                console.log('✅ Users fetched successfully:', userData);
 
                 // Transform API data to match table structure
                 const transformedUsers = userData.map((user, index) => ({
@@ -2617,22 +2649,41 @@ const ReusableTableComponent = ({config = null, onGroupAssignment}) => {
                 }));
 
                 setItems(transformedUsers);
-                console.log(
-                    '🎯 Transformed users set to state:',
-                    transformedUsers,
-                );
             } catch (err) {
-                console.error('❌ Error fetching users:', err);
+                console.error('Error fetching users:', err);
                 setError(err.message);
-                // Set fallback data if API fails
                 setItems([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchUsers();
-    }, []);
+        // Only fetch users if no initialData is provided
+        if (!configToUse?.initialData || configToUse.initialData.length === 0) {
+            fetchUsers();
+        } else {
+            setLoading(false);
+        }
+    }, [selectedAccount.id, selectedAccount.name]);
+
+    // Handle initialData from config
+    useEffect(() => {
+        if (
+            configToUse?.initialData &&
+            Array.isArray(configToUse.initialData)
+        ) {
+            console.log(
+                '📥 Received initialData from config:',
+                configToUse.initialData,
+            );
+            console.log(
+                '📥 initialData length:',
+                configToUse.initialData.length,
+            );
+            setItems(configToUse.initialData);
+            setLoading(false);
+        }
+    }, [configToUse?.initialData]);
 
     // Debug effect to monitor selection changes
     useEffect(() => {

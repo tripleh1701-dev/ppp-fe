@@ -463,14 +463,14 @@ const CredentialManager_tableConfig = {
 
     // API Configuration for auto-save
     api: {
-        baseUrl: 'http://localhost:4000/api/credentials',
+        baseUrl: '/api/credentials',
         endpoints: {
-            create: 'http://localhost:4000/api/credentials',
-            update: 'http://localhost:4000/api/credentials/{id}',
-            delete: 'http://localhost:4000/api/credentials/{id}',
-            bulkCreate: 'http://localhost:4000/api/credentials/bulk',
-            bulkUpdate: 'http://localhost:4000/api/credentials/bulk',
-            bulkDelete: 'http://localhost:4000/api/credentials/bulk',
+            create: '/api/credentials',
+            update: '/api/credentials/{id}',
+            delete: '/api/credentials/{id}',
+            bulkCreate: '/api/credentials/bulk',
+            bulkUpdate: '/api/credentials/bulk',
+            bulkDelete: '/api/credentials/bulk',
         },
         autoSave: {
             enabled: true,

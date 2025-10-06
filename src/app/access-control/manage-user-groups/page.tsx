@@ -2,9 +2,11 @@
 
 import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {motion} from 'framer-motion';
-import ReusableTableComponent from '@/components/reusable/ReusableTableComponent';
+import {BookmarkIcon} from '@heroicons/react/24/outline';
+import ReusableTableComponent from '@/components/Manage_User/TableComponent';
 import ManageUserGroups_tableConfig from '@/config/ManageUserGroups_tableConfig';
 import RolesCountCell from '@/components/RolesCountCell';
+import SimpleSlidingPanels from '@/components/SimpleSlidingPanels';
 
 // Define types for better TypeScript support
 interface UserGroup {
@@ -193,6 +195,29 @@ export default function ManageUserGroups() {
     const [entitiesLoading, setEntitiesLoading] = useState(false);
     const [servicesLoading, setServicesLoading] = useState(false);
 
+    // Auto-save timer states (10-second timer with countdown)
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
+        null,
+    );
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const tableDataRef = useRef<UserGroup[]>([]);
+    const [savingStates, setSavingStates] = useState<
+        Record<string, 'saving' | 'saved' | 'error'>
+    >({});
+
+    // State for role assignment sliding panel
+    const [showRolePanel, setShowRolePanel] = useState(false);
+    const [selectedGroupForRoles, setSelectedGroupForRoles] =
+        useState<UserGroup | null>(null);
+
+    // Update ref to track current tableData state
+    useEffect(() => {
+        tableDataRef.current = tableData;
+    }, [tableData]);
+
     // Fetch entities from backend API
     const fetchEntities = useCallback(async () => {
         console.log('🚀 Starting to fetch entities from API...');
@@ -332,110 +357,131 @@ export default function ManageUserGroups() {
 
     // Load user groups data
     const loadUserGroups = useCallback(async () => {
+        console.log('🔵 ========================================');
+        console.log('🔵 loadUserGroups FUNCTION CALLED');
+        console.log('🔵 ========================================');
         setLoading(true);
         try {
-            console.log('🚀 Fetching user groups from API...');
+            // Get selected account from localStorage
+            const selectedAccountId =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountId')
+                    : null;
+            const selectedAccountName =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountName')
+                    : null;
 
-            // Fetch groups from the backend API
-            const response = await fetch('http://localhost:4000/api/groups');
+            console.log(
+                '🚀 Fetching user groups from API with account context:',
+                {
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    accountIdType: typeof selectedAccountId,
+                    accountNameType: typeof selectedAccountName,
+                },
+            );
+
+            // Build API URL with account parameters
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const params = new URLSearchParams();
+
+            // Only add params if we have a non-Systiva account
+            const hasValidAccountId =
+                selectedAccountId &&
+                selectedAccountId !== 'null' &&
+                selectedAccountId !== '';
+            const hasValidAccountName =
+                selectedAccountName &&
+                selectedAccountName !== 'null' &&
+                selectedAccountName !== '';
+
+            console.log('🔍 Account validation:', {
+                hasValidAccountId,
+                hasValidAccountName,
+                willAddParams: hasValidAccountId && hasValidAccountName,
+            });
+
+            if (hasValidAccountId && hasValidAccountName) {
+                params.append('accountId', selectedAccountId);
+                params.append('accountName', selectedAccountName);
+                console.log('✅ Added account params to URL');
+            } else {
+                console.log(
+                    'ℹ️ No account params added (Systiva or invalid account)',
+                );
+            }
+
+            const queryString = params.toString();
+            const url = queryString
+                ? `${apiBase}/api/user-management/groups?${queryString}`
+                : `${apiBase}/api/user-management/groups`;
+
+            console.log('🌐 Final API URL:', url);
+            console.log('🌐 Query string:', queryString || '(empty)');
+
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch groups: ${response.status}`);
             }
 
             const groupsData = await response.json();
             console.log('📊 Groups fetched from API:', groupsData);
-
-            // Transform API data to match the table structure
-            const transformedGroups = await Promise.all(
-                groupsData.map(async (group: any) => {
-                    try {
-                        // Fetch roles for each group
-                        const rolesResponse = await fetch(
-                            `http://localhost:4000/api/user-groups/${group.id}/roles`,
-                        );
-                        let groupRoles: string[] = [];
-
-                        if (rolesResponse.ok) {
-                            const rolesData = await rolesResponse.json();
-                            if (
-                                rolesData.success &&
-                                rolesData.data &&
-                                rolesData.data.roles
-                            ) {
-                                groupRoles = rolesData.data.roles.map(
-                                    (role: any) => role.name,
-                                );
-                            }
-                        }
-
-                        // Fetch users count for each group
-                        const usersResponse = await fetch(
-                            `http://localhost:4000/api/user-groups/${group.id}/users`,
-                        );
-                        let memberCount = 0;
-
-                        if (usersResponse.ok) {
-                            const usersData = await usersResponse.json();
-                            if (
-                                usersData.success &&
-                                usersData.data &&
-                                usersData.data.users
-                            ) {
-                                memberCount = usersData.data.users.length;
-                            }
-                        }
-
-                        return {
-                            id: group.id,
-                            groupName: group.name,
-                            description:
-                                group.description || 'No description provided',
-                            entity: group.entity || 'General',
-                            service: group.service || 'General',
-                            roles: groupRoles,
-                            createdDate: group.createdAt
-                                ? new Date(group.createdAt)
-                                      .toISOString()
-                                      .split('T')[0]
-                                : new Date().toISOString().split('T')[0],
-                            lastModified:
-                                group.updatedAt ||
-                                group.createdAt ||
-                                new Date().toISOString(),
-                            memberCount: memberCount,
-                        };
-                    } catch (error) {
-                        console.error(
-                            `Error processing group ${group.id}:`,
-                            error,
-                        );
-                        return {
-                            id: group.id,
-                            groupName: group.name,
-                            description:
-                                group.description || 'No description provided',
-                            entity: 'General',
-                            service: 'General',
-                            roles: [],
-                            createdDate: group.createdAt
-                                ? new Date(group.createdAt)
-                                      .toISOString()
-                                      .split('T')[0]
-                                : new Date().toISOString().split('T')[0],
-                            lastModified:
-                                group.updatedAt ||
-                                group.createdAt ||
-                                new Date().toISOString(),
-                            memberCount: 0,
-                        };
-                    }
-                }),
+            console.log(
+                '📊 Number of groups fetched:',
+                groupsData?.length || 0,
             );
 
+            // Handle case where API returns non-array
+            if (!Array.isArray(groupsData)) {
+                console.warn('⚠️ API returned non-array response:', groupsData);
+                throw new Error('Invalid response format from API');
+            }
+
+            // Transform API data to match the table structure
+            console.log('🔄 Transforming groups to table format...');
+            const transformedGroups = groupsData.map((group: any) => {
+                console.log('🔄 Transforming group:', group);
+                return {
+                    id: group.id,
+                    groupName: group.name,
+                    description: group.description || 'No description provided',
+                    entity: group.entity || 'General',
+                    service: group.service || 'General',
+                    roles: group.assignedRoles || [],
+                    createdDate: group.createdAt
+                        ? new Date(group.createdAt).toISOString().split('T')[0]
+                        : new Date().toISOString().split('T')[0],
+                    lastModified:
+                        group.updatedAt ||
+                        group.createdAt ||
+                        new Date().toISOString(),
+                    memberCount: 0, // Will be populated later if needed
+                };
+            });
+
             console.log('✅ Transformed groups data:', transformedGroups);
+            console.log('✅ Sample group structure:', transformedGroups[0]);
+            console.log(
+                `✅ Successfully loaded ${transformedGroups.length} groups from systiva DB`,
+            );
 
             // Set only the API data, no fallback to mock data
+            console.log(
+                '📝 About to call setTableData with:',
+                transformedGroups,
+            );
             setTableData(transformedGroups);
+            console.log(
+                '✅ setTableData called with',
+                transformedGroups.length,
+                'groups',
+            );
+            console.log('🎉 Groups are now visible in the table!');
+            console.log('🔵 ========================================');
+            console.log('🔵 loadUserGroups COMPLETED SUCCESSFULLY');
+            console.log('🔵 ========================================');
         } catch (error) {
             console.error('❌ Error loading user groups:', error);
             // Set empty array if API fails
@@ -446,10 +492,597 @@ export default function ManageUserGroups() {
     }, []);
 
     useEffect(() => {
+        console.log('🟢 Component mounted - calling loadUserGroups...');
         loadUserGroups();
         fetchEntities();
         fetchServices();
     }, [loadUserGroups, fetchEntities, fetchServices]);
+
+    // Listen for account changes and reload groups
+    useEffect(() => {
+        const handleAccountChange = () => {
+            console.log('🔄 Account changed, reloading groups...');
+            loadUserGroups();
+        };
+
+        // Listen for the custom accountChanged event
+        window.addEventListener('accountChanged', handleAccountChange);
+
+        return () => {
+            window.removeEventListener('accountChanged', handleAccountChange);
+        };
+    }, [loadUserGroups]);
+
+    // Debug: Log when tableData changes
+    useEffect(() => {
+        console.log('🟡 tableData STATE CHANGED:', {
+            length: tableData.length,
+            data: tableData,
+        });
+    }, [tableData]);
+
+    // Debounced auto-save function (10-second timer with countdown)
+    const debouncedAutoSave = useCallback(async () => {
+        console.log(
+            '🕐 debouncedAutoSave called - clearing existing timer and starting new one',
+        );
+
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+
+        // Start countdown
+        setAutoSaveCountdown(10);
+
+        // Countdown interval
+        const countdownInterval = setInterval(() => {
+            setAutoSaveCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(countdownInterval);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        const timer = setTimeout(async () => {
+            try {
+                console.log(
+                    '🔥 10-second timer triggered - starting auto-save process',
+                );
+                setIsAutoSaving(true);
+                setAutoSaveCountdown(null);
+                if (countdownIntervalRef.current) {
+                    clearInterval(countdownIntervalRef.current);
+                }
+
+                // Get all groups that need to be saved (temp groups with complete data)
+                const groupsToSave = tableDataRef.current.filter((group) => {
+                    const isTemp =
+                        group.id.toString().startsWith('temp-') ||
+                        group.id.toString().startsWith('new-') ||
+                        group.isNew === true;
+
+                    if (!isTemp) return false;
+
+                    // Check if group has all required fields
+                    const hasGroupName = group.groupName?.trim();
+                    const hasDescription = group.description?.trim();
+
+                    const isComplete = hasGroupName && hasDescription;
+
+                    if (isTemp && !isComplete) {
+                        console.log(
+                            `🚫 Skipping incomplete temporary group ${group.id}:`,
+                            {
+                                hasGroupName: !!hasGroupName,
+                                hasDescription: !!hasDescription,
+                                groupNameValue: group.groupName,
+                                descriptionValue: group.description,
+                            },
+                        );
+                    }
+
+                    return isComplete;
+                });
+
+                console.log(
+                    `📊 Found ${groupsToSave.length} complete groups to auto-save`,
+                );
+
+                if (groupsToSave.length > 0) {
+                    console.log(
+                        '💾 Auto-saving groups after 10 seconds of inactivity...',
+                        groupsToSave.map((g) => g.id),
+                    );
+
+                    for (const group of groupsToSave) {
+                        await autoSaveGroup(group, true);
+                    }
+
+                    // Show success animation
+                    console.log('✨ Showing auto-save success animation');
+                    setShowAutoSaveSuccess(true);
+
+                    setTimeout(() => {
+                        console.log('✨ Hiding auto-save success animation');
+                        setShowAutoSaveSuccess(false);
+                    }, 3000);
+
+                    console.log(
+                        `✅ Auto-saved ${groupsToSave.length} groups successfully`,
+                    );
+                } else {
+                    console.log('ℹ️ No groups found to auto-save');
+                }
+            } catch (error) {
+                console.error('❌ Auto-save failed:', error);
+            } finally {
+                setIsAutoSaving(false);
+            }
+        }, 10000); // 10 seconds delay
+
+        autoSaveTimerRef.current = timer;
+        console.log('⏰ Auto-save timer set for 10 seconds');
+    }, []);
+
+    // Auto-save individual group function
+    const autoSaveGroup = useCallback(
+        async (groupData: UserGroup, isNewGroup: boolean = false) => {
+            const groupId = groupData.id;
+            console.log(
+                `🎯 ${isNewGroup ? 'Creating' : 'Updating'} group: ${
+                    groupData.groupName
+                } (${groupId})`,
+            );
+
+            // Set saving state
+            setSavingStates((prev) => ({...prev, [groupId]: 'saving'}));
+
+            try {
+                if (
+                    isNewGroup ||
+                    groupData.id.toString().startsWith('temp-') ||
+                    groupData.id.toString().startsWith('new-') ||
+                    groupData.id.toString().startsWith('item-') ||
+                    groupData.isNew
+                ) {
+                    // Validate required fields
+                    const hasRequiredFields =
+                        groupData.groupName?.trim() &&
+                        groupData.description?.trim();
+
+                    if (!hasRequiredFields) {
+                        console.log(
+                            '⚠️ Skipping auto-save: Required fields missing',
+                            {
+                                groupName: groupData.groupName,
+                                description: groupData.description,
+                            },
+                        );
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [groupId]: 'error',
+                        }));
+                        return;
+                    }
+
+                    // Create new group via userManagement API
+                    console.log('🆕 Auto-saving new group:', groupData);
+
+                    // Get selected account from localStorage
+                    const selectedAccountId =
+                        typeof window !== 'undefined'
+                            ? window.localStorage.getItem('selectedAccountId')
+                            : null;
+                    const selectedAccountName =
+                        typeof window !== 'undefined'
+                            ? window.localStorage.getItem('selectedAccountName')
+                            : null;
+
+                    const requestBody: any = {
+                        name: groupData.groupName,
+                        description: groupData.description,
+                        entity: groupData.entity || '',
+                        service: groupData.service || '',
+                        assignedRoles: groupData.roles || [],
+                    };
+
+                    // Add account context if not Systiva
+                    if (selectedAccountId && selectedAccountId !== 'null') {
+                        requestBody.selectedAccountId = selectedAccountId;
+                    }
+                    if (selectedAccountName && selectedAccountName !== 'null') {
+                        requestBody.selectedAccountName = selectedAccountName;
+                    }
+
+                    console.log('📤 POST Request Body:', requestBody);
+
+                    const apiBase =
+                        process.env.NEXT_PUBLIC_API_BASE ||
+                        'http://localhost:4000';
+                    const response = await fetch(
+                        `${apiBase}/api/user-management/groups`,
+                        {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(requestBody),
+                        },
+                    );
+
+                    console.log(
+                        '📥 POST Response Status:',
+                        response.status,
+                        response.statusText,
+                    );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to create group: ${response.status}`,
+                        );
+                    }
+
+                    const newGroup = await response.json();
+                    console.log('📦 Created group response:', newGroup);
+
+                    // Update the group ID with the real backend ID
+                    setTableData((prevData) =>
+                        prevData.map((g) =>
+                            g.id === groupId
+                                ? {
+                                      ...g,
+                                      id: newGroup.id,
+                                      isNew: false,
+                                      lastModified:
+                                          newGroup.updatedAt ||
+                                          new Date().toISOString(),
+                                  }
+                                : g,
+                        ),
+                    );
+
+                    setSavingStates((prev) => ({
+                        ...prev,
+                        [newGroup.id]: 'saved',
+                    }));
+                    console.log(`🎉 Created group: ${groupData.groupName}`);
+
+                    // Clear the temp ID from saving states
+                    setSavingStates((prev) => {
+                        const newStates = {...prev};
+                        delete newStates[groupId];
+                        return newStates;
+                    });
+                } else {
+                    // Update existing group
+                    console.log(
+                        '🔄 Auto-saving existing group:',
+                        groupId,
+                        groupData,
+                    );
+
+                    // Get selected account from localStorage
+                    const selectedAccountId =
+                        typeof window !== 'undefined'
+                            ? window.localStorage.getItem('selectedAccountId')
+                            : null;
+                    const selectedAccountName =
+                        typeof window !== 'undefined'
+                            ? window.localStorage.getItem('selectedAccountName')
+                            : null;
+
+                    const updateBody: any = {
+                        name: groupData.groupName,
+                        description: groupData.description,
+                        entity: groupData.entity || '',
+                        service: groupData.service || '',
+                        assignedRoles: groupData.roles || [],
+                    };
+
+                    // Add account context if not Systiva
+                    if (selectedAccountId && selectedAccountId !== 'null') {
+                        updateBody.selectedAccountId = selectedAccountId;
+                    }
+                    if (selectedAccountName && selectedAccountName !== 'null') {
+                        updateBody.selectedAccountName = selectedAccountName;
+                    }
+
+                    console.log('📤 PUT Request Body:', updateBody);
+
+                    const apiBase =
+                        process.env.NEXT_PUBLIC_API_BASE ||
+                        'http://localhost:4000';
+                    const response = await fetch(
+                        `${apiBase}/api/user-management/groups/${groupId}`,
+                        {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(updateBody),
+                        },
+                    );
+
+                    console.log(
+                        '📥 PUT Response Status:',
+                        response.status,
+                        response.statusText,
+                    );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to update group: ${response.status}`,
+                        );
+                    }
+
+                    // Handle empty response body (backend might return 200 OK with no body)
+                    const responseText = await response.text();
+                    const updatedGroup = responseText
+                        ? JSON.parse(responseText)
+                        : null;
+                    console.log('📦 Updated group response:', updatedGroup);
+
+                    // If update returned null, the group doesn't exist in DB - create it instead
+                    if (updatedGroup === null) {
+                        console.warn(
+                            '⚠️ Group not found in database, creating it instead...',
+                        );
+                        const createBody: any = {
+                            name: groupData.groupName,
+                            description: groupData.description,
+                            entity: groupData.entity || '',
+                            service: groupData.service || '',
+                            assignedRoles: groupData.roles || [],
+                        };
+
+                        // Add account context if not Systiva
+                        if (selectedAccountId && selectedAccountId !== 'null') {
+                            createBody.selectedAccountId = selectedAccountId;
+                        }
+                        if (
+                            selectedAccountName &&
+                            selectedAccountName !== 'null'
+                        ) {
+                            createBody.selectedAccountName =
+                                selectedAccountName;
+                        }
+
+                        const createResponse = await fetch(
+                            `${apiBase}/api/user-management/groups`,
+                            {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify(createBody),
+                            },
+                        );
+
+                        if (!createResponse.ok) {
+                            throw new Error(
+                                `Failed to create group: ${createResponse.status}`,
+                            );
+                        }
+
+                        const newGroup = await createResponse.json();
+                        console.log('✅ Created group (fallback):', newGroup);
+
+                        // Update the group ID with the real backend ID
+                        setTableData((prevData) =>
+                            prevData.map((g) =>
+                                g.id === groupId
+                                    ? {
+                                          ...g,
+                                          id: newGroup.id,
+                                          isNew: false,
+                                          lastModified:
+                                              newGroup.updatedAt ||
+                                              new Date().toISOString(),
+                                      }
+                                    : g,
+                            ),
+                        );
+
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [newGroup.id]: 'saved',
+                        }));
+
+                        // Clear the old ID from saving states
+                        setSavingStates((prev) => {
+                            const newStates = {...prev};
+                            delete newStates[groupId];
+                            return newStates;
+                        });
+                    } else {
+                        setSavingStates((prev) => ({
+                            ...prev,
+                            [groupId]: 'saved',
+                        }));
+                        console.log(`💾 Updated group: ${groupData.groupName}`);
+                    }
+                }
+
+                // Clear saved state after 2 seconds
+                setTimeout(() => {
+                    setSavingStates((prev) => {
+                        const newStates = {...prev};
+                        delete newStates[groupId];
+                        return newStates;
+                    });
+                }, 2000);
+            } catch (error) {
+                console.error('❌ Auto-save failed for group:', groupId, error);
+                setSavingStates((prev) => ({...prev, [groupId]: 'error'}));
+
+                // Clear error state after 5 seconds
+                setTimeout(() => {
+                    setSavingStates((prev) => {
+                        const newStates = {...prev};
+                        delete newStates[groupId];
+                        return newStates;
+                    });
+                }, 5000);
+            }
+        },
+        [],
+    );
+
+    // Manual Save All function
+    const handleSaveAll = async () => {
+        console.log('='.repeat(80));
+        console.log('💾 SAVE BUTTON CLICKED');
+        console.log('='.repeat(80));
+        console.log('📊 Current tableData state:', tableData);
+        console.log('📊 Current tableDataRef.current:', tableDataRef.current);
+        console.log('📊 Number of groups in tableData:', tableData.length);
+        console.log(
+            '📊 Number of groups in tableDataRef:',
+            tableDataRef.current.length,
+        );
+
+        // Clear auto-save timer
+        if (autoSaveTimerRef.current) {
+            console.log('🛑 Manual save clicked - clearing auto-save timer');
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            setAutoSaveCountdown(null);
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+
+        // Get all groups with complete data (both temp and existing)
+        console.log('🔍 Filtering groups from tableDataRef.current...');
+        const groupsToSave = tableDataRef.current.filter((group) => {
+            // Check if this is a temp/new group
+            const isTemp =
+                group.id.toString().startsWith('temp-') ||
+                group.id.toString().startsWith('new-') ||
+                group.isNew === true;
+
+            // Validate required fields
+            const hasGroupName = group.groupName?.trim();
+            const hasDescription = group.description?.trim();
+            const isComplete = hasGroupName && hasDescription;
+
+            console.log(`🔍 Checking group ${group.id}:`, {
+                id: group.id,
+                groupName: group.groupName,
+                description: group.description,
+                entity: group.entity,
+                service: group.service,
+                isTemp,
+                hasGroupName: !!hasGroupName,
+                hasDescription: !!hasDescription,
+                isComplete,
+                willBeSaved: isComplete ? '✅ YES' : '❌ NO',
+            });
+
+            // Save if it has complete data (regardless of temp or existing)
+            return isComplete;
+        });
+
+        console.log(
+            `📊 Found ${groupsToSave.length} groups to save manually:`,
+            groupsToSave.map((g) => ({
+                id: g.id,
+                name: g.groupName,
+                isNew: g.isNew,
+            })),
+        );
+
+        if (groupsToSave.length === 0) {
+            console.log(
+                'ℹ️ No groups to save - all groups are either incomplete or unchanged',
+            );
+            return;
+        }
+
+        setIsAutoSaving(true);
+
+        try {
+            for (const group of groupsToSave) {
+                // Determine if this is a new group based on ID pattern
+                const isNewGroup =
+                    group.id.toString().startsWith('temp-') ||
+                    group.id.toString().startsWith('new-') ||
+                    group.id.toString().startsWith('item-') ||
+                    group.isNew === true;
+
+                console.log(
+                    `💾 Saving group ${group.groupName} (isNew: ${isNewGroup})`,
+                );
+                await autoSaveGroup(group, isNewGroup);
+            }
+
+            // Show success animation
+            setShowAutoSaveSuccess(true);
+
+            setTimeout(() => {
+                setShowAutoSaveSuccess(false);
+            }, 3000);
+
+            console.log(
+                `✅ Manually saved ${groupsToSave.length} groups successfully`,
+            );
+        } catch (error) {
+            console.error('❌ Manual save failed:', error);
+        } finally {
+            setIsAutoSaving(false);
+        }
+    };
+
+    // Enhanced onDataChange with 10-second debounced auto-save
+    const handleDataChange = useCallback(
+        (newData: UserGroup[]) => {
+            console.log('🚀 HANDLE_DATA_CHANGE CALLED for groups!');
+            console.log(
+                '📝 Data changed, starting 10-second auto-save timer...',
+                {
+                    newDataLength: newData.length,
+                    newData: newData.map((g) => ({
+                        id: g.id,
+                        groupName: g.groupName,
+                        description: g.description,
+                    })),
+                },
+            );
+
+            // Check if data has actually changed to prevent infinite loops
+            const hasChanged =
+                JSON.stringify(newData) !== JSON.stringify(tableData);
+            if (!hasChanged) {
+                console.log('⏭️ Data unchanged, skipping auto-save timer');
+                return;
+            }
+
+            // Update table data immediately for UI responsiveness
+            setTableData(newData);
+
+            // CRITICAL: Also update the ref so autosave and manual save can access the latest data
+            tableDataRef.current = newData;
+            console.log('✅ Updated tableDataRef.current with new data');
+
+            // Trigger debounced auto-save timer (10 seconds)
+            debouncedAutoSave();
+        },
+        [tableData, debouncedAutoSave],
+    );
+
+    // Cleanup timeouts on unmount
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
 
     // Handler functions for action buttons
     const handleSort = (column: string) => {
@@ -494,6 +1127,9 @@ export default function ManageUserGroups() {
 
     // Process data with filters and sorting
     const processedTableData = useMemo(() => {
+        console.log('🔄 processedTableData useMemo triggered');
+        console.log('📊 tableData length:', tableData.length);
+        console.log('📊 tableData:', tableData);
         let processed = [...tableData];
 
         // Apply filters
@@ -527,6 +1163,8 @@ export default function ManageUserGroups() {
             });
         }
 
+        console.log('✅ processedTableData result:', processed);
+        console.log('✅ processedTableData length:', processed.length);
         return processed;
     }, [tableData, activeFilters, sortConfig]);
 
@@ -612,15 +1250,97 @@ export default function ManageUserGroups() {
 
     // Handle role management for a user group
     const handleManageRoles = (groupData: UserGroup) => {
-        console.log('Manage roles for group:', groupData);
-        // This could open a roles assignment modal or navigate to a roles page
+        console.log('🎭 Opening role assignment panel for group:', groupData);
+        setSelectedGroupForRoles(groupData);
+        setShowRolePanel(true);
+    };
+
+    // Handle role assignment callback from sliding panel
+    const handleRoleAssignment = async (groupId: string, roles: any[]) => {
+        console.log('💾 Assigning roles to group:', groupId, roles);
+
+        try {
+            // Extract role IDs from the roles array
+            const roleIds = roles.map((role) => role.id || role);
+
+            // Update the group with assigned roles
+            const response = await fetch(
+                `http://localhost:4000/api/user-management/groups/${groupId}`,
+                {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        assignedRoles: roleIds,
+                    }),
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to assign roles: ${response.status}`);
+            }
+
+            console.log('✅ Roles assigned successfully');
+
+            // Update local state
+            setTableData((prevData) =>
+                prevData.map((group) =>
+                    group.id === groupId ? {...group, roles: roleIds} : group,
+                ),
+            );
+
+            // Close the panel
+            setShowRolePanel(false);
+            setSelectedGroupForRoles(null);
+        } catch (error) {
+            console.error('❌ Error assigning roles:', error);
+        }
     };
 
     // Use the base configuration - API integration is handled by ReusableTableComponent
     const dynamicTableConfig = useMemo(() => {
         console.log('📋 Using base table configuration with API integration');
-        return ManageUserGroups_tableConfig;
-    }, []);
+        console.log('🔧 Injecting fetched services into config:', services);
+
+        // Clone the config and inject the fetched services into the service column
+        const configWithServices = {
+            ...ManageUserGroups_tableConfig,
+            mainTableColumns: ManageUserGroups_tableConfig.mainTableColumns.map(
+                (col) => {
+                    if (col.id === 'service') {
+                        // Extract just the string values for the dropdown (TableComponent expects array of strings)
+                        const serviceValues =
+                            services.length > 0
+                                ? services.map((s) => s.value || s.label || s)
+                                : col.options;
+                        console.log(
+                            '🔧 Service dropdown values:',
+                            serviceValues,
+                        );
+                        return {
+                            ...col,
+                            options: serviceValues,
+                        };
+                    }
+                    if (col.id === 'entity') {
+                        // Extract just the string values for the dropdown (TableComponent expects array of strings)
+                        const entityValues =
+                            entities.length > 0
+                                ? entities.map((e) => e.value || e.label || e)
+                                : col.options;
+                        console.log('🔧 Entity dropdown values:', entityValues);
+                        return {
+                            ...col,
+                            options: entityValues,
+                        };
+                    }
+                    return col;
+                },
+            ),
+        };
+
+        console.log('✅ Config with services:', configWithServices);
+        return configWithServices;
+    }, [services, entities]);
 
     // Handle user group actions
     const handleGroupAction = (
@@ -918,6 +1638,79 @@ export default function ManageUserGroups() {
                             Create New User Group
                         </button>
 
+                        {/* Save Button with countdown timer */}
+                        <button
+                            onClick={handleSaveAll}
+                            disabled={isAutoSaving}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                                isAutoSaving
+                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    : showAutoSaveSuccess
+                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                    : autoSaveCountdown
+                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                            }`}
+                        >
+                            {/* Animated saving icon */}
+                            {isAutoSaving && (
+                                <svg
+                                    className='animate-spin h-4 w-4 text-white'
+                                    xmlns='http://www.w3.org/2000/svg'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                >
+                                    <circle
+                                        className='opacity-25'
+                                        cx='12'
+                                        cy='12'
+                                        r='10'
+                                        stroke='currentColor'
+                                        strokeWidth='4'
+                                    ></circle>
+                                    <path
+                                        className='opacity-75'
+                                        fill='currentColor'
+                                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                    ></path>
+                                </svg>
+                            )}
+
+                            {/* Save icon or checkmark */}
+                            {!isAutoSaving && (
+                                <>
+                                    {showAutoSaveSuccess ? (
+                                        <svg
+                                            className='h-4 w-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M5 13l4 4L19 7'
+                                            />
+                                        </svg>
+                                    ) : (
+                                        <BookmarkIcon className='h-4 w-4' />
+                                    )}
+                                </>
+                            )}
+
+                            {/* Button text with countdown */}
+                            <span className='font-medium'>
+                                {isAutoSaving
+                                    ? 'Saving...'
+                                    : showAutoSaveSuccess
+                                    ? 'Saved!'
+                                    : autoSaveCountdown
+                                    ? `Auto-save in ${autoSaveCountdown}s`
+                                    : 'Save'}
+                            </span>
+                        </button>
+
                         <ToolbarTrashButton onClick={() => {}} />
 
                         {/* Search Input - appears when search is active */}
@@ -1128,60 +1921,112 @@ export default function ManageUserGroups() {
                                         {
                                             ...dynamicTableConfig,
                                             initialData: processedTableData,
+                                            savingStates: savingStates,
                                             customHeaderRenderer:
                                                 renderColumnHeader,
+
+                                            // FORCE ALL ADVANCED FEATURES ON
+                                            features: {
+                                                ...dynamicTableConfig.features,
+                                                dragAndDrop: true,
+                                                hoverControls: true,
+                                                inlineEditing: true,
+                                                compactRows: true,
+                                                modernMicroInteractions: true,
+                                                animatedTransitions: true,
+                                                sortableColumns: true,
+                                                rowHoverEffect: true,
+                                                selectionHighlight: true,
+                                                modernIcons: true,
+                                                svgIcons: true,
+                                                autoSave: true,
+                                                virtualScrolling: false,
+                                                optimizedRendering: true,
+                                            },
+
+                                            ui: {
+                                                ...dynamicTableConfig.ui,
+                                                enableAdvancedFeatures: true,
+                                                showDragHandles: true,
+                                                enableHoverControls: true,
+                                                enableSortableHeaders: true,
+                                                enableCompactMode: true,
+                                                showModernIcons: true,
+                                                enableMicroInteractions: true,
+                                                modernTableStyling: true,
+                                                editTrigger: 'doubleClick', // Double-click to edit cells
+                                            },
+
+                                            // Direct prop overrides
+                                            enableDragAndDrop: true,
+                                            enableHoverControls: true,
+                                            enableSortableHeaders: true,
+                                            enableCompactMode: true,
+                                            enableModernUI: true,
+                                            showAdvancedFeatures: true,
+                                            modernIcons: true,
+                                            svgIcons: true,
+                                            editTrigger: 'doubleClick', // Double-click to edit
+
                                             // Pass current user context for API calls
                                             currentUser: {
                                                 accountId: 1,
                                                 enterpriseId: 1,
                                             },
-                                            customRenderers: {
-                                                rolesCount: (
-                                                    value: any,
-                                                    rowData: UserGroup,
-                                                ) => (
-                                                    <RolesCountCell
-                                                        groupData={rowData}
-                                                        onManageRoles={
-                                                            handleManageRoles
+
+                                            actions: {
+                                                ...dynamicTableConfig.actions,
+                                                onDataChange: handleDataChange,
+                                                customRenderers: {
+                                                    rolesCount: (
+                                                        value: any,
+                                                        rowData: UserGroup,
+                                                    ) => (
+                                                        <RolesCountCell
+                                                            groupData={rowData}
+                                                            onManageRoles={
+                                                                handleManageRoles
+                                                            }
+                                                            roleCount={
+                                                                rowData.roles
+                                                                    ?.length ||
+                                                                0
+                                                            }
+                                                        />
+                                                    ),
+                                                    entity: (
+                                                        value: any,
+                                                        rowData: UserGroup,
+                                                    ) => {
+                                                        // For existing records, show as non-editable chip
+                                                        if (!rowData.isNew) {
+                                                            return (
+                                                                <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200'>
+                                                                    {value}
+                                                                </div>
+                                                            );
                                                         }
-                                                        roleCount={
-                                                            rowData.roles
-                                                                ?.length || 0
+                                                        // For new records, return null to use default dropdown
+                                                        return null;
+                                                    },
+                                                    service: (
+                                                        value: any,
+                                                        rowData: UserGroup,
+                                                    ) => {
+                                                        // For existing records, show as non-editable chip
+                                                        if (!rowData.isNew) {
+                                                            return (
+                                                                <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200'>
+                                                                    {value}
+                                                                </div>
+                                                            );
                                                         }
-                                                    />
-                                                ),
-                                                entity: (
-                                                    value: any,
-                                                    rowData: UserGroup,
-                                                ) => {
-                                                    // For existing records, show as non-editable chip
-                                                    if (!rowData.isNew) {
-                                                        return (
-                                                            <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200'>
-                                                                {value}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // For new records, return null to use default dropdown
-                                                    return null;
-                                                },
-                                                service: (
-                                                    value: any,
-                                                    rowData: UserGroup,
-                                                ) => {
-                                                    // For existing records, show as non-editable chip
-                                                    if (!rowData.isNew) {
-                                                        return (
-                                                            <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200'>
-                                                                {value}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // For new records, return null to use default dropdown
-                                                    return null;
+                                                        // For new records, return null to use default dropdown
+                                                        return null;
+                                                    },
                                                 },
                                             },
+
                                             onAction: handleGroupAction,
                                             loading:
                                                 loading ||
@@ -1191,12 +2036,36 @@ export default function ManageUserGroups() {
                                             groupBy: selectedGroupBy,
                                         } as any
                                     }
+                                    onGroupAssignment={() => {}}
                                 />
                             )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Role Assignment Sliding Panel */}
+            {selectedGroupForRoles && showRolePanel && (
+                <SimpleSlidingPanels
+                    key={`role-panel-${selectedGroupForRoles.id}`}
+                    isOpen={showRolePanel}
+                    onClose={() => {
+                        setShowRolePanel(false);
+                        setSelectedGroupForRoles(null);
+                    }}
+                    currentUser={{
+                        id: selectedGroupForRoles.id,
+                        name: selectedGroupForRoles.groupName,
+                        description: selectedGroupForRoles.description,
+                        assignedRoles: selectedGroupForRoles.roles || [],
+                    }}
+                    onAssignGroups={(roles) => {
+                        handleRoleAssignment(selectedGroupForRoles.id, roles);
+                    }}
+                    initialPanel='roles'
+                    visiblePanels={['roles']}
+                />
+            )}
         </div>
     );
 }

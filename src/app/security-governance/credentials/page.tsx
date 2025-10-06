@@ -129,58 +129,27 @@ export default function CredentialManager() {
     const loadCredentials = useCallback(async () => {
         try {
             setLoading(true);
-            console.log('🔄 Loading credentials from API...');
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const response = await fetch(`${apiBase}/api/credentials`);
 
-            // Mock API call - replace with actual API
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to fetch credentials: ${response.status}`,
+                );
+            }
 
-            // Mock sample data for display
-            const sampleCredentials: CredentialRecord[] = [
-                {
-                    id: '1',
-                    credentialName: 'Production API Key',
-                    description: 'Main production environment API access',
-                    entity: 'Production',
-                    connector: 'REST_API',
-                    authenticationType: 'API_KEY' as const,
-                    lastUpdated: '2024-01-15T10:30:00Z',
-                    createdAt: '2024-01-01T00:00:00Z',
-                    createdBy: 'admin',
-                },
-                {
-                    id: '2',
-                    credentialName: 'Database Connection',
-                    description: 'Primary database access credentials',
-                    entity: 'Production',
-                    connector: 'Database',
-                    authenticationType: 'BASIC_AUTH' as const,
-                    lastUpdated: '2024-01-10T14:20:00Z',
-                    createdAt: '2023-12-15T00:00:00Z',
-                    createdBy: 'admin',
-                },
-                {
-                    id: '3',
-                    credentialName: 'OAuth Integration',
-                    description: 'Third-party service OAuth credentials',
-                    entity: 'Staging',
-                    connector: 'Third_Party_Service',
-                    authenticationType: 'OAUTH' as const,
-                    lastUpdated: '2024-01-12T09:15:00Z',
-                    createdAt: '2023-12-20T00:00:00Z',
-                    createdBy: 'developer',
-                },
-            ];
-
-            setCredentials(sampleCredentials);
-            setTableData(sampleCredentials);
-
-            console.log('✅ Credentials loaded successfully');
+            const credentialsData = await response.json();
+            setCredentials(credentialsData);
+            setTableData(credentialsData);
         } catch (error) {
-            console.error('❌ Error loading credentials:', error);
+            console.error('Error loading credentials:', error);
+            setCredentials([]);
+            setTableData([]);
         } finally {
             setLoading(false);
         }
-    }, []); // Empty dependency array to prevent repeated calls
+    }, []);
 
     useEffect(() => {
         loadCredentials();

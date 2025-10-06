@@ -276,6 +276,20 @@ export default function Breadcrumbs({
                     name: String(a.accountName ?? a.name ?? 'Unnamed Account'),
                 }));
                 setAccounts(mapped);
+
+                // If no accounts exist, clear localStorage
+                if (mapped.length === 0) {
+                    console.log(
+                        '⚠️ No accounts found, clearing account selection',
+                    );
+                    setSelectedAccountId(undefined);
+                    try {
+                        window.localStorage.removeItem('selectedAccountId');
+                        window.localStorage.removeItem('selectedAccountName');
+                    } catch {}
+                    return;
+                }
+
                 // Initialize selection
                 const savedId =
                     typeof window !== 'undefined'
@@ -298,15 +312,21 @@ export default function Breadcrumbs({
                             );
                     } catch {}
                 } else if (mapped.length > 0) {
-                    setSelectedAccountId(mapped[0].id);
+                    // Default to Systiva if it exists, otherwise first account
+                    const systivaAccount = mapped.find(
+                        (x) => x.name.toLowerCase() === 'systiva',
+                    );
+                    const defaultAccount = systivaAccount || mapped[0];
+
+                    setSelectedAccountId(defaultAccount.id);
                     try {
                         window.localStorage.setItem(
                             'selectedAccountId',
-                            mapped[0].id,
+                            defaultAccount.id,
                         );
                         window.localStorage.setItem(
                             'selectedAccountName',
-                            mapped[0].name,
+                            defaultAccount.name,
                         );
                     } catch {}
                 }
@@ -363,19 +383,30 @@ export default function Breadcrumbs({
         };
     }, []);
 
+    const accountMenuRef = useRef<HTMLDivElement | null>(null);
+    const enterpriseMenuRef = useRef<HTMLDivElement | null>(null);
+
     useEffect(() => {
         const onDocClick = (e: MouseEvent) => {
             const target = e.target as Node;
+            // Check if click is outside account button AND account menu
             if (
                 accountBtnRef.current &&
-                !accountBtnRef.current.contains(target)
-            )
+                !accountBtnRef.current.contains(target) &&
+                accountMenuRef.current &&
+                !accountMenuRef.current.contains(target)
+            ) {
                 setAccountMenuOpen(false);
+            }
+            // Check if click is outside enterprise button AND enterprise menu
             if (
                 enterpriseBtnRef.current &&
-                !enterpriseBtnRef.current.contains(target)
-            )
+                !enterpriseBtnRef.current.contains(target) &&
+                enterpriseMenuRef.current &&
+                !enterpriseMenuRef.current.contains(target)
+            ) {
                 setEnterpriseMenuOpen(false);
+            }
         };
         document.addEventListener('mousedown', onDocClick);
         return () => document.removeEventListener('mousedown', onDocClick);
@@ -397,6 +428,13 @@ export default function Breadcrumbs({
             const acc = accounts.find((a) => a.id === id);
             if (acc)
                 window.localStorage.setItem('selectedAccountName', acc.name);
+
+            // Dispatch custom event to notify other components
+            window.dispatchEvent(
+                new CustomEvent('accountChanged', {
+                    detail: {id, name: acc?.name},
+                }),
+            );
         } catch {}
     };
     const updateEnterprise = (id: string) => {
@@ -406,6 +444,13 @@ export default function Breadcrumbs({
             const ent = enterprises.find((e) => e.id === id);
             if (ent)
                 window.localStorage.setItem('selectedEnterpriseName', ent.name);
+
+            // Dispatch custom event to notify other components
+            window.dispatchEvent(
+                new CustomEvent('enterpriseChanged', {
+                    detail: {id, name: ent?.name},
+                }),
+            );
         } catch {}
     };
 
@@ -617,6 +662,7 @@ export default function Breadcrumbs({
                             accounts.length > 1 &&
                             selectedAccountId && (
                                 <div
+                                    ref={accountMenuRef}
                                     className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
                                     role='listbox'
                                 >
@@ -710,6 +756,7 @@ export default function Breadcrumbs({
                             enterprises.length > 1 &&
                             selectedEnterpriseId && (
                                 <div
+                                    ref={enterpriseMenuRef}
                                     className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
                                     role='listbox'
                                 >

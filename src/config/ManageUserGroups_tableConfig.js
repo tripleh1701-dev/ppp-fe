@@ -424,9 +424,9 @@ const ManageUserGroups_tableConfig = {
         autoSaveDelay: 1000, // Auto-save after 1 second of inactivity
 
         // Hover edit configuration
-        enableHoverEdit: true,
+        enableHoverEdit: false,
         hoverEditMode: 'immediate', // 'immediate', 'delayed'
-        editTrigger: 'hover', // 'hover', 'click', 'doubleClick'
+        editTrigger: 'doubleClick', // 'hover', 'click', 'doubleClick'
         inlineEditing: true,
         quickEdit: true,
     },

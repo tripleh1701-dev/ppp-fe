@@ -4,17 +4,10 @@ export const API_BASE = rawApiBase.endsWith('/api')
     ? rawApiBase.slice(0, -4)
     : rawApiBase;
 
-// Debug log to see what the API base is set to
-console.log('Raw API_BASE:', rawApiBase);
-console.log('Cleaned API_BASE:', API_BASE);
-console.log('NEXT_PUBLIC_API_BASE env var:', process.env.NEXT_PUBLIC_API_BASE);
-
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     const url = `${API_BASE}${cleanPath}`;
-
-    console.log('API Request URL:', url); // Debug log
 
     const res = await fetch(url, {
         headers: {
@@ -119,6 +112,271 @@ export async function deleteEnterpriseConfigurationRecord(
     recordId: string,
 ): Promise<void> {
     return request(`/api/enterprise-configuration/${recordId}`, {
+        method: 'DELETE',
+    });
+}
+
+// Enterprise-Product-Service Linkage API functions
+export async function createEnterprise(data: {name: string}): Promise<any> {
+    return request('/api/enterprises', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function createProduct(data: {name: string}): Promise<any> {
+    return request('/api/products', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function createService(data: {name: string}): Promise<any> {
+    return request('/api/services', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function createEnterpriseProductServiceLinkage(data: {
+    enterpriseId: string;
+    productId: string;
+    serviceIds: string[];
+}): Promise<any> {
+    return request('/api/enterprise-products-services', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function fetchEnterpriseProductServiceLinkages(): Promise<any[]> {
+    return request('/api/enterprise-products-services');
+}
+
+export async function fetchLinkagesByEnterprise(
+    enterpriseId: string,
+): Promise<any[]> {
+    return request(
+        `/api/enterprise-products-services/enterprise/${enterpriseId}`,
+    );
+}
+
+export async function fetchDetailedLinkagesByEnterprise(
+    enterpriseId: string,
+): Promise<any[]> {
+    return request(
+        `/api/enterprise-products-services/enterprise/${enterpriseId}/detailed`,
+    );
+}
+
+export async function deleteLinkage(linkageId: string): Promise<void> {
+    return request(`/api/enterprise-products-services/${linkageId}`, {
+        method: 'DELETE',
+    });
+}
+
+// Account License API functions
+export async function syncLinkageToAccount(data: {
+    accountId: string;
+    accountName: string;
+    linkageId: string;
+    licenseStart?: string;
+    licenseEnd?: string;
+}): Promise<any> {
+    return request('/api/account-licenses/sync-linkage', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function syncServiceToAccount(data: {
+    accountId: string;
+    accountName: string;
+    enterpriseId: string;
+    productId: string;
+    serviceId: string;
+    licenseStart?: string;
+    licenseEnd?: string;
+}): Promise<any> {
+    return request('/api/account-licenses/sync', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function fetchAccountLicenses(accountId: string): Promise<any[]> {
+    return request(`/api/account-licenses/account/${accountId}`);
+}
+
+export async function deleteAccountLicense(
+    accountId: string,
+    licenseId: string,
+): Promise<void> {
+    return request(
+        `/api/account-licenses/account/${accountId}/license/${licenseId}`,
+        {
+            method: 'DELETE',
+        },
+    );
+}
+
+export async function updateAccountLicensePeriod(
+    accountId: string,
+    licenseId: string,
+    licenseStart: string,
+    licenseEnd: string,
+): Promise<any> {
+    return request(
+        `/api/account-licenses/account/${accountId}/license/${licenseId}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify({licenseStart, licenseEnd}),
+        },
+    );
+}
+
+// ==========================================
+// User Management API Functions (systiva table)
+// ==========================================
+
+// User operations
+export async function fetchUsersFromSystiva(): Promise<any[]> {
+    return request('/api/user-management/users');
+}
+
+export async function fetchUserFromSystiva(userId: string): Promise<any> {
+    return request(`/api/user-management/users/${userId}`);
+}
+
+export async function fetchUserWithHierarchy(userId: string): Promise<any> {
+    return request(`/api/user-management/users/${userId}/hierarchy`);
+}
+
+export async function createUserInSystiva(data: {
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    emailAddress: string;
+    status: 'ACTIVE' | 'INACTIVE';
+    startDate: string;
+    endDate?: string;
+    password?: string;
+    technicalUser: boolean;
+    assignedGroups?: string[];
+}): Promise<any> {
+    return request('/api/user-management/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateUserInSystiva(
+    userId: string,
+    data: Partial<{
+        firstName: string;
+        middleName?: string;
+        lastName: string;
+        emailAddress: string;
+        status: 'ACTIVE' | 'INACTIVE';
+        startDate: string;
+        endDate?: string;
+        password?: string;
+        technicalUser: boolean;
+        assignedGroups?: string[];
+    }>,
+): Promise<any> {
+    return request(`/api/user-management/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteUserFromSystiva(userId: string): Promise<void> {
+    return request(`/api/user-management/users/${userId}`, {
+        method: 'DELETE',
+    });
+}
+
+// Group operations
+export async function fetchGroupsFromSystiva(): Promise<any[]> {
+    return request('/api/user-management/groups');
+}
+
+export async function fetchGroupFromSystiva(groupId: string): Promise<any> {
+    return request(`/api/user-management/groups/${groupId}`);
+}
+
+export async function fetchGroupRoles(groupId: string): Promise<any[]> {
+    return request(`/api/user-management/groups/${groupId}/roles`);
+}
+
+export async function createGroupInSystiva(data: {
+    name: string;
+    description?: string;
+    assignedRoles?: string[];
+}): Promise<any> {
+    return request('/api/user-management/groups', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateGroupInSystiva(
+    groupId: string,
+    data: Partial<{
+        name: string;
+        description?: string;
+        assignedRoles?: string[];
+    }>,
+): Promise<any> {
+    return request(`/api/user-management/groups/${groupId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteGroupFromSystiva(groupId: string): Promise<void> {
+    return request(`/api/user-management/groups/${groupId}`, {
+        method: 'DELETE',
+    });
+}
+
+// Role operations
+export async function fetchRolesFromSystiva(): Promise<any[]> {
+    return request('/api/user-management/roles');
+}
+
+export async function fetchRoleFromSystiva(roleId: string): Promise<any> {
+    return request(`/api/user-management/roles/${roleId}`);
+}
+
+export async function createRoleInSystiva(data: {
+    name: string;
+    description?: string;
+    scopeConfig?: any;
+}): Promise<any> {
+    return request('/api/user-management/roles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateRoleInSystiva(
+    roleId: string,
+    data: Partial<{
+        name: string;
+        description?: string;
+        scopeConfig?: any;
+    }>,
+): Promise<any> {
+    return request(`/api/user-management/roles/${roleId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteRoleFromSystiva(roleId: string): Promise<void> {
+    return request(`/api/user-management/roles/${roleId}`, {
         method: 'DELETE',
     });
 }

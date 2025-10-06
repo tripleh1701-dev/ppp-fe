@@ -120,46 +120,42 @@ export default function NavigationSidebar({
     const [isPipelineOpen, setIsPipelineOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
     const [currentUser, setCurrentUser] = useState({
-        firstName: '',
-        lastName: '',
-        emailAddress: '',
-        role: '',
+        firstName: 'Nihar',
+        lastName: 'Sharma',
+        emailAddress: 'nihar.sharma@systiva.com',
+        role: 'Administrator',
     });
 
     // Load current user data from API
     useEffect(() => {
         const loadCurrentUser = async () => {
             try {
+                const apiBase =
+                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
                 const response = await fetch(
-                    'http://localhost:4000/api/auth/current-user',
+                    `${apiBase}/api/auth/current-user`,
                 );
                 if (response.ok) {
                     const userData = await response.json();
                     setCurrentUser({
-                        firstName: userData.firstName || 'User',
-                        lastName: userData.lastName || '',
+                        firstName: userData.firstName || 'Nihar',
+                        lastName: userData.lastName || 'Sharma',
                         emailAddress:
-                            userData.emailAddress || 'user@company.com',
-                        role: userData.role || 'User',
+                            userData.emailAddress || 'nihar.sharma@systiva.com',
+                        role: userData.role || 'Administrator',
                     });
                 } else {
-                    // Temporary hardcoded user for demo purposes
-                    setCurrentUser({
-                        firstName: 'Nihar',
-                        lastName: 'Sharma',
-                        emailAddress: '',
-                        role: 'Administrator',
-                    });
+                    // Fallback to default user if API fails
+                    console.log(
+                        'Using fallback user: Nihar Sharma (Administrator)',
+                    );
                 }
             } catch (error) {
-                console.error('Error loading current user:', error);
-                // Temporary hardcoded user for demo purposes
-                setCurrentUser({
-                    firstName: 'Nihar',
-                    lastName: 'Sharma',
-                    emailAddress: '',
-                    role: 'Administrator',
-                });
+                console.error(
+                    'Error loading current user, using fallback:',
+                    error,
+                );
+                // Keep the default fallback user (Nihar Sharma)
             }
         };
 
@@ -587,8 +583,7 @@ export default function NavigationSidebar({
                                         {currentUser.lastName}
                                     </p>
                                     <p className='text-xs text-slate-200 truncate drop-shadow-sm'>
-                                        {currentUser.role}{' '}
-                                        {currentUser.emailAddress}
+                                        {currentUser.role}
                                     </p>
                                 </div>
                             )}

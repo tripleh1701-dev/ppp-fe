@@ -23,13 +23,45 @@ class UserService {
      */
     async createUser(userData) {
         try {
+            // Get selected account from localStorage (set by breadcrumb)
+            const selectedAccountId =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountId')
+                    : null;
+            const selectedAccountName =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountName')
+                    : null;
+
+            // Only include account information if it exists and is not "null" string
+            const requestData = {
+                ...userData,
+            };
+
+            // Only add account fields if they have valid values
+            if (selectedAccountId && selectedAccountId !== 'null') {
+                requestData.selectedAccountId = selectedAccountId;
+            }
+            if (selectedAccountName && selectedAccountName !== 'null') {
+                requestData.selectedAccountName = selectedAccountName;
+            }
+
+            console.log('📤 Creating user with account context:', {
+                selectedAccountId:
+                    requestData.selectedAccountId ||
+                    '(none - will use systiva)',
+                selectedAccountName:
+                    requestData.selectedAccountName ||
+                    '(none - will use systiva)',
+            });
+
             const response = await fetch(`${API_BASE_URL}/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${this.getAuthToken()}`,
                 },
-                body: JSON.stringify(userData),
+                body: JSON.stringify(requestData),
             });
 
             if (!response.ok) {
@@ -60,16 +92,41 @@ class UserService {
         try {
             const queryParams = new URLSearchParams();
 
-            // Add query parameters if they exist
+            // Add account context from localStorage if not provided in options
+            if (typeof window !== 'undefined') {
+                const accountId =
+                    options.accountId ||
+                    window.localStorage.getItem('selectedAccountId');
+                const accountName =
+                    options.accountName ||
+                    window.localStorage.getItem('selectedAccountName');
+
+                // Only add if they exist and are not "null" string
+                if (accountId && accountId !== 'null') {
+                    queryParams.append('accountId', accountId);
+                }
+                if (accountName && accountName !== 'null') {
+                    queryParams.append('accountName', accountName);
+                }
+            }
+
+            // Add other query parameters if they exist
             Object.keys(options).forEach((key) => {
                 if (
                     options[key] !== undefined &&
                     options[key] !== null &&
-                    options[key] !== ''
+                    options[key] !== '' &&
+                    key !== 'accountId' &&
+                    key !== 'accountName'
                 ) {
                     queryParams.append(key, options[key]);
                 }
             });
+
+            console.log(
+                '📤 Fetching users with params:',
+                queryParams.toString(),
+            );
 
             const response = await fetch(
                 `${API_BASE_URL}/users?${queryParams.toString()}`,
@@ -127,13 +184,36 @@ class UserService {
      */
     async updateUser(userId, userData) {
         try {
+            // Get selected account from localStorage (set by breadcrumb)
+            const selectedAccountId =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountId')
+                    : null;
+            const selectedAccountName =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountName')
+                    : null;
+
+            // Include account context in update request
+            const requestData = {
+                ...userData,
+            };
+
+            // Only add account fields if they have valid values
+            if (selectedAccountId && selectedAccountId !== 'null') {
+                requestData.selectedAccountId = selectedAccountId;
+            }
+            if (selectedAccountName && selectedAccountName !== 'null') {
+                requestData.selectedAccountName = selectedAccountName;
+            }
+
             const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${this.getAuthToken()}`,
                 },
-                body: JSON.stringify(userData),
+                body: JSON.stringify(requestData),
             });
 
             if (!response.ok) {
@@ -193,7 +273,31 @@ class UserService {
      */
     async deleteUser(userId) {
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+            // Get selected account from localStorage (set by breadcrumb)
+            const selectedAccountId =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountId')
+                    : null;
+            const selectedAccountName =
+                typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountName')
+                    : null;
+
+            // Build query parameters for account context
+            const queryParams = new URLSearchParams();
+            if (selectedAccountId && selectedAccountId !== 'null') {
+                queryParams.append('accountId', selectedAccountId);
+            }
+            if (selectedAccountName && selectedAccountName !== 'null') {
+                queryParams.append('accountName', selectedAccountName);
+            }
+
+            const queryString = queryParams.toString();
+            const url = queryString
+                ? `${API_BASE_URL}/users/${userId}?${queryString}`
+                : `${API_BASE_URL}/users/${userId}`;
+
+            const response = await fetch(url, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${this.getAuthToken()}`,

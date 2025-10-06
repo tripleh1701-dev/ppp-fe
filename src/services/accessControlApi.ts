@@ -52,6 +52,8 @@ export interface ListUsersOptions {
     limit?: number;
     search?: string;
     status?: 'ACTIVE' | 'INACTIVE';
+    accountId?: string | null;
+    accountName?: string | null;
 }
 
 export interface ListUsersResponse {
@@ -78,6 +80,15 @@ export class AccessControlApiService {
         if (options.limit) params.append('limit', options.limit.toString());
         if (options.search) params.append('search', options.search);
         if (options.status) params.append('status', options.status);
+
+        // Add account parameters even if they exist (including null values)
+        // The backend needs to receive them to determine filtering
+        if (options.accountId !== undefined) {
+            params.append('accountId', options.accountId || '');
+        }
+        if (options.accountName !== undefined) {
+            params.append('accountName', options.accountName || '');
+        }
 
         const queryString = params.toString();
         const endpoint = queryString

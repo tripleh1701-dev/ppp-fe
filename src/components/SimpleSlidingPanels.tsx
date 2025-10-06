@@ -21,6 +21,7 @@ interface SimpleSlidingPanelsProps {
     currentUser?: any;
     onAssignGroups?: (groups: any[]) => void;
     initialPanel?: 'userGroups' | 'roles' | 'scope';
+    visiblePanels?: ('userGroups' | 'roles' | 'scope')[];
 }
 
 type PanelType = 'userGroups' | 'roles' | 'scope';
@@ -31,11 +32,12 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     currentUser,
     onAssignGroups,
     initialPanel = 'userGroups',
+    visiblePanels: visiblePanelsProp,
 }) => {
     const [activePanel, setActivePanel] = useState<PanelType>(initialPanel);
     const [selectedRole, setSelectedRole] = useState<any>(null);
     const [visiblePanels, setVisiblePanels] = useState<Set<PanelType>>(
-        new Set(['userGroups'] as PanelType[]),
+        new Set(visiblePanelsProp || (['userGroups'] as PanelType[])),
     );
 
     // State for API data
@@ -59,6 +61,22 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     // State for scope configuration save trigger
     const [triggerScopeSave, setTriggerScopeSave] = useState(0);
     const [selectedUserGroup, setSelectedUserGroup] = useState<any>(null);
+
+    // Sync activePanel with initialPanel prop when it changes
+    useEffect(() => {
+        if (isOpen && initialPanel) {
+            console.log('🔄 Setting active panel to:', initialPanel);
+            setActivePanel(initialPanel);
+        }
+    }, [isOpen, initialPanel]);
+
+    // Sync visiblePanels with visiblePanelsProp when it changes
+    useEffect(() => {
+        if (visiblePanelsProp) {
+            console.log('🔄 Setting visible panels to:', visiblePanelsProp);
+            setVisiblePanels(new Set(visiblePanelsProp));
+        }
+    }, [visiblePanelsProp]);
 
     // Fetch user groups from API with role counts
     const fetchUserGroups = async () => {
@@ -208,11 +226,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
         }
     };
 
-    // Reset visible panels and active panel when component opens
+    // Fetch data when component opens (but don't override panel settings)
     useEffect(() => {
         if (isOpen) {
-            setVisiblePanels(new Set(['userGroups'] as PanelType[]));
-            setActivePanel('userGroups');
             fetchUserGroups();
             fetchRoles();
             fetchScopeConfig();
@@ -243,7 +259,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
     // Scope configuration data is now fetched from API in state
 
-    const panels = [
+    const allPanels = [
         {
             id: 'userGroups' as const,
             title: 'Assign User Groups',
@@ -271,6 +287,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             headerGradient: 'bg-blue-300',
         },
     ];
+
+    // Filter panels based on visiblePanels prop
+    const panels = allPanels.filter((panel) => visiblePanels.has(panel.id));
 
     const handleRoleSelect = (role: any) => {
         console.log('🔄 handleRoleSelect called with role:', role);
@@ -396,66 +415,60 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
 
             console.log('📤 Groups to assign:', groupsToAssign);
 
-            // Save to backend API using individual group assignments
-            console.log('🌐 Assigning groups individually...');
-
-            for (const group of groupsToAssign) {
-                const apiUrl = `http://localhost:4000/api/users/${currentUser.id}/groups`;
-                const payload = {groupId: group.id};
-
-                console.log('🌐 Making API call:', {
-                    url: apiUrl,
-                    method: 'POST',
-                    payload: payload,
-                });
-
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                console.log('📥 API Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ API Error Response:', errorText);
-                    throw new Error(
-                        `Failed to assign group ${group.name}: ${response.status} ${response.statusText} - ${errorText}`,
-                    );
-                }
-            }
-
-            // Create a dummy response for the rest of the code
-            const response = {
-                ok: true,
-                json: () => Promise.resolve({success: true}),
-            };
-
-            console.log('✅ All groups assigned successfully');
-
-            const updatedUser = await response.json();
-            console.log('✅ Backend updated successfully:', updatedUser);
-
-            // Call the callback function if provided
+            // Call the callback function if provided (let parent handle the API calls)
             if (onAssignGroups) {
-                console.log('📞 Calling onAssignGroups callback');
+                console.log(
+                    '📞 Calling onAssignGroups callback with groups:',
+                    groupsToAssign,
+                );
                 onAssignGroups(groupsToAssign);
+                console.log('✅ onAssignGroups callback completed');
             } else {
                 console.warn('⚠️ No onAssignGroups callback provided');
+
+                // Fallback: Save to backend API using individual group assignments (for backward compatibility)
+                console.log('🌐 Assigning groups individually via API...');
+
+                for (const group of groupsToAssign) {
+                    const apiUrl = `http://localhost:4000/api/users/${currentUser.id}/groups`;
+                    const payload = {groupId: group.id};
+
+                    console.log('🌐 Making API call:', {
+                        url: apiUrl,
+                        method: 'POST',
+                        payload: payload,
+                    });
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    console.log('📥 API Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        ok: response.ok,
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('❌ API Error Response:', errorText);
+                        throw new Error(
+                            `Failed to assign group ${group.name}: ${response.status} ${response.statusText} - ${errorText}`,
+                        );
+                    }
+                }
+
+                console.log('✅ All groups assigned successfully via API');
             }
 
             console.log('✅ Groups assigned successfully');
 
-            // Clear selection and show roles panel for next step
+            // Clear selection
             setSelectedGroups(new Set());
-            showRolesPanel();
         } catch (error) {
             console.error('❌ Error assigning groups:', error);
         } finally {
@@ -470,8 +483,13 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             return;
         }
 
-        if (!selectedUserGroup) {
-            console.error('❌ No user group selected for role assignment');
+        // Check if we're assigning roles to a group (currentUser is actually a group)
+        const targetEntity = selectedUserGroup || currentUser;
+
+        if (!targetEntity) {
+            console.error(
+                '❌ No target entity (user/group) for role assignment',
+            );
             return;
         }
 
@@ -479,53 +497,80 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             setRoleAssignmentLoading(true);
 
             console.log(
-                `🔄 Assigning ${selectedRoles.size} roles to user group: ${selectedUserGroup.name}`,
+                `🔄 Assigning ${selectedRoles.size} roles to: ${targetEntity.name}`,
             );
 
-            // Assign each selected role to the user group
-            const assignmentPromises = Array.from(selectedRoles).map(
-                async (roleId) => {
-                    const roleData = rolesData.find(
-                        (role) => role.id === roleId,
-                    );
-                    const response = await fetch(
-                        `http://localhost:4000/api/user-groups/${selectedUserGroup.id}/roles`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                roleId: roleId,
-                                roleName:
-                                    roleData?.name ||
-                                    roleData?.roleName ||
-                                    'Unknown Role',
-                            }),
-                        },
-                    );
+            // Convert selected roles to array with full role data
+            const rolesToAssign = Array.from(selectedRoles).map((roleId) => {
+                const roleData = rolesData.find((role) => role.id === roleId);
+                return {
+                    id: roleId,
+                    name:
+                        roleData?.name || roleData?.roleName || 'Unknown Role',
+                };
+            });
 
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to assign role ${
-                                roleData?.name || roleId
-                            }: ${response.status}`,
+            console.log('📤 Roles to assign:', rolesToAssign);
+
+            // Call the callback function if provided (let parent handle the API calls)
+            if (onAssignGroups) {
+                console.log(
+                    '📞 Calling onAssignGroups callback with roles:',
+                    rolesToAssign,
+                );
+                onAssignGroups(rolesToAssign);
+                console.log('✅ onAssignGroups callback completed');
+            } else {
+                console.warn('⚠️ No onAssignGroups callback provided');
+
+                // Fallback: Use old API endpoint (for backward compatibility)
+                console.log('🌐 Assigning roles individually via API...');
+
+                const assignmentPromises = Array.from(selectedRoles).map(
+                    async (roleId) => {
+                        const roleData = rolesData.find(
+                            (role) => role.id === roleId,
                         );
-                    }
+                        const response = await fetch(
+                            `http://localhost:4000/api/user-groups/${targetEntity.id}/roles`,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    roleId: roleId,
+                                    roleName:
+                                        roleData?.name ||
+                                        roleData?.roleName ||
+                                        'Unknown Role',
+                                }),
+                            },
+                        );
 
-                    return response.json();
-                },
-            );
+                        if (!response.ok) {
+                            throw new Error(
+                                `Failed to assign role ${
+                                    roleData?.name || roleId
+                                }: ${response.status}`,
+                            );
+                        }
 
-            await Promise.all(assignmentPromises);
+                        return response.json();
+                    },
+                );
 
-            console.log('✅ All roles assigned successfully');
+                await Promise.all(assignmentPromises);
+                console.log('✅ All roles assigned successfully via API');
 
-            // Clear selections and refresh data
+                // Refresh user groups data to update role counts
+                await fetchUserGroups();
+            }
+
+            console.log('✅ Roles assigned successfully');
+
+            // Clear selections
             setSelectedRoles(new Set());
-
-            // Refresh user groups data to update role counts
-            await fetchUserGroups();
         } catch (error) {
             console.error('❌ Error assigning roles:', error);
         } finally {
@@ -560,389 +605,436 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             >
                 <div className='flex h-full'>
                     {/* Panel 1 - User Groups */}
-                    <motion.div
-                        className={`h-full border-r border-gray-200 overflow-hidden ${
-                            activePanel === 'userGroups'
-                                ? 'bg-white'
-                                : 'bg-gray-50'
-                        }`}
-                        animate={{
-                            width: activePanel === 'userGroups' ? '100%' : '5%',
-                        }}
-                        transition={{duration: 0.3, ease: 'easeInOut'}}
-                    >
-                        {/* Header */}
-                        <div
-                            className={`${
+                    {visiblePanels.has('userGroups') && (
+                        <motion.div
+                            className={`h-full border-r border-gray-200 overflow-hidden ${
                                 activePanel === 'userGroups'
-                                    ? 'bg-[#0171EC]' // Dark when expanded
-                                    : 'bg-blue-400' // Lighter when collapsed
-                            } text-white p-4 cursor-pointer ${
-                                activePanel !== 'userGroups'
-                                    ? 'h-full flex items-center justify-center'
-                                    : ''
+                                    ? 'bg-white'
+                                    : 'bg-gray-50'
                             }`}
-                            onClick={() => handlePanelClick('userGroups')}
+                            animate={{
+                                width:
+                                    activePanel === 'userGroups'
+                                        ? '100%'
+                                        : '5%',
+                            }}
+                            transition={{duration: 0.3, ease: 'easeInOut'}}
                         >
-                            {activePanel === 'userGroups' ? (
-                                <div className='flex items-center justify-between'>
-                                    <div className='flex items-center space-x-4'>
-                                        {panels[0].icon}
-                                        <div>
-                                            <h3 className='text-lg font-semibold'>
-                                                {panels[0].title}
-                                            </h3>
-                                            <p className='text-sm opacity-90'>
-                                                {panels[0].subtitle}
-                                            </p>
-                                        </div>
+                            {/* Header */}
+                            <div
+                                className={`${
+                                    activePanel === 'userGroups'
+                                        ? 'bg-[#0171EC]' // Dark when expanded
+                                        : 'bg-blue-400' // Lighter when collapsed
+                                } text-white p-4 cursor-pointer ${
+                                    activePanel !== 'userGroups'
+                                        ? 'h-full flex items-center justify-center'
+                                        : ''
+                                }`}
+                                onClick={() => handlePanelClick('userGroups')}
+                            >
+                                {activePanel === 'userGroups' ? (
+                                    <div className='flex items-center justify-between'>
+                                        <div className='flex items-center space-x-4'>
+                                            {
+                                                panels.find(
+                                                    (p) =>
+                                                        p.id === 'userGroups',
+                                                )?.icon
+                                            }
+                                            <div>
+                                                <h3 className='text-lg font-semibold'>
+                                                    {
+                                                        panels.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                'userGroups',
+                                                        )?.title
+                                                    }
+                                                </h3>
+                                                <p className='text-sm opacity-90'>
+                                                    {
+                                                        panels.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                'userGroups',
+                                                        )?.subtitle
+                                                    }
+                                                </p>
+                                            </div>
 
-                                        {/* User Info with Animation */}
-                                        {currentUser && (
-                                            <motion.div
-                                                className='flex items-center gap-3 ml-6 pl-6 border-l border-white/30'
-                                                initial={{opacity: 0, x: -20}}
-                                                animate={{opacity: 1, x: 0}}
-                                                transition={{
-                                                    duration: 0.5,
-                                                    delay: 0.2,
-                                                }}
-                                            >
+                                            {/* User Info with Animation */}
+                                            {currentUser && (
                                                 <motion.div
-                                                    className='w-8 h-8 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg'
-                                                    whileHover={{scale: 1.1}}
-                                                    transition={{
-                                                        type: 'spring',
-                                                        stiffness: 300,
+                                                    className='flex items-center gap-3 ml-6 pl-6 border-l border-white/30'
+                                                    initial={{
+                                                        opacity: 0,
+                                                        x: -20,
                                                     }}
-                                                >
-                                                    {(
-                                                        (currentUser
-                                                            .firstName?.[0] ||
-                                                            '') +
-                                                        (currentUser
-                                                            .lastName?.[0] ||
-                                                            '')
-                                                    ).toUpperCase() || 'U'}
-                                                </motion.div>
-                                                <motion.div
-                                                    initial={{opacity: 0}}
-                                                    animate={{opacity: 1}}
+                                                    animate={{opacity: 1, x: 0}}
                                                     transition={{
                                                         duration: 0.5,
-                                                        delay: 0.4,
+                                                        delay: 0.2,
                                                     }}
                                                 >
-                                                    <div className='text-sm font-medium text-white'>
-                                                        {currentUser.firstName}{' '}
-                                                        {currentUser.lastName}
-                                                    </div>
-                                                    <div className='text-xs text-white/80'>
-                                                        {currentUser.emailAddress ||
-                                                            'No email provided'}
-                                                    </div>
+                                                    <motion.div
+                                                        className='w-8 h-8 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg'
+                                                        whileHover={{
+                                                            scale: 1.1,
+                                                        }}
+                                                        transition={{
+                                                            type: 'spring',
+                                                            stiffness: 300,
+                                                        }}
+                                                    >
+                                                        {(
+                                                            (currentUser
+                                                                .firstName?.[0] ||
+                                                                '') +
+                                                            (currentUser
+                                                                .lastName?.[0] ||
+                                                                '')
+                                                        ).toUpperCase() || 'U'}
+                                                    </motion.div>
+                                                    <motion.div
+                                                        initial={{opacity: 0}}
+                                                        animate={{opacity: 1}}
+                                                        transition={{
+                                                            duration: 0.5,
+                                                            delay: 0.4,
+                                                        }}
+                                                    >
+                                                        <div className='text-sm font-medium text-white'>
+                                                            {
+                                                                currentUser.firstName
+                                                            }{' '}
+                                                            {
+                                                                currentUser.lastName
+                                                            }
+                                                        </div>
+                                                        <div className='text-xs text-white/80'>
+                                                            {currentUser.emailAddress ||
+                                                                'No email provided'}
+                                                        </div>
+                                                    </motion.div>
                                                 </motion.div>
-                                            </motion.div>
-                                        )}
-                                    </div>
-
-                                    <div className='flex items-center gap-2'>
-                                        {/* Assign Groups Button */}
-                                        {selectedGroups.size > 0 && (
-                                            <motion.button
-                                                initial={{
-                                                    opacity: 0,
-                                                    scale: 0.8,
-                                                }}
-                                                animate={{opacity: 1, scale: 1}}
-                                                exit={{opacity: 0, scale: 0.8}}
-                                                onClick={handleAssignGroups}
-                                                disabled={assignmentLoading}
-                                                className='bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 backdrop-blur-sm border border-white/30 disabled:opacity-50'
-                                                whileHover={{scale: 1.05}}
-                                                whileTap={{scale: 0.95}}
-                                            >
-                                                {assignmentLoading ? (
-                                                    <div className='flex items-center gap-2'>
-                                                        <div className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin'></div>
-                                                        Assigning...
-                                                    </div>
-                                                ) : (
-                                                    `Assign ${
-                                                        selectedGroups.size
-                                                    } Group${
-                                                        selectedGroups.size !==
-                                                        1
-                                                            ? 's'
-                                                            : ''
-                                                    }`
-                                                )}
-                                            </motion.button>
-                                        )}
-
-                                        {/* Close Button */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onClose();
-                                            }}
-                                            className='p-2 hover:bg-white/20 rounded-lg transition-colors'
-                                        >
-                                            <XMarkIcon className='w-5 h-5' />
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className='transform -rotate-90 whitespace-nowrap cursor-pointer h-full flex items-center justify-center'
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handlePanelClick('userGroups');
-                                    }}
-                                    style={{pointerEvents: 'auto'}}
-                                >
-                                    <div className='flex items-center space-x-2'>
-                                        {panels[0].icon}
-                                        <span className='font-semibold'>
-                                            User Groups
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Content */}
-                        {activePanel === 'userGroups' && (
-                            <div className='h-full flex flex-col'>
-                                {/* Groups Table */}
-                                <div className='flex-1 overflow-auto'>
-                                    {loading ? (
-                                        <div className='flex items-center justify-center h-32'>
-                                            <div className='text-gray-500'>
-                                                Loading available groups...
-                                            </div>
+                                            )}
                                         </div>
-                                    ) : error ? (
-                                        <div className='flex items-center justify-center h-32'>
-                                            <div className='text-red-500 text-center'>
-                                                <div>Error: {error}</div>
-                                                <button
-                                                    onClick={fetchUserGroups}
-                                                    className='mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700'
+
+                                        <div className='flex items-center gap-2'>
+                                            {/* Assign Groups Button */}
+                                            {selectedGroups.size > 0 && (
+                                                <motion.button
+                                                    initial={{
+                                                        opacity: 0,
+                                                        scale: 0.8,
+                                                    }}
+                                                    animate={{
+                                                        opacity: 1,
+                                                        scale: 1,
+                                                    }}
+                                                    exit={{
+                                                        opacity: 0,
+                                                        scale: 0.8,
+                                                    }}
+                                                    onClick={handleAssignGroups}
+                                                    disabled={assignmentLoading}
+                                                    className='bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 backdrop-blur-sm border border-white/30 disabled:opacity-50'
+                                                    whileHover={{scale: 1.05}}
+                                                    whileTap={{scale: 0.95}}
                                                 >
-                                                    Retry
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className='h-full'>
-                                            <table className='w-full border-collapse'>
-                                                <thead className='bg-gray-50 sticky top-0'>
-                                                    <tr>
-                                                        <th className='w-12 p-3 text-left border-b border-gray-200'>
-                                                            <input
-                                                                type='checkbox'
-                                                                checked={
-                                                                    selectedGroups.size ===
-                                                                        userGroupsData.length &&
-                                                                    userGroupsData.length >
-                                                                        0
-                                                                }
-                                                                onChange={(
-                                                                    e,
-                                                                ) => {
-                                                                    if (
-                                                                        e.target
-                                                                            .checked
-                                                                    ) {
-                                                                        setSelectedGroups(
-                                                                            new Set(
-                                                                                userGroupsData.map(
-                                                                                    (
-                                                                                        g,
-                                                                                    ) =>
-                                                                                        g.id,
-                                                                                ),
-                                                                            ),
-                                                                        );
-                                                                    } else {
-                                                                        setSelectedGroups(
-                                                                            new Set(),
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                className='h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500'
-                                                            />
-                                                        </th>
-                                                        <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
-                                                            Group Name
-                                                        </th>
-                                                        <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
-                                                            Description
-                                                        </th>
-                                                        <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
-                                                            Entity
-                                                        </th>
-                                                        <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
-                                                            Service
-                                                        </th>
-                                                        <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
-                                                            Roles
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {userGroupsData.length ===
-                                                        0 && (
-                                                        <tr>
-                                                            <td
-                                                                colSpan={6}
-                                                                className='p-4 text-center text-gray-500'
-                                                            >
-                                                                {loading
-                                                                    ? 'Loading groups...'
-                                                                    : 'No user groups found'}
-                                                            </td>
-                                                        </tr>
+                                                    {assignmentLoading ? (
+                                                        <div className='flex items-center gap-2'>
+                                                            <div className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin'></div>
+                                                            Assigning...
+                                                        </div>
+                                                    ) : (
+                                                        `Assign ${
+                                                            selectedGroups.size
+                                                        } Group${
+                                                            selectedGroups.size !==
+                                                            1
+                                                                ? 's'
+                                                                : ''
+                                                        }`
                                                     )}
-                                                    {userGroupsData.map(
-                                                        (group, index) => (
-                                                            <tr
-                                                                key={group.id}
-                                                                className={`hover:bg-gray-50 cursor-pointer transition-colors ${
-                                                                    selectedGroups.has(
-                                                                        group.id,
-                                                                    )
-                                                                        ? 'bg-blue-50'
-                                                                        : ''
-                                                                }`}
-                                                                onClick={() =>
-                                                                    handleGroupSelection(
-                                                                        group.id,
-                                                                        !selectedGroups.has(
-                                                                            group.id,
-                                                                        ),
-                                                                    )
-                                                                }
-                                                            >
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <input
-                                                                        type='checkbox'
-                                                                        checked={selectedGroups.has(
-                                                                            group.id,
-                                                                        )}
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            handleGroupSelection(
-                                                                                group.id,
-                                                                                e
-                                                                                    .target
-                                                                                    .checked,
+                                                </motion.button>
+                                            )}
+
+                                            {/* Close Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onClose();
+                                                }}
+                                                className='p-2 hover:bg-white/20 rounded-lg transition-colors'
+                                            >
+                                                <XMarkIcon className='w-5 h-5' />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        className='transform -rotate-90 whitespace-nowrap cursor-pointer h-full flex items-center justify-center'
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePanelClick('userGroups');
+                                        }}
+                                        style={{pointerEvents: 'auto'}}
+                                    >
+                                        <div className='flex items-center space-x-2'>
+                                            {
+                                                panels.find(
+                                                    (p) =>
+                                                        p.id === 'userGroups',
+                                                )?.icon
+                                            }
+                                            <span className='font-semibold'>
+                                                User Groups
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            {activePanel === 'userGroups' && (
+                                <div className='h-full flex flex-col'>
+                                    {/* Groups Table */}
+                                    <div className='flex-1 overflow-auto'>
+                                        {loading ? (
+                                            <div className='flex items-center justify-center h-32'>
+                                                <div className='text-gray-500'>
+                                                    Loading available groups...
+                                                </div>
+                                            </div>
+                                        ) : error ? (
+                                            <div className='flex items-center justify-center h-32'>
+                                                <div className='text-red-500 text-center'>
+                                                    <div>Error: {error}</div>
+                                                    <button
+                                                        onClick={
+                                                            fetchUserGroups
+                                                        }
+                                                        className='mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700'
+                                                    >
+                                                        Retry
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className='h-full'>
+                                                <table className='w-full border-collapse'>
+                                                    <thead className='bg-gray-50 sticky top-0'>
+                                                        <tr>
+                                                            <th className='w-12 p-3 text-left border-b border-gray-200'>
+                                                                <input
+                                                                    type='checkbox'
+                                                                    checked={
+                                                                        selectedGroups.size ===
+                                                                            userGroupsData.length &&
+                                                                        userGroupsData.length >
+                                                                            0
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        if (
+                                                                            e
+                                                                                .target
+                                                                                .checked
+                                                                        ) {
+                                                                            setSelectedGroups(
+                                                                                new Set(
+                                                                                    userGroupsData.map(
+                                                                                        (
+                                                                                            g,
+                                                                                        ) =>
+                                                                                            g.id,
+                                                                                    ),
+                                                                                ),
                                                                             );
-                                                                        }}
-                                                                        className='h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500'
-                                                                    />
-                                                                </td>
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <div className='font-medium text-gray-900'>
-                                                                        {
-                                                                            group.name
+                                                                        } else {
+                                                                            setSelectedGroups(
+                                                                                new Set(),
+                                                                            );
                                                                         }
-                                                                    </div>
+                                                                    }}
+                                                                    className='h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500'
+                                                                />
+                                                            </th>
+                                                            <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
+                                                                Group Name
+                                                            </th>
+                                                            <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
+                                                                Description
+                                                            </th>
+                                                            <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
+                                                                Entity
+                                                            </th>
+                                                            <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
+                                                                Service
+                                                            </th>
+                                                            <th className='p-3 text-left border-b border-gray-200 font-medium text-gray-900'>
+                                                                Roles
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {userGroupsData.length ===
+                                                            0 && (
+                                                            <tr>
+                                                                <td
+                                                                    colSpan={6}
+                                                                    className='p-4 text-center text-gray-500'
+                                                                >
+                                                                    {loading
+                                                                        ? 'Loading groups...'
+                                                                        : 'No user groups found'}
                                                                 </td>
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <div className='text-sm text-gray-600 max-w-xs truncate'>
-                                                                        {group.description ||
-                                                                            '-'}
-                                                                    </div>
-                                                                </td>
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <div className='text-sm'>
-                                                                        <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                                                                            {group.entity ||
-                                                                                'General'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <div className='text-sm'>
-                                                                        <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
-                                                                            {group.service ||
-                                                                                'General'}
-                                                                        </span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className='p-3 border-b border-gray-100'>
-                                                                    <div className='text-sm'>
-                                                                        <button
-                                                                            className='inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-300 hover:shadow-md hover:scale-105 group'
-                                                                            onClick={async (
+                                                            </tr>
+                                                        )}
+                                                        {userGroupsData.map(
+                                                            (group, index) => (
+                                                                <tr
+                                                                    key={
+                                                                        group.id
+                                                                    }
+                                                                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${
+                                                                        selectedGroups.has(
+                                                                            group.id,
+                                                                        )
+                                                                            ? 'bg-blue-50'
+                                                                            : ''
+                                                                    }`}
+                                                                    onClick={() =>
+                                                                        handleGroupSelection(
+                                                                            group.id,
+                                                                            !selectedGroups.has(
+                                                                                group.id,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <input
+                                                                            type='checkbox'
+                                                                            checked={selectedGroups.has(
+                                                                                group.id,
+                                                                            )}
+                                                                            onChange={(
                                                                                 e,
                                                                             ) => {
                                                                                 e.stopPropagation();
-                                                                                console.log(
-                                                                                    '🎯 Role button clicked for group:',
-                                                                                    group.name,
-                                                                                );
-                                                                                await showRolesPanel(
-                                                                                    group,
+                                                                                handleGroupSelection(
+                                                                                    group.id,
+                                                                                    e
+                                                                                        .target
+                                                                                        .checked,
                                                                                 );
                                                                             }}
-                                                                        >
-                                                                            <svg
-                                                                                className='w-5 h-5 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-md'
-                                                                                viewBox='0 0 24 24'
-                                                                                fill='none'
-                                                                                stroke='currentColor'
-                                                                                strokeWidth='2'
-                                                                                style={{
-                                                                                    color:
-                                                                                        group.rolesCount &&
-                                                                                        group.rolesCount >
-                                                                                            0
-                                                                                            ? '#10b981'
-                                                                                            : '#9ca3af',
+                                                                            className='h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500'
+                                                                        />
+                                                                    </td>
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <div className='font-medium text-gray-900'>
+                                                                            {
+                                                                                group.name
+                                                                            }
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <div className='text-sm text-gray-600 max-w-xs truncate'>
+                                                                            {group.description ||
+                                                                                '-'}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <div className='text-sm'>
+                                                                            <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                                                                                {group.entity ||
+                                                                                    'General'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <div className='text-sm'>
+                                                                            <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                                                                                {group.service ||
+                                                                                    'General'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className='p-3 border-b border-gray-100'>
+                                                                        <div className='text-sm'>
+                                                                            <button
+                                                                                className='inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-300 hover:shadow-md hover:scale-105 group'
+                                                                                onClick={async (
+                                                                                    e,
+                                                                                ) => {
+                                                                                    e.stopPropagation();
+                                                                                    console.log(
+                                                                                        '🎯 Role button clicked for group:',
+                                                                                        group.name,
+                                                                                    );
+                                                                                    await showRolesPanel(
+                                                                                        group,
+                                                                                    );
                                                                                 }}
                                                                             >
-                                                                                <path
-                                                                                    d='M12 2L3 7L12 22L21 7L12 2Z'
+                                                                                <svg
+                                                                                    className='w-5 h-5 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-md'
+                                                                                    viewBox='0 0 24 24'
+                                                                                    fill='none'
                                                                                     stroke='currentColor'
                                                                                     strokeWidth='2'
-                                                                                    strokeLinecap='round'
-                                                                                    strokeLinejoin='round'
-                                                                                    fill='none'
-                                                                                />
-                                                                                <path
-                                                                                    d='M12 7V17'
-                                                                                    stroke='currentColor'
-                                                                                    strokeWidth='1.5'
-                                                                                    strokeLinecap='round'
-                                                                                />
-                                                                                <circle
-                                                                                    cx='12'
-                                                                                    cy='10'
-                                                                                    r='2'
-                                                                                    stroke='currentColor'
-                                                                                    strokeWidth='1.5'
-                                                                                    fill='none'
-                                                                                />
-                                                                            </svg>
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ),
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                                                                    style={{
+                                                                                        color:
+                                                                                            group.rolesCount &&
+                                                                                            group.rolesCount >
+                                                                                                0
+                                                                                                ? '#10b981'
+                                                                                                : '#9ca3af',
+                                                                                    }}
+                                                                                >
+                                                                                    <path
+                                                                                        d='M12 2L3 7L12 22L21 7L12 2Z'
+                                                                                        stroke='currentColor'
+                                                                                        strokeWidth='2'
+                                                                                        strokeLinecap='round'
+                                                                                        strokeLinejoin='round'
+                                                                                        fill='none'
+                                                                                    />
+                                                                                    <path
+                                                                                        d='M12 7V17'
+                                                                                        stroke='currentColor'
+                                                                                        strokeWidth='1.5'
+                                                                                        strokeLinecap='round'
+                                                                                    />
+                                                                                    <circle
+                                                                                        cx='12'
+                                                                                        cy='10'
+                                                                                        r='2'
+                                                                                        stroke='currentColor'
+                                                                                        strokeWidth='1.5'
+                                                                                        fill='none'
+                                                                                    />
+                                                                                </svg>
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ),
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </motion.div>
+                            )}
+                        </motion.div>
+                    )}
 
                     {/* Panel 2 - Roles */}
                     {visiblePanels.has('roles') && (
@@ -973,13 +1065,29 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                 {activePanel === 'roles' ? (
                                     <div className='flex items-center justify-between'>
                                         <div className='flex items-center space-x-3'>
-                                            {panels[1].icon}
+                                            {
+                                                panels.find(
+                                                    (p) => p.id === 'roles',
+                                                )?.icon
+                                            }
                                             <div>
                                                 <h3 className='text-lg font-semibold'>
-                                                    {panels[1].title}
+                                                    {
+                                                        panels.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                'roles',
+                                                        )?.title
+                                                    }
                                                 </h3>
                                                 <p className='text-sm opacity-90'>
-                                                    {panels[1].subtitle}
+                                                    {
+                                                        panels.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                'roles',
+                                                        )?.subtitle
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
@@ -1048,7 +1156,11 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                         style={{pointerEvents: 'auto'}}
                                     >
                                         <div className='flex items-center space-x-2'>
-                                            {panels[1].icon}
+                                            {
+                                                panels.find(
+                                                    (p) => p.id === 'roles',
+                                                )?.icon
+                                            }
                                             <span className='font-semibold'>
                                                 Assign Roles
                                             </span>
@@ -1156,10 +1268,20 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                 {activePanel === 'scope' ? (
                                     <div className='flex items-center justify-between'>
                                         <div className='flex items-center space-x-4'>
-                                            {panels[2].icon}
+                                            {
+                                                panels.find(
+                                                    (p) => p.id === 'scope',
+                                                )?.icon
+                                            }
                                             <div>
                                                 <h3 className='text-lg font-semibold'>
-                                                    {panels[2].title}
+                                                    {
+                                                        panels.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                'scope',
+                                                        )?.title
+                                                    }
                                                 </h3>
                                                 <p className='text-sm opacity-90'>
                                                     Define permissions for:{' '}
@@ -1247,7 +1369,11 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                                         style={{pointerEvents: 'auto'}}
                                     >
                                         <div className='flex items-center space-x-2'>
-                                            {panels[2].icon}
+                                            {
+                                                panels.find(
+                                                    (p) => p.id === 'scope',
+                                                )?.icon
+                                            }
                                             <span className='font-semibold'>
                                                 Configure Scope
                                             </span>
