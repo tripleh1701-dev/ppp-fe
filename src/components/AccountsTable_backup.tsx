@@ -91,132 +91,6 @@ const getAccountColor = (accountName: string) => {
     return accountColors[hash % accountColors.length];
 };
 
-// Simple dropdown component for predefined values (like cloudType)
-interface SimpleDropdownProps {
-    value: string;
-    options: Array<{ value: string; label: string }>;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    className?: string;
-}
-
-const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
-    value,
-    options,
-    onChange,
-    placeholder = 'Select option',
-    className = ''
-}) => {
-    const [isOpen, setIsOpen] = React.useState(false);
-    const dropdownRef = React.useRef<HTMLDivElement>(null);
-    const [dropdownPosition, setDropdownPosition] = React.useState<{top: number; left: number; width: number} | null>(null);
-
-    // Calculate dropdown position
-    const calculatePosition = React.useCallback(() => {
-        if (dropdownRef.current) {
-            const rect = dropdownRef.current.getBoundingClientRect();
-            setDropdownPosition({
-                top: rect.bottom + 2,
-                left: rect.left,
-                width: Math.max(rect.width, 120)
-            });
-        }
-    }, []);
-
-    // Update position when opening
-    React.useEffect(() => {
-        if (isOpen) {
-            calculatePosition();
-            window.addEventListener('resize', calculatePosition);
-            window.addEventListener('scroll', calculatePosition, true);
-            return () => {
-                window.removeEventListener('resize', calculatePosition);
-                window.removeEventListener('scroll', calculatePosition, true);
-            };
-        }
-    }, [isOpen, calculatePosition]);
-
-    // Close dropdown when clicking outside
-    React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const selectedOption = options.find(opt => opt.value === value);
-
-    return (
-        <div ref={dropdownRef} className={`relative w-full ${className}`}>
-            <button
-                type="button"
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('🔽 SimpleDropdown clicked, opening dropdown, current value:', value);
-                    setIsOpen(!isOpen);
-                }}
-                className="w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 flex items-center justify-between min-h-[24px]"
-            >
-                <span className="truncate flex-1 pr-1">
-                    {selectedOption ? selectedOption.label : (
-                        <span className="text-slate-400">{placeholder}</span>
-                    )}
-                </span>
-                <ChevronDown 
-                    size={12} 
-                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-                />
-            </button>
-
-            {isOpen && dropdownPosition && createPortal(
-                <div 
-                    className="fixed z-[99999] bg-white border border-gray-200 rounded-md shadow-xl"
-                    style={{ 
-                        top: `${dropdownPosition.top}px`,
-                        left: `${dropdownPosition.left}px`,
-                        width: `${dropdownPosition.width}px`,
-                        maxHeight: '120px',
-                        overflow: 'auto'
-                    }}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
-                >
-                    {options.map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('🚀 MOUSE DOWN on option:', option.value);
-                            }}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('✅ Option selected:', option.value, 'calling onChange');
-                                console.log('🎯 About to call onChange with:', option.value);
-                                onChange(option.value);
-                                console.log('🎯 onChange called, closing dropdown');
-                                setIsOpen(false);
-                            }}
-                            className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
-                                value === option.value ? 'bg-blue-100 text-blue-700' : 'text-slate-700'
-                            }`}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>,
-                document.body
-            )}
-        </div>
-    );
-};
-
 // Chip component for dropdown selections
 const SelectionChip = ({
     label,
@@ -373,10 +247,6 @@ export interface AccountRow {
     id: string;
     // New simplified fields - primary data model
     accountName: string;
-    masterAccount: string;
-    cloudType: string;
-    email: string;
-    phone: string;
     // Add licenses array for expandable sub-rows
     licenses?: License[];
 }
@@ -519,7 +389,7 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template';
+type CatalogType = 'accountName' | 'template';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -1537,7 +1407,7 @@ function PhoneMultiSelect({
                                                 key={opt.id}
                                                 option={opt}
                                                 tone={tone}
-                                                type='template'
+                                                type='phone'
                                                 isInUse={isPhoneInUse(
                                                     opt.name,
                                                 )}
@@ -1937,13 +1807,13 @@ function AsyncChipSelect({
     isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'phones',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'phones',
         item: {id: string; name: string},
     ) => void;
     accounts?: AccountRow[];
@@ -1952,8 +1822,8 @@ function AsyncChipSelect({
     currentRowProduct?: string;
     dropdownOptions?: {
         accountNames: Array<{id: string; name: string}>;
-        cloudTypes: Array<{id: string; name: string}>;
-        addresses: Array<{id: string; name: string}>;
+        emails: Array<{id: string; name: string}>;
+        phones: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -1986,9 +1856,25 @@ function AsyncChipSelect({
                 if (type === 'accountName') {
                     // Never filter account names - show all options
                     return false;
-                } else if (type === 'address') {
-                    // For addresses, show all options (no filtering needed)
+                } else if (type === 'email') {
+                    // For emails, check if this email is already paired with the current account name
+                    const currentAccountName = currentRowEnterprise || '';
+
+                    if (currentAccountName) {
+                        // Check if this email is already used with the selected account name
+                        const isUsedWithCurrentAccountName =
+                            (account.accountName === currentAccountName &&
+                                account.email === optionName);
+
+                        return isUsedWithCurrentAccountName;
+                    }
+                    // If no account name is selected yet, don't filter anything
                     return false;
+                } else if (type === 'phone') {
+                    const phones =
+                        account.phone?.split(', ').filter(Boolean) ||
+                        [];
+                    return phones.includes(optionName);
                 }
                 return false;
             });
@@ -2038,15 +1924,8 @@ function AsyncChipSelect({
         const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
         
         // Prefer below if there's enough space, otherwise use above if there's more space above
-        // For cloudType, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'cloudType';
-        
-        if (forceBelow && spaceBelow >= 100) {
-            // For cloudType, show below if there's at least 100px space
-            setDropdownPosition('below');
-            top = containerRect.bottom + 4;
-        } else if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
+        if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
             setDropdownPosition('below');
             top = containerRect.bottom + 4;
             // Ensure it doesn't go below table bounds
@@ -2065,7 +1944,7 @@ function AsyncChipSelect({
         
         setDropdownPortalPos({ top, left, width });
         console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above', tableRect });
-    }, [type]);
+    }, []);
 
     // Calculate position when dropdown opens
     React.useEffect(() => {
@@ -2094,33 +1973,18 @@ function AsyncChipSelect({
             if (type === 'accountName' && dropdownOptions?.accountNames) {
                 allData = dropdownOptions.accountNames;
                 console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-            } else if (type === 'address' && dropdownOptions?.addresses) {
-                allData = dropdownOptions.addresses;
-                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-            } else if (type === 'cloudType') {
-                // Always use predefined cloudType options (prioritize dropdownOptions)
-                if (dropdownOptions?.cloudTypes?.length > 0) {
-                    allData = dropdownOptions.cloudTypes;
-                    console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-                } else {
-                    console.log('Using fallback predefined cloudType options');
-                    allData = [
-                        { id: 'private-cloud', name: 'Private Cloud' },
-                        { id: 'public-cloud', name: 'Public Cloud' }
-                    ];
-                }
-            } else if (type === 'masterAccount') {
-                console.log('Calling API: /api/masterAccounts');
+            } else if (type === 'email') {
+                console.log('Calling API: /api/emails');
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/masterAccounts',
+                    '/api/emails',
                 ) || [];
-            } else if (type === 'address') {
-                console.log('Calling API: /api/addresses');
+            } else if (type === 'phone') {
+                console.log('Calling API: /api/phones');
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/addresses',
+                    '/api/phones',
                 ) || [];
             } else if (type === 'template') {
-                console.log('Calling API: /api/templates');
+                console.log('Calling API: /api/templates (for template)');
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/templates',
                 ) || [];
@@ -2168,7 +2032,11 @@ function AsyncChipSelect({
             });
         }
 
-        // Apply usage filter - no filtering needed for accountName or address
+        // Apply usage filter for emails
+        if (type === 'email') {
+            filtered = filtered.filter(email => !isOptionInUse(email.name));
+        }
+
         setOptions(filtered);
     }, [allOptions, query, type, isOptionInUse]);
 
@@ -2184,15 +2052,13 @@ function AsyncChipSelect({
         }
     }, [open, allOptions.length, loadAllOptions]);
 
-    // Load cloudType options immediately on mount since they're predefined
+    // Reload options when currentRowEnterprise changes (for product filtering)
     React.useEffect(() => {
-        if (type === 'cloudType' && allOptions.length === 0) {
-            loadAllOptions();
+        if (type === 'email' && currentRowEnterprise) {
+            // Reset allOptions to force reload with new account name context
+            setAllOptions([]);
         }
-    }, [type, allOptions.length, loadAllOptions]);
-
-    // Remove unused effect for email filtering
-    // React.useEffect was here for email/account filtering - no longer needed
+    }, [currentRowEnterprise, type]);
 
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
@@ -2230,18 +2096,14 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'masterAccount') {
+            if (type === 'email') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/masterAccounts',
+                    '/api/emails',
                     {name},
                 );
-            } else if (type === 'cloudType') {
-                // Cloud Type has predefined options, don't create new ones
-                console.log('Cannot create new cloudType options - using predefined values only');
-                return;
-            } else if (type === 'address') {
+            } else if (type === 'phone') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/addresses',
+                    '/api/phones',
                     {name},
                 );
             } else if (type === 'template') {
@@ -2277,13 +2139,9 @@ function AsyncChipSelect({
                     const dropdownType =
                         type === 'accountName'
                             ? 'accountNames'
-                            : type === 'masterAccount'
-                            ? 'masterAccounts'
-                            : type === 'cloudType'
-                            ? 'cloudTypes'
-                            : type === 'address'
-                            ? 'addresses' 
-                            : 'emails';
+                            : type === 'email'
+                            ? 'emails'
+                            : 'phones';
                     onNewItemCreated(dropdownType, created);
                 }
             }
@@ -2314,13 +2172,6 @@ function AsyncChipSelect({
         setCurrent(value);
     }, [value]);
 
-    // Debug logging for cloudType
-    React.useEffect(() => {
-        if (type === 'cloudType') {
-            console.log(`CloudType AsyncChipSelect render - allOptions.length: ${allOptions.length}`, allOptions);
-        }
-    }, [type, allOptions]);
-
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
     return (
         <div
@@ -2343,7 +2194,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
@@ -2361,30 +2212,8 @@ function AsyncChipSelect({
                                 }, 10);
                             }
                         }}
-                        onClick={(e: any) => {
-                            // For cloudType, also allow single click to open dropdown
-                            if (type === 'cloudType' && allOptions.length > 0) {
-                                const target = e.target as HTMLElement;
-                                if (!target.closest('button')) {
-                                    setQuery('');
-                                    setOpen(true);
-                                    setTimeout(() => {
-                                        if (inputRef.current) {
-                                            inputRef.current.focus();
-                                        }
-                                    }, 10);
-                                }
-                            }
-                        }}
                     >
                         <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
-                            <ChevronDown 
-                                size={12} 
-                                className="text-slate-400 flex-shrink-0 ml-1" 
-                            />
-                        )}
                         <button
                             onClick={(e: any) => {
                                 e.stopPropagation();
@@ -2404,100 +2233,76 @@ function AsyncChipSelect({
                 
                 {/* Show input when no value selected or actively typing */}
                 {(!current && !value) || open ? (
-                    <div className="relative w-full">
-                        <input
-                            ref={inputRef}
-                            value={query}
-                            onChange={(e: any) => {
-                                const newValue = e.target.value;
-                                setQuery(newValue);
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+                            
+                            // Only open dropdown when typing if there are options to show
+                            if (allOptions.length > 0) {
+                                setOpen(true);
+                            }
+                            
+                            // Don't load options if dropdown is disabled (empty options array)
+                            
+                            // Clear current selection if user clears the input completely
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onBlur={(e: any) => {
+                            // Create chip from entered text when focus is lost
+                            const newValue = query.trim();
+                            if (newValue) {
+                                onChange(newValue);
+                                setCurrent(newValue);
+                                setQuery('');
+                            }
+                            setOpen(false);
+                        }}
+                        onFocus={() => {
+                            // Only open dropdown on focus if there are options to show
+                            if (allOptions.length > 0) {
+                                setOpen(true);
+                            }
+                            
+                            // Don't load options if dropdown is disabled (empty options array)
+                            if (false) {
+                                loadAllOptions();
+                            }
+                        }}
+                        onKeyDown={async (e: any) => {
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 
-                                // Only open dropdown when typing if there are options to show
-                                if (allOptions.length > 0) {
-                                    setOpen(true);
-                                }
-                                
-                                // Don't load options if dropdown is disabled (empty options array)
-                                
-                                // Clear current selection if user clears the input completely
-                                if (newValue === '') {
-                                    onChange('');
-                                    setCurrent('');
-                                }
-                            }}
-                            onBlur={(e: any) => {
-                                // Create chip from entered text when focus is lost
+                                // Save current value immediately
                                 const newValue = query.trim();
                                 if (newValue) {
                                     onChange(newValue);
-                                    setCurrent(newValue);
                                     setQuery('');
-                                }
-                                setOpen(false);
-                            }}
-                            onFocus={() => {
-                                // Only open dropdown on focus if there are options to show
-                                if (allOptions.length > 0) {
-                                    setOpen(true);
+                                    setOpen(false);
                                 }
                                 
-                                // Don't load options if dropdown is disabled (empty options array)
-                                if (false) {
-                                    loadAllOptions();
-                                }
-                            }}
-                            onKeyDown={async (e: any) => {
-                                if (e.key === 'Enter' || e.key === 'Tab') {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    
-                                    // Save current value immediately
-                                    const newValue = query.trim();
-                                    if (newValue) {
-                                        onChange(newValue);
-                                        setQuery('');
-                                        setOpen(false);
+                                // Use provided tab navigation functions
+                                setTimeout(() => {
+                                    if (e.key === 'Tab' && e.shiftKey && onTabPrev) {
+                                        onTabPrev(); // Previous field (Shift+Tab)
+                                    } else if (onTabNext) {
+                                        onTabNext(); // Next field (Tab or Enter)
                                     }
-                                    
-                                    // Use provided tab navigation functions
-                                    setTimeout(() => {
-                                        if (e.key === 'Tab' && e.shiftKey && onTabPrev) {
-                                            onTabPrev(); // Previous field (Shift+Tab)
-                                        } else if (onTabNext) {
-                                            onTabNext(); // Next field (Tab or Enter)
-                                        }
-                                    }, 10);
-                                } else if (e.key === 'Escape') {
-                                    setOpen(false);
-                                    setQuery('');
-                                }
-                            }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
-                            placeholder=''
-                        />
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (allOptions.length > 0) {
-                                        setOpen(!open);
-                                        if (!open && inputRef.current) {
-                                            inputRef.current.focus();
-                                        }
-                                    } else {
-                                        // Force load options
-                                        loadAllOptions();
-                                    }
-                                }}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 z-10"
-                            >
-                                <ChevronDown size={14} />
-                            </button>
-                        )}
-                    </div>
+                                }, 10);
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            }
+                        }}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=''
+                    />
                 ) : null}
             </div>
             
@@ -2589,20 +2394,12 @@ function AsyncChipSelect({
                                                                     created = await api.post<{ id: string; name: string; }>('/api/accountNames', {
                                                                         name: query.trim(),
                                                                     });
-                                                                } else if (type === 'masterAccount') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/masterAccounts', {
+                                                                } else if (type === 'email') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/emails', {
                                                                         name: query.trim(),
                                                                     });
-                                                                } else if (type === 'cloudType') {
-                                                                    // Cloud Type has predefined options, don't create new ones
-                                                                    console.log('Cannot create new cloudType options - using predefined values only');
-                                                                    return;
-                                                                } else if (type === 'address') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/addresses', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'template') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/templates', {
+                                                                } else if (type === 'phone') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/phones', {
                                                                         name: query.trim(),
                                                                     });
                                                                 }
@@ -2620,7 +2417,7 @@ function AsyncChipSelect({
                                                                     
                                                                     // Notify parent component
                                                                     if (onNewItemCreated) {
-                                                                        const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
+                                                                        const dropdownType = type === 'accountName' ? 'accountNames' : type === 'email' ? 'emails' : 'phones';
                                                                         onNewItemCreated(dropdownType, created);
                                                                     }
                                                                 }
@@ -2643,7 +2440,7 @@ function AsyncChipSelect({
                                                                 
                                                                 // Notify parent component
                                                                 if (onNewItemCreated) {
-                                                                    const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
+                                                                    const dropdownType = type === 'accountName' ? 'accountNames' : type === 'email' ? 'emails' : 'phones';
                                                                     onNewItemCreated(dropdownType, created);
                                                                 }
                                                             }
@@ -2684,16 +2481,13 @@ interface AccountsTableProps {
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'accountName' | 'email' | 'phone';
+    groupByExternal?: 'none' | 'accountName';
     onGroupByChange?: (
-        g: 'none' | 'accountName' | 'email' | 'phone',
+        g: 'none' | 'accountName',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
         | 'accountName'
-        | 'masterAccount'
-        | 'cloudType'
-        | 'address'
         | 'actions'
     >;
     highlightQuery?: string;
@@ -2701,9 +2495,6 @@ interface AccountsTableProps {
     enableDropdownChips?: boolean;
     dropdownOptions?: {
         accountNames?: Array<{id: string; name: string}>;
-        cloudTypes?: Array<{id: string; name: string}>;
-        emails?: Array<{id: string; name: string}>;
-        phones?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -2712,13 +2503,13 @@ interface AccountsTableProps {
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -2884,8 +2675,8 @@ function LicenseSubRow({
                         placeholder="Enter license name"
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'name')}
                         compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate}
+                        onNewItemCreated={onNewItemCreated}
                         accounts={accounts}
                         currentRowId={license.id}
                         currentRowEnterprise={license.name}
@@ -2903,8 +2694,8 @@ function LicenseSubRow({
                         placeholder="Enter license type"
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'type')}
                         compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate}
+                        onNewItemCreated={onNewItemCreated}
                         accounts={accounts}
                         currentRowId={license.id}
                         currentRowEnterprise={license.name}
@@ -2922,8 +2713,8 @@ function LicenseSubRow({
                         placeholder="Enter status"
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'status')}
                         compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate}
+                        onNewItemCreated={onNewItemCreated}
                         accounts={accounts}
                         currentRowId={license.id}
                         currentRowEnterprise={license.name}
@@ -2941,8 +2732,8 @@ function LicenseSubRow({
                         placeholder="Optional expiry date"
                         isError={false}
                         compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate}
+                        onNewItemCreated={onNewItemCreated}
                         accounts={accounts}
                         currentRowId={license.id}
                         currentRowEnterprise={license.name}
@@ -3350,8 +3141,8 @@ function SortableAccountRow({
                                 }}
                                 placeholder=''
                                 isError={isCellMissing(row.id, 'accountName')}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate}
+                                onNewItemCreated={onNewItemCreated}
                                 accounts={allRows}
                                 currentRowId={row.id}
                                 currentRowEnterprise={
@@ -3382,7 +3173,7 @@ function SortableAccountRow({
                     </div>
                 </div>
             )}
-            {cols.includes('masterAccount') && (
+            {cols.includes('email') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected 
@@ -3390,130 +3181,93 @@ function SortableAccountRow({
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
-                    data-col='masterAccount'
+                    data-col='email'
                     style={{width: '100%'}}
                 >
                     {enableDropdownChips ? (
                         <AsyncChipSelect
-                            type='masterAccount'
-                            value={(row as any).masterAccount || ''}
+                            type='email'
+                            value={row.email || ''}
                             onChange={(v) =>
-                                onUpdateField(row.id, 'masterAccount' as any, v || '')
+                                onUpdateField(row.id, 'email', v || '')
                             }
-                            placeholder='Enter master account'
-                            isError={isCellMissing(row.id, 'masterAccount')}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
+                            placeholder="Enter email"
+                            isError={isCellMissing(row.id, 'email')}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate}
+                            onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
                             currentRowId={row.id}
                             currentRowEnterprise={
                                 row.accountName || ''
                             }
                             currentRowProduct={
-                                (row as any).masterAccount || ''
+                                row.email || ''
                             }
-                            {...createTabNavigation('masterAccount')}
+                            {...createTabNavigation('email')}
                         />
                     ) : (
                         <InlineEditableText
-                            value={(row as any).masterAccount || ''}
+                            value={row.email || ''}
                             onCommit={(v) =>
-                                onUpdateField(row.id, 'masterAccount' as any, v)
+                                onUpdateField(row.id, 'email', v)
                             }
                             className='text-[12px]'
-                            dataAttr={`masterAccount-${row.id}`}
-                            isError={isCellMissing(row.id, 'masterAccount')}
-                            placeholder='Enter master account'
-                            {...createTabNavigation('masterAccount')}
+                            dataAttr={`email-${row.id}`}
+                            isError={isCellMissing(row.id, 'email')}
+                            placeholder=''
+                            {...createTabNavigation('email')}
                         />
                     )}
                 </div>
             )}
-            {cols.includes('cloudType') && (
+            {cols.includes('phone') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] px-2 py-1 w-full ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
-                    data-col='cloudType'
-                    style={{width: '100%'}}
-                >
-                    {enableDropdownChips ? (
-                        <SimpleDropdown
-                            value={(row as any).cloudType || ''}
-                            options={[
-                                { value: 'Private Cloud', label: 'Private Cloud' },
-                                { value: 'Public Cloud', label: 'Public Cloud' }
-                            ]}
-                            onChange={(v) => {
-                                console.log('🔥 CRITICAL: CloudType dropdown onChange called:', v, 'for row:', row.id);
-                                console.log('🔥 CRITICAL: Current row.cloudType before update:', (row as any).cloudType);
-                                console.log('🔥 CRITICAL: Calling onUpdateField with:', row.id, 'cloudType', v || '');
-                                onUpdateField(row.id, 'cloudType' as any, v || '');
-                            }}
-                            placeholder='Select...'
-                            className=""
-                        />
-                    ) : (
-                        <InlineEditableText
-                            value={(row as any).cloudType || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'cloudType' as any, v)
-                            }
-                            className='text-[12px]'
-                            dataAttr={`cloudType-${row.id}`}
-                            isError={isCellMissing(row.id, 'cloudType')}
-                            placeholder='Select cloud type'
-                            {...createTabNavigation('cloudType')}
-                        />
-                    )}
-                </div>
-            )}
-            {cols.includes('address') && (
-                <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='address'
-                    style={{width: '100%'}}
+                    data-col='phone'
+                    style={{ 
+                        borderRight: 'none', 
+                        width: '100%', 
+                        minWidth: '500px',
+                        maxWidth: 'none'
+                    }}
                 >
                     {enableDropdownChips ? (
                         <AsyncChipSelect
-                            type='address'
-                            value={(row as any).address || ''}
+                            type='phone'
+                            value={row.phone || ''}
                             onChange={(v) =>
-                                onUpdateField(row.id, 'address' as any, v || '')
+                                onUpdateField(row.id, 'phone', v || '')
                             }
-                            placeholder='Enter address'
-                            isError={isCellMissing(row.id, 'address')}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
+                            placeholder="Enter phone"
+                            isError={isCellMissing(row.id, 'phone')}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate}
+                            onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
                             currentRowId={row.id}
                             currentRowEnterprise={
                                 row.accountName || ''
                             }
                             currentRowProduct={
-                                (row as any).address || ''
+                                row.phone || ''
                             }
-                            {...createTabNavigation('address')}
+                            {...createTabNavigation('phone')}
                         />
                     ) : (
                         <InlineEditableText
-                            value={(row as any).address || ''}
+                            value={row.phone || ''}
                             onCommit={(v) =>
-                                onUpdateField(row.id, 'address' as any, v)
+                                onUpdateField(row.id, 'phone', v)
                             }
                             className='text-[12px]'
-                            dataAttr={`address-${row.id}`}
-                            isError={isCellMissing(row.id, 'address')}
-                            placeholder='Enter address'
-                            {...createTabNavigation('address')}
+                            dataAttr={`phone-${row.id}`}
+                            isError={isCellMissing(row.id, 'phone')}
+                            placeholder=''
+                            {...createTabNavigation('phone')}
                         />
                     )}
                 </div>
@@ -3742,17 +3496,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     }, [triggerValidation, baseLocalRows, localEdits, onValidationComplete]);
 
     // Effect to highlight errors when incompleteRowIds changes from parent
-    // TEMPORARILY DISABLED to fix infinite re-render loop
-    // useEffect(() => {
-    //     if (showValidationErrors && incompleteRowIds.length > 0) {
-    //         // Simply set validation errors to the incomplete row IDs from parent
-    //         // Don't do local validation here to avoid circular dependencies
-    //         setValidationErrors(new Set(incompleteRowIds));
-    //     } else {
-    //         // Clear validation errors when not showing validation or no incomplete rows from parent
-    //         setValidationErrors(new Set());
-    //     }
-    // }, [incompleteRowIds, showValidationErrors]);
+    useEffect(() => {
+        if (showValidationErrors && incompleteRowIds.length > 0) {
+            // Simply set validation errors to the incomplete row IDs from parent
+            // Don't do local validation here to avoid circular dependencies
+            setValidationErrors(new Set(incompleteRowIds));
+        } else {
+            // Clear validation errors when not showing validation or no incomplete rows from parent
+            setValidationErrors(new Set());
+        }
+    }, [incompleteRowIds, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -4177,11 +3930,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
         () => [
-            // Only the required columns
+            // Only the three required columns
             'accountName',
-            'masterAccount',
-            'cloudType',
-            'address',
+            'email',
+            'phone',
         ],
         [],
     );
@@ -4196,7 +3948,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     const colSizes: Record<string, string> = {
         deleteButton: '8px', // Space for delete button with proper padding
-        accountName: '200px', // Account name column - increased for label + arrows + resize handle
+        accountName: '200px', // Account column - increased for label + arrows + resize handle
         email: '220px', // Email column - increased for label + arrows + resize handle
         phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
     };
@@ -4217,9 +3969,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             // Define minimum and maximum widths per column
             const constraints = {
                 accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
-                masterAccount: { min: 190, max: 310 }, // Master Account column constraints
-                cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
-                address: { min: 200, max: 320 }, // Address column constraints
+                email: { min: 200, max: 320 }, // Increased min width to prevent arrow overlap
+                phone: { min: 600, max: Infinity } // Increased minimum to ensure content visibility
             };
             
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
@@ -4575,7 +4326,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             
             switch (groupBy) {
                 case 'accountName':
-                    groupKey = item.accountName || '(No Account Name)';
+                    groupKey = item.accountName || '(No Account)';
                     break;
                 case 'email':
                     groupKey = item.email || '(No Email)';
@@ -5027,10 +4778,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
-                            accountName: 'Account Name',
-                            masterAccount: 'Master Account',
-                            cloudType: 'Cloud Type',
-                            address: 'Address',
+                            accountName: 'Account',
+                            email: 'Master Account', 
+                            phone: 'Country',
                         };
 
                         // Merge custom labels with defaults
@@ -5043,14 +4793,11 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             accountName: (
                                 <User size={14} />
                             ),
-                            masterAccount: (
+                            email: (
                                 <Building2 size={14} />
                             ),
-                            cloudType: (
-                                <FileText size={14} />
-                            ),
-                            address: (
-                                <MapPin size={14} />
+                            phone: (
+                                <Globe size={14} />
                             ),
                         };
                         return (
@@ -5096,9 +4843,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                             </div>
                                             {[
                                                 'accountName',
-                                                'masterAccount',
-                                                'cloudType',
-                                                'address',
                                                 'email',
                                                 'phone',
                                             ].includes(c) && (
@@ -5122,7 +4866,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 </div>
                                             )}
                                             {/* Show resize handle for resizable columns but not for Phone (last column) */}
-                                            {['accountName', 'masterAccount', 'cloudType', 'address', 'email'].includes(c) && (
+                                            {['accountName', 'email'].includes(c) && (
                                                 <div
                                                     onMouseDown={(e: any) =>
                                                         startResize(c, e)
@@ -5218,8 +4962,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             compressingLicenseId={compressingLicenseId}
                                                             foldingLicenseId={foldingLicenseId}
                                                             onDeleteClick={onLicenseDelete}
-                                                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                                            onNewItemCreated={onNewItemCreated as any}
+                                                            onDropdownOptionUpdate={onDropdownOptionUpdate}
+                                                            onNewItemCreated={onNewItemCreated}
                                                             accounts={rows}
                                                         />
                                                     ))}
@@ -5248,7 +4992,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         }`}
                                                         title={
                                                             !isMainRowComplete(r)
-                                                            ? 'Complete main row fields (Account Name, Email, Phone) before adding licenses'
+                                                            ? 'Complete main row fields (Account, Email, Phone) before adding licenses'
                                                             : (rowLicenses[r.id] || []).some(license => 
                                                                 !license.name || !license.type || !license.status
                                                             )
