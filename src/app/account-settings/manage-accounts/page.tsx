@@ -14,11 +14,13 @@ import {
     MagnifyingGlassIcon,
     ArrowsUpDownIcon,
     EyeSlashIcon,
+    EyeIcon,
     RectangleStackIcon,
     BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import ConfirmModal from '@/components/ConfirmModal';
 import AccountsTable, {AccountRow} from '@/components/AccountsTable';
+import AddressModal from '@/components/AddressModal';
 import {api} from '@/utils/api';
 
 
@@ -113,6 +115,15 @@ export default function ManageAccounts() {
     const [compressingLicenseId, setCompressingLicenseId] = useState<string | null>(null);
     const [foldingLicenseId, setFoldingLicenseId] = useState<string | null>(null);
 
+    // Address modal state
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    const [selectedAccountForAddress, setSelectedAccountForAddress] = useState<{
+        id: string;
+        accountName: string;
+        masterAccount: string;
+        address: string;
+    } | null>(null);
+
     // Dropdown options for chips
     const [dropdownOptions, setDropdownOptions] = useState({
         enterprises: [] as Array<{id: string; name: string}>,
@@ -139,7 +150,7 @@ export default function ManageAccounts() {
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'AccountName' | 'Address'
+        'None' | 'Account' | 'Master Account' | 'Cloud Type' | 'Address'
     >('None');
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
         'accountName',
@@ -317,6 +328,16 @@ export default function ManageAccounts() {
                 (config) => config.accountName === activeFilters.accountName,
             );
         }
+        if (activeFilters.masterAccount) {
+            filtered = filtered.filter(
+                (config) => config.masterAccount === activeFilters.masterAccount,
+            );
+        }
+        if (activeFilters.cloudType) {
+            filtered = filtered.filter(
+                (config) => config.cloudType === activeFilters.cloudType,
+            );
+        }
         if (activeFilters.address) {
             filtered = filtered.filter(
                 (config) => config.address === activeFilters.address,
@@ -333,6 +354,14 @@ export default function ManageAccounts() {
                     case 'accountName':
                         valueA = (a.accountName || '').toString().toLowerCase();
                         valueB = (b.accountName || '').toString().toLowerCase();
+                        break;
+                    case 'masterAccount':
+                        valueA = (a.masterAccount || '').toString().toLowerCase();
+                        valueB = (b.masterAccount || '').toString().toLowerCase();
+                        break;
+                    case 'cloudType':
+                        valueA = (a.cloudType || '').toString().toLowerCase();
+                        valueB = (b.cloudType || '').toString().toLowerCase();
                         break;
                     case 'address':
                         valueA = (a.address || '').toString().toLowerCase();
@@ -369,6 +398,7 @@ export default function ManageAccounts() {
     const columnLabels: Record<string, string> = {
         accountName: 'Account',
         masterAccount: 'Master Account',
+        cloudType: 'Cloud Type',
         address: 'Address'
     };
 
@@ -402,6 +432,8 @@ export default function ManageAccounts() {
     // Filter form state
     const [filterForm, setFilterForm] = useState({
         accountName: '',
+        masterAccount: '',
+        cloudType: '',
         address: '',
     });
 
@@ -410,6 +442,12 @@ export default function ManageAccounts() {
 
         if (filterForm.accountName.trim()) {
             newFilters.accountName = filterForm.accountName.trim();
+        }
+        if (filterForm.masterAccount.trim()) {
+            newFilters.masterAccount = filterForm.masterAccount.trim();
+        }
+        if (filterForm.cloudType.trim()) {
+            newFilters.cloudType = filterForm.cloudType.trim();
         }
         if (filterForm.address.trim()) {
             newFilters.address = filterForm.address.trim();
@@ -420,19 +458,23 @@ export default function ManageAccounts() {
     };
 
     const handleClearFilters = () => {
-        setFilterForm({accountName: '', address: ''});
+        setFilterForm({accountName: '', masterAccount: '', cloudType: '', address: ''});
         setActiveFilters({});
         closeAllDialogs();
     };
 
     const setGroupByFromLabel = (label: string) => {
-        const l = label as 'None' | 'AccountName' | 'Address';
+        const l = label as 'None' | 'Account' | 'Master Account' | 'Cloud Type' | 'Address';
         setActiveGroupLabel(l);
     };
 
     const groupByProp =
-        ActiveGroupLabel === 'AccountName'
+        ActiveGroupLabel === 'Account'
             ? 'accountName'
+            : ActiveGroupLabel === 'Master Account'
+            ? 'masterAccount'
+            : ActiveGroupLabel === 'Cloud Type'
+            ? 'cloudType'
             : ActiveGroupLabel === 'Address'
             ? 'address'
             : 'none';
@@ -669,6 +711,8 @@ export default function ManageAccounts() {
             const isTemporary = String(config.id).startsWith('tmp-');
             const isEmpty =
                 !config.accountName &&
+                !config.masterAccount &&
+                !config.cloudType &&
                 !config.address;
             return isTemporary && isEmpty;
         });
@@ -691,27 +735,31 @@ export default function ManageAccounts() {
         // Check for incomplete temporary rows (exclude completely blank rows)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasAccountName = config.accountName?.trim();
+            const hasMasterAccount = config.masterAccount?.trim();
+            const hasCloudType = config.cloudType?.trim();
             const hasAddress = config.address?.trim();
 
             // Don't include completely blank rows (new rows that haven't been touched)
-            const isCompletelyBlank = !hasAccountName && !hasAddress;
+            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
             if (isCompletelyBlank) return false;
 
-            // Row is incomplete if it has some data but not all required fields
-            return !hasAccountName || !hasAddress;
+            // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
+            return !hasAccountName || !hasMasterAccount || !hasCloudType;
         });
 
         // Check for incomplete existing rows (exclude completely blank rows)
         const incompleteExistingRows = existingRows.filter((config: any) => {
             const hasAccountName = config.accountName?.trim();
+            const hasMasterAccount = config.masterAccount?.trim();
+            const hasCloudType = config.cloudType?.trim();
             const hasAddress = config.address?.trim();
 
             // Don't include completely blank rows (existing rows shouldn't be blank, but just in case)
-            const isCompletelyBlank = !hasAccountName && !hasAddress;
+            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
             if (isCompletelyBlank) return false;
 
-            // Row is incomplete if it has some data but not all required fields
-            return !hasAccountName || !hasAddress;
+            // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
+            return !hasAccountName || !hasMasterAccount || !hasCloudType;
         });
 
         // Combine all incomplete rows
@@ -720,8 +768,9 @@ export default function ManageAccounts() {
         if (incompleteRows.length > 0) {
             const missingFields = new Set<string>();
             incompleteRows.forEach((config) => {
-                if (!config.accountName?.trim()) missingFields.add('Account');
-                if (!config.address?.trim()) missingFields.add('Address');
+                if (!config.accountName?.trim()) missingFields.add('Account Name');
+                if (!config.masterAccount?.trim()) missingFields.add('Master Account');
+                if (!config.cloudType?.trim()) missingFields.add('Cloud Type');
             });
             
             const incompleteCount = incompleteRows.length;
@@ -788,6 +837,8 @@ export default function ManageAccounts() {
         const incompleteRows = effectiveConfigs
             .filter((config: any) => {
                 const hasAccountName = config.accountName?.trim();
+                const hasMasterAccount = config.masterAccount?.trim();
+                const hasCloudType = config.cloudType?.trim();
                 const hasAddress = config.address?.trim();
 
                 // Check if this account has incomplete licenses
@@ -801,14 +852,14 @@ export default function ManageAccounts() {
 
                 // When validation errors are being shown, include completely blank rows for highlighting
                 // Otherwise, don't include completely blank rows (new rows that haven't been touched)
-                const isCompletelyBlank = !hasAccountName && !hasAddress;
+                const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
                 if (isCompletelyBlank && !showValidationErrors && !hasIncompleteLicenses) return false;
 
                 // Row is incomplete if:
-                // 1. It has some data but not all required main fields, OR
+                // 1. It has some data but not all required main fields (Account Name, Master Account, Cloud Type), OR
                 // 2. It's completely blank and validation is active, OR  
                 // 3. It has incomplete license data
-                const isIncomplete = !hasAccountName || !hasAddress || hasIncompleteLicenses;
+                const isIncomplete = !hasAccountName || !hasMasterAccount || !hasCloudType || hasIncompleteLicenses;
                 
                 return isIncomplete;
             })
@@ -890,18 +941,21 @@ export default function ManageAccounts() {
                     if (isExisting && isModified) {
                         // Double-check that the record still has all required fields
                         const hasAccountName = config.accountName?.trim();
-                        const hasEmail = config.email?.trim();
-                        const hasPhone = config.phone?.trim();
+                        const hasMasterAccount = config.masterAccount?.trim();
+                        const hasCloudType = config.cloudType?.trim();
+                        const hasAddress = config.address?.trim();
                         
-                        const isComplete = hasAccountName && hasEmail && hasPhone;
+                        const isComplete = hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
                         
                         console.log(`🔍 Checking modified account ${config.id}: isComplete=${isComplete}`, {
                             hasAccountName: !!hasAccountName,
-                            hasEmail: !!hasEmail,
-                            hasPhone: !!hasPhone,
+                            hasMasterAccount: !!hasMasterAccount,
+                            hasCloudType: !!hasCloudType,
+                            hasAddress: !!hasAddress,
                             accountNameValue: config.accountName,
-                            emailValue: config.email,
-                            phoneValue: config.phone
+                            masterAccountValue: config.masterAccount,
+                            cloudTypeValue: config.cloudType,
+                            addressValue: config.address
                         });
                         
                         return isComplete;
@@ -1022,10 +1076,11 @@ export default function ManageAccounts() {
                 if (!isTemp) return false;
                 
                 const hasAccountName = config.accountName?.trim();
-                const hasEmail = config.email?.trim();
-                const hasPhone = config.phone?.trim();
+                const hasMasterAccount = config.masterAccount?.trim();
+                const hasCloudType = config.cloudType?.trim();
+                const hasAddress = config.address?.trim();
                 
-                return hasAccountName && hasEmail && hasPhone;
+                return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
             });
             
             // Get all modified existing records that are still complete
@@ -1036,18 +1091,21 @@ export default function ManageAccounts() {
                 if (isExisting && isModified) {
                     // Double-check that the record still has all required fields
                     const hasAccountName = config.accountName?.trim();
-                    const hasEmail = config.email?.trim();
-                    const hasPhone = config.phone?.trim();
+                    const hasMasterAccount = config.masterAccount?.trim();
+                    const hasCloudType = config.cloudType?.trim();
+                    const hasAddress = config.address?.trim();
                     
-                    const isComplete = hasAccountName && hasEmail && hasPhone;
+                    const isComplete = hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
                     
                     console.log(`🔍 Checking modified account ${config.id}: isComplete=${isComplete}`, {
                         hasAccountName: !!hasAccountName,
-                        hasEmail: !!hasEmail,
-                        hasPhone: !!hasPhone,
+                        hasMasterAccount: !!hasMasterAccount,
+                        hasCloudType: !!hasCloudType,
+                        hasAddress: !!hasAddress,
                         accountNameValue: config.accountName,
-                        emailValue: config.email,
-                        phoneValue: config.phone
+                        masterAccountValue: config.masterAccount,
+                        cloudTypeValue: config.cloudType,
+                        addressValue: config.address
                     });
                     
                     return isComplete;
@@ -1184,19 +1242,21 @@ export default function ManageAccounts() {
         // Check for incomplete temporary rows (including completely blank ones)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasAccountName = config.accountName?.trim();
-            const hasEmail = config.email?.trim();
-            const hasPhone = config.phone?.trim();
+            const hasMasterAccount = config.masterAccount?.trim();
+            const hasCloudType = config.cloudType?.trim();
+            const hasAddress = config.address?.trim();
 
-            return !hasAccountName || !hasEmail || !hasPhone;
+            return !hasAccountName || !hasMasterAccount || !hasCloudType || !hasAddress;
         });
 
         // Check for incomplete existing rows (including completely blank ones)
         const incompleteExistingRows = existingRows.filter((config: any) => {
             const hasAccountName = config.accountName?.trim();
-            const hasEmail = config.email?.trim();
-            const hasPhone = config.phone?.trim();
+            const hasMasterAccount = config.masterAccount?.trim();
+            const hasCloudType = config.cloudType?.trim();
+            const hasAddress = config.address?.trim();
 
-            return !hasAccountName || !hasEmail || !hasPhone;
+            return !hasAccountName || !hasMasterAccount || !hasCloudType || !hasAddress;
         });
 
         // Combine all incomplete rows
@@ -1340,8 +1400,8 @@ export default function ManageAccounts() {
             if (incompleteRows.length > 0) {
                 incompleteRows.forEach((config) => {
                     if (!config.accountName?.trim()) allMissingFields.add('Account');
-                    if (!config.email?.trim()) allMissingFields.add('Email');
-                    if (!config.phone?.trim()) allMissingFields.add('Phone');
+                    if (!config.masterAccount?.trim()) allMissingFields.add('Master Account');
+                    if (!config.cloudType?.trim()) allMissingFields.add('Cloud Type');
                 });
                 totalIncompleteCount += incompleteRows.length;
             }
@@ -1396,9 +1456,10 @@ export default function ManageAccounts() {
             let savedCount = 0;
             const completeTemporaryRows = temporaryRows.filter((config: any) => {
                 const hasAccountName = config.accountName?.trim();
-                const hasEmail = config.email?.trim();
-                const hasPhone = config.phone?.trim();
-                return hasAccountName && hasEmail && hasPhone;
+                const hasMasterAccount = config.masterAccount?.trim();
+                const hasCloudType = config.cloudType?.trim();
+                const hasAddress = config.address?.trim();
+                return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
             });
             
             // Save temporary rows
@@ -1485,10 +1546,11 @@ export default function ManageAccounts() {
                             if (!isTemp) return false;
                             
                             const hasAccountName = config.accountName?.trim();
-                            const hasEmail = config.email?.trim();
-                            const hasPhone = config.phone?.trim();
+                            const hasMasterAccount = config.masterAccount?.trim();
+                            const hasCloudType = config.cloudType?.trim();
+                            const hasAddress = config.address?.trim();
                             
-                            return hasAccountName && hasEmail && hasPhone;
+                            return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
                         });
                         
                         let savedCount = 0;
@@ -2056,6 +2118,50 @@ export default function ManageAccounts() {
         }, 100);
     };
 
+    // Address modal functions
+    const handleOpenAddressModal = (row: AccountRow) => {
+        setSelectedAccountForAddress({
+            id: row.id,
+            accountName: row.accountName || '',
+            masterAccount: row.masterAccount || '',
+            address: row.address || ''
+        });
+        setIsAddressModalOpen(true);
+    };
+
+    const handleCloseAddressModal = () => {
+        setIsAddressModalOpen(false);
+        setSelectedAccountForAddress(null);
+    };
+
+    const handleSaveAddresses = (addresses: any[]) => {
+        if (!selectedAccountForAddress) return;
+
+        // Convert address objects back to simple string for now
+        // In a real app, you might want to store full address objects
+        const addressString = addresses.length > 0 
+            ? `${addresses[0].addressLine1}, ${addresses[0].city}, ${addresses[0].state} ${addresses[0].zipCode}`.trim()
+            : '';
+
+        // Update the account with the new address
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === selectedAccountForAddress.id
+                    ? {
+                          ...account,
+                          address: addressString,
+                          updatedAt: new Date().toISOString()
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            return sorted;
+        });
+
+        console.log('💾 Address saved for account:', selectedAccountForAddress.id, 'Address:', addressString);
+    };
+
     return (
         <div className='h-full bg-secondary flex flex-col'>
             {/* Header Section */}
@@ -2225,6 +2331,48 @@ export default function ManageAccounts() {
                                                             setFilterForm({
                                                                 ...filterForm,
                                                                 accountName:
+                                                                    e.target.value,
+                                                            })
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Master Account Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Master Account
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.masterAccount}
+                                                        onChange={(e) =>
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                masterAccount:
+                                                                    e.target.value,
+                                                            })
+                                                        }
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Cloud Type Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Cloud Type
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.cloudType}
+                                                        onChange={(e) =>
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                cloudType:
                                                                     e.target.value,
                                                             })
                                                         }
@@ -2517,8 +2665,10 @@ export default function ManageAccounts() {
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option>None</option>
-                                                        <option>Business Types</option>
-                                                        <option>Individual Customer</option>
+                                                        <option>Account</option>
+                                                        <option>Master Account</option>
+                                                        <option>Cloud Type</option>
+                                                        <option>Address</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -2700,6 +2850,41 @@ export default function ManageAccounts() {
                                     </div>
                                 </div>
                             </div>
+                        ) : visibleCols.length === 0 ? (
+                            // Empty State for Hidden Columns
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        All Columns Hidden
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        All table columns are currently hidden. Click the button below to show all columns.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={showAllColumns}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <EyeIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Show All Columns
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         ) : (
                             <div className='flex-1 overflow-auto'>
                                 <AccountsTable
@@ -2731,7 +2916,7 @@ export default function ManageAccounts() {
                                     }}
                                     visibleColumns={visibleCols}
                                     highlightQuery={searchTerm}
-                                    groupByExternal={'none'}
+                                    groupByExternal={groupByProp as 'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'}
                                     onAddNewRow={handleAddNewRow}
                                     hideRowExpansion={false}
                                     customColumnLabels={{
@@ -2795,10 +2980,11 @@ export default function ManageAccounts() {
                                                 const account = accounts.find((a) => a.id === rowId);
                                                 if (account) {
                                                     const hasAccountName = account.accountName?.trim();
-                                                    const hasEmail = account.email?.trim();
-                                                    const hasPhone = account.phone?.trim();
+                                                    const hasMasterAccount = account.masterAccount?.trim();
+                                                    const hasCloudType = account.cloudType?.trim();
+                                                    const hasAddress = account.address?.trim();
                                                     
-                                                    if (hasAccountName && hasEmail && hasPhone) {
+                                                    if (hasAccountName && hasMasterAccount && hasCloudType && hasAddress) {
                                                         console.log('✅ License change on complete temporary account, starting auto-save timer...');
                                                         debouncedAutoSave();
                                                     }
@@ -2853,10 +3039,11 @@ export default function ManageAccounts() {
                                                     [field]: value,
                                                 };
 
-                                                // Check if we have accountName, email, and phone
+                                                // Check if we have all required fields
                                                 const hasAccountName = accountWithUpdate.accountName?.trim();
-                                                const hasEmail = accountWithUpdate.email?.trim();
-                                                const hasPhone = accountWithUpdate.phone?.trim();
+                                                const hasMasterAccount = accountWithUpdate.masterAccount?.trim();
+                                                const hasCloudType = accountWithUpdate.cloudType?.trim();
+                                                const hasAddress = accountWithUpdate.address?.trim();
 
                                                 console.log('🔍 Auto-save check:', {
                                                     rowId,
@@ -2864,13 +3051,14 @@ export default function ManageAccounts() {
                                                     value,
                                                     accountWithUpdate,
                                                     hasAccountName,
-                                                    hasEmail,
-                                                    hasPhone,
-                                                    willTriggerDebouncedSave: hasAccountName && hasEmail && hasPhone,
+                                                    hasMasterAccount,
+                                                    hasCloudType,
+                                                    hasAddress,
+                                                    willTriggerDebouncedSave: hasAccountName && hasMasterAccount && hasCloudType && hasAddress,
                                                 });
 
                                                 // Trigger debounced auto-save if all required fields are filled
-                                                if (hasAccountName && hasEmail && hasPhone) {
+                                                if (hasAccountName && hasMasterAccount && hasCloudType && hasAddress) {
                                                     console.log('✅ All required account fields filled, starting 10-second auto-save timer...');
                                                     
                                                     // Clear validation errors for this row since it's now complete
@@ -2890,11 +3078,13 @@ export default function ManageAccounts() {
                                                 } else {
                                                     console.log('❌ Auto-save conditions not met:', {
                                                         hasAccountName,
-                                                        hasEmail,
-                                                        hasPhone,
+                                                        hasMasterAccount,
+                                                        hasCloudType,
+                                                        hasAddress,
                                                         accountNameValue: accountWithUpdate.accountName,
-                                                        emailValue: accountWithUpdate.email,
-                                                        phoneValue: accountWithUpdate.phone,
+                                                        masterAccountValue: accountWithUpdate.masterAccount,
+                                                        cloudTypeValue: accountWithUpdate.cloudType,
+                                                        addressValue: accountWithUpdate.address,
                                                     });
                                                 }
                                             }
@@ -2909,21 +3099,23 @@ export default function ManageAccounts() {
                                                 
                                                 // Check if all required fields are present and not empty
                                                 const hasAccountName = updatedAccount.accountName?.trim();
-                                                const hasEmail = updatedAccount.email?.trim();
-                                                const hasPhone = updatedAccount.phone?.trim();
+                                                const hasMasterAccount = updatedAccount.masterAccount?.trim();
+                                                const hasCloudType = updatedAccount.cloudType?.trim();
+                                                const hasAddress = updatedAccount.address?.trim();
                                                 
                                                 console.log('🔍 Existing account auto-save check:', {
                                                     rowId,
                                                     field,
                                                     value,
                                                     hasAccountName: !!hasAccountName,
-                                                    hasEmail: !!hasEmail,
-                                                    hasPhone: !!hasPhone,
-                                                    willTriggerAutoSave: !!(hasAccountName && hasEmail && hasPhone),
+                                                    hasMasterAccount: !!hasMasterAccount,
+                                                    hasCloudType: !!hasCloudType,
+                                                    hasAddress: !!hasAddress,
+                                                    willTriggerAutoSave: !!(hasAccountName && hasMasterAccount && hasCloudType && hasAddress),
                                                 });
                                                 
                                                 // Only trigger auto-save if all fields are complete
-                                                if (hasAccountName && hasEmail && hasPhone) {
+                                                if (hasAccountName && hasMasterAccount && hasCloudType && hasAddress) {
                                                     console.log('🔄 Triggering auto-save timer for complete existing account:', rowId);
                                                     
                                                     // Clear validation errors for this row since it's now complete
@@ -2950,8 +3142,9 @@ export default function ManageAccounts() {
                                                 } else {
                                                     console.log('❌ Not triggering auto-save for incomplete existing account:', rowId, {
                                                         hasAccountName: !!hasAccountName,
-                                                        hasEmail: !!hasEmail,
-                                                        hasPhone: !!hasPhone
+                                                        hasMasterAccount: !!hasMasterAccount,
+                                                        hasCloudType: !!hasCloudType,
+                                                        hasAddress: !!hasAddress
                                                     });
                                                     // Remove from modified records set if it was there
                                                     setModifiedExistingRecords(prev => {
@@ -2992,6 +3185,7 @@ export default function ManageAccounts() {
                                     incompleteRowIds={getIncompleteRows()}
                                     showValidationErrors={showValidationErrors}
                                     hasBlankRow={hasBlankRow()}
+                                    onOpenAddressModal={handleOpenAddressModal}
                                 />
                             </div>
                         )}
@@ -3171,6 +3365,26 @@ export default function ManageAccounts() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Address Modal */}
+            {selectedAccountForAddress && (
+                <AddressModal
+                    isOpen={isAddressModalOpen}
+                    onClose={handleCloseAddressModal}
+                    onSave={handleSaveAddresses}
+                    accountName={selectedAccountForAddress.accountName}
+                    masterAccount={selectedAccountForAddress.masterAccount}
+                    initialAddresses={selectedAccountForAddress.address ? [{
+                        id: 'existing',
+                        addressLine1: selectedAccountForAddress.address,
+                        addressLine2: '',
+                        city: '',
+                        state: '',
+                        zipCode: '',
+                        country: ''
+                    }] : []}
+                />
             )}
         </div>
     );

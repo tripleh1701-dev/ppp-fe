@@ -98,6 +98,7 @@ interface SimpleDropdownProps {
     onChange: (value: string) => void;
     placeholder?: string;
     className?: string;
+    isError?: boolean;
 }
 
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
@@ -105,7 +106,8 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
     options,
     onChange,
     placeholder = 'Select option',
-    className = ''
+    className = '',
+    isError = false
 }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -160,7 +162,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                     console.log('🔽 SimpleDropdown clicked, opening dropdown, current value:', value);
                     setIsOpen(!isOpen);
                 }}
-                className="w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border border-blue-300 bg-white hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 flex items-center justify-between min-h-[24px]"
+                className={`w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} flex items-center justify-between min-h-[24px]`}
             >
                 <span className="truncate flex-1 pr-1">
                     {selectedOption ? selectedOption.label : (
@@ -375,8 +377,7 @@ export interface AccountRow {
     accountName: string;
     masterAccount: string;
     cloudType: string;
-    email: string;
-    phone: string;
+    address: string;
     // Add licenses array for expandable sub-rows
     licenses?: License[];
 }
@@ -830,9 +831,8 @@ function PhoneMultiSelect({
             if (!accounts || accounts.length === 0) return false;
 
             return accounts.some((account) => {
-                const phones =
-                    account.phone?.split(', ').filter(Boolean) || [];
-                return phones.includes(phoneNumber);
+                // Since phone is no longer used, always return false
+                return false;
             });
         },
         [accounts],
@@ -2099,7 +2099,7 @@ function AsyncChipSelect({
                 console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
             } else if (type === 'cloudType') {
                 // Always use predefined cloudType options (prioritize dropdownOptions)
-                if (dropdownOptions?.cloudTypes?.length > 0) {
+                if (dropdownOptions?.cloudTypes && dropdownOptions.cloudTypes.length > 0) {
                     allData = dropdownOptions.cloudTypes;
                     console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
                 } else {
@@ -2274,17 +2274,27 @@ function AsyncChipSelect({
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
-                    const dropdownType =
-                        type === 'accountName'
-                            ? 'accountNames'
-                            : type === 'masterAccount'
-                            ? 'masterAccounts'
-                            : type === 'cloudType'
-                            ? 'cloudTypes'
-                            : type === 'address'
-                            ? 'addresses' 
-                            : 'emails';
-                    onNewItemCreated(dropdownType, created);
+                    let dropdownType: string;
+                    
+                    switch (type) {
+                        case 'accountName':
+                            dropdownType = 'accountNames';
+                            break;
+                        case 'masterAccount':
+                            dropdownType = 'masterAccounts';
+                            break;
+                        case 'address':
+                            dropdownType = 'addresses';
+                            break;
+                        default:
+                            dropdownType = 'emails'; // fallback
+                            break;
+                    }
+                    
+                    // Only call if this is a supported type for the callback
+                    if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
+                        onNewItemCreated(dropdownType as any, created);
+                    }
                 }
             }
         } catch (error: any) {
@@ -2620,8 +2630,27 @@ function AsyncChipSelect({
                                                                     
                                                                     // Notify parent component
                                                                     if (onNewItemCreated) {
-                                                                        const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
-                                                                        onNewItemCreated(dropdownType, created);
+                                                                        let dropdownType: string;
+                                                                        
+                                                                        switch (type) {
+                                                                            case 'accountName':
+                                                                                dropdownType = 'accountNames';
+                                                                                break;
+                                                                            case 'masterAccount':
+                                                                                dropdownType = 'masterAccounts';
+                                                                                break;
+                                                                            case 'address':
+                                                                                dropdownType = 'addresses';
+                                                                                break;
+                                                                            default:
+                                                                                dropdownType = 'emails'; // fallback
+                                                                                break;
+                                                                        }
+                                                                        
+                                                                        // Only call if this is a supported type for the callback
+                                                                        if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
+                                                                            onNewItemCreated(dropdownType as any, created);
+                                                                        }
                                                                     }
                                                                 }
                                                             } catch (error) {
@@ -2684,7 +2713,7 @@ interface AccountsTableProps {
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'accountName' | 'email' | 'phone';
+    groupByExternal?: 'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address';
     onGroupByChange?: (
         g: 'none' | 'accountName' | 'email' | 'phone',
     ) => void;
@@ -2736,6 +2765,7 @@ interface AccountsTableProps {
     onLicenseValidationChange?: (hasIncompleteLicenses: boolean, incompleteLicenseRows: string[]) => void; // Callback for license validation state
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
+    onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
 }
 
 // License Sub Row Component
@@ -2984,6 +3014,7 @@ function SortableAccountRow({
     foldingRowId = null,
     allRows = [],
     onDeleteClick,
+    onOpenAddressModal,
 }: {
     row: AccountRow;
     index: number;
@@ -3021,6 +3052,7 @@ function SortableAccountRow({
     foldingRowId?: string | null;
     allRows?: AccountRow[];
     onDeleteClick?: (rowId: string) => void;
+    onOpenAddressModal?: (row: AccountRow) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3034,8 +3066,9 @@ function SortableAccountRow({
     const editableCols = cols.filter((col) =>
         [
             'accountName',
-            'email',
-            'phone',
+            'masterAccount',
+            'cloudType',
+            'address',
         ].includes(col),
     );
 
@@ -3358,7 +3391,7 @@ function SortableAccountRow({
                                     row.accountName || ''
                                 }
                                 currentRowProduct={
-                                    row.email || ''
+                                    row.masterAccount || ''
                                 }
                                 {...createTabNavigation('accountName')}
                             />
@@ -3455,6 +3488,7 @@ function SortableAccountRow({
                             }}
                             placeholder='Select...'
                             className=""
+                            isError={isCellMissing(row.id, 'cloudType')}
                         />
                     ) : (
                         <InlineEditableText
@@ -3473,7 +3507,7 @@ function SortableAccountRow({
             )}
             {cols.includes('address') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected 
                             ? 'bg-blue-50' 
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
@@ -3482,40 +3516,16 @@ function SortableAccountRow({
                     data-col='address'
                     style={{width: '100%'}}
                 >
-                    {enableDropdownChips ? (
-                        <AsyncChipSelect
-                            type='address'
-                            value={(row as any).address || ''}
-                            onChange={(v) =>
-                                onUpdateField(row.id, 'address' as any, v || '')
-                            }
-                            placeholder='Enter address'
-                            isError={isCellMissing(row.id, 'address')}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
-                            accounts={allRows}
-                            currentRowId={row.id}
-                            currentRowEnterprise={
-                                row.accountName || ''
-                            }
-                            currentRowProduct={
-                                (row as any).address || ''
-                            }
-                            {...createTabNavigation('address')}
-                        />
-                    ) : (
-                        <InlineEditableText
-                            value={(row as any).address || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'address' as any, v)
-                            }
-                            className='text-[12px]'
-                            dataAttr={`address-${row.id}`}
-                            isError={isCellMissing(row.id, 'address')}
-                            placeholder='Enter address'
-                            {...createTabNavigation('address')}
-                        />
-                    )}
+                    <button
+                        onClick={() => onOpenAddressModal?.(row)}
+                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        title={`Manage address for ${row.accountName || 'this account'}`}
+                    >
+                        <MapPin className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        {(row as any).address && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                        )}
+                    </button>
                 </div>
             )}
             {/* actions column removed */}
@@ -3570,6 +3580,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     onLicenseValidationChange,
     onLicenseDelete,
     onCompleteLicenseDeletion,
+    onOpenAddressModal,
 }, ref) => {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -3582,6 +3593,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
     const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
+    const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
 
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
@@ -3652,10 +3664,12 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         switch (field) {
             case 'accountName':
                 return !row.accountName || row.accountName.trim() === '';
-            case 'email':
-                return !row.email || row.email.trim() === '';
-            case 'phone':
-                return !row.phone || row.phone.trim() === '';
+            case 'masterAccount':
+                return !row.masterAccount || row.masterAccount.trim() === '';
+            case 'cloudType':
+                return !row.cloudType || row.cloudType.trim() === '';
+            case 'address':
+                return !row.address || row.address.trim() === '';
             default:
                 return false;
         }
@@ -3784,6 +3798,28 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             );
         };
     }, []);
+
+    // Only show license validation during explicit save attempts with incomplete licenses
+    const prevShowValidationErrors = useRef(false);
+    useEffect(() => {
+        // Only trigger license validation when showValidationErrors changes from false to true (save attempt)
+        if (showValidationErrors && !prevShowValidationErrors.current) {
+            const rowsWithIncompleteLicenses = new Set<string>();
+            Object.keys(rowLicenses).forEach(rowId => {
+                const licenses = rowLicenses[rowId] || [];
+                const hasIncompleteLicense = licenses.some(license => 
+                    !license.name?.trim() || !license.type?.trim() || !license.status?.trim()
+                );
+                if (licenses.length > 0 && hasIncompleteLicense) {
+                    rowsWithIncompleteLicenses.add(rowId);
+                }
+            });
+            setLicenseValidationTriggered(rowsWithIncompleteLicenses);
+        } else if (!showValidationErrors) {
+            setLicenseValidationTriggered(new Set());
+        }
+        prevShowValidationErrors.current = showValidationErrors;
+    }, [showValidationErrors]);
     async function persistAccountRow(row: AccountRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
@@ -3797,15 +3833,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             const core = {
                 // Core fields for account configuration
                 accountName: row.accountName,
-                email: row.email,
-                phone: row.phone,
+                masterAccount: row.masterAccount,
+                cloudType: row.cloudType,
+                address: row.address,
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
                 // Account configuration specific fields
                 accountName: row.accountName || '',
-                email: row.email || '',
-                phone: row.phone || '',
+                masterAccount: row.masterAccount || '',
+                cloudType: row.cloudType || '',
+                address: row.address || '',
             } as any;
             // Handle existing (non-temporary) rows
             // Check if we're on account management page
@@ -3918,8 +3956,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     // Helper function to check if main row fields are complete
     const isMainRowComplete = (row: AccountRow): boolean => {
         return !!(row.accountName && row.accountName.trim() && 
-                 row.email && row.email.trim() && 
-                 row.phone && row.phone.trim());
+                 row.masterAccount && row.masterAccount.trim() && 
+                 row.cloudType && row.cloudType.trim());
     };
 
     const addNewLicense = (rowId: string) => {
@@ -3943,6 +3981,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             ...prev,
             [rowId]: [...(prev[rowId] || []), newLicense]
         }));
+
+        // Clear license validation for this row when adding new license
+        setLicenseValidationTriggered(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(rowId);
+            return newSet;
+        });
 
         // Mark this row as having pending licenses for validation
         setPendingLicenseRows(prev => {
@@ -4168,7 +4213,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     }, [rowLicenses, onLicenseValidationChange]);
 
     const [groupBy, setGroupBy] = useState<
-        'none' | 'accountName' | 'email' | 'phone'
+        'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
     >('none');
     // sync external groupBy
     React.useEffect(() => {
@@ -4577,25 +4622,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 case 'accountName':
                     groupKey = item.accountName || '(No Account Name)';
                     break;
-                case 'email':
-                    groupKey = item.email || '(No Email)';
+                case 'masterAccount':
+                    groupKey = item.masterAccount || '(No Master Account)';
                     break;
-                case 'phone':
-                    // For phone, we need to handle multiple phone numbers per row
-                    if (item.phone) {
-                        const phones = item.phone.split(',').map(s => s.trim()).filter(Boolean);
-                        if (phones.length > 0) {
-                            phones.forEach(phone => {
-                                const phoneKey = phone || '(No Phone)';
-                                if (!groups[phoneKey]) {
-                                    groups[phoneKey] = [];
-                                }
-                                groups[phoneKey].push(item);
-                            });
-                            return; // Don't add to default group
-                        }
-                    }
-                    groupKey = '(No Phone)';
+                case 'cloudType':
+                    groupKey = item.cloudType || '(No Cloud Type)';
+                    break;
+                case 'address':
+                    groupKey = item.address || '(No Address)';
                     break;
                 default:
                     groupKey = 'All Records';
@@ -5191,6 +5225,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         inFillRange={false}
                                         onDeleteClick={handleDeleteClick}
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                        onOpenAddressModal={onOpenAddressModal}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
@@ -5213,7 +5248,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             rowId={r.id}
                                                             onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
                                                             onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
-                                                            showValidationErrors={showValidationErrors && pendingLicenseRows.has(r.id)}
+                                                            showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
                                                             isLicenseFieldMissing={isLicenseFieldMissing}
                                                             compressingLicenseId={compressingLicenseId}
                                                             foldingLicenseId={foldingLicenseId}
@@ -5248,7 +5283,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         }`}
                                                         title={
                                                             !isMainRowComplete(r)
-                                                            ? 'Complete main row fields (Account Name, Email, Phone) before adding licenses'
+                                                            ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
                                                             : (rowLicenses[r.id] || []).some(license => 
                                                                 !license.name || !license.type || !license.status
                                                             )
@@ -5343,6 +5378,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     inFillRange={false}
                                                     onDeleteClick={handleDeleteClick}
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                                    onOpenAddressModal={onOpenAddressModal}
                                                 />
                                             </div>
                                         ))}
