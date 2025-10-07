@@ -737,10 +737,9 @@ export default function ManageAccounts() {
             const hasAccountName = config.accountName?.trim();
             const hasMasterAccount = config.masterAccount?.trim();
             const hasCloudType = config.cloudType?.trim();
-            const hasAddress = config.address?.trim();
 
             // Don't include completely blank rows (new rows that haven't been touched)
-            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
+            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType;
             if (isCompletelyBlank) return false;
 
             // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
@@ -752,10 +751,9 @@ export default function ManageAccounts() {
             const hasAccountName = config.accountName?.trim();
             const hasMasterAccount = config.masterAccount?.trim();
             const hasCloudType = config.cloudType?.trim();
-            const hasAddress = config.address?.trim();
 
             // Don't include completely blank rows (existing rows shouldn't be blank, but just in case)
-            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
+            const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType;
             if (isCompletelyBlank) return false;
 
             // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
@@ -839,7 +837,6 @@ export default function ManageAccounts() {
                 const hasAccountName = config.accountName?.trim();
                 const hasMasterAccount = config.masterAccount?.trim();
                 const hasCloudType = config.cloudType?.trim();
-                const hasAddress = config.address?.trim();
 
                 // Check if this account has incomplete licenses
                 const hasIncompleteLicenses = config.licenses && config.licenses.length > 0 && 
@@ -852,7 +849,7 @@ export default function ManageAccounts() {
 
                 // When validation errors are being shown, include completely blank rows for highlighting
                 // Otherwise, don't include completely blank rows (new rows that haven't been touched)
-                const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType && !hasAddress;
+                const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType;
                 if (isCompletelyBlank && !showValidationErrors && !hasIncompleteLicenses) return false;
 
                 // Row is incomplete if:
@@ -1078,9 +1075,8 @@ export default function ManageAccounts() {
                 const hasAccountName = config.accountName?.trim();
                 const hasMasterAccount = config.masterAccount?.trim();
                 const hasCloudType = config.cloudType?.trim();
-                const hasAddress = config.address?.trim();
                 
-                return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
+                return hasAccountName && hasMasterAccount && hasCloudType;
             });
             
             // Get all modified existing records that are still complete
@@ -1093,15 +1089,13 @@ export default function ManageAccounts() {
                     const hasAccountName = config.accountName?.trim();
                     const hasMasterAccount = config.masterAccount?.trim();
                     const hasCloudType = config.cloudType?.trim();
-                    const hasAddress = config.address?.trim();
                     
-                    const isComplete = hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
+                    const isComplete = hasAccountName && hasMasterAccount && hasCloudType;
                     
                     console.log(`🔍 Checking modified account ${config.id}: isComplete=${isComplete}`, {
                         hasAccountName: !!hasAccountName,
                         hasMasterAccount: !!hasMasterAccount,
                         hasCloudType: !!hasCloudType,
-                        hasAddress: !!hasAddress,
                         accountNameValue: config.accountName,
                         masterAccountValue: config.masterAccount,
                         cloudTypeValue: config.cloudType,
@@ -1200,8 +1194,20 @@ export default function ManageAccounts() {
     const handleSaveAll = async () => {
         const effectiveConfigs = getEffectiveAccounts();
         
+        // Get current license state from AccountsTable to ensure we have the latest data
+        const currentLicenseState = accountsTableRef.current?.getCurrentLicenseState?.() || {};
+        
+        // Update effectiveConfigs with current license state
+        const configsWithCurrentLicenses = effectiveConfigs.map((config: any) => {
+            const currentLicenses = currentLicenseState[config.id];
+            if (currentLicenses) {
+                return { ...config, licenses: currentLicenses };
+            }
+            return config;
+        });
+        
         console.log('💾 Save button clicked - effective accounts state:'); 
-        effectiveConfigs.forEach((c: any, index: number) => {
+        configsWithCurrentLicenses.forEach((c: any, index: number) => {
             console.log(`  Record ${index + 1}:`, {
                 id: c.id,
                 enterprise: c.enterprise || c.enterpriseName,
@@ -1229,13 +1235,13 @@ export default function ManageAccounts() {
         localStorage.removeItem('accountsAutoSave');
         console.log('🧹 Cleared auto-save data from localStorage due to manual save');
 
-        // Get all temporary (unsaved) rows using effective configs
-        const temporaryRows = effectiveConfigs.filter((config: any) => 
+        // Get all temporary (unsaved) rows using effective configs with current licenses
+        const temporaryRows = configsWithCurrentLicenses.filter((config: any) => 
             String(config.id).startsWith('tmp-')
         );
 
-        // Get all existing rows that might have incomplete data using effective configs
-        const existingRows = effectiveConfigs.filter((config: any) => 
+        // Get all existing rows that might have incomplete data using effective configs with current licenses
+        const existingRows = configsWithCurrentLicenses.filter((config: any) => 
             !String(config.id).startsWith('tmp-')
         );
 
@@ -1244,9 +1250,8 @@ export default function ManageAccounts() {
             const hasAccountName = config.accountName?.trim();
             const hasMasterAccount = config.masterAccount?.trim();
             const hasCloudType = config.cloudType?.trim();
-            const hasAddress = config.address?.trim();
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType || !hasAddress;
+            return !hasAccountName || !hasMasterAccount || !hasCloudType;
         });
 
         // Check for incomplete existing rows (including completely blank ones)
@@ -1254,9 +1259,8 @@ export default function ManageAccounts() {
             const hasAccountName = config.accountName?.trim();
             const hasMasterAccount = config.masterAccount?.trim();
             const hasCloudType = config.cloudType?.trim();
-            const hasAddress = config.address?.trim();
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType || !hasAddress;
+            return !hasAccountName || !hasMasterAccount || !hasCloudType;
         });
 
         // Combine all incomplete rows
@@ -1297,14 +1301,19 @@ export default function ManageAccounts() {
         let singleLicenseSpecificFields = new Set<string>();
         let hasSingleIncompleteAccount = false;
         
-        const currentHasIncompleteLicenses = effectiveConfigs.some((config: any) => {
+        const currentHasIncompleteLicenses = configsWithCurrentLicenses.some((config: any) => {
             if (config.licenses && config.licenses.length > 0) {
                 const hasIncompleteInThisRow = config.licenses.some((license: any) => {
-                    const hasName = license.name?.trim();
-                    const hasType = license.type?.trim();
-                    const hasStatus = license.status?.trim();
+                    const hasEnterprise = license.enterprise?.trim();
+                    const hasProduct = license.product?.trim();
+                    const hasService = license.service?.trim();
+                    const hasLicenseStartDate = license.licenseStartDate?.trim();
+                    const hasLicenseEndDate = license.licenseEndDate?.trim();
+                    const hasNumberOfUsers = license.numberOfUsers?.trim();
+                    const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
                     
-                    return !hasName || !hasType || !hasStatus;
+                    return !hasEnterprise || !hasProduct || !hasService || !hasLicenseStartDate || 
+                           !hasLicenseEndDate || !hasNumberOfUsers || !hasValidNoticePeriod;
                 });
                 if (hasIncompleteInThisRow) {
                     currentIncompleteLicenseData.push(config.id);
@@ -1323,13 +1332,19 @@ export default function ManageAccounts() {
                 totalLicenses: number;
             }> = [];
             
-            effectiveConfigs.forEach((config: any) => {
+            configsWithCurrentLicenses.forEach((config: any) => {
                 if (config.licenses && config.licenses.length > 0) {
                     const incompleteLicenses = config.licenses.filter((license: any) => {
-                        const hasName = license.name?.trim();
-                        const hasType = license.type?.trim();
-                        const hasStatus = license.status?.trim();
-                        return !hasName || !hasType || !hasStatus;
+                        const hasEnterprise = license.enterprise?.trim();
+                        const hasProduct = license.product?.trim();
+                        const hasService = license.service?.trim();
+                        const hasLicenseStartDate = license.licenseStartDate?.trim();
+                        const hasLicenseEndDate = license.licenseEndDate?.trim();
+                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                        const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                        
+                        return !hasEnterprise || !hasProduct || !hasService || !hasLicenseStartDate || 
+                               !hasLicenseEndDate || !hasNumberOfUsers || !hasValidNoticePeriod;
                     });
                     
                     if (incompleteLicenses.length > 0) {
@@ -1341,13 +1356,21 @@ export default function ManageAccounts() {
                         });
                         
                         incompleteLicenses.forEach((license: any) => {
-                            const hasName = license.name?.trim();
-                            const hasType = license.type?.trim();
-                            const hasStatus = license.status?.trim();
+                            const hasEnterprise = license.enterprise?.trim();
+                            const hasProduct = license.product?.trim();
+                            const hasService = license.service?.trim();
+                            const hasLicenseStartDate = license.licenseStartDate?.trim();
+                            const hasLicenseEndDate = license.licenseEndDate?.trim();
+                            const hasNumberOfUsers = license.numberOfUsers?.trim();
+                            const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
                             
-                            if (!hasName) allLicenseMissingFields.add('License Name');
-                            if (!hasType) allLicenseMissingFields.add('License Type');
-                            if (!hasStatus) allLicenseMissingFields.add('License Status');
+                            if (!hasEnterprise) allLicenseMissingFields.add('Enterprise');
+                            if (!hasProduct) allLicenseMissingFields.add('Product');
+                            if (!hasService) allLicenseMissingFields.add('Service');
+                            if (!hasLicenseStartDate) allLicenseMissingFields.add('License Start Date');
+                            if (!hasLicenseEndDate) allLicenseMissingFields.add('License End Date');
+                            if (!hasNumberOfUsers) allLicenseMissingFields.add('No. of Users');
+                            if (!hasValidNoticePeriod) allLicenseMissingFields.add('Notice Period (days)');
                         });
                     }
                 }
@@ -1363,26 +1386,37 @@ export default function ManageAccounts() {
         }
 
         console.log('🔍 License validation check:', {
-            totalConfigs: effectiveConfigs.length,
-            configsWithLicenses: effectiveConfigs.filter(c => c.licenses?.length > 0).length,
+            totalConfigs: configsWithCurrentLicenses.length,
+            configsWithLicenses: configsWithCurrentLicenses.filter(c => c.licenses?.length > 0).length,
             currentHasIncompleteLicenses,
             allLicenseMissingFields: Array.from(allLicenseMissingFields),
             singleLicenseSpecificFields: Array.from(singleLicenseSpecificFields),
             hasSingleIncompleteAccount,
             incompleteLicenseAccountCount: currentIncompleteLicenseData.length,
             incompleteLicenseAccounts: currentIncompleteLicenseData,
-            detailedLicenseCheck: effectiveConfigs.filter(c => c.licenses?.length > 0).map(c => ({
+            detailedLicenseCheck: configsWithCurrentLicenses.filter(c => c.licenses?.length > 0).map(c => ({
                 id: c.id,
                 totalLicenses: c.licenses.length,
                 licenses: c.licenses.map((l: any) => ({
                     id: l.id,
-                    name: `"${l.name}"`,
-                    type: `"${l.type}"`,
-                    status: `"${l.status}"`,
-                    hasName: !!l.name?.trim(),
-                    hasType: !!l.type?.trim(),
-                    hasStatus: !!l.status?.trim(),
-                    isComplete: !!(l.name?.trim() && l.type?.trim() && l.status?.trim())
+                    enterprise: `"${l.enterprise}"`,
+                    product: `"${l.product}"`,
+                    service: `"${l.service}"`,
+                    licenseStartDate: `"${l.licenseStartDate}"`,
+                    licenseEndDate: `"${l.licenseEndDate}"`,
+                    numberOfUsers: `"${l.numberOfUsers}"`,
+                    renewalNotice: l.renewalNotice,
+                    noticePeriodDays: `"${l.noticePeriodDays || ''}"`,
+                    hasEnterprise: !!l.enterprise?.trim(),
+                    hasProduct: !!l.product?.trim(),
+                    hasService: !!l.service?.trim(),
+                    hasLicenseStartDate: !!l.licenseStartDate?.trim(),
+                    hasLicenseEndDate: !!l.licenseEndDate?.trim(),
+                    hasNumberOfUsers: !!l.numberOfUsers?.trim(),
+                    hasValidNoticePeriod: !l.renewalNotice || !!l.noticePeriodDays?.trim(),
+                    isComplete: !!(l.enterprise?.trim() && l.product?.trim() && l.service?.trim() && 
+                                  l.licenseStartDate?.trim() && l.licenseEndDate?.trim() && l.numberOfUsers?.trim() &&
+                                  (!l.renewalNotice || l.noticePeriodDays?.trim()))
                 }))
             }))
         });
@@ -1458,8 +1492,7 @@ export default function ManageAccounts() {
                 const hasAccountName = config.accountName?.trim();
                 const hasMasterAccount = config.masterAccount?.trim();
                 const hasCloudType = config.cloudType?.trim();
-                const hasAddress = config.address?.trim();
-                return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
+                return hasAccountName && hasMasterAccount && hasCloudType;
             });
             
             // Save temporary rows
@@ -1548,9 +1581,8 @@ export default function ManageAccounts() {
                             const hasAccountName = config.accountName?.trim();
                             const hasMasterAccount = config.masterAccount?.trim();
                             const hasCloudType = config.cloudType?.trim();
-                            const hasAddress = config.address?.trim();
                             
-                            return hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
+                            return hasAccountName && hasMasterAccount && hasCloudType;
                         });
                         
                         let savedCount = 0;

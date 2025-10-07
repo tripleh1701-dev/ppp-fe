@@ -45,6 +45,8 @@ import {
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
+import DateChipSelect from './DateChipSelect';
+import ContactModal from './ContactModal';
 
 // Utility function to generate consistent colors for account data across the application
 const getAccountColor = (accountName: string) => {
@@ -383,12 +385,27 @@ export interface AccountRow {
 }
 
 // License interface for sub-rows
-export interface License {
+interface Contact {
     id: string;
     name: string;
-    type: string;
-    status: string;
-    expiryDate?: string;
+    email: string;
+    phone: string;
+    department: string;
+    designation: string;
+    company: string;
+}
+
+export interface License {
+    id: string;
+    enterprise: string;
+    product: string;
+    service: string;
+    licenseStartDate: string;
+    licenseEndDate: string;
+    numberOfUsers: string;
+    contactDetails: Contact;
+    renewalNotice: boolean;
+    noticePeriodDays?: string;
 }
 
 function InlineEditableText({
@@ -2781,11 +2798,12 @@ function LicenseSubRow({
     onDeleteClick,
     onDropdownOptionUpdate,
     onNewItemCreated,
+    onOpenContactModal,
     accounts = [],
 }: {
     license: License;
     rowId: string;
-    onUpdate: (licenseId: string, field: keyof License, value: string) => void;
+    onUpdate: (licenseId: string, field: keyof License, value: string | boolean) => void;
     onDelete: (licenseId: string) => void;
     showValidationErrors: boolean;
     isLicenseFieldMissing: (license: License, field: keyof License) => boolean;
@@ -2802,13 +2820,14 @@ function LicenseSubRow({
         type: 'accountNames' | 'emails' | 'phones',
         item: {id: string; name: string},
     ) => void;
+    onOpenContactModal: (rowId: string, licenseId: string, initialData?: Contact) => void;
     accounts?: AccountRow[];
 }) {
     const [isRowHovered, setIsRowHovered] = useState(false);
 
     // Tab navigation for license fields
     const createLicenseTabNavigation = (currentCol: string) => {
-        const editableCols = ['name', 'type', 'status', 'expiryDate'];
+        const editableCols = ['enterprise', 'product', 'service', 'licenseStartDate', 'licenseEndDate', 'numberOfUsers', 'noticePeriodDays'];
         const currentIndex = editableCols.indexOf(currentCol);
 
         const onTabNext = () => {
@@ -2904,82 +2923,170 @@ function LicenseSubRow({
             </div>
             
             {/* License row content */}
-            <div className="flex-1 grid grid-cols-4 gap-3 p-2 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200">
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="name">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License Name</label>
+            <div 
+                className="flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200"
+                style={{
+                    gridTemplateColumns: license.renewalNotice 
+                        ? "minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) 70px 40px 80px 100px" 
+                        : "minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr) 70px 40px 80px"
+                }}
+            >
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Enterprise</label>
                     <AsyncChipSelect
                         type='template'
-                        value={license.name}
-                        onChange={(value) => onUpdate(license.id, 'name', value || '')}
-                        placeholder="Enter license name"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'name')}
+                        value={license.enterprise}
+                        onChange={(value) => onUpdate(license.id, 'enterprise', value || '')}
+                        placeholder="Enter enterprise"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'enterprise')}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
                         accounts={accounts}
                         currentRowId={license.id}
-                        currentRowEnterprise={license.name}
-                        currentRowProduct={license.type}
-                        {...createLicenseTabNavigation('name')}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('enterprise')}
                     />
                 </div>
                 
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="type">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License Type</label>
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Product</label>
                     <AsyncChipSelect
                         type='template'
-                        value={license.type}
-                        onChange={(value) => onUpdate(license.id, 'type', value || '')}
-                        placeholder="Enter license type"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'type')}
+                        value={license.product}
+                        onChange={(value) => onUpdate(license.id, 'product', value || '')}
+                        placeholder="Enter product"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'product')}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
                         accounts={accounts}
                         currentRowId={license.id}
-                        currentRowEnterprise={license.name}
-                        currentRowProduct={license.type}
-                        {...createLicenseTabNavigation('type')}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('product')}
                     />
                 </div>
                 
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="status">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Status</label>
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Service</label>
                     <AsyncChipSelect
                         type='template'
-                        value={license.status}
-                        onChange={(value) => onUpdate(license.id, 'status', value || '')}
-                        placeholder="Enter status"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'status')}
+                        value={license.service}
+                        onChange={(value) => onUpdate(license.id, 'service', value || '')}
+                        placeholder="Enter service"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'service')}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
                         accounts={accounts}
                         currentRowId={license.id}
-                        currentRowEnterprise={license.name}
-                        currentRowProduct={license.type}
-                        {...createLicenseTabNavigation('status')}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('service')}
                     />
                 </div>
                 
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="expiryDate">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Expiry Date</label>
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
+                    <label className="text-xs font-medium text-blue-700 mb-1">License Start Date</label>
+                    <DateChipSelect
+                        value={license.licenseStartDate}
+                        onChange={(value) => onUpdate(license.id, 'licenseStartDate', value || '')}
+                        placeholder="Start date"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
+                        compact={true}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
+                    <label className="text-xs font-medium text-blue-700 mb-1">License End Date</label>
+                    <DateChipSelect
+                        value={license.licenseEndDate}
+                        onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
+                        placeholder="End date"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
+                        compact={true}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
+                    <label className="text-xs font-medium text-blue-700 mb-1">No. of Users</label>
                     <AsyncChipSelect
                         type='template'
-                        value={license.expiryDate || ''}
-                        onChange={(value) => onUpdate(license.id, 'expiryDate', value || '')}
-                        placeholder="Optional expiry date"
-                        isError={false}
+                        value={license.numberOfUsers}
+                        onChange={(value) => onUpdate(license.id, 'numberOfUsers', value || '')}
+                        placeholder="Count"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'numberOfUsers')}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
                         accounts={accounts}
                         currentRowId={license.id}
-                        currentRowEnterprise={license.name}
-                        currentRowProduct={license.type}
-                        {...createLicenseTabNavigation('expiryDate')}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('numberOfUsers')}
                     />
                 </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Contact</label>
+                    <div className="flex items-start justify-center h-8 pt-0.5">
+                        <button
+                            onClick={() => onOpenContactModal(rowId, license.id, license.contactDetails)}
+                            className="flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md"
+                            title="Edit contact details"
+                        >
+                            <svg
+                                className="w-3 h-3 text-blue-600 group-hover:text-blue-700"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>
+                    <div className="flex items-start h-8 space-x-1 pt-0.5">
+                        <input
+                            type="checkbox"
+                            checked={license.renewalNotice}
+                            onChange={(e) => onUpdate(license.id, 'renewalNotice', e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-600">Notify</span>
+                    </div>
+                </div>
+                
+                {license.renewalNotice && (
+                    <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
+                        <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>
+                        <AsyncChipSelect
+                            type='template'
+                            value={license.noticePeriodDays || ''}
+                            onChange={(value) => onUpdate(license.id, 'noticePeriodDays', value || '')}
+                            placeholder="Days"
+                            isError={showValidationErrors && license.renewalNotice && !license.noticePeriodDays}
+                            compact={true}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                            onNewItemCreated={onNewItemCreated as any}
+                            accounts={accounts}
+                            currentRowId={license.id}
+                            currentRowEnterprise={license.enterprise}
+                            currentRowProduct={license.product}
+                            {...createLicenseTabNavigation('noticePeriodDays')}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -3595,6 +3702,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
     const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
 
+    // ContactModal state for license contact details
+    const [contactModalData, setContactModalData] = useState<Contact[]>([]);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactModalRowId, setContactModalRowId] = useState<string | null>(null);
+    const [contactModalLicenseId, setContactModalLicenseId] = useState<string | null>(null);
+    const [contactModalAccountName, setContactModalAccountName] = useState<string>('');
+    const [contactModalMasterAccount, setContactModalMasterAccount] = useState<string>('');
+
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
     const orderRef = useRef<string[]>([]);
@@ -3656,8 +3771,11 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 setPendingDeleteRowId(null);
                 console.log('✅ License removed from rowLicenses state via ref');
             }
+        },
+        getCurrentLicenseState: () => {
+            return rowLicenses;
         }
-    }), [pendingDeleteLicenseId, pendingDeleteRowId]);
+    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses]);
 
     // Helper function to check if a field is missing/invalid
     const isFieldMissing = (row: AccountRow, field: string): boolean => {
@@ -3808,7 +3926,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             Object.keys(rowLicenses).forEach(rowId => {
                 const licenses = rowLicenses[rowId] || [];
                 const hasIncompleteLicense = licenses.some(license => 
-                    !license.name?.trim() || !license.type?.trim() || !license.status?.trim()
+                    !license.enterprise?.trim() || !license.product?.trim() || !license.service?.trim() ||
+                    !license.licenseStartDate?.trim() || !license.licenseEndDate?.trim() || !license.numberOfUsers?.trim() ||
+                    (license.renewalNotice && !license.noticePeriodDays?.trim())
                 );
                 if (licenses.length > 0 && hasIncompleteLicense) {
                     rowsWithIncompleteLicenses.add(rowId);
@@ -3964,10 +4084,23 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         const newLicenseId = `license-${rowId}-${Date.now()}`;
         const newLicense: License = {
             id: newLicenseId,
-            name: '',
-            type: '',
-            status: '',
-            expiryDate: ''
+            enterprise: '',
+            product: '',
+            service: '',
+            licenseStartDate: '',
+            licenseEndDate: '',
+            numberOfUsers: '',
+            contactDetails: {
+                id: crypto.randomUUID(),
+                name: '',
+                email: '',
+                phone: '',
+                department: '',
+                designation: '',
+                company: ''
+            },
+            renewalNotice: false,
+            noticePeriodDays: ''
         };
 
         // Ensure the row is expanded when adding a license
@@ -4013,7 +4146,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         });
     };
 
-    const updateLicense = (rowId: string, licenseId: string, field: keyof License, value: string) => {
+    const updateLicense = (rowId: string, licenseId: string, field: keyof License, value: string | boolean) => {
         setRowLicenses(prev => {
             const updatedLicenses = {
                 ...prev,
@@ -4026,10 +4159,15 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             // Check if the license is now complete using the updated state
             const updatedLicense = updatedLicenses[rowId]?.find(l => l.id === licenseId);
-            if (updatedLicense && updatedLicense.name && updatedLicense.type && updatedLicense.status) {
+            if (updatedLicense && updatedLicense.enterprise && updatedLicense.product && updatedLicense.service && 
+                updatedLicense.licenseStartDate && updatedLicense.licenseEndDate && updatedLicense.numberOfUsers &&
+                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays)) {
                 // License is complete, check if all licenses in row are complete
                 const allLicenses = updatedLicenses[rowId] || [];
-                const allComplete = allLicenses.every(l => l.name && l.type && l.status);
+                const allComplete = allLicenses.every(l => 
+                    l.enterprise && l.product && l.service && l.licenseStartDate && l.licenseEndDate && l.numberOfUsers &&
+                    (!l.renewalNotice || l.noticePeriodDays)
+                );
                 if (allComplete) {
                     // Use setTimeout to avoid state update during render
                     setTimeout(() => {
@@ -4056,7 +4194,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         // Only trigger auto-save for license updates if ALL mandatory fields are complete
         // This prevents auto-save from triggering on partial license completion
-        const isValueEmpty = !value || value.trim() === '';
+        const isValueEmpty = typeof value === 'boolean' ? false : (!value || value.trim() === '');
         
         if (!isValueEmpty && onUpdateField) {
             // Get the updated licenses for this row
@@ -4069,9 +4207,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             // Check if this specific license now has all mandatory fields completed
             const updatedLicense = updatedRowLicenses.find(license => license.id === licenseId);
             const hasAllFields = updatedLicense && 
-                updatedLicense.name?.trim() && 
-                updatedLicense.type?.trim() && 
-                updatedLicense.status?.trim();
+                updatedLicense.enterprise?.trim() && 
+                updatedLicense.product?.trim() && 
+                updatedLicense.service?.trim() &&
+                updatedLicense.licenseStartDate?.trim() &&
+                updatedLicense.licenseEndDate?.trim() &&
+                updatedLicense.numberOfUsers?.trim() &&
+                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays?.trim());
             
             if (hasAllFields) {
                 console.log('🔄 Triggering auto-save for complete license:', {
@@ -4092,9 +4234,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     hasAllFields,
                     licenseData: updatedLicense,
                     missing: {
-                        name: !updatedLicense?.name?.trim(),
-                        type: !updatedLicense?.type?.trim(),
-                        status: !updatedLicense?.status?.trim()
+                        enterprise: !updatedLicense?.enterprise?.trim(),
+                        product: !updatedLicense?.product?.trim(),
+                        service: !updatedLicense?.service?.trim(),
+                        licenseStartDate: !updatedLicense?.licenseStartDate?.trim(),
+                        licenseEndDate: !updatedLicense?.licenseEndDate?.trim(),
+                        numberOfUsers: !updatedLicense?.numberOfUsers?.trim(),
+                        noticePeriodDays: updatedLicense?.renewalNotice && !updatedLicense?.noticePeriodDays?.trim()
                     }
                 });
             }
@@ -4183,10 +4329,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     const isLicenseFieldMissing = (license: License, field: keyof License): boolean => {
         switch (field) {
-            case 'name':
-            case 'type':
-            case 'status':
+            case 'enterprise':
+            case 'product':
+            case 'service':
+            case 'licenseStartDate':
+            case 'licenseEndDate':
+            case 'numberOfUsers':
                 return !license[field] || license[field].trim() === '';
+            case 'noticePeriodDays':
+                // Only required if renewalNotice is enabled
+                return license.renewalNotice && (!license.noticePeriodDays || license.noticePeriodDays.trim() === '');
             default:
                 return false;
         }
@@ -4200,7 +4352,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             Object.entries(rowLicenses).forEach(([rowId, licenses]) => {
                 const hasIncomplete = licenses.some(license => 
-                    !license.name || !license.type || !license.status
+                    !license.enterprise || !license.product || !license.service || 
+                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                    (license.renewalNotice && !license.noticePeriodDays)
                 );
                 if (hasIncomplete) {
                     incompleteLicenseRows.push(rowId);
@@ -4318,6 +4472,61 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         if (onDelete) {
             onDelete(rowId);
         }
+    };
+
+    // ContactModal handlers for license contact details
+    const handleOpenContactModal = (rowId: string, licenseId: string, initialData?: Contact) => {
+        const row = localRows.find(r => r.id === rowId);
+        setContactModalRowId(rowId);
+        setContactModalLicenseId(licenseId);
+        setContactModalAccountName(row?.accountName || '');
+        setContactModalMasterAccount(row?.masterAccount || '');
+        setContactModalData(initialData ? [initialData] : []);
+        setShowContactModal(true);
+    };
+
+    const handleCloseContactModal = () => {
+        setShowContactModal(false);
+        setContactModalData([]);
+        setContactModalRowId(null);
+        setContactModalLicenseId(null);
+        setContactModalAccountName('');
+        setContactModalMasterAccount('');
+    };
+
+    const handleContactModalSave = (contacts: Contact[]) => {
+        if (!contactModalRowId || !contactModalLicenseId) return;
+
+        // Update the license's contact details with the first contact
+        const contactData = contacts.length > 0 ? contacts[0] : {
+            id: crypto.randomUUID(),
+            name: '',
+            email: '',
+            phone: '',
+            department: '',
+            designation: '',
+            company: ''
+        };
+
+        setRowLicenses(prev => {
+            const rowLicenses = prev[contactModalRowId] || [];
+            const updatedLicenses = rowLicenses.map(license => {
+                if (license.id === contactModalLicenseId) {
+                    return {
+                        ...license,
+                        contactDetails: contactData
+                    };
+                }
+                return license;
+            });
+            
+            return {
+                ...prev,
+                [contactModalRowId]: updatedLicenses
+            };
+        });
+
+        handleCloseContactModal();
     };
 
     // removed fill down state
@@ -5255,6 +5464,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             onDeleteClick={onLicenseDelete}
                                                             onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                                             onNewItemCreated={onNewItemCreated as any}
+                                                            onOpenContactModal={handleOpenContactModal}
                                                             accounts={rows}
                                                         />
                                                     ))}
@@ -5271,12 +5481,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             !isMainRowComplete(r) ||
                                                             // Check if there are any incomplete licenses in this row
                                                             (rowLicenses[r.id] || []).some(license => 
-                                                                !license.name || !license.type || !license.status
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
                                                             )
                                                         }
                                                         className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
                                                             (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
-                                                                !license.name || !license.type || !license.status
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
                                                             ))
                                                             ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
                                                             : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm hover:shadow-md'
@@ -5285,7 +5499,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             !isMainRowComplete(r)
                                                             ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
                                                             : (rowLicenses[r.id] || []).some(license => 
-                                                                !license.name || !license.type || !license.status
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
                                                             )
                                                             ? 'Complete existing licenses before adding new ones'
                                                             : 'Add New License'
@@ -5418,6 +5634,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     </div>
                 </div>
             )}
+            
+            {/* ContactModal for license contact details */}
+            <ContactModal
+                isOpen={showContactModal}
+                onClose={handleCloseContactModal}
+                onSave={handleContactModalSave}
+                accountName={contactModalAccountName}
+                masterAccount={contactModalMasterAccount}
+                initialContacts={contactModalData}
+            />
         </div>
     );
 });
