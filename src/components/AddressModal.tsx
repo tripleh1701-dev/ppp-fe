@@ -49,10 +49,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
 
     // Helper function to check if an address is complete
     const isAddressComplete = (address: Address): boolean => {
+        // Only check for fields with asterisks (*) - Address Line 1 and Country
         return !!(address.addressLine1?.trim() && 
-                 address.city?.trim() && 
-                 address.state?.trim() && 
-                 address.zipCode?.trim() && 
                  address.country?.trim());
     };
 
@@ -67,15 +65,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
         if (!address.addressLine1?.trim()) {
             errors.push('addressLine1');
         }
-        if (!address.city?.trim()) {
-            errors.push('city');
-        }
-        if (!address.state?.trim()) {
-            errors.push('state');
-        }
-        if (!address.zipCode?.trim()) {
-            errors.push('zipCode');
-        } else if (!validateZipCode(address.zipCode)) {
+        // City, State, and Zip Code are now optional fields
+        if (address.zipCode?.trim() && !validateZipCode(address.zipCode)) {
             errors.push('zipCode');
         }
         if (!address.country?.trim()) {
@@ -285,7 +276,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
             
             {/* Modal Panel */}
             <motion.div 
-                className="absolute right-0 top-0 h-full w-[500px] bg-white shadow-2xl border-l border-gray-200 flex flex-col"
+                className="absolute right-0 top-0 h-screen w-[500px] shadow-2xl border-l border-gray-200 flex overflow-hidden"
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
@@ -296,47 +287,72 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <MapPin className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-semibold text-white">Manage Addresses</h2>
-                                <p className="text-blue-100 text-sm">Configure Account addresses</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <button
-                                onClick={handleSave}
-                                className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                            >
-                                <BookmarkIcon className="h-4 w-4" />
-                                <span>Save</span>
-                            </button>
-                            <button
-                                onClick={handleClose}
-                                className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
+                {/* Left Panel - Pipeline Canvas Style (Narrow) */}
+                <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
+                    {/* Panel Content - Empty (no icons) */}
+                    <div className="flex-1 relative z-10">
+                        {/* Empty space - no content */}
+                    </div>
+                    
+                    {/* Middle Text - Rotated and Bold */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
+                        <div className="flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide">
+                            <MapPin className="h-4 w-4" />
+                            <span>Manage Address</span>
                         </div>
                     </div>
                     
-                    {/* Account Info */}
-                    <div className="mt-4 grid grid-cols-2 gap-4">
-                        <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/20">
-                            <div className="text-blue-100 text-xs font-medium mb-1">Account Name</div>
-                            <div className="text-white font-semibold truncate">{accountName}</div>
-                        </div>
-                        <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/20">
-                            <div className="text-blue-100 text-xs font-medium mb-1">Master Account</div>
-                            <div className="text-white font-semibold truncate">{masterAccount}</div>
-                        </div>
+                    {/* Logo Watermark - Bottom of Panel */}
+                    <div className="absolute bottom-2 left-1 right-1 h-16">
+                        <img 
+                            src="/images/logos/logo.svg" 
+                            alt="Logo" 
+                            className="w-full h-full object-contain opacity-20"
+                        />
                     </div>
                 </div>
+
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col bg-white">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-blue-100 text-base">Configure Account address</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={handleSave}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                                >
+                                    <BookmarkIcon className="h-4 w-4" />
+                                    <span>Save</span>
+                                </button>
+                                <button
+                                    onClick={handleClose}
+                                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Account Info */}
+                        <div className="mt-4 flex gap-3">
+                            <div className="flex-1 max-w-xs">
+                                <div className="text-blue-100 text-sm font-medium mb-1">Account Name</div>
+                                <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                    <div className="text-white font-medium truncate text-xs">{accountName || '\u00A0'}</div>
+                                </div>
+                            </div>
+                            <div className="flex-1 max-w-xs">
+                                <div className="text-blue-100 text-sm font-medium mb-1">Master Account</div>
+                                <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                    <div className="text-white font-medium truncate text-xs">{masterAccount || '\u00A0'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                 {/* Content Area - Fixed height and proper overflow */}
                 <div className="flex-1 bg-gray-50 overflow-hidden">
@@ -361,6 +377,24 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                             {isAddressComplete(address) && activelyEditingNewAddress.has(address.id) && (
                                                 <button
                                                     onClick={() => {
+                                                        // Validate the address before allowing Done
+                                                        const addressErrors = validateAddress(address);
+                                                        if (addressErrors.length > 0) {
+                                                            // Update validation errors to show the errors for this address
+                                                            setValidationErrors(prev => ({
+                                                                ...prev,
+                                                                [address.id]: addressErrors
+                                                            }));
+                                                            return; // Don't proceed if there are validation errors
+                                                        }
+
+                                                        // Clear any existing validation errors for this address
+                                                        setValidationErrors(prev => {
+                                                            const newErrors = { ...prev };
+                                                            delete newErrors[address.id];
+                                                            return newErrors;
+                                                        });
+
                                                         // Remove from actively editing when user is done
                                                         setActivelyEditingNewAddress(prev => {
                                                             const newSet = new Set(prev);
@@ -422,10 +456,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                     type="text"
                                                     value={address.addressLine1 || ''}
                                                     onChange={(e) => updateAddress(address.id, 'addressLine1', e.target.value)}
-                                                    className={`w-full px-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[address.id]?.includes('addressLine1')
-                                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                     }`}
                                                     autoComplete="address-line1"
                                                 />
@@ -444,7 +478,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                     type="text"
                                                     value={address.addressLine2 || ''}
                                                     onChange={(e) => updateAddress(address.id, 'addressLine2', e.target.value)}
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                                                    className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-colors bg-white min-h-[28px]"
                                                     autoComplete="address-line2"
                                                 />
                                             </div>
@@ -452,7 +486,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        City *
+                                                        City
                                                     </label>
                                                     <input
                                                         id={`city-${address.id}`}
@@ -460,10 +494,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                         type="text"
                                                         value={address.city || ''}
                                                         onChange={(e) => updateAddress(address.id, 'city', e.target.value)}
-                                                        className={`w-full px-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[address.id]?.includes('city')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                         autoComplete="address-level2"
                                                     />
@@ -474,7 +508,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                 
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        State *
+                                                        State
                                                     </label>
                                                     <input
                                                         id={`state-${address.id}`}
@@ -482,10 +516,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                         type="text"
                                                         value={address.state || ''}
                                                         onChange={(e) => updateAddress(address.id, 'state', e.target.value)}
-                                                        className={`w-full px-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[address.id]?.includes('state')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                         autoComplete="address-level1"
                                                     />
@@ -498,7 +532,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        ZIP Code *
+                                                        ZIP Code
                                                     </label>
                                                     <input
                                                         id={`zipcode-${address.id}`}
@@ -508,10 +542,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                         onChange={(e) => updateAddress(address.id, 'zipCode', e.target.value)}
                                                         onBlur={(e) => handleZipCodeBlur(address.id, e.target.value, e.target)}
                                                         onKeyDown={(e) => handleZipCodeKeyDown(e, address.id)}
-                                                        className={`w-full px-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[address.id]?.includes('zipCode')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                         autoComplete="postal-code"
                                                     />
@@ -532,10 +566,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                         type="text"
                                                         value={address.country || ''}
                                                         onChange={(e) => updateAddress(address.id, 'country', e.target.value)}
-                                                        className={`w-full px-4 py-3 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[address.id]?.includes('country')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                         autoComplete="country"
                                                     />
@@ -655,16 +689,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                     }`}>
                                                         Add New Address
                                                     </div>
-                                                    <div className={`text-sm transition-colors duration-200 ${
-                                                        isFirstAddressComplete 
-                                                            ? 'text-gray-500 group-hover:text-blue-500'
-                                                            : 'text-gray-400'
-                                                    }`}>
-                                                        {isFirstAddressComplete 
-                                                            ? 'Click to add another delivery address'
-                                                            : 'Complete all required fields in Address 1 first'
-                                                        }
-                                                    </div>
                                                 </div>
                                             </div>
                                             
@@ -691,6 +715,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                             })()}
                         </div>
                     </div>
+                </div>
                 </div>
             </motion.div>
 

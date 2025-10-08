@@ -102,6 +102,8 @@ interface SimpleDropdownProps {
     placeholder?: string;
     className?: string;
     isError?: boolean;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
 }
 
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
@@ -110,9 +112,12 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
     onChange,
     placeholder = 'Select option',
     className = '',
-    isError = false
+    isError = false,
+    onTabNext,
+    onTabPrev
 }) => {
     const [isOpen, setIsOpen] = React.useState(false);
+    const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
     const [dropdownPosition, setDropdownPosition] = React.useState<{top: number; left: number; width: number} | null>(null);
 
@@ -165,6 +170,52 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                     console.log('🔽 SimpleDropdown clicked, opening dropdown, current value:', value);
                     setIsOpen(!isOpen);
                 }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Tab') {
+                        if (e.shiftKey && onTabPrev) {
+                            e.preventDefault();
+                            onTabPrev();
+                        } else if (!e.shiftKey && onTabNext) {
+                            e.preventDefault();
+                            onTabNext();
+                        }
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (isOpen && highlightedIndex >= 0) {
+                            // Select the highlighted option
+                            const selectedOption = options[highlightedIndex];
+                            onChange(selectedOption.value);
+                            setIsOpen(false);
+                            setHighlightedIndex(-1);
+                        } else {
+                            // Open dropdown
+                            setIsOpen(!isOpen);
+                            setHighlightedIndex(-1);
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (!isOpen) {
+                            setIsOpen(true);
+                            setHighlightedIndex(0);
+                        } else {
+                            setHighlightedIndex(prev => 
+                                prev < options.length - 1 ? prev + 1 : prev
+                            );
+                        }
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (!isOpen) {
+                            setIsOpen(true);
+                            setHighlightedIndex(options.length - 1);
+                        } else {
+                            setHighlightedIndex(prev => prev > 0 ? prev - 1 : prev);
+                        }
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setIsOpen(false);
+                        setHighlightedIndex(-1);
+                    }
+                }}
                 className={`w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} flex items-center justify-between min-h-[24px]`}
             >
                 <span className="truncate flex-1 pr-1">
@@ -190,7 +241,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                     }}
                     onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
                 >
-                    {options.map((option) => (
+                    {options.map((option, index) => (
                         <button
                             key={option.value}
                             type="button"
@@ -199,6 +250,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                                 e.stopPropagation();
                                 console.log('🚀 MOUSE DOWN on option:', option.value);
                             }}
+                            onMouseEnter={() => setHighlightedIndex(index)}
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -207,9 +259,11 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                                 onChange(option.value);
                                 console.log('🎯 onChange called, closing dropdown');
                                 setIsOpen(false);
+                                setHighlightedIndex(-1);
                             }}
                             className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
-                                value === option.value ? 'bg-blue-100 text-blue-700' : 'text-slate-700'
+                                value === option.value ? 'bg-blue-100 text-blue-700' : 
+                                highlightedIndex === index ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                             }`}
                         >
                             {option.label}
@@ -2931,8 +2985,8 @@ function LicenseSubRow({
                 className="flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200"
                 style={{
                     gridTemplateColumns: license.renewalNotice 
-                        ? "minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) 70px 40px 80px 100px" 
-                        : "minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr) 70px 40px 80px"
+                        ? "minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
+                        : "minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
                 }}
             >
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
@@ -2997,7 +3051,7 @@ function LicenseSubRow({
                     <DateChipSelect
                         value={license.licenseStartDate}
                         onChange={(value) => onUpdate(license.id, 'licenseStartDate', value || '')}
-                        placeholder="Start date"
+                        placeholder=""
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
                         compact={true}
                     />
@@ -3008,7 +3062,7 @@ function LicenseSubRow({
                     <DateChipSelect
                         value={license.licenseEndDate}
                         onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
-                        placeholder="End date"
+                        placeholder=""
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
                         compact={true}
                     />
@@ -3042,7 +3096,7 @@ function LicenseSubRow({
                             title="Edit contact details"
                         >
                             <svg
-                                className="w-3 h-3 text-blue-600 group-hover:text-blue-700"
+                                className="w-4 h-4 text-blue-600 group-hover:text-blue-700"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -3181,7 +3235,6 @@ function SortableAccountRow({
             'accountName',
             'masterAccount',
             'cloudType',
-            'address',
         ].includes(col),
     );
 
@@ -3202,22 +3255,31 @@ function SortableAccountRow({
                     if (nextInput) {
                         nextInput.focus();
                     } else {
-                        // If no input found, trigger edit mode by clicking the InlineEditableText span
-                        const nextCellSpan = document.querySelector(
-                            `[data-row-id="${row.id}"][data-col="${nextCol}"] span[data-inline]`,
-                        ) as HTMLElement;
-                        if (nextCellSpan) {
-                            nextCellSpan.click();
-                            // After click, try to find the input again
-                            setTimeout(() => {
-                                nextInput = document.querySelector(
-                                    `[data-row-id="${row.id}"][data-col="${nextCol}"] input`,
-                                ) as HTMLInputElement;
-                                if (nextInput) {
-                                    nextInput.focus();
-                                    nextInput.select(); // Select all text for immediate editing
-                                }
-                            }, 50);
+                        // Try to find a button (for dropdowns like SimpleDropdown)
+                        const nextButton = document.querySelector(
+                            `[data-row-id="${row.id}"][data-col="${nextCol}"] button`,
+                        ) as HTMLButtonElement;
+                        
+                        if (nextButton) {
+                            nextButton.focus();
+                        } else {
+                            // If no input or button found, trigger edit mode by clicking the InlineEditableText span
+                            const nextCellSpan = document.querySelector(
+                                `[data-row-id="${row.id}"][data-col="${nextCol}"] span[data-inline]`,
+                            ) as HTMLElement;
+                            if (nextCellSpan) {
+                                nextCellSpan.click();
+                                // After click, try to find the input again
+                                setTimeout(() => {
+                                    nextInput = document.querySelector(
+                                        `[data-row-id="${row.id}"][data-col="${nextCol}"] input`,
+                                    ) as HTMLInputElement;
+                                    if (nextInput) {
+                                        nextInput.focus();
+                                        nextInput.select(); // Select all text for immediate editing
+                                    }
+                                }, 50);
+                            }
                         }
                     }
                 }, 10);
@@ -3238,22 +3300,31 @@ function SortableAccountRow({
                     if (prevInput) {
                         prevInput.focus();
                     } else {
-                        // If no input found, trigger edit mode by clicking the InlineEditableText span
-                        const prevCellSpan = document.querySelector(
-                            `[data-row-id="${row.id}"][data-col="${prevCol}"] span[data-inline]`,
-                        ) as HTMLElement;
-                        if (prevCellSpan) {
-                            prevCellSpan.click();
-                            // After click, try to find the input again
-                            setTimeout(() => {
-                                prevInput = document.querySelector(
-                                    `[data-row-id="${row.id}"][data-col="${prevCol}"] input`,
-                                ) as HTMLInputElement;
-                                if (prevInput) {
-                                    prevInput.focus();
-                                    prevInput.select(); // Select all text for immediate editing
-                                }
-                            }, 50);
+                        // Try to find a button (for dropdowns like SimpleDropdown)
+                        const prevButton = document.querySelector(
+                            `[data-row-id="${row.id}"][data-col="${prevCol}"] button`,
+                        ) as HTMLButtonElement;
+                        
+                        if (prevButton) {
+                            prevButton.focus();
+                        } else {
+                            // If no input or button found, trigger edit mode by clicking the InlineEditableText span
+                            const prevCellSpan = document.querySelector(
+                                `[data-row-id="${row.id}"][data-col="${prevCol}"] span[data-inline]`,
+                            ) as HTMLElement;
+                            if (prevCellSpan) {
+                                prevCellSpan.click();
+                                // After click, try to find the input again
+                                setTimeout(() => {
+                                    prevInput = document.querySelector(
+                                        `[data-row-id="${row.id}"][data-col="${prevCol}"] input`,
+                                    ) as HTMLInputElement;
+                                    if (prevInput) {
+                                        prevInput.focus();
+                                        prevInput.select(); // Select all text for immediate editing
+                                    }
+                                }, 50);
+                            }
                         }
                     }
                 }, 10);
@@ -3419,6 +3490,7 @@ function SortableAccountRow({
                         }}
                         className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md'
                         title='Delete row'
+                        tabIndex={-1}
                     >
                         <svg
                             className='w-2 h-2 transition-transform duration-200'
@@ -3459,6 +3531,7 @@ function SortableAccountRow({
                             }`}
                             onClick={() => onToggle(row.id)}
                             title='Toggle subitems'
+                            tabIndex={-1}
                         >
                             <motion.span
                                 initial={false}
@@ -3602,6 +3675,7 @@ function SortableAccountRow({
                             placeholder='Select...'
                             className=""
                             isError={isCellMissing(row.id, 'cloudType')}
+                            {...createTabNavigation('cloudType')}
                         />
                     ) : (
                         <InlineEditableText
@@ -3631,10 +3705,11 @@ function SortableAccountRow({
                 >
                     <button
                         onClick={() => onOpenAddressModal?.(row)}
-                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        className="group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md"
                         title={`Manage address for ${row.accountName || 'this account'}`}
+                        tabIndex={-1}
                     >
-                        <MapPin className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        <MapPin className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
                         {(row as any).address && (
                             <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
                         )}
@@ -3654,10 +3729,11 @@ function SortableAccountRow({
                 >
                     <button
                         onClick={() => onOpenTechnicalUserModal?.(row)}
-                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        className="group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md"
                         title={`Manage technical users for ${row.accountName || 'this account'}`}
+                        tabIndex={-1}
                     >
-                        <User className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        <User className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
                         {row.technicalUsers && row.technicalUsers.length > 0 && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
                                 <span className="text-[8px] text-white font-bold">
@@ -3964,16 +4040,18 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     !license.licenseStartDate?.trim() || !license.licenseEndDate?.trim() || !license.numberOfUsers?.trim() ||
                     (license.renewalNotice && !license.noticePeriodDays?.trim())
                 );
-                if (licenses.length > 0 && hasIncompleteLicense) {
+                // Include any row that has licenses with incomplete data
+                if (hasIncompleteLicense) {
                     rowsWithIncompleteLicenses.add(rowId);
                 }
             });
+            console.log('🔍 License validation triggered for rows:', Array.from(rowsWithIncompleteLicenses));
             setLicenseValidationTriggered(rowsWithIncompleteLicenses);
         } else if (!showValidationErrors) {
             setLicenseValidationTriggered(new Set());
         }
         prevShowValidationErrors.current = showValidationErrors;
-    }, [showValidationErrors]);
+    }, [showValidationErrors, rowLicenses]);
     async function persistAccountRow(row: AccountRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
@@ -4362,6 +4440,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     }, [pendingDeleteLicenseId, pendingDeleteRowId]);
 
     const isLicenseFieldMissing = (license: License, field: keyof License): boolean => {
+        let isMissing = false;
         switch (field) {
             case 'enterprise':
             case 'product':
@@ -4369,13 +4448,22 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             case 'licenseStartDate':
             case 'licenseEndDate':
             case 'numberOfUsers':
-                return !license[field] || license[field].trim() === '';
+                isMissing = !license[field] || license[field].trim() === '';
+                break;
             case 'noticePeriodDays':
                 // Only required if renewalNotice is enabled
-                return license.renewalNotice && (!license.noticePeriodDays || license.noticePeriodDays.trim() === '');
+                isMissing = license.renewalNotice && (!license.noticePeriodDays || license.noticePeriodDays.trim() === '');
+                break;
             default:
-                return false;
+                isMissing = false;
         }
+        
+        // Debug logging for missing fields
+        if (isMissing && showValidationErrors) {
+            console.log(`🔴 License field missing - License ID: ${license.id}, Field: ${field}, Value: "${license[field] || ''}", showValidationErrors: ${showValidationErrors}`);
+        }
+        
+        return isMissing;
     };
 
     // License validation effect - notify parent when license validation state changes
@@ -4399,6 +4487,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             onLicenseValidationChange(hasIncompleteLicenses, incompleteLicenseRows);
         }
     }, [rowLicenses, onLicenseValidationChange]);
+
+    // Function to check if there are any incomplete licenses
+    const hasIncompleteLicenses = () => {
+        return Object.entries(rowLicenses).some(([rowId, licenses]) => 
+            licenses.some(license => 
+                !license.enterprise || !license.product || !license.service || 
+                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                (license.renewalNotice && !license.noticePeriodDays)
+            )
+        );
+    };
 
     const [groupBy, setGroupBy] = useState<
         'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
@@ -4433,8 +4532,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         accountName: '200px', // Account name column - increased for label + arrows + resize handle
         masterAccount: '200px', // Master Account column
         cloudType: '160px', // Cloud Type column
-        address: '80px', // Address column - icon only
-        technicalUser: '80px', // Technical User column - icon only
+        address: '120px', // Address column - increased width for icon + text alignment
+        technicalUser: '140px', // Technical User column - increased width for icon + text alignment
         email: '220px', // Email column - increased for label + arrows + resize handle
         phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
     };
@@ -4457,7 +4556,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
                 masterAccount: { min: 190, max: 310 }, // Master Account column constraints
                 cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
-                address: { min: 200, max: 320 }, // Address column constraints
+                address: { min: 120, max: 200 }, // Address column constraints - increased for icon + text
+                technicalUser: { min: 140, max: 220 }, // Technical User column constraints - increased for icon + text
             };
             
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
@@ -5384,7 +5484,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 'accountName',
                                                 'masterAccount',
                                                 'cloudType',
-                                                'address',
                                                 'email',
                                                 'phone',
                                             ].includes(c) && (
@@ -5564,13 +5663,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             {/* Add New Row Button */}
                             {onAddNewRow && (
                                 <div 
-                                    className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                     style={{
                                         gridTemplateColumns: gridTemplate, 
                                         minWidth: 'max-content',
                                         width: '100%'
                                     }}
                                     onClick={onAddNewRow}
+                                    title="Add new account row"
                                 >
                                     {/* Empty delete button space */}
                                     <div className='flex items-center justify-center px-2 py-1'>
@@ -5578,7 +5678,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                     </div>
                                     
                                     {/* Add new row content spanning all columns */}
-                                    <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                    <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                         <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
                                             <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
                                         </svg>
@@ -5651,13 +5751,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             {onAddNewRow && (
                                 <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
                                     <div 
-                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                        className="grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                         style={{
                                             gridTemplateColumns: gridTemplate, 
                                             minWidth: 'max-content',
                                             width: '100%'
                                         }}
                                         onClick={onAddNewRow}
+                                        title="Add new account row"
                                     >
                                         {/* Empty delete button space */}
                                         <div className='flex items-center justify-center px-2 py-1'>
@@ -5665,7 +5766,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         </div>
                                         
                                         {/* Add new row content spanning all columns */}
-                                        <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                        <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                             <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
                                                 <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
                                             </svg>
