@@ -1553,6 +1553,14 @@ function WorkflowBuilderContent({
                         }}
                         onExportPipeline={async () => {
                             try {
+                                // Validate that we have nodes to export
+                                if (!nodes || nodes.length === 0) {
+                                    alert(
+                                        'No pipeline stages to export. Please add some stages first.',
+                                    );
+                                    return;
+                                }
+
                                 // Convert current pipeline to YAML and download
                                 const metadata = {
                                     name: `Pipeline-${Date.now()}`,
@@ -1561,6 +1569,12 @@ function WorkflowBuilderContent({
                                     entity: entity || 'Default',
                                     deploymentType: 'Integration' as const,
                                 };
+
+                                console.log(
+                                    'Exporting pipeline with',
+                                    nodes.length,
+                                    'stages',
+                                );
                                 const yamlContent = convertToYAML(
                                     nodes,
                                     edges,
@@ -1576,13 +1590,38 @@ function WorkflowBuilderContent({
                                 a.download = `pipeline-${Date.now()}.yaml`;
                                 a.click();
                                 URL.revokeObjectURL(url);
+
+                                // Show success message with details
+                                const stageNames = nodes
+                                    .map(
+                                        (node) =>
+                                            node.data.label ||
+                                            `stage-${node.id}`,
+                                    )
+                                    .join(', ');
+                                console.log(
+                                    `Pipeline exported successfully with ${nodes.length} stages: ${stageNames}`,
+                                );
+
+                                // Optional: Show a brief success message (uncomment if desired)
+                                // alert(`Pipeline exported successfully!\n\nStages included: ${stageNames}\nTotal stages: ${nodes.length}`);
                             } catch (error) {
                                 console.error('Export error:', error);
-                                alert('Failed to export pipeline.');
+                                alert(
+                                    'Failed to export pipeline. Please check the console for details.',
+                                );
                             }
                         }}
                         onSavePipeline={async () => {
                             try {
+                                // Validate that we have nodes to save
+                                if (!nodes || nodes.length === 0) {
+                                    alert(
+                                        'No pipeline stages to save. Please add some stages first.',
+                                    );
+                                    return;
+                                }
+
                                 const metadata = {
                                     name: `Pipeline-${Date.now()}`,
                                     description: 'Saved pipeline',
@@ -1590,19 +1629,39 @@ function WorkflowBuilderContent({
                                     entity: entity || 'Default',
                                     deploymentType: 'Integration' as const,
                                 };
+
+                                console.log(
+                                    'Saving pipeline with',
+                                    nodes.length,
+                                    'stages',
+                                );
                                 const yamlContent = convertToYAML(
                                     nodes,
                                     edges,
                                     metadata,
                                 );
+
                                 await savePipelineYAML(
                                     'current-pipeline',
                                     yamlContent,
                                 );
-                                alert('Pipeline saved successfully!');
+
+                                // Show success message with more details
+                                const stageNames = nodes
+                                    .map(
+                                        (node) =>
+                                            node.data.label ||
+                                            `stage-${node.id}`,
+                                    )
+                                    .join(', ');
+                                alert(
+                                    `Pipeline saved successfully!\n\nStages included: ${stageNames}\nTotal stages: ${nodes.length}`,
+                                );
                             } catch (error) {
                                 console.error('Save error:', error);
-                                alert('Failed to save pipeline.');
+                                alert(
+                                    'Failed to save pipeline. Please check the console for details.',
+                                );
                             }
                         }}
                         onLoadPipeline={async () => {

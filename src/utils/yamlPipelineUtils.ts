@@ -65,6 +65,10 @@ export function convertToYAML(
         deploymentType: 'Integration' | 'Extension';
     },
 ): string {
+    console.log(
+        `Converting ${nodes.length} nodes and ${edges.length} edges to YAML`,
+    );
+
     // Create dependency map from edges
     const dependencies: Record<string, string[]> = {};
     edges.forEach((edge) => {
@@ -74,41 +78,48 @@ export function convertToYAML(
         dependencies[edge.target].push(edge.source);
     });
 
-    // Convert nodes to stages
-    const stages: PipelineStage[] = nodes.map((node) => {
-        const stage: PipelineStage = {
-            name: node.data.label || `stage-${node.id}`,
-            type: node.data.type,
-            description: node.data.description,
-            config: node.data.config || {},
-            position: node.position,
-            status: node.data.status,
-            duration: node.data.duration,
-        };
-
-        // Add dependencies if any
-        if (dependencies[node.id] && dependencies[node.id].length > 0) {
-            // Map dependency node IDs to stage names
-            stage.dependsOn = dependencies[node.id].map((depId) => {
-                const depNode = nodes.find((n) => n.id === depId);
-                return depNode?.data.label || `stage-${depId}`;
-            });
-        }
-
-        // Add notifications if configured
-        if (node.data.circularToggleConfig) {
-            stage.notifications = {
-                email:
-                    node.data.circularToggleConfig.success.notifications
-                        ?.email || false,
-                slack:
-                    node.data.circularToggleConfig.success.notifications
-                        ?.slack || false,
+    // Convert nodes to stages - include all selected stages
+    const stages: PipelineStage[] = nodes
+        .filter((node) => node.data && node.data.type) // Filter out invalid nodes
+        .map((node) => {
+            const stage: PipelineStage = {
+                name: node.data.label || `stage-${node.id}`,
+                type: node.data.type,
+                description: node.data.description,
+                config: node.data.config || {},
+                position: node.position,
+                status: node.data.status,
+                duration: node.data.duration,
             };
-        }
 
-        return stage;
-    });
+            // Add dependencies if any
+            if (dependencies[node.id] && dependencies[node.id].length > 0) {
+                // Map dependency node IDs to stage names
+                stage.dependsOn = dependencies[node.id].map((depId) => {
+                    const depNode = nodes.find((n) => n.id === depId);
+                    return depNode?.data.label || `stage-${depId}`;
+                });
+            }
+
+            // Add notifications if configured
+            if (node.data.circularToggleConfig) {
+                stage.notifications = {
+                    email:
+                        node.data.circularToggleConfig.success.notifications
+                            ?.email || false,
+                    slack:
+                        node.data.circularToggleConfig.success.notifications
+                            ?.slack || false,
+                };
+            }
+
+            return stage;
+        });
+
+    console.log(
+        `Created ${stages.length} stages for YAML export:`,
+        stages.map((s) => s.name),
+    );
 
     const pipelineYAML: PipelineYAML = {
         apiVersion: 'pipeline/v1',
@@ -138,11 +149,18 @@ export function convertToYAML(
         },
     };
 
-    return yaml.dump(pipelineYAML, {
-        indent: 2,
-        lineWidth: 120,
-        noRefs: true,
-    });
+    try {
+        const yamlString = yaml.dump(pipelineYAML, {
+            indent: 2,
+            lineWidth: 120,
+            noRefs: true,
+        });
+        console.log('YAML conversion successful, length:', yamlString.length);
+        return yamlString;
+    } catch (error) {
+        console.error('Error converting to YAML:', error);
+        throw new Error(`Failed to convert pipeline to YAML: ${error}`);
+    }
 }
 
 /**
