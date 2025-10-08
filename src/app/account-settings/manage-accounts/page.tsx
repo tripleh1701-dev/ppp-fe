@@ -123,6 +123,7 @@ export default function ManageAccounts() {
         accountName: string;
         masterAccount: string;
         address: string;
+        addressData?: any;
     } | null>(null);
 
     // Technical User modal state
@@ -702,6 +703,7 @@ export default function ManageAccounts() {
             }
 
             console.log('🎉 New account saved automatically!');
+            
             
         } catch (error) {
             console.error('❌ Auto-save failed:', error);
@@ -2112,6 +2114,14 @@ export default function ManageAccounts() {
             return;
         }
 
+        // Check for incomplete licenses
+        if (hasIncompleteLicenses) {
+            setValidationMessage('Please complete all license fields before adding a new row.');
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
+            setShowValidationModal(true);
+            return;
+        }
+
         // Check for incomplete rows before adding new row
         const validation = validateIncompleteRows();
         if (validation.hasIncomplete) {
@@ -2168,7 +2178,8 @@ export default function ManageAccounts() {
             id: row.id,
             accountName: row.accountName || '',
             masterAccount: row.masterAccount || '',
-            address: row.address || ''
+            address: row.address || '',
+            addressData: (row as any).addressData
         });
         setIsAddressModalOpen(true);
     };
@@ -2181,19 +2192,17 @@ export default function ManageAccounts() {
     const handleSaveAddresses = (addresses: any[]) => {
         if (!selectedAccountForAddress) return;
 
-        // Convert address objects back to simple string for now
-        // In a real app, you might want to store full address objects
-        const addressString = addresses.length > 0 
-            ? `${addresses[0].addressLine1}, ${addresses[0].city}, ${addresses[0].state} ${addresses[0].zipCode}`.trim()
-            : '';
+        // Store the full address object instead of concatenating to string
+        const addressData = addresses.length > 0 ? addresses[0] : null;
 
-        // Update the account with the new address
+        // Update the account with the new address data
         setAccounts((prev) => {
             const updated = prev.map((account) =>
                 account.id === selectedAccountForAddress.id
                     ? {
                           ...account,
-                          address: addressString,
+                          address: addressData ? `${addressData.addressLine1}, ${addressData.city}, ${addressData.state} ${addressData.zipCode}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '') : '',
+                          addressData: addressData, // Store full address object
                           updatedAt: new Date().toISOString()
                       }
                     : account,
@@ -2203,7 +2212,7 @@ export default function ManageAccounts() {
             return sorted;
         });
 
-        console.log('💾 Address saved for account:', selectedAccountForAddress.id, 'Address:', addressString);
+        console.log('💾 Address saved for account:', selectedAccountForAddress.id, 'Address data:', addressData);
     };
 
     // Technical User modal functions
@@ -3459,15 +3468,7 @@ export default function ManageAccounts() {
                     onSave={handleSaveAddresses}
                     accountName={selectedAccountForAddress.accountName}
                     masterAccount={selectedAccountForAddress.masterAccount}
-                    initialAddresses={selectedAccountForAddress.address ? [{
-                        id: 'existing',
-                        addressLine1: selectedAccountForAddress.address,
-                        addressLine2: '',
-                        city: '',
-                        state: '',
-                        zipCode: '',
-                        country: ''
-                    }] : []}
+                    initialAddresses={selectedAccountForAddress.addressData ? [selectedAccountForAddress.addressData] : []}
                 />
             )}
 

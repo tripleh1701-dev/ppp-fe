@@ -3,6 +3,7 @@ import { X, Plus, User, Save, Edit2, XCircle, Mail, Calendar, Lock, Users, Shiel
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateId } from '@/utils/id-generator';
+import DateChipSelect from './DateChipSelect';
 
 export interface TechnicalUser {
     id: string;
@@ -324,7 +325,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             
             {/* Modal Panel */}
             <motion.div 
-                className="absolute right-0 top-0 h-full w-[600px] bg-white shadow-2xl border-l border-gray-200 flex flex-col"
+                className="absolute right-0 top-0 h-screen w-[500px] shadow-2xl border-l border-gray-200 flex overflow-hidden"
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
@@ -335,47 +336,72 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <User className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-semibold text-white">Manage Technical Users</h2>
-                                <p className="text-blue-100 text-sm">Configure technical user accounts</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <button
-                                onClick={handleSave}
-                                className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                            >
-                                <BookmarkIcon className="h-4 w-4" />
-                                <span>Save</span>
-                            </button>
-                            <button
-                                onClick={handleClose}
-                                className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
+                {/* Left Panel - Pipeline Canvas Style (Narrow) */}
+                <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
+                    {/* Panel Content - Empty (no icons) */}
+                    <div className="flex-1 relative z-10">
+                        {/* Empty space - no content */}
+                    </div>
+                    
+                    {/* Middle Text - Rotated and Bold */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
+                        <div className="flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide">
+                            <Users className="h-4 w-4" />
+                            <span>Manage Tech User</span>
                         </div>
                     </div>
                     
-                    {/* Account Info */}
-                    <div className="mt-4 grid grid-cols-2 gap-4">
-                        <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/20">
-                            <div className="text-blue-100 text-xs font-medium mb-1">Account Name</div>
-                            <div className="text-white font-semibold truncate">{accountName}</div>
-                        </div>
-                        <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/20">
-                            <div className="text-blue-100 text-xs font-medium mb-1">Master Account</div>
-                            <div className="text-white font-semibold truncate">{masterAccount}</div>
-                        </div>
+                    {/* Logo Watermark - Bottom of Panel */}
+                    <div className="absolute bottom-2 left-1 right-1 h-16">
+                        <img 
+                            src="/images/logos/logo.svg" 
+                            alt="Logo" 
+                            className="w-full h-full object-contain opacity-20"
+                        />
                     </div>
                 </div>
+
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col bg-white">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-blue-100 text-base">Configure Technical User</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={handleSave}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                                >
+                                    <BookmarkIcon className="h-4 w-4" />
+                                    <span>Save</span>
+                                </button>
+                                <button
+                                    onClick={handleClose}
+                                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Account Info */}
+                        <div className="mt-4 flex gap-3">
+                            <div className="flex-1 max-w-xs">
+                                <div className="text-blue-100 text-sm font-medium mb-1">Account Name</div>
+                                <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                    <div className="text-white font-medium truncate text-xs">{accountName || '\u00A0'}</div>
+                                </div>
+                            </div>
+                            <div className="flex-1 max-w-xs">
+                                <div className="text-blue-100 text-sm font-medium mb-1">Master Account</div>
+                                <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                    <div className="text-white font-medium truncate text-xs">{masterAccount || '\u00A0'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                 {/* Content Area - Fixed height and proper overflow */}
                 <div className="flex-1 bg-gray-50 overflow-hidden">
@@ -460,10 +486,10 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.firstName || ''}
                                                         onChange={(e) => updateUser(user.id, 'firstName', e.target.value)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('firstName')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                     />
                                                     {validationErrors[user.id]?.includes('firstName') && (
@@ -479,7 +505,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.middleName || ''}
                                                         onChange={(e) => updateUser(user.id, 'middleName', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-colors bg-white min-h-[28px]"
                                                     />
                                                 </div>
                                                 
@@ -491,10 +517,10 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.lastName || ''}
                                                         onChange={(e) => updateUser(user.id, 'lastName', e.target.value)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('lastName')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                         }`}
                                                     />
                                                     {validationErrors[user.id]?.includes('lastName') && (
@@ -512,10 +538,10 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     value={user.emailAddress || ''}
                                                     onChange={(e) => updateUser(user.id, 'emailAddress', e.target.value)}
                                                     onBlur={(e) => handleEmailBlur(user.id, e.target.value, e.target)}
-                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[user.id]?.includes('emailAddress')
-                                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                     }`}
                                                 />
                                                 {validationErrors[user.id]?.includes('emailAddress') && (
@@ -556,16 +582,12 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Start Date *
                                                     </label>
-                                                    <input
-                                                        type="date"
+                                                    <DateChipSelect
                                                         value={user.startDate || ''}
-                                                        onChange={(e) => updateUser(user.id, 'startDate', e.target.value)}
-                                                        onBlur={(e) => handleDateBlur(user.id, 'startDate', e.target.value, e.target)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
-                                                            validationErrors[user.id]?.includes('startDate')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                                        }`}
+                                                        onChange={(value) => updateUser(user.id, 'startDate', value)}
+                                                        placeholder=""
+                                                        isError={validationErrors[user.id]?.includes('startDate')}
+                                                        compact={true}
                                                     />
                                                     {validationErrors[user.id]?.includes('startDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -578,16 +600,12 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         End Date *
                                                     </label>
-                                                    <input
-                                                        type="date"
+                                                    <DateChipSelect
                                                         value={user.endDate || ''}
-                                                        onChange={(e) => updateUser(user.id, 'endDate', e.target.value)}
-                                                        onBlur={(e) => handleDateBlur(user.id, 'endDate', e.target.value, e.target)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
-                                                            validationErrors[user.id]?.includes('endDate') || validationErrors[user.id]?.includes('dateRange')
-                                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                                : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                                        }`}
+                                                        onChange={(value) => updateUser(user.id, 'endDate', value)}
+                                                        placeholder=""
+                                                        isError={validationErrors[user.id]?.includes('endDate') || validationErrors[user.id]?.includes('dateRange')}
+                                                        compact={true}
                                                     />
                                                     {validationErrors[user.id]?.includes('endDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -608,10 +626,10 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     type="password"
                                                     value={user.password || ''}
                                                     onChange={(e) => updateUser(user.id, 'password', e.target.value)}
-                                                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[user.id]?.includes('password')
-                                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
-                                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                                                     }`}
                                                 />
                                                 {validationErrors[user.id]?.includes('password') && (
@@ -628,7 +646,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.assignedUserGroup}
                                                         readOnly
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed"
+                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed min-h-[28px]"
                                                     />
                                                 </div>
                                                 
@@ -640,7 +658,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.assignedRole}
                                                         readOnly
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed"
+                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed min-h-[28px]"
                                                     />
                                                 </div>
                                             </div>
@@ -773,16 +791,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     }`}>
                                                         Add New Technical User
                                                     </div>
-                                                    <div className={`text-sm transition-colors duration-200 ${
-                                                        isFirstUserComplete 
-                                                            ? 'text-gray-500 group-hover:text-blue-500'
-                                                            : 'text-gray-400'
-                                                    }`}>
-                                                        {isFirstUserComplete 
-                                                            ? 'Click to add another technical user'
-                                                            : 'Complete all required fields in Technical User 1 first'
-                                                        }
-                                                    </div>
                                                 </div>
                                             </div>
                                             
@@ -809,6 +817,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                             })()}
                         </div>
                     </div>
+                </div>
                 </div>
             </motion.div>
 
