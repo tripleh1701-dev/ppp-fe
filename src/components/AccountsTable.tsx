@@ -380,6 +380,7 @@ export interface AccountRow {
     masterAccount: string;
     cloudType: string;
     address: string;
+    technicalUsers?: any[]; // Add technical users field
     // Add licenses array for expandable sub-rows
     licenses?: License[];
 }
@@ -2740,6 +2741,7 @@ interface AccountsTableProps {
         | 'masterAccount'
         | 'cloudType'
         | 'address'
+        | 'technicalUser'
         | 'actions'
     >;
     highlightQuery?: string;
@@ -2783,6 +2785,7 @@ interface AccountsTableProps {
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
     onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
+    onOpenTechnicalUserModal?: (row: AccountRow) => void; // Callback to open technical user modal
 }
 
 // License Sub Row Component
@@ -3122,6 +3125,7 @@ function SortableAccountRow({
     allRows = [],
     onDeleteClick,
     onOpenAddressModal,
+    onOpenTechnicalUserModal,
 }: {
     row: AccountRow;
     index: number;
@@ -3160,6 +3164,7 @@ function SortableAccountRow({
     allRows?: AccountRow[];
     onDeleteClick?: (rowId: string) => void;
     onOpenAddressModal?: (row: AccountRow) => void;
+    onOpenTechnicalUserModal?: (row: AccountRow) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3635,6 +3640,33 @@ function SortableAccountRow({
                     </button>
                 </div>
             )}
+            {cols.includes('technicalUser') && (
+                <div
+                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
+                    }`}
+                    data-row-id={row.id}
+                    data-col='technicalUser'
+                    style={{width: '100%'}}
+                >
+                    <button
+                        onClick={() => onOpenTechnicalUserModal?.(row)}
+                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        title={`Manage technical users for ${row.accountName || 'this account'}`}
+                    >
+                        <User className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        {row.technicalUsers && row.technicalUsers.length > 0 && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                <span className="text-[8px] text-white font-bold">
+                                    {row.technicalUsers.length}
+                                </span>
+                            </div>
+                        )}
+                    </button>
+                </div>
+            )}
             {/* actions column removed */}
             {/* trailing add row removed; fill handle removed */}
             {!hideRowExpansion && isExpanded && expandedContent && (
@@ -3688,6 +3720,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     onLicenseDelete,
     onCompleteLicenseDeletion,
     onOpenAddressModal,
+    onOpenTechnicalUserModal,
 }, ref) => {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -4381,6 +4414,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             'masterAccount',
             'cloudType',
             'address',
+            'technicalUser',
         ],
         [],
     );
@@ -4396,6 +4430,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const colSizes: Record<string, string> = {
         deleteButton: '8px', // Space for delete button with proper padding
         accountName: '200px', // Account name column - increased for label + arrows + resize handle
+        masterAccount: '200px', // Master Account column
+        cloudType: '160px', // Cloud Type column
+        address: '80px', // Address column - icon only
+        technicalUser: '80px', // Technical User column - icon only
         email: '220px', // Email column - increased for label + arrows + resize handle
         phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
     };
@@ -5274,6 +5312,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             masterAccount: 'Master Account',
                             cloudType: 'Cloud Type',
                             address: 'Address',
+                            technicalUser: 'Technical User',
                         };
 
                         // Merge custom labels with defaults
@@ -5294,6 +5333,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             ),
                             address: (
                                 <MapPin size={14} />
+                            ),
+                            technicalUser: (
+                                <User size={14} />
                             ),
                         };
                         return (
@@ -5435,6 +5477,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         onDeleteClick={handleDeleteClick}
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
+                                        onOpenTechnicalUserModal={onOpenTechnicalUserModal}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
@@ -5595,6 +5638,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     onDeleteClick={handleDeleteClick}
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
+                                                    onOpenTechnicalUserModal={onOpenTechnicalUserModal}
                                                 />
                                             </div>
                                         ))}

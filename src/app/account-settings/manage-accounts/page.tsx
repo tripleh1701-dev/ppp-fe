@@ -21,6 +21,7 @@ import {
 import ConfirmModal from '@/components/ConfirmModal';
 import AccountsTable, {AccountRow} from '@/components/AccountsTable';
 import AddressModal from '@/components/AddressModal';
+import TechnicalUserModal, { TechnicalUser } from '@/components/TechnicalUserModal';
 import {api} from '@/utils/api';
 
 
@@ -124,6 +125,15 @@ export default function ManageAccounts() {
         address: string;
     } | null>(null);
 
+    // Technical User modal state
+    const [isTechnicalUserModalOpen, setIsTechnicalUserModalOpen] = useState(false);
+    const [selectedAccountForTechnicalUser, setSelectedAccountForTechnicalUser] = useState<{
+        id: string;
+        accountName: string;
+        masterAccount: string;
+        technicalUsers: TechnicalUser[];
+    } | null>(null);
+
     // Dropdown options for chips
     const [dropdownOptions, setDropdownOptions] = useState({
         enterprises: [] as Array<{id: string; name: string}>,
@@ -157,6 +167,7 @@ export default function ManageAccounts() {
         'masterAccount',
         'cloudType',
         'address',
+        'technicalUser',
     ]);
 
     // License validation state
@@ -296,8 +307,8 @@ export default function ManageAccounts() {
     };
 
     // All available columns
-    type ColumnType = 'accountName' | 'masterAccount' | 'cloudType' | 'address';
-    const allCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType', 'address'];
+    type ColumnType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'technicalUser';
+    const allCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType', 'address', 'technicalUser'];
 
     // Process account data with filtering, sorting, and search
     const processedConfigs = React.useMemo(() => {
@@ -399,7 +410,8 @@ export default function ManageAccounts() {
         accountName: 'Account',
         masterAccount: 'Master Account',
         cloudType: 'Cloud Type',
-        address: 'Address'
+        address: 'Address',
+        technicalUser: 'Technical User'
     };
 
     // Sort functions
@@ -2194,6 +2206,44 @@ export default function ManageAccounts() {
         console.log('💾 Address saved for account:', selectedAccountForAddress.id, 'Address:', addressString);
     };
 
+    // Technical User modal functions
+    const handleOpenTechnicalUserModal = (row: AccountRow) => {
+        setSelectedAccountForTechnicalUser({
+            id: row.id,
+            accountName: row.accountName || '',
+            masterAccount: row.masterAccount || '',
+            technicalUsers: (row as any).technicalUsers || []
+        });
+        setIsTechnicalUserModalOpen(true);
+    };
+
+    const handleCloseTechnicalUserModal = () => {
+        setIsTechnicalUserModalOpen(false);
+        setSelectedAccountForTechnicalUser(null);
+    };
+
+    const handleSaveTechnicalUsers = (users: TechnicalUser[]) => {
+        if (!selectedAccountForTechnicalUser) return;
+
+        // Update the account with the new technical users
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === selectedAccountForTechnicalUser.id
+                    ? {
+                          ...account,
+                          technicalUsers: users,
+                          updatedAt: new Date().toISOString()
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            return sorted;
+        });
+
+        console.log('💾 Technical users saved for account:', selectedAccountForTechnicalUser.id, 'Users:', users);
+    };
+
     return (
         <div className='h-full bg-secondary flex flex-col'>
             {/* Header Section */}
@@ -2955,6 +3005,7 @@ export default function ManageAccounts() {
                                         accountName: 'Account',
                                         email: 'Master Account',
                                         phone: 'Country',
+                                        technicalUser: 'Technical User',
                                     }}
                                     enableDropdownChips={true}
                                     dropdownOptions={dropdownOptions}
@@ -3218,6 +3269,7 @@ export default function ManageAccounts() {
                                     showValidationErrors={showValidationErrors}
                                     hasBlankRow={hasBlankRow()}
                                     onOpenAddressModal={handleOpenAddressModal}
+                                    onOpenTechnicalUserModal={handleOpenTechnicalUserModal}
                                 />
                             </div>
                         )}
@@ -3416,6 +3468,18 @@ export default function ManageAccounts() {
                         zipCode: '',
                         country: ''
                     }] : []}
+                />
+            )}
+
+            {/* Technical User Modal */}
+            {selectedAccountForTechnicalUser && (
+                <TechnicalUserModal
+                    isOpen={isTechnicalUserModalOpen}
+                    onClose={handleCloseTechnicalUserModal}
+                    onSave={handleSaveTechnicalUsers}
+                    accountName={selectedAccountForTechnicalUser.accountName}
+                    masterAccount={selectedAccountForTechnicalUser.masterAccount}
+                    initialUsers={selectedAccountForTechnicalUser.technicalUsers}
                 />
             )}
         </div>
