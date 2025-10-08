@@ -2,6 +2,7 @@
 
 import React, {useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
+import { generateId } from '@/utils/id-generator';
 import {
     ArrowUp,
     ArrowDown,
@@ -4124,7 +4125,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             licenseEndDate: '',
             numberOfUsers: '',
             contactDetails: {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 name: '',
                 email: '',
                 phone: '',
@@ -4537,7 +4538,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         // Update the license's contact details with the first contact
         const contactData = contacts.length > 0 ? contacts[0] : {
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: '',
             email: '',
             phone: '',
