@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, MapPin, Save, Edit2, XCircle } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateId } from '@/utils/id-generator';
 
 interface Address {
     id: string;
@@ -31,7 +32,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
     initialAddresses = []
 }) => {
     const [addresses, setAddresses] = useState<Address[]>([{
-        id: crypto.randomUUID(),
+        id: generateId(),
         addressLine1: '',
         addressLine2: '',
         city: '',
@@ -108,7 +109,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 setOriginalAddresses(JSON.parse(JSON.stringify(initialAddresses))); // Deep copy
                 setActivelyEditingNewAddress(new Set());
             } else {
-                const newId = crypto.randomUUID();
+                const newId = generateId();
                 const newAddresses = [{
                     id: newId,
                     addressLine1: '',
@@ -136,7 +137,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
     }, [addresses, originalAddresses, isOpen]);
 
     const addNewAddress = () => {
-        const newId = crypto.randomUUID();
+        const newId = generateId();
         setAddresses(prev => [
             ...prev,
             {

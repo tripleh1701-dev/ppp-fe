@@ -35,7 +35,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     initialUsers = []
 }) => {
     const [users, setUsers] = useState<TechnicalUser[]>([{
-        id: crypto.randomUUID(),
+        id: generateId(),
         firstName: '',
         middleName: '',
         lastName: '',
@@ -140,7 +140,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 setOriginalUsers(JSON.parse(JSON.stringify(initialUsers))); // Deep copy
                 setActivelyEditingNewUser(new Set());
             } else {
-                const newId = crypto.randomUUID();
+                const newId = generateId();
                 const newUsers = [{
                     id: newId,
                     firstName: '',
@@ -172,7 +172,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     }, [users, originalUsers, isOpen]);
 
     const addNewUser = () => {
-        const newId = crypto.randomUUID();
+        const newId = generateId();
         setUsers(prev => [
             ...prev,
             {

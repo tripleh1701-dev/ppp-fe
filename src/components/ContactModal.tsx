@@ -31,7 +31,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
     initialContacts = []
 }) => {
     const [contacts, setContacts] = useState<Contact[]>([{
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: '',
         email: '',
         phone: '',
@@ -118,7 +118,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                 setOriginalContacts(JSON.parse(JSON.stringify(initialContacts))); // Deep copy
                 setActivelyEditingNewContact(new Set());
             } else {
-                const newId = crypto.randomUUID();
+                const newId = generateId();
                 const newContacts = [{
                     id: newId,
                     name: '',
@@ -146,7 +146,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
     }, [contacts, originalContacts, isOpen]);
 
     const addNewContact = () => {
-        const newId = crypto.randomUUID();
+        const newId = generateId();
         setContacts(prev => [
             ...prev,
             {

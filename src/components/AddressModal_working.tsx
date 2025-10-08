@@ -30,7 +30,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
     initialAddresses = []
 }) => {
     const [addresses, setAddresses] = useState<Address[]>([{
-        id: crypto.randomUUID(),
+        id: generateId(),
         addressLine1: '',
         addressLine2: '',
         city: '',
@@ -47,7 +47,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 setAddresses(initialAddresses);
             } else {
                 setAddresses([{
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     addressLine1: '',
                     addressLine2: '',
                     city: '',
@@ -63,7 +63,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
         setAddresses(prev => [
             ...prev,
             {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 addressLine1: '',
                 addressLine2: '',
                 city: '',
