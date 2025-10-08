@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, User, Save, Edit2, XCircle, Mail, Calendar, Lock, Users, Shield } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateId } from '@/utils/id-generator';
 
 export interface TechnicalUser {
     id: string;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, MapPin, Save, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateId } from '@/utils/id-generator';
 
 interface Address {
     id: string;
