@@ -1,15 +1,16 @@
 'use client';
 
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
     ArrowDown,
     Trash2,
     Pencil,
-    Edit,
     MoreVertical,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     Plus,
     X,
     Pin,
@@ -31,12 +32,194 @@ import {
     CreditCard,
     Users,
     Bell,
-    Phone,
     Clock,
+    Maximize2,
+    Minimize2,
+    Expand,
+    ChevronsDown,
+    ChevronsUp,
+    Layers,
+    FoldVertical,
+    UnfoldVertical,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
+import DateChipSelect from './DateChipSelect';
+import ContactModal from './ContactModal';
+
+// Utility function to generate consistent colors for account data across the application
+const getAccountColor = (accountName: string) => {
+    const key = accountName.toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+    
+    // Blueish account color palette - consistent across all components
+    const accountColors = [
+        {
+            bg: 'bg-blue-50',
+            text: 'text-blue-800',
+            border: 'border-blue-200',
+            tone: 'blue' as const,
+        },
+        {
+            bg: 'bg-sky-50',
+            text: 'text-sky-800',
+            border: 'border-sky-200',
+            tone: 'sky' as const,
+        },
+        {
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-800',
+            border: 'border-indigo-200',
+            tone: 'indigo' as const,
+        },
+        {
+            bg: 'bg-cyan-50',
+            text: 'text-cyan-800',
+            border: 'border-cyan-200',
+            tone: 'cyan' as const,
+        },
+        {
+            bg: 'bg-slate-50',
+            text: 'text-slate-800',
+            border: 'border-slate-200',
+            tone: 'slate' as const,
+        },
+    ];
+    
+    return accountColors[hash % accountColors.length];
+};
+
+// Simple dropdown component for predefined values (like cloudType)
+interface SimpleDropdownProps {
+    value: string;
+    options: Array<{ value: string; label: string }>;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    className?: string;
+    isError?: boolean;
+}
+
+const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
+    value,
+    options,
+    onChange,
+    placeholder = 'Select option',
+    className = '',
+    isError = false
+}) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const [dropdownPosition, setDropdownPosition] = React.useState<{top: number; left: number; width: number} | null>(null);
+
+    // Calculate dropdown position
+    const calculatePosition = React.useCallback(() => {
+        if (dropdownRef.current) {
+            const rect = dropdownRef.current.getBoundingClientRect();
+            setDropdownPosition({
+                top: rect.bottom + 2,
+                left: rect.left,
+                width: Math.max(rect.width, 120)
+            });
+        }
+    }, []);
+
+    // Update position when opening
+    React.useEffect(() => {
+        if (isOpen) {
+            calculatePosition();
+            window.addEventListener('resize', calculatePosition);
+            window.addEventListener('scroll', calculatePosition, true);
+            return () => {
+                window.removeEventListener('resize', calculatePosition);
+                window.removeEventListener('scroll', calculatePosition, true);
+            };
+        }
+    }, [isOpen, calculatePosition]);
+
+    // Close dropdown when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedOption = options.find(opt => opt.value === value);
+
+    return (
+        <div ref={dropdownRef} className={`relative w-full ${className}`}>
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔽 SimpleDropdown clicked, opening dropdown, current value:', value);
+                    setIsOpen(!isOpen);
+                }}
+                className={`w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} flex items-center justify-between min-h-[24px]`}
+            >
+                <span className="truncate flex-1 pr-1">
+                    {selectedOption ? selectedOption.label : (
+                        <span className="text-slate-400">{placeholder}</span>
+                    )}
+                </span>
+                <ChevronDown 
+                    size={12} 
+                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+                />
+            </button>
+
+            {isOpen && dropdownPosition && createPortal(
+                <div 
+                    className="fixed z-[99999] bg-white border border-gray-200 rounded-md shadow-xl"
+                    style={{ 
+                        top: `${dropdownPosition.top}px`,
+                        left: `${dropdownPosition.left}px`,
+                        width: `${dropdownPosition.width}px`,
+                        maxHeight: '120px',
+                        overflow: 'auto'
+                    }}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
+                >
+                    {options.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('🚀 MOUSE DOWN on option:', option.value);
+                            }}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('✅ Option selected:', option.value, 'calling onChange');
+                                console.log('🎯 About to call onChange with:', option.value);
+                                onChange(option.value);
+                                console.log('🎯 onChange called, closing dropdown');
+                                setIsOpen(false);
+                            }}
+                            className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
+                                value === option.value ? 'bg-blue-100 text-blue-700' : 'text-slate-700'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
 
 // Chip component for dropdown selections
 const SelectionChip = ({
@@ -49,14 +232,14 @@ const SelectionChip = ({
     color?: 'blue' | 'green' | 'purple';
 }) => {
     const colorClasses = {
-        blue: 'bg-blue-100 text-blue-800 border-blue-200',
+        blue: 'bg-white text-black',
         green: 'bg-green-100 text-green-800 border-green-200',
         purple: 'bg-purple-100 text-purple-800 border-purple-200',
     };
 
     return (
         <span
-            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${colorClasses[color]} mr-1 mb-1`}
+            className={`inline-flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
         >
             {label}
             <button
@@ -142,7 +325,7 @@ const ChipDropdown = ({
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                             className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
                             autoFocus
                         />
@@ -192,64 +375,45 @@ const ChipDropdown = ({
 
 export interface AccountRow {
     id: string;
+    // New simplified fields - primary data model
     accountName: string;
-    firstName: string;
-    lastName: string;
+    masterAccount: string;
+    cloudType: string;
+    address: string;
+    technicalUsers?: any[]; // Add technical users field
+    // Add licenses array for expandable sub-rows
+    licenses?: License[];
+}
+
+// License interface for sub-rows
+interface Contact {
+    id: string;
+    name: string;
     email: string;
     phone: string;
-    status?: 'Active' | 'Inactive' | '';
-    servicesCount: number;
-    enterpriseName?: string;
-    productName?: string;
-    serviceName?: string;
-    servicesSummary?: string;
-    globalClientName?: string;
-    masterAccount?: string;
-    technicalUser?: string;
-    address?: {
-        addressLine1?: string;
-        addressLine2?: string;
-        country?: string;
-        state?: string;
-        city?: string;
-        pincode?: string;
-    };
-    technical?: {
-        firstName?: string;
-        middleName?: string;
-        lastName?: string;
-        email?: string;
-        status?: string;
-        startDate?: string;
-        endDate?: string;
-        password?: string;
-        technicalUser?: string;
-        // legacy fields for backward compatibility
-        username?: string;
-    };
-    licenses?: Array<{
-        enterprise?: string;
-        product?: string;
-        service?: string;
-        licenseStart?: string;
-        licenseEnd?: string;
-        users?: number;
-        renewalNotice?: boolean;
-        noticeDays?: number;
-        emailTemplate?: string;
-        contacts?: Array<{
-            contact?: string;
-            title?: string;
-            email?: string;
-            phone?: string;
-        }>;
-    }>;
+    department: string;
+    designation: string;
+    company: string;
+}
+
+export interface License {
+    id: string;
+    enterprise: string;
+    product: string;
+    service: string;
+    licenseStartDate: string;
+    licenseEndDate: string;
+    numberOfUsers: string;
+    contactDetails: Contact;
+    renewalNotice: boolean;
+    noticePeriodDays?: string;
 }
 
 function InlineEditableText({
     value,
     onCommit,
     placeholder,
+    isError = false,
     renderDisplay,
     className,
     dataAttr,
@@ -259,6 +423,7 @@ function InlineEditableText({
     value: string;
     onCommit: (next: string) => void;
     placeholder?: string;
+    isError?: boolean;
     renderDisplay?: (v: string) => React.ReactNode;
     className?: string;
     dataAttr?: string;
@@ -290,9 +455,9 @@ function InlineEditableText({
             <input
                 ref={inputRef}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
                 onBlur={commit}
-                onKeyDown={(e) => {
+                onKeyDown={(e: any) => {
                     if (e.key === 'Enter') commit();
                     if (e.key === 'Escape') cancel();
                     if (e.key === 'Tab') {
@@ -305,7 +470,7 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border border-slate-300 bg-white px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
                     className || ''
                 }`}
                 data-inline={dataAttr || undefined}
@@ -313,32 +478,48 @@ function InlineEditableText({
         );
     }
     const isEmpty = !value || value.length === 0;
+    
+    // Show input immediately for empty fields (like Enterprise Configuration)
+    if (editing || isEmpty) {
+        return (
+            <input
+                ref={inputRef}
+                value={draft}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+                onBlur={commit}
+                onFocus={() => setEditing(true)}
+                onKeyDown={(e: any) => {
+                    if (e.key === 'Enter') commit();
+                    if (e.key === 'Escape') cancel();
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const next = (draft || '').trim();
+                        if (next !== (value || '')) onCommit(next);
+                        setEditing(false);
+                        if (e.shiftKey) onTabPrev && onTabPrev();
+                        else onTabNext && onTabNext();
+                    }
+                }}
+                placeholder={placeholder}
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                    className || ''
+                }`}
+                data-inline={dataAttr || undefined}
+            />
+        );
+    }
+    
+    // Show display mode for non-empty fields
     return (
         <span
-            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-2 hover:ring-blue-300 hover:bg-blue-50 cursor-text bg-white border border-gray-200 ${
+            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
                 className || ''
             }`}
-            onClick={(e) => {
-                console.log('🔍 InlineEditableText clicked!', {value, editing});
-                e.stopPropagation();
-                e.preventDefault();
-                setEditing(true);
-            }}
-            onPointerDown={(e) => {
-                console.log('🔍 InlineEditableText pointer down!');
-                e.stopPropagation();
-                e.preventDefault();
-            }}
-            onMouseDown={(e) => {
-                console.log('🔍 InlineEditableText mouse down!');
-                e.stopPropagation();
-                e.preventDefault();
-            }}
-            title={(value || '').toString()}
+            onDoubleClick={() => setEditing(true)}
+            title={`Double-click to edit: ${(value || '').toString()}`}
             data-inline={dataAttr || undefined}
             tabIndex={0}
-            style={{pointerEvents: 'auto', zIndex: 10}}
-            onKeyDown={(e) => {
+            onKeyDown={(e: any) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     setEditing(true);
@@ -350,37 +531,303 @@ function InlineEditableText({
         >
             {renderDisplay ? (
                 renderDisplay(value || '')
-            ) : isEmpty && placeholder ? (
-                <span className='text-slate-400 italic'>{placeholder}</span>
             ) : (
-                value || ''
+                <span>{value || ''}</span>
             )}
         </span>
     );
 }
 
-type CatalogType =
-    | 'enterprise'
-    | 'product'
-    | 'service'
-    | 'template'
-    | 'technical-users';
+type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template';
 
-function AsyncChipSelect({
+// Modern dropdown option component with edit/delete functionality
+function DropdownOption({
+    option,
+    tone,
     type,
+    onSelect,
+    onEdit,
+    onDelete,
+    isInUse = false,
+}: {
+    option: {id: string; name: string};
+    tone: {bg: string; hover: string; text: string};
+    type: CatalogType;
+    onSelect: () => void;
+    onEdit: (newName: string) => Promise<void>;
+    onDelete: () => Promise<void>;
+    isInUse?: boolean;
+}) {
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editValue, setEditValue] = React.useState(option.name);
+    const [isHovered, setIsHovered] = React.useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    React.useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
+    const handleSave = async () => {
+        if (editValue.trim() && editValue.trim() !== option.name) {
+            await onEdit(editValue.trim());
+        }
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setEditValue(option.name);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <motion.div
+                initial={{scale: 0.98, opacity: 0}}
+                animate={{scale: 1, opacity: 1}}
+                className='w-full p-2 bg-white border border-blue-200 rounded-lg shadow-sm'
+            >
+                <div className='flex items-center gap-2'>
+                    <input
+                        ref={inputRef}
+                        value={editValue}
+                        onChange={(e: any) => setEditValue(e.target.value)}
+                        onKeyDown={(e: any) => {
+                            if (e.key === 'Enter') handleSave();
+                            if (e.key === 'Escape') handleCancel();
+                        }}
+                        className='flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500'
+                        placeholder=''
+                    />
+                    <button
+                        onClick={handleSave}
+                        className='p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors'
+                        title='Save'
+                    >
+                        <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M5 13l4 4L19 7'
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={handleCancel}
+                        className='p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors'
+                        title='Cancel'
+                    >
+                        <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M6 18L18 6M6 6l12 12'
+                            />
+                        </svg>
+                    </button>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <motion.div
+            initial={{scale: 0.98, opacity: 0}}
+            animate={{scale: 1, opacity: 1}}
+            whileHover={{scale: 1.02, y: -1}}
+            transition={{type: 'spring', stiffness: 400, damping: 25}}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className='relative group'
+        >
+            <button
+                onClick={onSelect}
+                className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-hidden`}
+                style={{wordBreak: 'break-word', overflowWrap: 'break-word'}}
+            >
+                <span className='relative z-10 block truncate pr-16'>{option.name}</span>
+                <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+            </button>
+
+            {/* Edit/Delete buttons - appear on hover */}
+            <motion.div
+                initial={{opacity: 0, scale: 0.9}}
+                animate={{
+                    opacity: isHovered ? 1 : 0,
+                    scale: isHovered ? 1 : 0.9,
+                }}
+                transition={{duration: 0.15}}
+                className='absolute top-1 right-1 flex gap-1'
+            >
+                <button
+                    onClick={(e: any) => {
+                        e.stopPropagation();
+                        setIsEditing(true);
+                    }}
+                    className='p-1 bg-white/90 hover:bg-white text-gray-600 hover:text-blue-600 rounded shadow-sm hover:shadow transition-all duration-150'
+                    title='Edit'
+                >
+                    <svg
+                        className='w-3 h-3'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                    >
+                        <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2}
+                            d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                        />
+                    </svg>
+                </button>
+                <motion.button
+                    onClick={(e: any) => {
+                        e.stopPropagation();
+                        if (isInUse) {
+                            alert(
+                                `Cannot delete "${option.name}" because it is currently being used in one or more table rows.`,
+                            );
+                            return;
+                        }
+                        if (
+                            confirm(
+                                `Are you sure you want to delete "${option.name}"? This will affect all rows using this ${type}.`,
+                            )
+                        ) {
+                            onDelete();
+                        }
+                    }}
+                    className={`group relative p-1.5 rounded-lg shadow-sm transition-all duration-300 transform ${
+                        isInUse
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-br from-red-50 to-red-100 hover:from-red-500 hover:to-red-600 text-red-500 hover:text-white hover:shadow-lg hover:scale-105 active:scale-95'
+                    }`}
+                    title={
+                        isInUse
+                            ? `Cannot delete - "${option.name}" is in use`
+                            : 'Delete'
+                    }
+                    whileHover={
+                        isInUse
+                            ? {}
+                            : {
+                                  scale: 1.1,
+                                  rotate: [0, -5, 5, 0],
+                                  transition: {duration: 0.3},
+                              }
+                    }
+                    whileTap={
+                        isInUse
+                            ? {}
+                            : {
+                                  scale: 0.9,
+                                  transition: {duration: 0.1},
+                              }
+                    }
+                    disabled={isInUse}
+                >
+                    {/* Animated background glow */}
+                    <div className='absolute inset-0 bg-red-400 rounded-lg opacity-0 group-hover:opacity-20 blur-sm transition-opacity duration-300'></div>
+
+                    {/* Enhanced trash icon with animation */}
+                    <svg
+                        className='w-3.5 h-3.5 relative z-10 transition-transform duration-300 group-hover:animate-pulse'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                    >
+                        {/* Trash lid */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M4 7h16'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.1}}
+                        />
+                        {/* Trash handle */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M10 11v6m4-6v6'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.2}}
+                        />
+                        {/* Trash body */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.3}}
+                        />
+                        {/* Trash top */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.4}}
+                        />
+                    </svg>
+
+                    {/* Ripple effect on click */}
+                    <div className='absolute inset-0 rounded-lg opacity-0 group-active:opacity-30 bg-red-300 animate-ping'></div>
+                </motion.button>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// Multi-select component specifically for phone numbers
+function PhoneMultiSelect({
     value,
     onChange,
-    placeholder,
-    compact,
+    placeholder = 'Select Services',
+    isError = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    accounts = [],
 }: {
-    type: CatalogType;
-    value?: string;
-    onChange: (next?: string) => void;
+    value: string;
+    onChange: (value: string) => void;
     placeholder?: string;
-    compact?: boolean;
+    isError?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        item: {id: string; name: string},
+    ) => void;
+    accounts?: AccountRow[];
 }) {
     const [open, setOpen] = React.useState(false);
-    const [current, setCurrent] = React.useState<string | undefined>(value);
     const [query, setQuery] = React.useState('');
     const [options, setOptions] = React.useState<{id: string; name: string}[]>(
         [],
@@ -388,81 +835,1382 @@ function AsyncChipSelect({
     const [loading, setLoading] = React.useState(false);
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
+    const [showMoreServices, setShowMoreServices] = React.useState(false);
+    const [moreServicesPos, setMoreServicesPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    const moreServicesRef = React.useRef<HTMLButtonElement>(null);
+
+    // Helper function to check if a phone number is in use
+    const isPhoneInUse = React.useCallback(
+        (phoneNumber: string): boolean => {
+            if (!accounts || accounts.length === 0) return false;
+
+            return accounts.some((account) => {
+                // Since phone is no longer used, always return false
+                return false;
+            });
+        },
+        [accounts],
+    );
+
     const containerRef = React.useRef<HTMLDivElement>(null);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
     const [dropdownPos, setDropdownPos] = React.useState<{
         top: number;
         left: number;
         width: number;
     } | null>(null);
-    // Inline adder inside dropdown (no separate portal positioning)
+
+    // Parse selected phones from comma-separated string
+    const selectedPhones = React.useMemo(() => {
+        return value
+            ? value
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+            : [];
+    }, [value]);
+
+    // Responsive display logic
+    // Show maximum 4 value chips, with count indicator for additional chips
+    const [visibleCount, setVisibleCount] = React.useState(4);
+
+    // Helper function to remove a phone number
+    const removePhone = React.useCallback((phoneToRemove: string) => {
+        const newServices = selectedPhones.filter((s: string) => s !== phoneToRemove);
+        onChange(newServices.join(', '));
+    }, [selectedPhones, onChange]);
+
+    // Helper function to toggle a phone number selection
+    const togglePhone = React.useCallback((phoneName: string) => {
+        const isSelected = selectedPhones.includes(phoneName);
+        let newServices;
+        if (isSelected) {
+            newServices = selectedPhones.filter((s: string) => s !== phoneName);
+        } else {
+            newServices = [...selectedPhones, phoneName];
+        }
+        onChange(newServices.join(', '));
+    }, [selectedPhones, onChange]);
+
+    React.useEffect(() => {
+        const updateVisibleCount = () => {
+            if (typeof window === 'undefined') return;
+            // Always show maximum 4 chips regardless of screen size
+            setVisibleCount(4);
+        };
+
+        updateVisibleCount();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', updateVisibleCount);
+            return () =>
+                window.removeEventListener('resize', updateVisibleCount);
+        }
+    }, []);
 
     const loadOptions = React.useCallback(async () => {
         setLoading(true);
         try {
-            if (type === 'product') {
-                const data = await api.get<Array<{id: string; name: string}>>(
-                    `/api/products${
-                        query ? `?search=${encodeURIComponent(query)}` : ''
-                    }`,
-                );
-                setOptions(data || []);
-            } else if (type === 'service') {
-                const data = await api.get<Array<{id: string; name: string}>>(
-                    `/api/services${
-                        query ? `?search=${encodeURIComponent(query)}` : ''
-                    }`,
-                );
-                setOptions(data || []);
-            } else if (type === 'template') {
-                // reuse products API for templates, or switch to dedicated endpoint if available
-                const data = await api.get<Array<{id: string; name: string}>>(
-                    `/api/products${
-                        query ? `?search=${encodeURIComponent(query)}` : ''
-                    }`,
-                );
-                setOptions(data || []);
-            } else if (type === 'technical-users') {
-                // Load technical users from API
-                const data = await api.get<any[]>(
-                    `/api/users?type=technical${
-                        query ? `&search=${encodeURIComponent(query)}` : ''
-                    }`,
-                );
-                setOptions(data || []);
-            } else {
-                const ents = await api.get<Array<{id: string; name: string}>>(
-                    '/api/enterprises',
-                );
-                const filtered = (ents || []).filter((e) =>
-                    query
-                        ? e.name.toLowerCase().includes(query.toLowerCase())
-                        : true,
-                );
-                setOptions(filtered);
-            }
+            const data = await api.get<Array<{id: string; name: string}>>(
+                `/api/phones${
+                    query ? `?search=${encodeURIComponent(query)}` : ''
+                }`,
+            );
+            // Filter out already selected phones
+            const filteredData = (data || []).filter(
+                (option: any) => !selectedPhones.includes(option.name),
+            );
+            setOptions(filteredData);
         } catch (_e) {
             setOptions([]);
         } finally {
             setLoading(false);
         }
-    }, [type, query]);
+    }, [query, selectedPhones]);
 
     React.useEffect(() => {
         if (!open) return;
         loadOptions();
         const rect = containerRef.current?.getBoundingClientRect();
-        if (rect) {
+        if (rect && typeof window !== 'undefined') {
+            // Find table container for better positioning
+            const tableContainer = containerRef.current?.closest('[role="table"]') || 
+                                  containerRef.current?.closest('.overflow-auto') ||
+                                  document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+            
             const width = 256;
-            const left = Math.max(
-                8,
-                Math.min(window.innerWidth - width - 8, rect.left),
-            );
-            const top = Math.min(window.innerHeight - 16, rect.bottom + 8);
+            // Constrain within table bounds
+            const tableRightBound = tableRect.right - width - 16;
+            const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
+            const minLeft = Math.max(tableRect.left + 16, 16);
+            const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
+            
+            const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
             setDropdownPos({top, left, width});
         }
     }, [open, loadOptions]);
-    // Note: search filters locally; do not refetch on query
+
+    // Position the more services dropdown
+    React.useEffect(() => {
+        if (showMoreServices && moreServicesRef.current) {
+            const rect = moreServicesRef.current.getBoundingClientRect();
+            
+            // Find the table container to ensure dropdown stays within table bounds
+            const tableContainer = moreServicesRef.current.closest('[role="table"]') || 
+                                  moreServicesRef.current.closest('.overflow-auto') ||
+                                  document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+            
+            // Calculate width with stricter table container constraints
+            const maxWidth = Math.min(280, tableRect.width * 0.4, window.innerWidth * 0.3);
+            const width = Math.max(180, Math.min(maxWidth, rect.width));
+            
+            // Ensure dropdown stays strictly within table container horizontally
+            const idealLeft = rect.left;
+            const tableRightBound = tableRect.right - width - 16; // More margin from table edge
+            const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
+            const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
+            const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+            
+            // Ensure dropdown stays within both table and viewport vertically
+            const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
+            setMoreServicesPos({top, left, width});
+        }
+    }, [showMoreServices]);
+
+    React.useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+                setShowAdder(false);
+                setAdding('');
+                setShowMoreServices(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    const addNew = async () => {
+        const name = (adding || query || '').trim();
+        if (!name) return;
+
+        // Check for existing entries (case-insensitive)
+        const existingMatch = options.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            // If exact match exists, add it to selection instead of creating new
+            toggleService(existingMatch.name);
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+            
+            // Focus next row's first field (Enterprise) after selecting existing service
+            const currentElement = inputRef?.current;
+            if (currentElement) {
+                // Find the closest div with data-row-id attribute
+                const currentRowDiv = currentElement.closest('[data-row-id]');
+                const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+                
+                if (currentRowId) {
+                    // Find the next row (increment the row number)
+                    const currentRowNum = parseInt(currentRowId);
+                    const nextRowId = (currentRowNum + 1).toString();
+                    
+                    // Find the enterprise column in the next row
+                    const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                    const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                    
+                    if (nextInput) {
+                        // Use requestAnimationFrame to ensure DOM is updated
+                        requestAnimationFrame(() => {
+                            nextInput.focus();
+                            nextInput.click();
+                        });
+                    }
+                }
+            }
+            return;
+        }
+
+        try {
+            const created = await api.post<{id: string; name: string}>(
+                '/api/services',
+                {name},
+            );
+            if (created) {
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === created!.id);
+                    return exists ? prev : [...prev, created!];
+                });
+                // Automatically add the new service to selection
+                toggleService(created.name);
+                setShowAdder(false);
+                setAdding('');
+                setQuery('');
+
+                // Focus next row's first field (Enterprise) after adding new service
+                const currentElement = inputRef?.current;
+                if (currentElement) {
+                    // Find the closest div with data-row-id attribute
+                    const currentRowDiv = currentElement.closest('[data-row-id]');
+                    const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+                    
+                    if (currentRowId) {
+                        // Find the next row (increment the row number)
+                        const currentRowNum = parseInt(currentRowId);
+                        const nextRowId = (currentRowNum + 1).toString();
+                        
+                        // Find the enterprise column in the next row
+                        const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                        const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                        
+                        if (nextInput) {
+                            // Use requestAnimationFrame to ensure DOM is updated
+                            requestAnimationFrame(() => {
+                                nextInput.focus();
+                                nextInput.click();
+                            });
+                        }
+                    }
+                }
+
+                // Notify parent component about the new item
+                if (onNewItemCreated) {
+                    onNewItemCreated('phones', created);
+                }
+            }
+        } catch (error: any) {
+            // Handle duplicate error from backend
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                // Try to find the existing item and add it to selection
+                const existingItem = options.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    togglePhone(existingItem.name);
+                    
+                    // Focus next row's first field (Enterprise) after selecting existing service
+                    const currentElement = inputRef?.current;
+                    if (currentElement) {
+                        // Find the closest div with data-row-id attribute
+                        const currentRowDiv = currentElement.closest('[data-row-id]');
+                        const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+                        
+                        if (currentRowId) {
+                            // Find the next row (increment the row number)
+                            const currentRowNum = parseInt(currentRowId);
+                            const nextRowId = (currentRowNum + 1).toString();
+                            
+                            // Find the enterprise column in the next row
+                            const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                            const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                            
+                            if (nextInput) {
+                                // Use requestAnimationFrame to ensure DOM is updated
+                                requestAnimationFrame(() => {
+                                    nextInput.focus();
+                                    nextInput.click();
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+        }
+    };
+
+    const toggleService = (serviceName: string) => {
+        const isSelected = selectedPhones.includes(serviceName);
+        let newServices;
+        if (isSelected) {
+            newServices = selectedPhones.filter((s: string) => s !== serviceName);
+        } else {
+            newServices = [...selectedPhones, serviceName];
+        }
+        onChange(newServices.join(', '));
+    };
+
+    const removeService = (serviceName: string) => {
+        const newServices = selectedPhones.filter((s: string) => s !== serviceName);
+        onChange(newServices.join(', '));
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative flex items-center gap-1 group/item'
+        >
+            <div className='flex items-center gap-1'>
+                {selectedPhones
+                    .slice(0, visibleCount)
+                    .map((service: string, index: number) => {
+                        // Use consistent color function
+                        const colorTheme = getAccountColor(service);
+                        
+                        return (
+                            <motion.span
+                                key={service}
+                                initial={{scale: 0.95, opacity: 0}}
+                                animate={{scale: 1, opacity: 1}}
+                                whileHover={{
+                                    y: -1,
+                                    boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                                }}
+                                transition={{
+                                    type: 'spring',
+                                    stiffness: 480,
+                                    damping: 30,
+                                }}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                title={service}
+                            >
+                                <span className='flex-1'>{service}</span>
+                                <button
+                                    onClick={() => removeService(service)}
+                                    className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded-sm'
+                                    aria-label='Remove'
+                                    style={{minWidth: '20px', minHeight: '20px'}}
+                                >
+                                    <X size={12} />
+                                </button>
+                            </motion.span>
+                        );
+                    })}
+                {selectedPhones.length > visibleCount && (
+                    <div className='relative'>
+                        <button
+                            ref={moreServicesRef}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                setShowMoreServices(!showMoreServices);
+                            }}
+                            className='inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
+                        >
+                            +{selectedPhones.length - visibleCount}
+                        </button>
+                        
+                        {/* Dropdown for additional services */}
+                        {showMoreServices && moreServicesPos && 
+                            createPortal(
+                                <div
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) => e.stopPropagation()}
+                                    onClick={(e: any) => e.stopPropagation()}
+                                    style={{
+                                        position: 'fixed',
+                                        top: Math.min(moreServicesPos.top, window.innerHeight - 200),
+                                        left: Math.min(moreServicesPos.left, window.innerWidth - 250),
+                                        width: Math.min(moreServicesPos.width, 240),
+                                        maxWidth: '240px'
+                                    }}
+                                >
+                                    <div className='p-3'>
+                                        <div className='text-xs font-medium text-slate-700 mb-2'>
+                                            Additional Phones ({selectedPhones.length - visibleCount})
+                                        </div>
+                                        <div className='space-y-1 max-h-32 overflow-y-auto'>
+                                            {selectedPhones.slice(visibleCount).map((phone, idx) => {
+                                                const colorTheme = getAccountColor(phone);
+                                                return (
+                                                    <div 
+                                                        key={`additional-${idx}`}
+                                                        className='flex items-center justify-between group/additional'
+                                                    >
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}>
+                                                            {phone}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                removePhone(phone);
+                                                                // Close dropdown if no more additional phones
+                                                                if (selectedPhones.length - 1 <= visibleCount) {
+                                                                    setShowMoreServices(false);
+                                                                }
+                                                            }}
+                                                            className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                            aria-label='Remove'
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>,
+                                document.body
+                            )
+                        }
+                    </div>
+                )}
+                
+                {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
+                {selectedPhones.length === 0 || open || isError ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            setQuery(e.target.value);
+                            setOpen(true);
+                        }}
+                        onFocus={() => {
+                            setOpen(true);
+                            setShowMoreServices(false); // Close the more services dropdown
+                        }}
+                        onKeyDown={async (e: any) => {
+                            // Helper function to navigate to next row's enterprise field
+                            const navigateToNextRow = (currentElement: HTMLInputElement) => {
+                                // Find the closest div with data-col attribute (current column)
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                if (currentRowId) {
+                                    // For services column, move to next row's first column (enterprise)
+                                    // Find next row by looking for the next row ID
+                                    const allRows = document.querySelectorAll('[data-row-id]');
+                                    const currentRowIndex = Array.from(allRows).findIndex(row => 
+                                        row.getAttribute('data-row-id') === currentRowId
+                                    );
+                                    
+                                    // Find next row's enterprise column
+                                    const nextRowElements = Array.from(allRows).slice(currentRowIndex + 1);
+                                    const nextEnterpriseCol = nextRowElements.find(row => 
+                                        row.getAttribute('data-col') === 'enterprise'
+                                    );
+                                    const nextInput = nextEnterpriseCol?.querySelector('input') as HTMLInputElement;
+                                    
+                                    if (nextInput) {
+                                        // Use requestAnimationFrame to ensure DOM is updated
+                                        requestAnimationFrame(() => {
+                                            nextInput.focus();
+                                            nextInput.click();
+                                        });
+                                    }
+                                }
+                            };
+
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault(); // Prevent form submission
+                                e.stopPropagation(); // Stop event bubbling
+                                
+                                // Check for exact match first
+                                const exactMatch = options.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                
+                                if (exactMatch) {
+                                    // Add existing service and navigate
+                                    toggleService(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    navigateToNextRow(e.target as HTMLInputElement);
+                                } else {
+                                    // Create new service (same logic as addNew function)
+                                    try {
+                        const created = await api.post<{ id: string; name: string; }>('/api/phones', {
+                            name: query.trim(),
+                        });                                        if (created) {
+                                            setOptions((prev) => {
+                                                const exists = prev.some((o) => o.id === created!.id);
+                                                return exists ? prev : [...prev, created!];
+                                            });
+                                            // Add the new service to selection
+                                            togglePhone(created.name);
+                                            setQuery('');
+                                            setOpen(false);
+                                            
+                                            // Navigate to next row
+                                            navigateToNextRow(e.target as HTMLInputElement);
+
+                                            // Notify parent component about the new item
+                                            if (onNewItemCreated) {
+                                                onNewItemCreated('phones', created);
+                                            }
+                                        }
+                                    } catch (error: any) {
+                                        // Handle duplicate error from backend
+                                        if (error?.message?.includes('already exists') || error?.message?.includes('duplicate')) {
+                                            // Try to find the existing item and add it to selection
+                                            const existingItem = options.find(
+                                                (opt) => opt.name.toLowerCase() === query.toLowerCase(),
+                                            );
+                                            if (existingItem) {
+                                                togglePhone(existingItem.name);
+                                                setQuery('');
+                                                setOpen(false);
+                                                navigateToNextRow(e.target as HTMLInputElement);
+                                            }
+                                        } else {
+                                            console.error('Failed to create service:', error);
+                                        }
+                                    }
+                                }
+                            } else if (e.key === 'Tab' && query.trim()) {
+                                // Check for exact match in all options when Tab is pressed
+                                const exactMatch = options.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                if (exactMatch) {
+                                    e.preventDefault(); // Prevent default Tab behavior
+                                    e.stopPropagation(); // Stop event bubbling
+                                    
+                                    // Add the service first
+                                    toggleService(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    
+                                    // Navigate to next row
+                                    navigateToNextRow(e.target as HTMLInputElement);
+                                } else {
+                                    // No exact match found - prevent Tab and show message to use Enter or Add button
+                                    e.preventDefault(); // Prevent default Tab behavior
+                                    e.stopPropagation(); // Stop event bubbling
+                                    console.log('Tab blocked: Please press Enter or click Add button to create new service, or change the value');
+                                    // Keep focus on current field
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            }
+                        }}
+                        className={`w-32 text-left px-1 py-0.5 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} transition-colors`}
+                        placeholder=''
+                    />
+                ) : (
+                    /* Show "Add more" button when services are selected and not actively typing */
+                    <button
+                        onClick={() => {
+                            setOpen(true);
+                            setQuery('');
+                            setShowMoreServices(false); // Close the more services dropdown
+                            // Focus the input field when "Add more" is clicked
+                            setTimeout(() => {
+                                inputRef.current?.focus();
+                            }, 10);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        + Add more
+                    </button>
+                )}
+            </div>
+
+            {open &&
+                dropdownPos &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxWidth: '300px'
+                        }}
+                    >
+                        <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
+                        <div className='py-1 text-[12px] px-3 space-y-2'>
+                            {loading ? (
+                                <div className='px-3 py-2 text-slate-500'>
+                                    Loading…
+                                </div>
+                            ) : (
+                                (() => {
+                                    const filteredOptions = options.filter(
+                                        (opt) => {
+                                            // First apply search filter
+                                            const matchesSearch = query
+                                                ? opt.name
+                                                      .toLowerCase()
+                                                      .includes(
+                                                          query.toLowerCase(),
+                                                      )
+                                                : true;
+
+                                            return matchesSearch;
+                                        },
+                                    );
+
+                                    const hasExactMatch =
+                                        query &&
+                                        options.some(
+                                            (opt) =>
+                                                opt.name.toLowerCase() ===
+                                                query.toLowerCase().trim(),
+                                        );
+
+                                    const showAddNew =
+                                        query.trim() &&
+                                        !hasExactMatch;
+
+                                    if (showAddNew) {
+                                        return (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const created =
+                                                            await api.post<{
+                                                                id: string;
+                                                                name: string;
+                                                            }>(
+                                                                '/api/services',
+                                                                {
+                                                                    name: query.trim(),
+                                                                },
+                                                            );
+                                                        if (created) {
+                                                            setOptions(
+                                                                (prev) => [
+                                                                    ...prev,
+                                                                    created,
+                                                                ],
+                                                            );
+                                                            toggleService(
+                                                                created.name,
+                                                            );
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to create service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                                className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
+                                            >
+                                                <div className='flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'>
+                                                    <Plus size={12} />
+                                                </div>
+                                                <div className='flex-1'>
+                                                    <span className='text-sm text-blue-600 font-medium'>
+                                                        Add &quot;{query}&quot;
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    }
+
+                                    if (filteredOptions.length === 0) {
+                                        return (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                No matches
+                                            </div>
+                                        );
+                                    }
+
+                                    return filteredOptions.map((opt, idx) => {
+                                        const isSelected =
+                                            selectedPhones.includes(opt.name);
+                                        const palette = [
+                                            {
+                                                bg: 'bg-blue-100',
+                                                hover: 'hover:bg-blue-200',
+                                                text: 'text-blue-700',
+                                            },
+                                            {
+                                                bg: 'bg-cyan-100',
+                                                hover: 'hover:bg-cyan-200',
+                                                text: 'text-cyan-700',
+                                            },
+                                            {
+                                                bg: 'bg-sky-100',
+                                                hover: 'hover:bg-sky-200',
+                                                text: 'text-sky-700',
+                                            },
+                                            {
+                                                bg: 'bg-indigo-100',
+                                                hover: 'hover:bg-indigo-200',
+                                                text: 'text-indigo-700',
+                                            },
+                                        ];
+                                        const tone =
+                                            palette[idx % palette.length];
+
+                                        return (
+                                            <DropdownOption
+                                                key={opt.id}
+                                                option={opt}
+                                                tone={tone}
+                                                type='template'
+                                                isInUse={isPhoneInUse(
+                                                    opt.name,
+                                                )}
+                                                onSelect={() =>
+                                                    toggleService(opt.name)
+                                                }
+                                                onEdit={async (newName) => {
+                                                    try {
+                                                        // Update via API
+                                                        await api.put(
+                                                            `/api/services/${opt.id}`,
+                                                            {
+                                                                name: newName,
+                                                            },
+                                                        );
+
+                                                        // Update local options
+                                                        setOptions((prev) =>
+                                                            prev.map((o) =>
+                                                                o.id === opt.id
+                                                                    ? {
+                                                                          ...o,
+                                                                          name: newName,
+                                                                      }
+                                                                    : o,
+                                                            ),
+                                                        );
+
+                                                        // Update selected services if this one was selected
+                                                        if (
+                                                            selectedPhones.includes(
+                                                                opt.name,
+                                                            )
+                                                        ) {
+                                                            const updatedServices =
+                                                                selectedPhones.map(
+                                                                    (s: string) =>
+                                                                        s ===
+                                                                        opt.name
+                                                                            ? newName
+                                                                            : s,
+                                                                );
+                                                            onChange(
+                                                                updatedServices.join(
+                                                                    ', ',
+                                                                ),
+                                                            );
+                                                        }
+
+                                                        // Notify parent component to update all rows
+                                                        if (
+                                                            onDropdownOptionUpdate
+                                                        ) {
+                                                            await onDropdownOptionUpdate(
+                                                                'phones',
+                                                                'update',
+                                                                opt.name,
+                                                                newName,
+                                                            );
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to update service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                                onDelete={async () => {
+                                                    try {
+                                                        // Delete via API
+                                                        await api.del(
+                                                            `/api/services/${opt.id}`,
+                                                        );
+
+                                                        // Remove from local options
+                                                        setOptions((prev) =>
+                                                            prev.filter(
+                                                                (o) =>
+                                                                    o.id !==
+                                                                    opt.id,
+                                                            ),
+                                                        );
+
+                                                        // Remove from selected services if it was selected
+                                                        if (
+                                                            selectedPhones.includes(
+                                                                opt.name,
+                                                            )
+                                                        ) {
+                                                            const updatedServices =
+                                                                selectedPhones.filter(
+                                                                    (s: string) =>
+                                                                        s !==
+                                                                        opt.name,
+                                                                );
+                                                            onChange(
+                                                                updatedServices.join(
+                                                                    ', ',
+                                                                ),
+                                                            );
+                                                        }
+
+                                                        // Notify parent component to update all rows
+                                                        if (
+                                                            onDropdownOptionUpdate
+                                                        ) {
+                                                            await onDropdownOptionUpdate(
+                                                                'phones',
+                                                                'delete',
+                                                                opt.name,
+                                                            );
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to delete service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        );
+                                    });
+                                })()
+                            )}
+                        </div>
+                        {/* Only show bottom Add button when dropdown is open but no query is typed */}
+                        {!query.trim() && (
+                            <div className='border-t border-slate-200 px-3 py-2'>
+                                <button
+                                    onClick={() => {
+                                        setAdding('');
+                                        setShowAdder(true);
+                                    }}
+                                    className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
+                                >
+                                    <Plus size={14} />
+                                    <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
+                                        Add new service
+                                    </span>
+                                </button>
+                                {showAdder && (
+                                <div className='mt-2 overflow-hidden'>
+                                    {(() => {
+                                        const similarMatch = adding.trim()
+                                            ? options.find(
+                                                  (opt) =>
+                                                      opt.name.toLowerCase() ===
+                                                      adding
+                                                          .trim()
+                                                          .toLowerCase(),
+                                              )
+                                            : null;
+
+                                        return (
+                                            <>
+                                                <div className='flex items-center gap-2'>
+                                                    <motion.input
+                                                        initial={{
+                                                            x: -12,
+                                                            opacity: 0,
+                                                        }}
+                                                        animate={{
+                                                            x: 0,
+                                                            opacity: 1,
+                                                        }}
+                                                        transition={{
+                                                            type: 'spring',
+                                                            stiffness: 420,
+                                                            damping: 28,
+                                                        }}
+                                                        value={adding}
+                                                        onChange={(e: any) =>
+                                                            setAdding(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        onKeyDown={(e: any) => {
+                                                            if (
+                                                                e.key ===
+                                                                'Enter'
+                                                            )
+                                                                addNew();
+                                                            if (
+                                                                e.key ===
+                                                                'Escape'
+                                                            )
+                                                                setShowAdder(
+                                                                    false,
+                                                                );
+                                                        }}
+                                                        placeholder=''
+                                                        className={`flex-1 rounded border px-2 py-1 text-[12px] ${
+                                                            similarMatch
+                                                                ? 'border-amber-400 bg-amber-50'
+                                                                : 'border-slate-300'
+                                                        }`}
+                                                    />
+                                                    <button
+                                                        onClick={addNew}
+                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] ${
+                                                            similarMatch
+                                                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                                                : 'bg-violet-600 hover:bg-violet-700 text-white'
+                                                        }`}
+                                                    >
+                                                        {similarMatch
+                                                            ? 'Add Existing'
+                                                            : 'Add'}
+                                                    </button>
+                                                </div>
+                                                {similarMatch && (
+                                                    <motion.div
+                                                        initial={{
+                                                            opacity: 0,
+                                                            height: 0,
+                                                        }}
+                                                        animate={{
+                                                            opacity: 1,
+                                                            height: 'auto',
+                                                        }}
+                                                        className='mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800'
+                                                    >
+                                                        <span className='font-medium'>
+                                                            ⚠️ Similar service
+                                                            exists:
+                                                        </span>{' '}
+                                                        &quot;
+                                                        {similarMatch.name}
+                                                        &quot;
+                                                        <br />
+                                                        <span className='text-amber-600'>
+                                                            Click &quot;Add
+                                                            Existing&quot; to
+                                                            select it instead of
+                                                            creating a
+                                                            duplicate.
+                                                        </span>
+                                                    </motion.div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                        )}
+                    </div>,
+                    document.body,
+                )}
+        </div>
+    );
+}
+
+// Simple chip input component without dropdown functionality
+function SimpleChipInput({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    onTabNext,
+    onTabPrev,
+}: {
+    value?: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!editing) setDraft(value || '');
+    }, [value, editing]);
+
+    useEffect(() => {
+        if (editing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [editing]);
+
+    const commit = () => {
+        const trimmed = draft.trim();
+        if (trimmed !== (value || '')) {
+            onChange(trimmed);
+        }
+        setEditing(false);
+    };
+
+    const cancel = () => {
+        setDraft(value || '');
+        setEditing(false);
+    };
+
+    if (editing) {
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                        e.preventDefault();
+                        commit();
+                        if (e.key === 'Tab' && e.shiftKey) {
+                            onTabPrev && onTabPrev();
+                        } else {
+                            onTabNext && onTabNext();
+                        }
+                    } else if (e.key === 'Escape') {
+                        cancel();
+                    }
+                }}
+                onBlur={commit}
+                placeholder={placeholder}
+                className={`min-w-0 w-full rounded-sm border ${
+                    isError 
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                        : 'border-blue-300 bg-white'
+                } px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${
+                    isError 
+                        ? 'focus:ring-red-200 focus:border-red-500' 
+                        : 'focus:ring-blue-200 focus:border-blue-500'
+                }`}
+            />
+        );
+    }
+
+    const isEmpty = !value || value.length === 0;
+    const displayValue = value || '';
+
+    if (isEmpty) {
+        return (
+            <div
+                className="w-full flex items-center bg-white border border-blue-300 rounded-sm px-2 py-1 hover:bg-slate-50 hover:border-blue-400 transition-all duration-150 cursor-text min-h-[28px]"
+                onDoubleClick={() => setEditing(true)}
+                title="Double-click to enter value"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setEditing(true);
+                    }
+                }}
+            >
+                <span className="text-[12px] text-slate-300 leading-[14px]">
+                    {placeholder || ''}
+                </span>
+            </div>
+        );
+    }
+
+    // Display the same as Enterprise Config table - simple span with hover effects
+    return (
+        <span
+            className="group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text"
+            onDoubleClick={() => setEditing(true)}
+            title="Double-click to edit"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setEditing(true);
+                }
+            }}
+        >
+            {displayValue}
+        </span>
+    );
+}
+
+function AsyncChipSelect({
+    type,
+    value,
+    onChange,
+    placeholder,
+    isError = false,
+    compact,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    accounts = [],
+    currentRowId,
+    currentRowEnterprise,
+    currentRowProduct,
+    dropdownOptions,
+    onTabNext,
+    onTabPrev,
+}: {
+    type: CatalogType;
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    compact?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        item: {id: string; name: string},
+    ) => void;
+    accounts?: AccountRow[];
+    currentRowId?: string;
+    currentRowEnterprise?: string;
+    currentRowProduct?: string;
+    dropdownOptions?: {
+        accountNames: Array<{id: string; name: string}>;
+        cloudTypes: Array<{id: string; name: string}>;
+        addresses: Array<{id: string; name: string}>;
+    };
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [open, setOpen] = React.useState(false);
+    const [current, setCurrent] = React.useState<string | undefined>(value);
+    const [query, setQuery] = React.useState('');
+    const [options, setOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
+    const [allOptions, setAllOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
+    const [loading, setLoading] = React.useState(false);
+    const [adding, setAdding] = React.useState('');
+    const [showAdder, setShowAdder] = React.useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    // Helper function to check if an option is in use (with composite key constraint)
+    const isOptionInUse = React.useCallback(
+        (optionName: string): boolean => {
+            if (!accounts || accounts.length === 0) return false;
+
+            return accounts.some((account) => {
+                // Skip the current row being edited
+                if (currentRowId && account.id === currentRowId) {
+                    return false;
+                }
+
+                if (type === 'accountName') {
+                    // Never filter account names - show all options
+                    return false;
+                } else if (type === 'address') {
+                    // For addresses, show all options (no filtering needed)
+                    return false;
+                }
+                return false;
+            });
+        },
+        [accounts, type, currentRowId, currentRowEnterprise],
+    );
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const [dropdownPosition, setDropdownPosition] = React.useState<'below' | 'above'>('below');
+    const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    // Portal-based dropdown to avoid table clipping
+
+    // Function to calculate optimal dropdown position
+    const calculateDropdownPosition = React.useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+        
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer = containerRef.current.closest('.compact-table') ||
+                              containerRef.current.closest('[role="table"]') || 
+                              containerRef.current.closest('.rounded-xl') ||
+                              containerRef.current.closest('.overflow-auto') ||
+                              containerRef.current.closest('.w-full.compact-table') ||
+                              document.querySelector('.compact-table') ||
+                              document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+        
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(120, tableRect.width - 64, viewportWidth - 64); // Reduced to match dropdown width
+        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+        
+        // Ensure dropdown stays within table container horizontally with more padding
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32); // More padding
+        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+        
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        // For cloudType, always prefer below unless there's really no space
+        let top;
+        const forceBelow = type === 'cloudType';
+        
+        if (forceBelow && spaceBelow >= 100) {
+            // For cloudType, show below if there's at least 100px space
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+        } else if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+            // Ensure it doesn't go below table bounds
+            if (top + dropdownHeight > tableRect.bottom) {
+                top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
+                setDropdownPosition('above');
+            }
+        } else {
+            setDropdownPosition('above');
+            top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
+        }
+        
+        // Final constraint to ensure dropdown is within table bounds
+        top = Math.max(top, tableRect.top + 10);
+        top = Math.min(top, tableRect.bottom - 100);
+        
+        setDropdownPortalPos({ top, left, width });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above', tableRect });
+    }, [type]);
+
+    // Calculate position when dropdown opens
+    React.useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            // Recalculate on scroll or resize
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    // Separate function to load all options (called once when dropdown opens)
+    const loadAllOptions = React.useCallback(async () => {
+        setLoading(true);
+        try {
+            let allData: Array<{id: string; name: string}> = [];
+            
+            console.log(`Loading options for type: ${type}`);
+            
+            // Use dropdownOptions if available for accountName
+            if (type === 'accountName' && dropdownOptions?.accountNames) {
+                allData = dropdownOptions.accountNames;
+                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'address' && dropdownOptions?.addresses) {
+                allData = dropdownOptions.addresses;
+                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'cloudType') {
+                // Always use predefined cloudType options (prioritize dropdownOptions)
+                if (dropdownOptions?.cloudTypes && dropdownOptions.cloudTypes.length > 0) {
+                    allData = dropdownOptions.cloudTypes;
+                    console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+                } else {
+                    console.log('Using fallback predefined cloudType options');
+                    allData = [
+                        { id: 'private-cloud', name: 'Private Cloud' },
+                        { id: 'public-cloud', name: 'Public Cloud' }
+                    ];
+                }
+            } else if (type === 'masterAccount') {
+                console.log('Calling API: /api/masterAccounts');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/masterAccounts',
+                ) || [];
+            } else if (type === 'address') {
+                console.log('Calling API: /api/addresses');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/addresses',
+                ) || [];
+            } else if (type === 'template') {
+                console.log('Calling API: /api/templates');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/templates',
+                ) || [];
+            } else {
+                console.log('Calling API: /api/accountNames');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/accountNames',
+                ) || [];
+            }
+            
+            console.log(`API call successful for ${type}, got ${allData.length} items:`, allData);
+            setAllOptions(allData);
+        } catch (error) {
+            console.error(`API call failed for ${type}:`, error);
+            setAllOptions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [type, dropdownOptions]);
+
+    // Function to filter options based on current query and other criteria
+    const filterOptions = React.useCallback(() => {
+        if (allOptions.length === 0) return;
+
+        let filtered = allOptions;
+
+        // Apply search filter
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
+            );
+            
+            // Sort filtered results: exact matches first, then alphabetical
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+                
+                // Exact match comes first
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+                
+                // Otherwise alphabetical order
+                return aLower.localeCompare(bLower);
+            });
+        }
+
+        // Apply usage filter - no filtering needed for accountName or address
+        setOptions(filtered);
+    }, [allOptions, query, type, isOptionInUse]);
+
+    // Filter options when query or allOptions change
+    React.useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    // Load options when dropdown opens
+    React.useEffect(() => {
+        if (open && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, loadAllOptions]);
+
+    // Load cloudType options immediately on mount since they're predefined
+    React.useEffect(() => {
+        if (type === 'cloudType' && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [type, allOptions.length, loadAllOptions]);
+
+    // Remove unused effect for email filtering
+    // React.useEffect was here for email/account filtering - no longer needed
 
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
@@ -482,47 +2230,124 @@ function AsyncChipSelect({
     const addNew = async () => {
         const name = (adding || query || '').trim();
         if (!name) return;
+
+        // Check for existing entries (case-insensitive)
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            // If exact match exists, select it instead of creating new
+            onChange(existingMatch.name);
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+            setOpen(false);
+            return;
+        }
+
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'product') {
+            if (type === 'masterAccount') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/products',
+                    '/api/masterAccounts',
                     {name},
                 );
-            } else if (type === 'service') {
+            } else if (type === 'cloudType') {
+                // Cloud Type has predefined options, don't create new ones
+                console.log('Cannot create new cloudType options - using predefined values only');
+                return;
+            } else if (type === 'address') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/services',
+                    '/api/addresses',
                     {name},
                 );
             } else if (type === 'template') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/products',
+                    '/api/templates',
                     {name},
                 );
             } else {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/enterprises',
+                    '/api/accountNames',
                     {name},
                 );
             }
             if (created) {
-                // Inject newly created into the current dropdown list and hide the input
+                // Inject newly created into the current dropdown list and select it
                 setOptions((prev) => {
                     const exists = prev.some((o) => o.id === created!.id);
                     return exists ? prev : [...prev, created!];
                 });
+                // Also add to allOptions for future exact match checking
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === created!.id);
+                    return exists ? prev : [...prev, created!];
+                });
+                onChange(created.name);
                 setShowAdder(false);
                 setAdding('');
                 setQuery('');
+                setOpen(false);
+
+                // Notify parent component about the new item
+                if (onNewItemCreated) {
+                    let dropdownType: string;
+                    
+                    switch (type) {
+                        case 'accountName':
+                            dropdownType = 'accountNames';
+                            break;
+                        case 'masterAccount':
+                            dropdownType = 'masterAccounts';
+                            break;
+                        case 'address':
+                            dropdownType = 'addresses';
+                            break;
+                        default:
+                            dropdownType = 'emails'; // fallback
+                            break;
+                    }
+                    
+                    // Only call if this is a supported type for the callback
+                    if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
+                        onNewItemCreated(dropdownType as any, created);
+                    }
+                }
             }
-        } catch (_e) {
-            // no-op
+        } catch (error: any) {
+            console.error(`Failed to create ${type}:`, error);
+            // Handle duplicate error from backend
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                // Try to find the existing item and select it
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setOpen(false);
+                }
+            }
+        } finally {
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
         }
     };
 
     React.useEffect(() => {
         setCurrent(value);
     }, [value]);
+
+    // Debug logging for cloudType
+    React.useEffect(() => {
+        if (type === 'cloudType') {
+            console.log(`CloudType AsyncChipSelect render - allOptions.length: ${allOptions.length}`, allOptions);
+        }
+    }, [type, allOptions]);
 
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
     return (
@@ -531,342 +2356,372 @@ function AsyncChipSelect({
             className='relative min-w-0 flex items-center gap-1 group/item'
             style={{maxWidth: '100%'}}
         >
-            {current || value ? (
-                (() => {
-                    const key = (current || value || '').toLowerCase();
-                    let hash = 0;
-                    for (let i = 0; i < key.length; i++) {
-                        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-                    }
-                    const palettes: Record<
-                        CatalogType,
-                        {
-                            bg: string;
-                            text: string;
-                            border: string;
-                            dot: string;
-                        }[]
-                    > = {
-                        product: [
-                            {
-                                bg: 'bg-violet-50',
-                                text: 'text-violet-800',
-                                border: 'border-violet-200',
-                                dot: 'bg-violet-400',
-                            },
-                            {
-                                bg: 'bg-sky-50',
-                                text: 'text-sky-800',
-                                border: 'border-sky-200',
-                                dot: 'bg-sky-400',
-                            },
-                            {
-                                bg: 'bg-emerald-50',
-                                text: 'text-emerald-800',
-                                border: 'border-emerald-200',
-                                dot: 'bg-emerald-400',
-                            },
-                            {
-                                bg: 'bg-amber-50',
-                                text: 'text-amber-800',
-                                border: 'border-amber-200',
-                                dot: 'bg-amber-400',
-                            },
-                        ],
-                        service: [
-                            {
-                                bg: 'bg-rose-50',
-                                text: 'text-rose-800',
-                                border: 'border-rose-200',
-                                dot: 'bg-rose-400',
-                            },
-                            {
-                                bg: 'bg-indigo-50',
-                                text: 'text-indigo-800',
-                                border: 'border-indigo-200',
-                                dot: 'bg-indigo-400',
-                            },
-                            {
-                                bg: 'bg-teal-50',
-                                text: 'text-teal-800',
-                                border: 'border-teal-200',
-                                dot: 'bg-teal-400',
-                            },
-                            {
-                                bg: 'bg-fuchsia-50',
-                                text: 'text-fuchsia-800',
-                                border: 'border-fuchsia-200',
-                                dot: 'bg-fuchsia-400',
-                            },
-                        ],
-                        enterprise: [
-                            {
-                                bg: 'bg-cyan-50',
-                                text: 'text-cyan-800',
-                                border: 'border-cyan-200',
-                                dot: 'bg-cyan-400',
-                            },
-                            {
-                                bg: 'bg-lime-50',
-                                text: 'text-lime-800',
-                                border: 'border-lime-200',
-                                dot: 'bg-lime-400',
-                            },
-                            {
-                                bg: 'bg-orange-50',
-                                text: 'text-orange-800',
-                                border: 'border-orange-200',
-                                dot: 'bg-orange-400',
-                            },
-                            {
-                                bg: 'bg-purple-50',
-                                text: 'text-purple-800',
-                                border: 'border-purple-200',
-                                dot: 'bg-purple-400',
-                            },
-                        ],
-                        template: [
-                            {
-                                bg: 'bg-slate-50',
-                                text: 'text-slate-800',
-                                border: 'border-slate-200',
-                                dot: 'bg-slate-400',
-                            },
-                            {
-                                bg: 'bg-blue-50',
-                                text: 'text-blue-800',
-                                border: 'border-blue-200',
-                                dot: 'bg-blue-400',
-                            },
-                            {
-                                bg: 'bg-emerald-50',
-                                text: 'text-emerald-800',
-                                border: 'border-emerald-200',
-                                dot: 'bg-emerald-400',
-                            },
-                            {
-                                bg: 'bg-amber-50',
-                                text: 'text-amber-800',
-                                border: 'border-amber-200',
-                                dot: 'bg-amber-400',
-                            },
-                        ],
-                        'technical-users': [
-                            {
-                                bg: 'bg-blue-50',
-                                text: 'text-blue-800',
-                                border: 'border-blue-200',
-                                dot: 'bg-blue-400',
-                            },
-                            {
-                                bg: 'bg-cyan-50',
-                                text: 'text-cyan-800',
-                                border: 'border-cyan-200',
-                                dot: 'bg-cyan-400',
-                            },
-                            {
-                                bg: 'bg-indigo-50',
-                                text: 'text-indigo-800',
-                                border: 'border-indigo-200',
-                                dot: 'bg-indigo-400',
-                            },
-                            {
-                                bg: 'bg-slate-50',
-                                text: 'text-slate-800',
-                                border: 'border-slate-200',
-                                dot: 'bg-slate-400',
-                            },
-                        ],
-                    };
-                    const palette = palettes[type];
-                    const tone = palette[hash % palette.length];
-                    return (
-                        <motion.span
-                            initial={{scale: 0.95, opacity: 0}}
-                            animate={{scale: 1, opacity: 1}}
-                            whileHover={{
-                                y: -1,
-                                boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
-                            }}
-                            transition={{
-                                type: 'spring',
-                                stiffness: 480,
-                                damping: 30,
-                            }}
-                            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-[2px] text-[10px] leading-[12px] border max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis ${tone.bg} ${tone.text} ${tone.border}`}
-                            title={current || value || ''}
-                        >
-                            <span
-                                className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${tone.dot}`}
-                            ></span>
-                            <span className='truncate'>{current || value}</span>
-                            <button
-                                onClick={() => {
-                                    setCurrent(undefined);
-                                    onChange(undefined);
-                                }}
-                                className='ml-1 hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity'
-                                aria-label='Clear'
-                            >
-                                <X className='h-3 w-3' />
-                            </button>
-                        </motion.span>
-                    );
-                })()
-            ) : (
-                <button
-                    onClick={() => setOpen((s) => !s)}
-                    className={`w-full text-left px-2 ${sizeClass} rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-500`}
-                >
-                    {placeholder || 'Select'}
-                </button>
-            )}
-            {/* plus button removed per request */}
-            {open &&
-                dropdownPos &&
-                createPortal(
-                    <div
-                        ref={dropdownRef}
-                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            position: 'fixed',
-                            top: dropdownPos.top,
-                            left: dropdownPos.left,
-                            width: dropdownPos.width,
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
+                {/* Show selected value as chip when there's a value and not actively typing */}
+                {(current || value) && !open && (
+                    <motion.span
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
+                        style={{width: '100%', minWidth: '100%'}}
+                        title={`Double-click to edit: ${current || value}`}
+                        onDoubleClick={(e: any) => {
+                            const target = e.target as HTMLElement;
+                            if (!target.closest('button')) {
+                                // Always allow editing by setting the query and opening input
+                                setQuery(current || value || '');
+                                setOpen(true);
+                                // Focus the input after opening
+                                setTimeout(() => {
+                                    if (inputRef.current) {
+                                        inputRef.current.focus();
+                                        inputRef.current.select(); // Select all text for easy editing
+                                    }
+                                }, 10);
+                            }
+                        }}
+                        onClick={(e: any) => {
+                            // For cloudType, also allow single click to open dropdown
+                            if (type === 'cloudType' && allOptions.length > 0) {
+                                const target = e.target as HTMLElement;
+                                if (!target.closest('button')) {
+                                    setQuery('');
+                                    setOpen(true);
+                                    setTimeout(() => {
+                                        if (inputRef.current) {
+                                            inputRef.current.focus();
+                                        }
+                                    }, 10);
+                                }
+                            }
                         }}
                     >
-                        <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                        <div className='p-2 border-b border-slate-200'>
-                            <input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder={`Search ${type}s`}
-                                className='w-full rounded border border-slate-300 px-2 py-1 text-[12px]'
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        {/* Dropdown arrow for cloudType */}
+                        {type === 'cloudType' && (
+                            <ChevronDown 
+                                size={12} 
+                                className="text-slate-400 flex-shrink-0 ml-1" 
                             />
-                        </div>
-                        <div className='max-h-60 overflow-auto text-[12px] px-3 py-2 space-y-2'>
+                        )}
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                )}
+                
+                {/* Show input when no value selected or actively typing */}
+                {(!current && !value) || open ? (
+                    <div className="relative w-full">
+                        <input
+                            ref={inputRef}
+                            value={query}
+                            onChange={(e: any) => {
+                                const newValue = e.target.value;
+                                setQuery(newValue);
+                                
+                                // Only open dropdown when typing if there are options to show
+                                if (allOptions.length > 0) {
+                                    setOpen(true);
+                                }
+                                
+                                // Don't load options if dropdown is disabled (empty options array)
+                                
+                                // Clear current selection if user clears the input completely
+                                if (newValue === '') {
+                                    onChange('');
+                                    setCurrent('');
+                                }
+                            }}
+                            onBlur={(e: any) => {
+                                // Create chip from entered text when focus is lost
+                                const newValue = query.trim();
+                                if (newValue) {
+                                    onChange(newValue);
+                                    setCurrent(newValue);
+                                    setQuery('');
+                                }
+                                setOpen(false);
+                            }}
+                            onFocus={() => {
+                                // Only open dropdown on focus if there are options to show
+                                if (allOptions.length > 0) {
+                                    setOpen(true);
+                                }
+                                
+                                // Don't load options if dropdown is disabled (empty options array)
+                                if (false) {
+                                    loadAllOptions();
+                                }
+                            }}
+                            onKeyDown={async (e: any) => {
+                                if (e.key === 'Enter' || e.key === 'Tab') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    // Save current value immediately
+                                    const newValue = query.trim();
+                                    if (newValue) {
+                                        onChange(newValue);
+                                        setQuery('');
+                                        setOpen(false);
+                                    }
+                                    
+                                    // Use provided tab navigation functions
+                                    setTimeout(() => {
+                                        if (e.key === 'Tab' && e.shiftKey && onTabPrev) {
+                                            onTabPrev(); // Previous field (Shift+Tab)
+                                        } else if (onTabNext) {
+                                            onTabNext(); // Next field (Tab or Enter)
+                                        }
+                                    }, 10);
+                                } else if (e.key === 'Escape') {
+                                    setOpen(false);
+                                    setQuery('');
+                                }
+                            }}
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                            placeholder=''
+                        />
+                        {/* Dropdown arrow for cloudType */}
+                        {type === 'cloudType' && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (allOptions.length > 0) {
+                                        setOpen(!open);
+                                        if (!open && inputRef.current) {
+                                            inputRef.current.focus();
+                                        }
+                                    } else {
+                                        // Force load options
+                                        loadAllOptions();
+                                    }
+                                }}
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 z-10"
+                            >
+                                <ChevronDown size={14} />
+                            </button>
+                        )}
+                    </div>
+                ) : null}
+            </div>
+            
+            {/* Full Autocomplete Dropdown - Portal Based */}
+            {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: `${Math.min(dropdownPortalPos.width, 180)}px`,
+                        maxWidth: '180px',
+                        minWidth: '140px'
+                    }}
+                >
+                        <div className='py-1'>
+                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
                                 </div>
-                            ) : options.length === 0 ? (
-                                <div className='px-3 py-2 text-slate-500'>
-                                    No matches
-                                </div>
                             ) : (
-                                options
-                                    .filter((opt) =>
-                                        query
-                                            ? opt.name
-                                                  .toLowerCase()
-                                                  .includes(query.toLowerCase())
-                                            : true,
-                                    )
-                                    .map((opt, idx) => {
-                                        const palette = [
-                                            {
-                                                bg: 'bg-pink-500',
-                                                hover: 'hover:bg-pink-400',
-                                                text: 'text-white',
-                                            },
-                                            {
-                                                bg: 'bg-sky-500',
-                                                hover: 'hover:bg-sky-400',
-                                                text: 'text-white',
-                                            },
-                                            {
-                                                bg: 'bg-slate-400',
-                                                hover: 'hover:bg-slate-300',
-                                                text: 'text-white',
-                                            },
-                                            {
-                                                bg: 'bg-emerald-500',
-                                                hover: 'hover:bg-emerald-400',
-                                                text: 'text-white',
-                                            },
-                                            {
-                                                bg: 'bg-violet-500',
-                                                hover: 'hover:bg-violet-400',
-                                                text: 'text-white',
-                                            },
-                                            {
-                                                bg: 'bg-amber-500',
-                                                hover: 'hover:bg-amber-400',
-                                                text: 'text-white',
-                                            },
-                                        ];
-                                        const tone =
-                                            palette[idx % palette.length];
-                                        return (
-                                            <button
-                                                key={opt.id}
-                                                onClick={() => {
-                                                    setCurrent(opt.name);
-                                                    onChange(opt.name);
-                                                    setOpen(false);
-                                                }}
-                                                className={`w-full rounded-md px-4 py-2 ${tone.bg} ${tone.hover} ${tone.text} transition-colors`}
-                                            >
-                                                {opt.name}
-                                            </button>
-                                        );
-                                    })
+                                (() => {
+                                    // Filter options that match the query (show all if no query)
+                                    const filteredOptions = query.trim() 
+                                        ? options.filter(opt => 
+                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                            opt.name.toLowerCase().includes(query.toLowerCase())
+                                        ).sort((a, b) => {
+                                            const aLower = a.name.toLowerCase();
+                                            const bLower = b.name.toLowerCase();
+                                            const queryLower = query.toLowerCase();
+                                            
+                                            // Prioritize starts with matches
+                                            const aStartsWith = aLower.startsWith(queryLower);
+                                            const bStartsWith = bLower.startsWith(queryLower);
+                                            
+                                            if (aStartsWith && !bStartsWith) return -1;
+                                            if (bStartsWith && !aStartsWith) return 1;
+                                            
+                                            return aLower.localeCompare(bLower);
+                                        })
+                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                    
+                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
+                                    
+                                    // Check if query exactly matches an existing option
+                                    const exactMatch = query.trim() ? options.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    ) : null;
+                                    
+                                    const showCreateNew = query.trim() && !exactMatch;
+
+                                    return (
+                                        <div>
+                                            {/* Show existing matching options */}
+                                            {filteredOptions.length > 0 && (
+                                                <div>
+                                                    {filteredOptions.map((opt, idx) => (
+                                                        <div
+                                                            key={opt.id}
+                                                            onClick={() => {
+                                                                onChange(opt.name);
+                                                                setCurrent(opt.name);
+                                                                setQuery('');
+                                                                setOpen(false);
+                                                            }}
+                                                            className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
+                                                        >
+                                                            {opt.name}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show "Create New" option */}
+                                            {showCreateNew && (
+                                                <div className='border-t border-slate-200'>
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                let created: { id: string; name: string; } | null = null;
+                                                                
+                                                                if (type === 'accountName') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/accountNames', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                } else if (type === 'masterAccount') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/masterAccounts', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                } else if (type === 'cloudType') {
+                                                                    // Cloud Type has predefined options, don't create new ones
+                                                                    console.log('Cannot create new cloudType options - using predefined values only');
+                                                                    return;
+                                                                } else if (type === 'address') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/addresses', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                } else if (type === 'template') {
+                                                                    created = await api.post<{ id: string; name: string; }>('/api/templates', {
+                                                                        name: query.trim(),
+                                                                    });
+                                                                }
+                                                                
+                                                                if (created) {
+                                                                    // Update options list
+                                                                    setOptions((prev) => [...prev, created!]);
+                                                                    setAllOptions((prev) => [...prev, created!]);
+                                                                    
+                                                                    // Set the new value
+                                                                    onChange(created.name);
+                                                                    setCurrent(created.name);
+                                                                    setQuery('');
+                                                                    setOpen(false);
+                                                                    
+                                                                    // Notify parent component
+                                                                    if (onNewItemCreated) {
+                                                                        let dropdownType: string;
+                                                                        
+                                                                        switch (type) {
+                                                                            case 'accountName':
+                                                                                dropdownType = 'accountNames';
+                                                                                break;
+                                                                            case 'masterAccount':
+                                                                                dropdownType = 'masterAccounts';
+                                                                                break;
+                                                                            case 'address':
+                                                                                dropdownType = 'addresses';
+                                                                                break;
+                                                                            default:
+                                                                                dropdownType = 'emails'; // fallback
+                                                                                break;
+                                                                        }
+                                                                        
+                                                                        // Only call if this is a supported type for the callback
+                                                                        if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
+                                                                            onNewItemCreated(dropdownType as any, created);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } catch (error) {
+                                                                console.log(`API creation failed for ${type}, creating local entry`);
+                                                                
+                                                                // Fallback: create a local entry when API fails
+                                                                const newId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                                                                const created = { id: newId, name: query.trim() };
+                                                                
+                                                                // Update options list
+                                                                setOptions((prev) => [...prev, created]);
+                                                                setAllOptions((prev) => [...prev, created]);
+                                                                
+                                                                // Set the new value
+                                                                onChange(created.name);
+                                                                setCurrent(created.name);
+                                                                setQuery('');
+                                                                setOpen(false);
+                                                                
+                                                                // Notify parent component
+                                                                if (onNewItemCreated) {
+                                                                    const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
+                                                                    onNewItemCreated(dropdownType, created);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
+                                                    >
+                                                        + Create &quot;{query.trim()}&quot;
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show "No results" message */}
+                                            {filteredOptions.length === 0 && !showCreateNew && (
+                                                <div className='px-3 py-2 text-center text-sm text-slate-500'>
+                                                    {query.trim() ? (
+                                                        <div>No {type}s found matching &quot;{query}&quot;</div>
+                                                    ) : (
+                                                        <div>No {type}s available</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()
                             )}
                         </div>
-                        <div className='border-t border-slate-200 px-3 py-2'>
-                            <button
-                                onClick={() => {
-                                    setAdding('');
-                                    setShowAdder(true);
-                                }}
-                                className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
-                            >
-                                <Plus className='h-3.5 w-3.5' />
-                                <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
-                                    Add new {type}
-                                </span>
-                            </button>
-                            {showAdder && (
-                                <div className='mt-2 overflow-hidden'>
-                                    <div className='flex items-center gap-2'>
-                                        <motion.input
-                                            initial={{x: -12, opacity: 0}}
-                                            animate={{x: 0, opacity: 1}}
-                                            transition={{
-                                                type: 'spring',
-                                                stiffness: 420,
-                                                damping: 28,
-                                            }}
-                                            value={adding}
-                                            onChange={(e) =>
-                                                setAdding(e.target.value)
-                                            }
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') addNew();
-                                                if (e.key === 'Escape')
-                                                    setShowAdder(false);
-                                            }}
-                                            placeholder={`Enter ${type} name`}
-                                            className='flex-1 rounded border border-slate-300 px-2 py-1 text-[12px]'
-                                        />
-                                        <button
-                                            onClick={async () => {
-                                                await addNew();
-                                            }}
-                                            className='inline-flex items-center gap-1 px-2 py-1 rounded bg-violet-600 text-white text-[12px] hover:bg-violet-700'
-                                        >
-                                            Add
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>,
-                    document.body,
-                )}
-            {/* removed old portal-based adder */}
+                    </div>
+                </div>,
+                document.body
+            )
+        }
         </div>
     );
 }
@@ -876,38 +2731,368 @@ interface AccountsTableProps {
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'enterpriseName' | 'productName' | 'serviceName';
+    groupByExternal?: 'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address';
     onGroupByChange?: (
-        g: 'none' | 'enterpriseName' | 'productName' | 'serviceName',
+        g: 'none' | 'accountName' | 'email' | 'phone',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'masterAccount'
         | 'accountName'
-        | 'country'
-        | 'addressLine1'
-        | 'addressLine2'
-        | 'city'
-        | 'state'
-        | 'pincode'
+        | 'masterAccount'
+        | 'cloudType'
+        | 'address'
         | 'technicalUser'
         | 'actions'
     >;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
-        enterprises?: Array<{id: string; name: string}>;
-        products?: Array<{id: string; name: string}>;
-        services?: Array<{id: string; name: string}>;
+        accountNames?: Array<{id: string; name: string}>;
+        cloudTypes?: Array<{id: string; name: string}>;
+        emails?: Array<{id: string; name: string}>;
+        phones?: Array<{id: string; name: string}>;
     };
-    onUpdateField?: (
-        rowId: string,
-        field: keyof AccountRow | string,
-        value: any,
-    ) => void;
+    onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
+    enableInlineEditing?: boolean;
+    incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
+    hasBlankRow?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        item: {id: string; name: string},
+    ) => void;
+    onShowAllColumns?: () => void;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    compressingLicenseId?: string | null;
+    foldingLicenseId?: string | null;
+    triggerValidation?: boolean; // Trigger validation highlighting
+    onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
+    onAddNewRow?: () => void; // Callback to add a new row
+    externalSortColumn?: string; // External sort column from parent
+    externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
+    onSortChange?: (column: string, direction: 'asc' | 'desc') => void; // Callback when sort changes from column headers
+    isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
+    onLicenseValidationChange?: (hasIncompleteLicenses: boolean, incompleteLicenseRows: string[]) => void; // Callback for license validation state
+    onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
+    onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
+    onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
+    onOpenTechnicalUserModal?: (row: AccountRow) => void; // Callback to open technical user modal
+}
+
+// License Sub Row Component
+function LicenseSubRow({
+    license,
+    rowId,
+    onUpdate,
+    onDelete,
+    showValidationErrors,
+    isLicenseFieldMissing,
+    compressingLicenseId,
+    foldingLicenseId,
+    onDeleteClick,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    onOpenContactModal,
+    accounts = [],
+}: {
+    license: License;
+    rowId: string;
+    onUpdate: (licenseId: string, field: keyof License, value: string | boolean) => void;
+    onDelete: (licenseId: string) => void;
+    showValidationErrors: boolean;
+    isLicenseFieldMissing: (license: License, field: keyof License) => boolean;
+    compressingLicenseId?: string | null;
+    foldingLicenseId?: string | null;
+    onDeleteClick?: (licenseId: string) => void;
+    onDropdownOptionUpdate?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        item: {id: string; name: string},
+    ) => void;
+    onOpenContactModal: (rowId: string, licenseId: string, initialData?: Contact) => void;
+    accounts?: AccountRow[];
+}) {
+    const [isRowHovered, setIsRowHovered] = useState(false);
+
+    // Tab navigation for license fields
+    const createLicenseTabNavigation = (currentCol: string) => {
+        const editableCols = ['enterprise', 'product', 'service', 'licenseStartDate', 'licenseEndDate', 'numberOfUsers', 'noticePeriodDays'];
+        const currentIndex = editableCols.indexOf(currentCol);
+
+        const onTabNext = () => {
+            const nextIndex = currentIndex + 1;
+            if (nextIndex < editableCols.length) {
+                const nextCol = editableCols[nextIndex];
+                setTimeout(() => {
+                    const nextInput = document.querySelector(
+                        `[data-license-id="${license.id}"][data-license-col="${nextCol}"] input`,
+                    ) as HTMLInputElement;
+                    if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select();
+                    }
+                }, 10);
+            }
+        };
+
+        const onTabPrev = () => {
+            const prevIndex = currentIndex - 1;
+            if (prevIndex >= 0) {
+                const prevCol = editableCols[prevIndex];
+                setTimeout(() => {
+                    const prevInput = document.querySelector(
+                        `[data-license-id="${license.id}"][data-license-col="${prevCol}"] input`,
+                    ) as HTMLInputElement;
+                    if (prevInput) {
+                        prevInput.focus();
+                        prevInput.select();
+                    }
+                }, 10);
+            }
+        };
+
+        return {onTabNext, onTabPrev};
+    };
+
+    return (
+        <div 
+            className={`relative flex items-center ml-6 my-1 transition-all duration-200 ${
+                compressingLicenseId === license.id
+                    ? 'transform scale-x-75 transition-all duration-500 ease-out'
+                    : ''
+            } ${
+                foldingLicenseId === license.id
+                    ? 'opacity-0 transform scale-y-50 transition-all duration-300'
+                    : ''
+            }`}
+            onMouseEnter={() => setIsRowHovered(true)}
+            onMouseLeave={() => setIsRowHovered(false)}
+        >
+            {/* Connection line from parent row */}
+            <div className="absolute -left-6 top-0 bottom-0 w-6 flex">
+                {/* Vertical line continuing from parent */}
+                <div className="w-px h-full bg-blue-300 ml-3"></div>
+                {/* Horizontal connector to this row */}
+                <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
+            </div>
+            
+            {/* Delete button */}
+            <div className="flex items-center justify-center w-8 mr-2">
+                {isRowHovered && (
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e: any) => {
+                            e.stopPropagation();
+                            if (onDelete) {
+                                onDelete(license.id);
+                            }
+                        }}
+                        className="group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md"
+                        title="Delete License"
+                    >
+                        <svg
+                            className="w-2 h-2 transition-transform duration-200"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 12h12"
+                            />
+                        </svg>
+                    </motion.button>
+                )}
+            </div>
+            
+            {/* License row content */}
+            <div 
+                className="flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200"
+                style={{
+                    gridTemplateColumns: license.renewalNotice 
+                        ? "minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) 70px 40px 80px 100px" 
+                        : "minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(100px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr) 70px 40px 80px"
+                }}
+            >
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Enterprise</label>
+                    <AsyncChipSelect
+                        type='template'
+                        value={license.enterprise}
+                        onChange={(value) => onUpdate(license.id, 'enterprise', value || '')}
+                        placeholder="Enter enterprise"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'enterprise')}
+                        compact={true}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                        onNewItemCreated={onNewItemCreated as any}
+                        accounts={accounts}
+                        currentRowId={license.id}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('enterprise')}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Product</label>
+                    <AsyncChipSelect
+                        type='template'
+                        value={license.product}
+                        onChange={(value) => onUpdate(license.id, 'product', value || '')}
+                        placeholder="Enter product"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'product')}
+                        compact={true}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                        onNewItemCreated={onNewItemCreated as any}
+                        accounts={accounts}
+                        currentRowId={license.id}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('product')}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Service</label>
+                    <AsyncChipSelect
+                        type='template'
+                        value={license.service}
+                        onChange={(value) => onUpdate(license.id, 'service', value || '')}
+                        placeholder="Enter service"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'service')}
+                        compact={true}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                        onNewItemCreated={onNewItemCreated as any}
+                        accounts={accounts}
+                        currentRowId={license.id}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('service')}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
+                    <label className="text-xs font-medium text-blue-700 mb-1">License Start Date</label>
+                    <DateChipSelect
+                        value={license.licenseStartDate}
+                        onChange={(value) => onUpdate(license.id, 'licenseStartDate', value || '')}
+                        placeholder="Start date"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
+                        compact={true}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
+                    <label className="text-xs font-medium text-blue-700 mb-1">License End Date</label>
+                    <DateChipSelect
+                        value={license.licenseEndDate}
+                        onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
+                        placeholder="End date"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
+                        compact={true}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
+                    <label className="text-xs font-medium text-blue-700 mb-1">No. of Users</label>
+                    <AsyncChipSelect
+                        type='template'
+                        value={license.numberOfUsers}
+                        onChange={(value) => onUpdate(license.id, 'numberOfUsers', value || '')}
+                        placeholder="Count"
+                        isError={showValidationErrors && isLicenseFieldMissing(license, 'numberOfUsers')}
+                        compact={true}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                        onNewItemCreated={onNewItemCreated as any}
+                        accounts={accounts}
+                        currentRowId={license.id}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        {...createLicenseTabNavigation('numberOfUsers')}
+                    />
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Contact</label>
+                    <div className="flex items-start justify-center h-8 pt-0.5">
+                        <button
+                            onClick={() => onOpenContactModal(rowId, license.id, license.contactDetails)}
+                            className="flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md"
+                            title="Edit contact details"
+                        >
+                            <svg
+                                className="w-3 h-3 text-blue-600 group-hover:text-blue-700"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
+                    <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>
+                    <div className="flex items-start h-8 space-x-1 pt-0.5">
+                        <input
+                            type="checkbox"
+                            checked={license.renewalNotice}
+                            onChange={(e) => onUpdate(license.id, 'renewalNotice', e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-600">Notify</span>
+                    </div>
+                </div>
+                
+                {license.renewalNotice && (
+                    <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
+                        <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>
+                        <AsyncChipSelect
+                            type='template'
+                            value={license.noticePeriodDays || ''}
+                            onChange={(value) => onUpdate(license.id, 'noticePeriodDays', value || '')}
+                            placeholder="Days"
+                            isError={showValidationErrors && license.renewalNotice && !license.noticePeriodDays}
+                            compact={true}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                            onNewItemCreated={onNewItemCreated as any}
+                            accounts={accounts}
+                            currentRowId={license.id}
+                            currentRowEnterprise={license.enterprise}
+                            currentRowProduct={license.product}
+                            {...createLicenseTabNavigation('noticePeriodDays')}
+                        />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 function SortableAccountRow({
@@ -918,7 +3103,6 @@ function SortableAccountRow({
     cols,
     gridTemplate,
     highlightQuery,
-    onQuickAddRow,
     customColumns = [],
     isExpanded,
     onToggle,
@@ -931,6 +3115,17 @@ function SortableAccountRow({
     pinFirst,
     firstColWidth,
     hideRowExpansion = false,
+    enableDropdownChips = false,
+    shouldShowHorizontalScroll = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    isCellMissing = () => false,
+    compressingRowId = null,
+    foldingRowId = null,
+    allRows = [],
+    onDeleteClick,
+    onOpenAddressModal,
+    onOpenTechnicalUserModal,
 }: {
     row: AccountRow;
     index: number;
@@ -939,16 +3134,11 @@ function SortableAccountRow({
     cols: string[];
     gridTemplate: string;
     highlightQuery?: string;
-    onQuickAddRow?: () => void;
     customColumns?: string[];
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (
-        rowId: string,
-        key: keyof AccountRow | string,
-        value: any,
-    ) => void;
+    onUpdateField: (rowId: string, key: keyof AccountRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
     onStartFill: (rowId: string, col: keyof AccountRow, value: string) => void;
@@ -956,6 +3146,25 @@ function SortableAccountRow({
     pinFirst?: boolean;
     firstColWidth?: string;
     hideRowExpansion?: boolean;
+    enableDropdownChips?: boolean;
+    shouldShowHorizontalScroll?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accountNames' | 'emails' | 'phones',
+        item: {id: string; name: string},
+    ) => void;
+    isCellMissing?: (rowId: string, field: string) => boolean;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    allRows?: AccountRow[];
+    onDeleteClick?: (rowId: string) => void;
+    onOpenAddressModal?: (row: AccountRow) => void;
+    onOpenTechnicalUserModal?: (row: AccountRow) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -963,21 +3172,15 @@ function SortableAccountRow({
     const [menuPos, setMenuPos] = useState<{top: number; left: number} | null>(
         null,
     );
-    const [isDragging, setIsDragging] = useState(false);
+    const [isRowHovered, setIsRowHovered] = useState(false);
 
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
         [
-            'masterAccount',
             'accountName',
-            'email',
-            'phone',
-            'country',
-            'addressLine1',
-            'addressLine2',
-            'city',
-            'state',
-            'pincode',
+            'masterAccount',
+            'cloudType',
+            'address',
         ].includes(col),
     );
 
@@ -1059,68 +3262,6 @@ function SortableAccountRow({
         return {onTabNext, onTabPrev};
     };
 
-    // Tab navigation for subtables (Technical User and License Details)
-    const createSubtableTabNavigation = (
-        rowId: string,
-        subtableType: 'technical' | 'license',
-        currentField: string,
-        licenseIndex?: number,
-    ) => {
-        const technicalFields = [
-            'firstName',
-            'middleName',
-            'lastName',
-            'email',
-            'status',
-            'startDate',
-            'endDate',
-            'password',
-            'technicalUser',
-        ];
-        const licenseFields = [
-            'product',
-            'service',
-            'licenseStart',
-            'licenseEnd',
-            'users',
-            'renewalNotice',
-            'noticeDays',
-        ];
-
-        const fields =
-            subtableType === 'technical' ? technicalFields : licenseFields;
-        const currentIndex = fields.indexOf(currentField);
-
-        const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const nextIndex = e.shiftKey
-                    ? currentIndex - 1
-                    : currentIndex + 1;
-
-                if (nextIndex >= 0 && nextIndex < fields.length) {
-                    const nextField = fields[nextIndex];
-                    setTimeout(() => {
-                        let selector: string;
-                        if (subtableType === 'technical') {
-                            selector = `[data-tech-row="${rowId}"][data-tech-field="${nextField}"] input`;
-                        } else {
-                            selector = `[data-license-row="${rowId}"][data-license-index="${licenseIndex}"][data-license-field="${nextField}"] input, [data-license-row="${rowId}"][data-license-index="${licenseIndex}"][data-license-field="${nextField}"] select`;
-                        }
-                        const nextInput = document.querySelector(
-                            selector,
-                        ) as HTMLInputElement;
-                        if (nextInput) {
-                            nextInput.focus();
-                        }
-                    }, 10);
-                }
-            }
-        };
-
-        return {onKeyDown};
-    };
-
     const toggleMenu = () => {
         const rect = actionsRef.current?.getBoundingClientRect();
         if (rect) {
@@ -1169,41 +3310,41 @@ function SortableAccountRow({
         tone,
     }: {
         text: string;
-        tone: 'slate' | 'sky' | 'violet' | 'emerald' | 'amber';
+        tone: 'slate' | 'blue' | 'sky' | 'indigo' | 'cyan';
     }) => {
         const toneMap: Record<
             string,
             {bg: string; text: string; border: string; dot: string}
         > = {
+            blue: {
+                bg: 'bg-white',
+                text: 'text-black',
+                border: '',
+                dot: 'bg-blue-400',
+            },
             sky: {
                 bg: 'bg-sky-50',
                 text: 'text-sky-800',
                 border: 'border-sky-200',
                 dot: 'bg-sky-400',
             },
+            indigo: {
+                bg: 'bg-indigo-50',
+                text: 'text-indigo-800',
+                border: 'border-indigo-200',
+                dot: 'bg-indigo-400',
+            },
+            cyan: {
+                bg: 'bg-cyan-50',
+                text: 'text-cyan-800',
+                border: 'border-cyan-200',
+                dot: 'bg-cyan-400',
+            },
             slate: {
-                bg: 'bg-slate-100',
+                bg: 'bg-slate-50',
                 text: 'text-slate-800',
                 border: 'border-slate-200',
                 dot: 'bg-slate-400',
-            },
-            violet: {
-                bg: 'bg-violet-50',
-                text: 'text-violet-800',
-                border: 'border-violet-200',
-                dot: 'bg-violet-400',
-            },
-            emerald: {
-                bg: 'bg-emerald-50',
-                text: 'text-emerald-800',
-                border: 'border-emerald-200',
-                dot: 'bg-emerald-400',
-            },
-            amber: {
-                bg: 'bg-amber-50',
-                text: 'text-amber-800',
-                border: 'border-amber-200',
-                dot: 'bg-amber-400',
             },
         };
         const t = toneMap[tone] || toneMap.slate;
@@ -1213,337 +3354,107 @@ function SortableAccountRow({
                 animate={{scale: 1, opacity: 1}}
                 whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
                 transition={{type: 'spring', stiffness: 480, damping: 30}}
-                className={`inline-flex items-center gap-1 px-1.5 py-[2px] rounded-none text-[10px] leading-[12px] border max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis ${t.bg} ${t.text} ${t.border}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis rounded ${t.bg} ${t.text} ${t.border}`}
                 title={text}
             >
-                <span
-                    className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${t.dot}`}
-                ></span>
                 <span className='truncate'>{text}</span>
             </motion.span>
         );
     };
 
-    const cssTemplate = gridTemplate.split('_').join(' ');
     return (
-        <motion.div
+        <div
             id={row.id}
             data-account-id={row.id}
-            layout
-            draggable
-            onDragStartCapture={(e: React.DragEvent<HTMLDivElement>) => {
-                try {
-                    e.dataTransfer.effectAllowed = 'move';
-                    const rowEl = (e.currentTarget as HTMLElement).closest(
-                        '[data-account-id]',
-                    ) as HTMLElement | null;
-                    if (rowEl) {
-                        const rect = rowEl.getBoundingClientRect();
-                        const proxy = rowEl.cloneNode(true) as HTMLElement;
-
-                        // Enhanced folded/compressed drag image
-                        proxy.style.position = 'fixed';
-                        proxy.style.top = `${rect.top}px`;
-                        proxy.style.left = `${rect.left}px`;
-                        proxy.style.pointerEvents = 'none';
-                        proxy.style.zIndex = '9999';
-
-                        // Compression/folding effects
-                        proxy.style.width = `${Math.min(
-                            rect.width * 0.6,
-                            300,
-                        )}px`; // Compress to 60% width, max 300px
-                        proxy.style.height = `${rect.height * 0.8}px`; // Slightly reduce height
-                        proxy.style.maxWidth = `${Math.min(
-                            rect.width * 0.6,
-                            300,
-                        )}px`;
-                        proxy.style.overflow = 'hidden';
-
-                        // Enhanced visual styling
-                        proxy.style.background =
-                            'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
-                        proxy.style.border =
-                            '2px solid rgba(59, 130, 246, 0.4)';
-                        proxy.style.boxShadow = `
-                            0 20px 25px -5px rgba(0, 0, 0, 0.1),
-                            0 10px 10px -5px rgba(0, 0, 0, 0.04),
-                            0 0 0 1px rgba(59, 130, 246, 0.2),
-                            inset 0 1px 0 0 rgba(255, 255, 255, 0.8)
-                        `;
-                        proxy.style.borderRadius = '12px';
-                        proxy.style.backdropFilter = 'blur(8px)';
-
-                        // Add realistic folding animation with 3D effect
-                        proxy.classList.add('drag-folded-row');
-                        proxy.style.animation =
-                            'paperFold 0.6s ease-out forwards, dragPulse 1.5s ease-in-out infinite 0.6s';
-                        proxy.style.transformOrigin = 'center bottom';
-                        proxy.style.transformStyle = 'preserve-3d';
-
-                        // Add fold line in the middle to simulate paper crease
-                        const foldLine = document.createElement('div');
-                        foldLine.style.cssText = `
-                            position: absolute;
-                            top: 50%;
-                            left: 0;
-                            right: 0;
-                            height: 1px;
-                            background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.6) 20%, rgba(59, 130, 246, 0.8) 50%, rgba(59, 130, 246, 0.6) 80%, transparent 100%);
-                            z-index: 10;
-                            box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
-                            animation: foldLineGlow 2s ease-in-out infinite;
-                        `;
-                        proxy.appendChild(foldLine);
-
-                        // Add secondary fold line for more realistic effect
-                        const secondaryFoldLine = document.createElement('div');
-                        secondaryFoldLine.style.cssText = `
-                            position: absolute;
-                            top: 25%;
-                            left: 10%;
-                            right: 10%;
-                            height: 0.5px;
-                            background: linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.4) 50%, transparent 100%);
-                            z-index: 8;
-                            animation: foldLineGlow 2s ease-in-out infinite 0.3s;
-                        `;
-                        proxy.appendChild(secondaryFoldLine);
-
-                        // Apply compression transforms to child elements
-                        const cells = proxy.querySelectorAll(
-                            'div[style*="grid-column"]',
-                        );
-                        cells.forEach((cell: Element, cellIndex: number) => {
-                            const cellEl = cell as HTMLElement;
-                            cellEl.style.transform = 'scale(0.95)';
-                            // Show first 3 columns normally, add ellipsis indicator for hidden content
-                            if (cellIndex > 2) {
-                                cellEl.style.opacity = '0.3';
-                                cellEl.style.filter = 'blur(1px)';
-                            } else {
-                                cellEl.style.opacity = '1';
-                            }
-                            cellEl.style.transition = 'all 0.2s ease-out';
-                        });
-
-                        // Add visual indicator for hidden columns
-                        if (cells.length > 3) {
-                            const hiddenIndicator =
-                                document.createElement('div');
-                            hiddenIndicator.style.cssText = `
-                                position: absolute;
-                                top: 50%;
-                                right: 30px;
-                                transform: translateY(-50%);
-                                background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.8) 20%, rgba(59, 130, 246, 1) 100%);
-                                color: white;
-                                font-size: 11px;
-                                padding: 3px 8px;
-                                border-radius: 12px;
-                                font-weight: 700;
-                                z-index: 15;
-                                box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-                                display: flex;
-                                align-items: center;
-                                gap: 4px;
-                            `;
-                            hiddenIndicator.innerHTML = `
-                                <span style="font-size: 8px;">●●●</span>
-                                <span>+${cells.length - 3} more</span>
-                            `;
-                            proxy.appendChild(hiddenIndicator);
-                        }
-
-                        // Pulsing effect is now part of the combined animation above
-
-                        // Add row selection border effect
-                        const selectionBorder = document.createElement('div');
-                        selectionBorder.style.cssText = `
-                            position: absolute;
-                            inset: -2px;
-                            background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
-                            border-radius: 14px;
-                            z-index: -1;
-                            animation: selectionGlow 2s ease-in-out infinite;
-                        `;
-                        proxy.appendChild(selectionBorder);
-
-                        // Remove text badges - keep only visual effects
-
-                        document.body.appendChild(proxy);
-                        e.dataTransfer.setDragImage(proxy, 12, 12);
-
-                        const cleanup = () => {
-                            try {
-                                document.body.removeChild(proxy);
-                            } catch {}
-                            window.removeEventListener('dragend', cleanup);
-                        };
-                        window.addEventListener('dragend', cleanup, {
-                            once: true,
-                        });
-                    }
-                    e.dataTransfer.setData(
-                        'application/json',
-                        JSON.stringify({rowId: String(row.id)}),
-                    );
-                } catch {}
-            }}
-            onDragOverCapture={(e: React.DragEvent<HTMLDivElement>) => {
-                // Keep HTML5 DnD Active so the outer trash target accepts the drop
-                e.preventDefault();
-            }}
-            initial={
-                String(row.id || '').startsWith('tmp-')
-                    ? {opacity: 0, y: -6, scale: 0.98}
-                    : false
-            }
-            animate={{opacity: 1, y: 0, scale: 1}}
-            transition={{
-                layout: {duration: 0.22, ease: [0.22, 1, 0.36, 1]},
-                type: 'spring',
-                stiffness: 460,
-                damping: 30,
-                mass: 0.6,
-            }}
-            className={`w-full grid items-center gap-0 rounded-md overflow-visible border border-slate-200 transition-all duration-200 ease-in-out transform-gpu h-10 ${
-                isDragging
-                    ? 'cursor-grabbing ring-2 ring-primary-300/40 bg-white shadow-xl'
-                    : 'cursor-grab hover:bg-slate-50 hover:shadow-sm hover:ring-1 hover:ring-slate-200'
-            } ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} ${
-                isSelected ? 'ring-2 ring-primary-300/60 bg-primary-50/60' : ''
+            onMouseEnter={() => setIsRowHovered(true)}
+            onMouseLeave={() => setIsRowHovered(false)}
+            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+                isSelected 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
+                    : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
+            } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
+                isSelected ? 'border-blue-300' : 'border-slate-200'
             } ${inFillRange ? 'bg-primary-50/40' : ''} ${
                 isExpanded
-                    ? 'bg-primary-50 border-l-4 border-l-primary-400'
+                    ? 'bg-primary-50'
+                    : ''
+            } ${
+                compressingRowId === row.id
+                    ? 'transform scale-x-75 transition-all duration-500 ease-out'
+                    : ''
+            } ${
+                foldingRowId === row.id
+                    ? 'opacity-0 transform scale-y-50 transition-all duration-300'
                     : ''
             }`}
             style={{
-                gridTemplateColumns: cssTemplate,
+                gridTemplateColumns: gridTemplate,
                 willChange: 'transform',
-                zIndex: isDragging ? 20 : 'auto',
-                gap: '0px',
+                display: 'grid',
+                minWidth: 'max-content',
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
-                // If pointerdown starts on non-draggable interActive elements, don't begin HTML5 drag
-                const target = e.target as HTMLElement;
-                const isInlineEditable = target.closest('[data-inline]');
-
-                if (isInlineEditable) {
-                    console.log(
-                        '🔍 Row onPointerDown: detected inline element, skipping selection',
-                    );
-                    (e.currentTarget as HTMLElement).draggable = false;
-                    e.stopPropagation();
-                    return;
-                }
-
-                if (
-                    target.closest(
-                        'input,textarea,select,button,[contenteditable="true"]',
-                    )
-                ) {
-                    (e.currentTarget as HTMLElement).draggable = false;
-                } else {
-                    (e.currentTarget as HTMLElement).draggable = true;
-                }
-
                 onSelect(row.id);
             }}
         >
-            {cols.includes('masterAccount') && (
+            {/* Delete Button Column - Always first */}
+            <div className='flex items-center justify-center px-2 py-1'>
+                {isRowHovered && (
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e: any) => {
+                            e.stopPropagation();
+                            if (onDeleteClick) {
+                                onDeleteClick(row.id);
+                            }
+                        }}
+                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md'
+                        title='Delete row'
+                    >
+                        <svg
+                            className='w-2 h-2 transition-transform duration-200'
+                            fill='none'
+                            stroke='currentColor'
+                            strokeWidth='2.5'
+                            viewBox='0 0 24 24'
+                            xmlns='http://www.w3.org/2000/svg'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                d='M6 12h12'
+                            />
+                        </svg>
+                    </motion.button>
+                )}
+            </div>
+            {cols.includes('accountName') && (
                 <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 ${
-                        pinFirst
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full ${
+                        pinFirst && !shouldShowHorizontalScroll
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
-                    } ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'
-                    } border-l-4 ${
-                        isSelected ? 'border-l-sky-400' : 'border-l-slate-200'
                     }`}
                     style={{
-                        width: firstColWidth,
-                        minWidth: firstColWidth,
-                        maxWidth: firstColWidth,
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
                 >
-                    {/* Drag handle for HTML5 DnD to toolbar trash */}
-                    <span
-                        className='mr-1 inline-flex h-5 w-3 items-center justify-center cursor-grab Active:cursor-grabbing select-none text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150'
-                        title='Drag row to trash'
-                        draggable
-                        onMouseDown={(e: React.MouseEvent) => {
-                            // Prevent framer-motion row drag from hijacking
-                            e.stopPropagation();
-                        }}
-                        onDragStart={(e: React.DragEvent<HTMLSpanElement>) => {
-                            try {
-                                e.dataTransfer.effectAllowed = 'move';
-                                // Visible floating proxy so the row appears above headers while dragging
-                                const rowEl = (
-                                    e.currentTarget as HTMLElement
-                                ).closest(
-                                    '[data-account-id]',
-                                ) as HTMLElement | null;
-                                if (rowEl) {
-                                    const rect = rowEl.getBoundingClientRect();
-                                    const proxy = rowEl.cloneNode(
-                                        true,
-                                    ) as HTMLElement;
-                                    proxy.style.position = 'fixed';
-                                    proxy.style.top = `${rect.top}px`;
-                                    proxy.style.left = `${rect.left}px`;
-                                    proxy.style.width = `${rect.width}px`;
-                                    proxy.style.maxWidth = `${rect.width}px`;
-                                    proxy.style.pointerEvents = 'none';
-                                    proxy.style.background = 'white';
-                                    proxy.style.border =
-                                        '1px solid rgba(148,163,184,0.6)';
-                                    proxy.style.boxShadow =
-                                        '0 16px 40px rgba(15,23,42,0.2)';
-                                    proxy.style.borderRadius = '8px';
-                                    proxy.style.zIndex = '9999';
-                                    document.body.appendChild(proxy);
-                                    e.dataTransfer.setDragImage(proxy, 12, 12);
-                                    // Cleanup when drag ends
-                                    const cleanup = () => {
-                                        try {
-                                            document.body.removeChild(proxy);
-                                        } catch {}
-                                        window.removeEventListener(
-                                            'dragend',
-                                            cleanup,
-                                        );
-                                    };
-                                    window.addEventListener(
-                                        'dragend',
-                                        cleanup,
-                                        {once: true},
-                                    );
-                                }
-                                e.dataTransfer.setData(
-                                    'application/json',
-                                    JSON.stringify({rowId: String(row.id)}),
-                                );
-                            } catch {}
-                        }}
-                    >
-                        <svg viewBox='0 0 8 16' className='h-3 w-2 opacity-70'>
-                            <circle cx='2' cy='2' r='1' fill='currentColor' />
-                            <circle cx='6' cy='2' r='1' fill='currentColor' />
-                            <circle cx='2' cy='6' r='1' fill='currentColor' />
-                            <circle cx='6' cy='6' r='1' fill='currentColor' />
-                            <circle cx='2' cy='10' r='1' fill='currentColor' />
-                            <circle cx='6' cy='10' r='1' fill='currentColor' />
-                            <circle cx='2' cy='14' r='1' fill='currentColor' />
-                            <circle cx='6' cy='14' r='1' fill='currentColor' />
-                        </svg>
-                    </span>
                     {!hideRowExpansion && (
                         <button
-                            className={`h-5 w-5 rounded text-blue-600 hover:bg-slate-100 ${
-                                isExpanded ? '' : ''
+                            className={`h-5 w-5 rounded transition-all duration-200 ${
+                                isExpanded 
+                                    ? 'text-white bg-primary-600 ring-2 ring-primary-500 shadow-md font-bold hover:bg-primary-700' 
+                                    : 'text-primary-600 hover:bg-primary-100 hover:text-primary-700'
                             }`}
                             onClick={() => onToggle(row.id)}
                             title='Toggle subitems'
@@ -1556,381 +3467,207 @@ function SortableAccountRow({
                                     stiffness: 520,
                                     damping: 30,
                                 }}
-                                className='inline-flex'
+                                className={`inline-flex ${isExpanded ? 'font-bold' : ''}`}
                             >
                                 <ChevronRight
-                                    className={`h-4 w-4 transition-all duration-150 ${
-                                        isExpanded
-                                            ? 'opacity-100 text-sky-600'
-                                            : 'opacity-0 group-hover:opacity-100'
-                                    }`}
+                                    size={16}
+                                    strokeWidth={isExpanded ? 3 : 2}
                                 />
                             </motion.span>
                         </button>
                     )}
                     <div
-                        className='font-medium text-slate-900 text-[12px] min-w-0 truncate'
+                        className='text-slate-700 text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='masterAccount'
+                        data-col='accountName'
+                        style={{width: '100%'}}
                     >
-                        <InlineEditableText
-                            value={(row as any).masterAccount || ''}
-                            onCommit={(v) => {
-                                onUpdateField(
-                                    row.id,
-                                    'masterAccount' as any,
-                                    v,
-                                );
-                            }}
-                            className='text-[12px]'
-                            placeholder=''
-                            dataAttr={`${row.id}-masterAccount`}
-                            {...createTabNavigation('masterAccount')}
-                        />
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='accountName'
+                                value={(row as any).accountName || ''}
+                                onChange={(v) => {
+                                    onUpdateField(
+                                        row.id,
+                                        'accountName' as any,
+                                        v || '',
+                                    );
+                                }}
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'accountName')}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                onNewItemCreated={onNewItemCreated as any}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    row.accountName || ''
+                                }
+                                currentRowProduct={
+                                    row.masterAccount || ''
+                                }
+                                {...createTabNavigation('accountName')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.accountName || ''}
+                                onCommit={(v) => {
+                                    onUpdateField(
+                                        row.id,
+                                        'accountName' as any,
+                                        v,
+                                    );
+                                }}
+                                className='text-[12px]'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'accountName')}
+                                dataAttr={`${row.id}-accountName`}
+                                {...createTabNavigation('accountName')}
+                            />
+                        )}
                     </div>
                 </div>
             )}
-            {cols.includes('accountName') && (
+            {cols.includes('masterAccount') && (
                 <div
-                    className='text-slate-700 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
+                    }`}
                     data-row-id={row.id}
-                    data-col='accountName'
-                    style={{maxWidth: '120px', width: '120px'}}
+                    data-col='masterAccount'
+                    style={{width: '100%'}}
                 >
-                    <InlineEditableText
-                        value={row.accountName}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'accountName', v)
-                        }
-                        className='text-[12px]'
-                        dataAttr={`account-${row.id}`}
-                        placeholder=''
-                        {...createTabNavigation('accountName')}
-                    />
+                    {enableDropdownChips ? (
+                        <AsyncChipSelect
+                            type='masterAccount'
+                            value={(row as any).masterAccount || ''}
+                            onChange={(v) =>
+                                onUpdateField(row.id, 'masterAccount' as any, v || '')
+                            }
+                            placeholder='Enter master account'
+                            isError={isCellMissing(row.id, 'masterAccount')}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                            onNewItemCreated={onNewItemCreated as any}
+                            accounts={allRows}
+                            currentRowId={row.id}
+                            currentRowEnterprise={
+                                row.accountName || ''
+                            }
+                            currentRowProduct={
+                                (row as any).masterAccount || ''
+                            }
+                            {...createTabNavigation('masterAccount')}
+                        />
+                    ) : (
+                        <InlineEditableText
+                            value={(row as any).masterAccount || ''}
+                            onCommit={(v) =>
+                                onUpdateField(row.id, 'masterAccount' as any, v)
+                            }
+                            className='text-[12px]'
+                            dataAttr={`masterAccount-${row.id}`}
+                            isError={isCellMissing(row.id, 'masterAccount')}
+                            placeholder='Enter master account'
+                            {...createTabNavigation('masterAccount')}
+                        />
+                    )}
                 </div>
             )}
-            {cols.includes('email') && (
+            {cols.includes('cloudType') && (
                 <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
+                    }`}
                     data-row-id={row.id}
-                    data-col='email'
+                    data-col='cloudType'
+                    style={{width: '100%'}}
                 >
-                    <InlineEditableText
-                        value={row.email}
-                        onCommit={(v) => onUpdateField(row.id, 'email', v)}
-                        className='text-[12px]'
-                        placeholder='email@company.com'
-                        dataAttr={`${row.id}-email`}
-                        {...createTabNavigation('email')}
-                    />
+                    {enableDropdownChips ? (
+                        <SimpleDropdown
+                            value={(row as any).cloudType || ''}
+                            options={[
+                                { value: 'Private Cloud', label: 'Private Cloud' },
+                                { value: 'Public Cloud', label: 'Public Cloud' }
+                            ]}
+                            onChange={(v) => {
+                                console.log('🔥 CRITICAL: CloudType dropdown onChange called:', v, 'for row:', row.id);
+                                console.log('🔥 CRITICAL: Current row.cloudType before update:', (row as any).cloudType);
+                                console.log('🔥 CRITICAL: Calling onUpdateField with:', row.id, 'cloudType', v || '');
+                                onUpdateField(row.id, 'cloudType' as any, v || '');
+                            }}
+                            placeholder='Select...'
+                            className=""
+                            isError={isCellMissing(row.id, 'cloudType')}
+                        />
+                    ) : (
+                        <InlineEditableText
+                            value={(row as any).cloudType || ''}
+                            onCommit={(v) =>
+                                onUpdateField(row.id, 'cloudType' as any, v)
+                            }
+                            className='text-[12px]'
+                            dataAttr={`cloudType-${row.id}`}
+                            isError={isCellMissing(row.id, 'cloudType')}
+                            placeholder='Select cloud type'
+                            {...createTabNavigation('cloudType')}
+                        />
+                    )}
                 </div>
             )}
-            {cols.includes('phone') && (
+            {cols.includes('address') && (
                 <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
+                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
+                    }`}
                     data-row-id={row.id}
-                    data-col='phone'
+                    data-col='address'
+                    style={{width: '100%'}}
                 >
-                    <InlineEditableText
-                        value={row.phone}
-                        onCommit={(v) => onUpdateField(row.id, 'phone', v)}
-                        className='text-[12px]'
-                        placeholder='Phone number'
-                        dataAttr={`${row.id}-phone`}
-                        {...createTabNavigation('phone')}
-                    />
-                </div>
-            )}
-            {cols.includes('country') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='country'
-                >
-                    <InlineEditableText
-                        value={row.address?.country || ''}
-                        onCommit={(v) => onUpdateField(row.id, 'country', v)}
-                        className='text-[12px]'
-                        placeholder=''
-                        dataAttr={`${row.id}-country`}
-                        {...createTabNavigation('country')}
-                    />
-                </div>
-            )}
-            {cols.includes('addressLine1') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='addressLine1'
-                >
-                    <InlineEditableText
-                        value={row.address?.addressLine1 || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'addressLine1', v)
-                        }
-                        className='text-[12px]'
-                        placeholder=''
-                        dataAttr={`${row.id}-addressLine1`}
-                        {...createTabNavigation('addressLine1')}
-                    />
+                    <button
+                        onClick={() => onOpenAddressModal?.(row)}
+                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        title={`Manage address for ${row.accountName || 'this account'}`}
+                    >
+                        <MapPin className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        {(row as any).address && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                        )}
+                    </button>
                 </div>
             )}
             {cols.includes('technicalUser') && (
                 <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
+                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
+                    }`}
                     data-row-id={row.id}
                     data-col='technicalUser'
-                >
-                    <TechnicalUserSelect
-                        value={row.technicalUser || ''}
-                        onChange={(value) =>
-                            onUpdateField(row.id, 'technicalUser', value)
-                        }
-                    />
-                </div>
-            )}
-            {cols.includes('addressLine2') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='addressLine2'
-                >
-                    <InlineEditableText
-                        value={(row as any).address?.addressLine2 || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                addressLine2: v,
-                            })
-                        }
-                        className='text-[12px]'
-                        placeholder='Address Line 2'
-                        dataAttr={`${row.id}-addressLine2`}
-                        {...createTabNavigation('addressLine2')}
-                    />
-                </div>
-            )}
-            {cols.includes('city') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='city'
-                >
-                    <InlineEditableText
-                        value={(row as any).address?.city || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                city: v,
-                            })
-                        }
-                        className='text-[12px]'
-                        placeholder='City'
-                        dataAttr={`${row.id}-city`}
-                        {...createTabNavigation('city')}
-                    />
-                </div>
-            )}
-            {cols.includes('state') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='state'
-                >
-                    <InlineEditableText
-                        value={(row as any).address?.state || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                state: v,
-                            })
-                        }
-                        className='text-[12px]'
-                        placeholder='State'
-                        dataAttr={`${row.id}-state`}
-                        {...createTabNavigation('state')}
-                    />
-                </div>
-            )}
-            {cols.includes('pincode') && (
-                <div
-                    className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'
-                    data-row-id={row.id}
-                    data-col='pincode'
-                >
-                    <InlineEditableText
-                        value={(row as any).address?.pincode || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'address' as any, {
-                                ...((row as any).address || {}),
-                                pincode: v,
-                            })
-                        }
-                        className='text-[12px]'
-                        placeholder='PIN/ZIP'
-                        dataAttr={`${row.id}-pincode`}
-                        {...createTabNavigation('pincode')}
-                    />
-                </div>
-            )}
-            {cols.includes('enterpriseName') && (
-                <div className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'>
-                    <AsyncChipSelect
-                        type='enterprise'
-                        value={row.enterpriseName}
-                        onChange={(v) =>
-                            onUpdateField(row.id, 'enterpriseName', v || '')
-                        }
-                        placeholder='Select enterprise'
-                        compact
-                    />
-                </div>
-            )}
-            {cols.includes('productName') && (
-                <div className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'>
-                    <AsyncChipSelect
-                        type='product'
-                        value={row.productName}
-                        onChange={(v) =>
-                            onUpdateField(row.id, 'productName', v || '')
-                        }
-                        placeholder='Select product'
-                        compact
-                    />
-                </div>
-            )}
-            {cols.includes('serviceName') && (
-                <div className='text-blue-600 text-[12px] min-w-0 truncate border-r border-slate-200 px-2 py-1'>
-                    <AsyncChipSelect
-                        type='service'
-                        value={row.serviceName}
-                        onChange={(v) =>
-                            onUpdateField(row.id, 'serviceName', v || '')
-                        }
-                        placeholder='Select service'
-                        compact
-                    />
-                </div>
-            )}
-            {cols.includes('status') && (
-                <div className='relative border-r border-slate-200 px-0 py-0'>
-                    <div
-                        id={`status-${row.id}`}
-                        className={`group relative w-full h-full min-h-[32px] flex items-center justify-center px-3 cursor-pointer select-none rounded-md overflow-hidden shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] transition-colors ${
-                            row.status === 'Active'
-                                ? 'bg-emerald-500'
-                                : row.status === 'Inactive'
-                                ? 'bg-rose-500'
-                                : 'bg-slate-200'
-                        }`}
-                        style={{perspective: '600px'}}
-                        onClick={(e) => {
-                            const rect = (
-                                e.currentTarget as HTMLDivElement
-                            ).getBoundingClientRect();
-                            const menu = document.createElement('div');
-                            menu.style.position = 'fixed';
-                            menu.style.top = `${rect.bottom + 6}px`;
-                            menu.style.left = `${rect.left}px`;
-                            menu.style.zIndex = '9999';
-                            menu.style.minWidth = `${rect.width}px`;
-                            menu.className =
-                                'origin-top rounded-lg border border-slate-200 bg-white shadow-xl text-[12px] transition transform duration-150 ease-out';
-                            menu.style.transform = 'scale(0.96)';
-                            menu.style.opacity = '0';
-                            menu.innerHTML = `
-                                <div class="py-1">
-                                    <button data-val="Active" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-emerald-700 hover:bg-emerald-50">
-                                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                                        Active
-                                    </button>
-                                    <button data-val="Inactive" class="flex items-center gap-2 w-full px-3 py-2 text-left rounded-md text-rose-700 hover:bg-rose-50">
-                                        <span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
-                                        Inactive
-                                    </button>
-                                </div>
-                            `;
-                            const handler = (ev: any) => {
-                                const btn =
-                                    ev.target?.closest?.('button[data-val]');
-                                const val = btn?.getAttribute?.('data-val');
-                                if (val) {
-                                    onUpdateField(
-                                        row.id,
-                                        'status',
-                                        val as 'Active' | 'Inactive',
-                                    );
-                                    document.body.removeChild(menu);
-                                    document.removeEventListener(
-                                        'click',
-                                        outside,
-                                    );
-                                }
-                            };
-                            const outside = (ev: any) => {
-                                if (!menu.contains(ev.target)) {
-                                    document.body.removeChild(menu);
-                                    document.removeEventListener(
-                                        'click',
-                                        outside,
-                                    );
-                                }
-                            };
-                            menu.addEventListener('click', handler);
-                            document.body.appendChild(menu);
-                            setTimeout(
-                                () =>
-                                    document.addEventListener('click', outside),
-                                0,
-                            );
-                            requestAnimationFrame(() => {
-                                menu.style.transform = 'scale(1)';
-                                menu.style.opacity = '1';
-                            });
-                        }}
-                    >
-                        <span
-                            className={`font-semibold text-[12px] tracking-wide capitalize ${
-                                row.status ? 'text-white' : 'text-slate-700'
-                            }`}
-                        >
-                            {row.status
-                                ? row.status === 'Active'
-                                    ? 'Active'
-                                    : 'Inactive'
-                                : 'Set status'}
-                        </span>
-                    </div>
-                </div>
-            )}
-            {cols.includes('actions') && (
-                <div
-                    className='flex items-center justify-center gap-1 border-r border-slate-200 px-1 py-1'
-                    data-row-id={row.id}
-                    data-col='actions'
+                    style={{width: '100%'}}
                 >
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(row.id);
-                        }}
-                        className='h-6 w-6 rounded text-blue-600 hover:bg-blue-50 flex items-center justify-center'
-                        title='Edit'
+                        onClick={() => onOpenTechnicalUserModal?.(row)}
+                        className="group relative flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 hover:bg-blue-100 hover:scale-110 border border-transparent hover:border-blue-300"
+                        title={`Manage technical users for ${row.accountName || 'this account'}`}
                     >
-                        <Edit className='h-3 w-3' />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(row.id);
-                        }}
-                        className='h-6 w-6 rounded text-red-600 hover:bg-red-50 flex items-center justify-center'
-                        title='Delete'
-                    >
-                        <Trash2 className='h-3 w-3' />
+                        <User className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        {row.technicalUsers && row.technicalUsers.length > 0 && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                                <span className="text-[8px] text-white font-bold">
+                                    {row.technicalUsers.length}
+                                </span>
+                            </div>
+                        )}
                     </button>
                 </div>
             )}
+            {/* actions column removed */}
             {/* trailing add row removed; fill handle removed */}
             {!hideRowExpansion && isExpanded && expandedContent && (
                 <motion.div
@@ -1942,71 +3679,11 @@ function SortableAccountRow({
                     {expandedContent}
                 </motion.div>
             )}
-        </motion.div>
+        </div>
     );
 }
 
-// Technical User Select Component
-function TechnicalUserSelect({
-    value,
-    onChange,
-}: {
-    value: string;
-    onChange: (value: string) => void;
-}) {
-    const [users, setUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        const loadTechnicalUsers = async () => {
-            try {
-                setLoading(true);
-                // Fetch only technical users from the API
-                const allUsers = await accessControlApi.listUsers({
-                    limit: 1000,
-                });
-                // Filter to only technical users
-                const technicalUsers = allUsers.filter(
-                    (user) => user.technicalUser,
-                );
-                setUsers(technicalUsers);
-            } catch (error) {
-                console.error('Error loading technical users:', error);
-                // No fallback data - only database data
-                setUsers([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadTechnicalUsers();
-    }, []);
-
-    if (loading) {
-        return (
-            <div className='w-full text-[12px] text-gray-500 px-2 py-1'>
-                Loading...
-            </div>
-        );
-    }
-
-    return (
-        <select
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className='w-full bg-white text-[12px] border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1'
-        >
-            <option value=''>Select Technical User</option>
-            {users.map((user) => (
-                <option key={user.id} value={user.emailAddress}>
-                    {user.firstName} {user.lastName} ({user.emailAddress})
-                </option>
-            ))}
-        </select>
-    );
-}
-
-export default function AccountsTable({
+const AccountsTable = forwardRef<any, AccountsTableProps>(({
     rows,
     onEdit,
     onDelete,
@@ -2016,34 +3693,231 @@ export default function AccountsTable({
     hideControls,
     visibleColumns,
     highlightQuery,
-    onQuickAddRow,
     customColumnLabels,
     enableDropdownChips = false,
     dropdownOptions = {},
     onUpdateField,
     hideRowExpansion = false,
-}: AccountsTableProps) {
-    // Keep a local order for drag-and-drop. Sync when rows change
-    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
-    const [localRows, setLocalRows] = useState<AccountRow[]>(rows);
+    enableInlineEditing = true,
+    incompleteRowIds = [],
+    showValidationErrors = false,
+    hasBlankRow = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    onShowAllColumns,
+    compressingRowId = null,
+    foldingRowId = null,
+    compressingLicenseId = null,
+    foldingLicenseId = null,
+    triggerValidation = false,
+    onValidationComplete,
+    onAddNewRow,
+    externalSortColumn,
+    externalSortDirection,
+    onSortChange,
+    isAIInsightsPanelOpen = false,
+    onLicenseValidationChange,
+    onLicenseDelete,
+    onCompleteLicenseDeletion,
+    onOpenAddressModal,
+    onOpenTechnicalUserModal,
+}, ref) => {
+    // Local validation state to track rows with errors
+    const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+    
+    // State for license deletion
+    const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<string | null>(null);
+    const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+    
+    // State for expanded rows and licenses
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
+    const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
+    const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
+
+    // ContactModal state for license contact details
+    const [contactModalData, setContactModalData] = useState<Contact[]>([]);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactModalRowId, setContactModalRowId] = useState<string | null>(null);
+    const [contactModalLicenseId, setContactModalLicenseId] = useState<string | null>(null);
+    const [contactModalAccountName, setContactModalAccountName] = useState<string>('');
+    const [contactModalMasterAccount, setContactModalMasterAccount] = useState<string>('');
+
+    // Use refs to track previous values and avoid infinite loops
+    const prevRowsRef = useRef<AccountRow[]>([]);
+    const orderRef = useRef<string[]>([]);
+    
+    // Keep local state for editing, but initialize it safely
+    const [localEdits, setLocalEdits] = useState<Record<string, Partial<AccountRow>>>({});
+    
+    // Use useMemo for base derived state with stable comparison
+    const { baseLocalRows, order } = useMemo(() => {
+        // Check if rows array length or IDs have changed (shallow comparison)
+        const currentIds = rows.map(r => r.id).join(',');
+        const prevIds = prevRowsRef.current.map(r => r.id).join(',');
+        
+        if (currentIds === prevIds && rows.length === prevRowsRef.current.length) {
+            return {
+                baseLocalRows: prevRowsRef.current,
+                order: orderRef.current
+            };
+        }
+        
+        // Update refs and create new state
+        prevRowsRef.current = rows.map(r => ({ ...r }));
+        const newOrder = rows.map(r => r.id);
+        orderRef.current = newOrder;
+        
+        return {
+            baseLocalRows: prevRowsRef.current,
+            order: newOrder
+        };
+    }, [rows]);
+    
+    // Apply local edits to create final localRows with stable reference
+    const localRows = useMemo(() => {
+        return baseLocalRows.map(row => {
+            const edits = localEdits[row.id];
+            if (!edits || Object.keys(edits).length === 0) {
+                return row; // Return same reference if no edits
+            }
+            return {
+                ...row,
+                ...edits
+            };
+        });
+    }, [baseLocalRows, localEdits]);
+    
+    // Initialize rowLicenses from rows prop only once
+    const [hasInitializedLicenses, setHasInitializedLicenses] = useState(false);
+
+    // Expose methods to parent component via ref
+    useImperativeHandle(ref, () => ({
+        completeLicenseDeletion: () => {
+            if (pendingDeleteLicenseId && pendingDeleteRowId) {
+                console.log('🗑️ Completing license deletion via ref:', pendingDeleteLicenseId);
+                setRowLicenses(prev => ({
+                    ...prev,
+                    [pendingDeleteRowId]: (prev[pendingDeleteRowId] || []).filter(license => license.id !== pendingDeleteLicenseId)
+                }));
+                setPendingDeleteLicenseId(null);
+                setPendingDeleteRowId(null);
+                console.log('✅ License removed from rowLicenses state via ref');
+            }
+        },
+        getCurrentLicenseState: () => {
+            return rowLicenses;
+        }
+    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses]);
+
+    // Helper function to check if a field is missing/invalid
+    const isFieldMissing = (row: AccountRow, field: string): boolean => {
+        switch (field) {
+            case 'accountName':
+                return !row.accountName || row.accountName.trim() === '';
+            case 'masterAccount':
+                return !row.masterAccount || row.masterAccount.trim() === '';
+            case 'cloudType':
+                return !row.cloudType || row.cloudType.trim() === '';
+            case 'address':
+                return !row.address || row.address.trim() === '';
+            default:
+                return false;
+        }
+    };
+
+    // Enhanced helper function to check if a cell should be highlighted as missing
+    const isCellMissing = (rowId: string, field: string) => {
+        const row = localRows.find((r) => r.id === rowId);
+        if (!row) return false;
+
+        // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
+        // This prevents new rows from inheriting validation styling from previous validation sessions
+        if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
+            return false;
+        }
+
+        // Check if this row has validation errors (either from parent or local validation)
+        const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
+        
+        if (!hasValidationError) return false;
+
+        // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
+        // including completely blank rows
+        return isFieldMissing(row, field);
+    };
+
+    // Function to validate all rows and highlight missing fields
+    const validateAndHighlightErrors = () => {
+        const errorRowIds = new Set<string>();
+        
+        localRows.forEach(row => {
+            // Check if any required field is missing
+            if (isFieldMissing(row, 'accountName') || 
+                isFieldMissing(row, 'email') || 
+                isFieldMissing(row, 'phone')) {
+                errorRowIds.add(row.id);
+            }
+        });
+        
+        setValidationErrors(errorRowIds);
+        return errorRowIds;
+    };
+    
     useEffect(() => {
-        // Preserve existing order; append any new ids
-        const existing = new Set(order);
-        const merged = [
-            ...order.filter((id) => rows.some((r) => r.id === id)),
-            ...rows.filter((r) => !existing.has(r.id)).map((r) => r.id),
-        ];
-        setOrder(merged);
-        // Deep copy licenses so new references are created
-        const cloned = rows.map((r) => ({
-            ...r,
-            licenses: (r as any).licenses
-                ? (r as any).licenses.map((l: any) => ({...l}))
-                : [],
-        })) as AccountRow[];
-        setLocalRows(cloned);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rows.map((r) => r.id).join(',')]);
+        if (!hasInitializedLicenses) {
+            const initialLicenses: Record<string, License[]> = {};
+            rows.forEach(row => {
+                if (row.licenses && row.licenses.length > 0) {
+                    initialLicenses[row.id] = row.licenses;
+                }
+            });
+            
+            if (Object.keys(initialLicenses).length > 0) {
+                setRowLicenses(initialLicenses);
+            }
+            setHasInitializedLicenses(true);
+        }
+    }, [rows, hasInitializedLicenses]);
+    
+    // No useEffect needed - using useMemo for derived state above
+
+    // Effect to trigger validation when requested
+    useEffect(() => {
+        if (triggerValidation) {
+            const errorRowIds = new Set<string>();
+            
+            // Use baseLocalRows with localEdits applied inline to avoid dependency issues
+            baseLocalRows.forEach(baseRow => {
+                const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
+                // Check if any required field is missing
+                if (isFieldMissing(row, 'accountName') || 
+                    isFieldMissing(row, 'email') || 
+                    isFieldMissing(row, 'phone')) {
+                    errorRowIds.add(row.id);
+                }
+            });
+            
+            setValidationErrors(errorRowIds);
+            
+            if (onValidationComplete) {
+                onValidationComplete(Array.from(errorRowIds));
+            }
+        }
+    }, [triggerValidation, baseLocalRows, localEdits, onValidationComplete]);
+
+    // Effect to highlight errors when incompleteRowIds changes from parent
+    // TEMPORARILY DISABLED to fix infinite re-render loop
+    // useEffect(() => {
+    //     if (showValidationErrors && incompleteRowIds.length > 0) {
+    //         // Simply set validation errors to the incomplete row IDs from parent
+    //         // Don't do local validation here to avoid circular dependencies
+    //         setValidationErrors(new Set(incompleteRowIds));
+    //     } else {
+    //         // Clear validation errors when not showing validation or no incomplete rows from parent
+    //         setValidationErrors(new Set());
+    //     }
+    // }, [incompleteRowIds, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -2075,234 +3949,458 @@ export default function AccountsTable({
             );
         };
     }, []);
+
+    // Only show license validation during explicit save attempts with incomplete licenses
+    const prevShowValidationErrors = useRef(false);
+    useEffect(() => {
+        // Only trigger license validation when showValidationErrors changes from false to true (save attempt)
+        if (showValidationErrors && !prevShowValidationErrors.current) {
+            const rowsWithIncompleteLicenses = new Set<string>();
+            Object.keys(rowLicenses).forEach(rowId => {
+                const licenses = rowLicenses[rowId] || [];
+                const hasIncompleteLicense = licenses.some(license => 
+                    !license.enterprise?.trim() || !license.product?.trim() || !license.service?.trim() ||
+                    !license.licenseStartDate?.trim() || !license.licenseEndDate?.trim() || !license.numberOfUsers?.trim() ||
+                    (license.renewalNotice && !license.noticePeriodDays?.trim())
+                );
+                if (licenses.length > 0 && hasIncompleteLicense) {
+                    rowsWithIncompleteLicenses.add(rowId);
+                }
+            });
+            setLicenseValidationTriggered(rowsWithIncompleteLicenses);
+        } else if (!showValidationErrors) {
+            setLicenseValidationTriggered(new Set());
+        }
+        prevShowValidationErrors.current = showValidationErrors;
+    }, [showValidationErrors]);
     async function persistAccountRow(row: AccountRow) {
         try {
+            // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
+            if (String(row.id || '').startsWith('tmp-')) {
+                console.log(
+                    '⏭️ Skipping old auto-save for temporary row, letting linkage auto-save handle it:',
+                    row.id,
+                );
+                return;
+            }
             const core = {
+                // Core fields for account configuration
                 accountName: row.accountName,
-                email: row.email,
-                phone: row.phone,
+                masterAccount: row.masterAccount,
+                cloudType: row.cloudType,
+                address: row.address,
             } as any;
             // Map UI state into backend details JSON expected by server
-            const addr = (row as any).address || {};
-            const tech = (row as any).technical || {};
-            const licenses = (((row as any).licenses as any[]) || []).map(
-                (lic) => ({
-                    enterprise: lic.enterprise || null,
-                    product: lic.product || null,
-                    service: lic.service || null,
-                    category: lic.service || null,
-                    licenseDate: lic.licenseStart || null,
-                    expirationDate: lic.licenseEnd || null,
-                    users:
-                        typeof lic.users === 'number'
-                            ? lic.users
-                            : lic.users
-                            ? parseInt(String(lic.users), 10)
-                            : 0,
-                    renewalNotice:
-                        typeof lic.renewalNotice === 'boolean'
-                            ? lic.renewalNotice
-                            : !!lic.renewalNotice,
-                    renewalNoticePeriod:
-                        typeof lic.noticeDays === 'number'
-                            ? lic.noticeDays
-                            : lic.noticeDays
-                            ? parseInt(String(lic.noticeDays), 10)
-                            : null,
-                    contacts: Array.isArray(lic.contacts)
-                        ? lic.contacts.map((c: any) => ({
-                              contact: c.contact || '',
-                              title: c.title || '',
-                              email: c.email || '',
-                              phone: c.phone || '',
-                          }))
-                        : [],
-                }),
-            );
             const details = {
-                firstName: row.firstName,
-                lastName: row.lastName,
-                globalClientName: (row as any).globalClientName || '',
-                status: row.status,
-                enterpriseName: row.enterpriseName,
-                productName: row.productName,
-                serviceName: row.serviceName,
-                // Address fields are expected at the top-level of details
-                addressLine1: addr.addressLine1 || '',
-                addressLine2: addr.addressLine2 || '',
-                country: addr.country || '',
-                state: addr.state || '',
-                city: addr.city || '',
-                pincode: addr.pincode || '',
-                // Technical user is expected as technicalUserDetails or technicalUsername
-                technicalUserDetails: {
-                    username: tech.username || '',
-                    email: tech.email || '',
-                    firstName: tech.firstName || '',
-                },
-                technicalUsername: tech.username || '',
-                // Licenses are expected in details.services
-                services: licenses,
+                // Account configuration specific fields
+                accountName: row.accountName || '',
+                masterAccount: row.masterAccount || '',
+                cloudType: row.cloudType || '',
+                address: row.address || '',
             } as any;
-            if (String(row.id || '').startsWith('tmp-')) {
-                if (!row.accountName || !row.accountName.trim()) return; // wait until valid
-                const created = await api.post<AccountRow>('/api/accounts', {
-                    ...core,
-                    ...details,
-                });
-                // Replace temp id with real id
-                setLocalRows((prev) =>
-                    prev.map((r) =>
-                        String(r.id) === String(row.id)
-                            ? ({...r, id: created.id} as AccountRow)
-                            : r,
-                    ),
+            // Handle existing (non-temporary) rows
+            // Check if we're on account management page
+            if (
+                typeof window !== 'undefined' &&
+                window.location.pathname.includes('/manage-accounts')
+            ) {
+                console.log(
+                    '🔄 Updating account linkage instead of enterprise:',
+                    row.id,
                 );
-                setOrder((prev) =>
-                    prev.map((id) =>
-                        String(id) === String(row.id)
-                            ? (created.id as string)
-                            : id,
-                    ),
+
+                // For account management, update the linkage via the parent's onUpdateField
+                // The parent component will handle the account linkage updates
+                console.log(
+                    '⏭️ Skipping direct API call for account management page',
                 );
-                // Related tables are handled server-side from details
-            } else {
-                await api.put<AccountRow>('/api/accounts', {
-                    id: row.id,
-                    ...core,
-                    ...details,
-                });
-                // Related tables handled server-side from details
+                return;
             }
+
+            // For account management, all persistence is handled by parent component
+            console.log(
+                '⏭️ Skipping API call - account management handled by parent',
+            );
+            return;
         } catch (_e) {
             // TODO: surface toast; keep silent here to avoid blocking UI
         }
     }
 
-    function updateRowField(
-        rowId: string,
-        key: keyof AccountRow | string,
-        value: any,
-    ) {
+    function updateRowField(rowId: string, key: keyof AccountRow, value: any) {
         let changed: AccountRow | null = null;
-        setLocalRows((prev) =>
-            prev.map((r) => {
-                if (r.id !== rowId) return r;
-                const next = {...r, [key]: value} as AccountRow;
+        
+        // Update local edits instead of directly modifying localRows
+        setLocalEdits(prev => {
+            // Use baseLocalRows with current edits to avoid circular dependency
+            const baseRow = baseLocalRows.find(r => r.id === rowId);
+            if (baseRow) {
+                const currentEdits = prev[rowId] || {};
+                const currentRow = { ...baseRow, ...currentEdits };
+                const next = {...currentRow, [key]: value} as AccountRow;
                 changed = next;
-                return next;
-            }),
-        );
+                
+                return {
+                    ...prev,
+                    [rowId]: {
+                        ...(prev[rowId] || {}),
+                        [key]: value
+                    }
+                };
+            }
+            return prev;
+        });
+        
         if (changed) schedulePersist(changed);
+
+        // Also call the parent's onUpdateField function if provided
+        if (onUpdateField) {
+            console.log('🔗 Calling parent onUpdateField:', {
+                rowId,
+                key,
+                value,
+            });
+            onUpdateField(rowId, key as string, value);
+        }
     }
 
-    function updateRowNested(
-        rowId: string,
-        path: ['address' | 'technical', string],
-        value: any,
-    ) {
-        let changed: AccountRow | null = null;
-        setLocalRows((prev) =>
-            prev.map((r) => {
-                if (r.id !== rowId) return r;
-                const [root, field] = path;
-                let next: AccountRow;
-                if (root === 'address') {
-                    next = {
-                        ...r,
-                        address: {
-                            ...((r as any).address || {}),
-                            [field]: value,
-                        },
-                    } as AccountRow;
-                } else {
-                    next = {
-                        ...r,
-                        technical: {
-                            ...((r as any).technical || {}),
-                            [field]: value,
-                        },
-                    } as AccountRow;
+    // License management functions
+    const toggleRowExpansion = (rowId: string) => {
+        setExpandedRows(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(rowId)) {
+                newSet.delete(rowId);
+            } else {
+                newSet.add(rowId);
+                // Initialize licenses if not exist
+                if (!rowLicenses[rowId]) {
+                    setRowLicenses(prevLicenses => ({
+                        ...prevLicenses,
+                        [rowId]: []
+                    }));
                 }
-                changed = next;
-                return next;
-            }),
-        );
-        if (changed) schedulePersist(changed);
-    }
+            }
+            return newSet;
+        });
+    };
 
-    function updateLicenseField(
-        rowId: string,
-        index: number,
-        key:
-            | 'enterprise'
-            | 'product'
-            | 'service'
-            | 'licenseStart'
-            | 'licenseEnd'
-            | 'users'
-            | 'renewalNotice'
-            | 'noticeDays',
-        value: any,
-    ) {
-        let changed: AccountRow | null = null;
-        setLocalRows((prev) =>
-            prev.map((r) => {
-                if (r.id !== rowId) return r;
-                const list = [...(((r as any).licenses as any[]) || [])];
-                const curr = {...(list[index] || {})} as any;
-                curr[key] = value;
-                list[index] = curr;
-                const next = {...r, licenses: list} as AccountRow;
-                changed = next;
-                return next;
-            }),
-        );
-        if (changed) schedulePersist(changed);
-    }
-    // removed license contact chevron state
-    function updateLicenseContactField(
-        rowId: string,
-        licIndex: number,
-        contactIndex: number,
-        key: 'contact' | 'title' | 'email' | 'phone',
-        value: any,
-    ) {
-        let changed: AccountRow | null = null;
-        setLocalRows((prev) =>
-            prev.map((r) => {
-                if (r.id !== rowId) return r;
-                const licenses = [...(((r as any).licenses as any[]) || [])];
-                const lic = {...(licenses[licIndex] || {})} as any;
-                const contacts = [...((lic.contacts as any[]) || [])];
-                const curr = {...(contacts[contactIndex] || {})};
-                (curr as any)[key] = value;
-                contacts[contactIndex] = curr;
-                lic.contacts = contacts;
-                licenses[licIndex] = lic;
-                const next = {...r, licenses} as AccountRow;
-                changed = next;
-                return next;
-            }),
-        );
-        if (changed) schedulePersist(changed);
-    }
-    function addLicenseContactRow(rowId: string, licIndex: number) {
-        setLocalRows((prev) =>
-            prev.map((r) => {
-                if (r.id !== rowId) return r;
-                const licenses = [...(((r as any).licenses as any[]) || [])];
-                const lic = {...(licenses[licIndex] || {})} as any;
-                const contacts = [...((lic.contacts as any[]) || [])];
-                contacts.push({contact: '', title: '', email: '', phone: ''});
-                lic.contacts = contacts;
-                licenses[licIndex] = lic;
-                return {...r, licenses} as AccountRow;
-            }),
-        );
-    }
+    // Expand all rows function
+    const expandAllRows = () => {
+        const allRowIds = orderedItems.map(row => row.id);
+        setExpandedRows(new Set(allRowIds));
+        
+        // Initialize licenses for all rows that don't have them
+        setRowLicenses(prevLicenses => {
+            const newLicenses = { ...prevLicenses };
+            allRowIds.forEach(rowId => {
+                if (!newLicenses[rowId]) {
+                    newLicenses[rowId] = [];
+                }
+            });
+            return newLicenses;
+        });
+    };
+
+    // Collapse all rows function
+    const collapseAllRows = () => {
+        setExpandedRows(new Set());
+    };
+
+    // Helper function to check if main row fields are complete
+    const isMainRowComplete = (row: AccountRow): boolean => {
+        return !!(row.accountName && row.accountName.trim() && 
+                 row.masterAccount && row.masterAccount.trim() && 
+                 row.cloudType && row.cloudType.trim());
+    };
+
+    const addNewLicense = (rowId: string) => {
+        const newLicenseId = `license-${rowId}-${Date.now()}`;
+        const newLicense: License = {
+            id: newLicenseId,
+            enterprise: '',
+            product: '',
+            service: '',
+            licenseStartDate: '',
+            licenseEndDate: '',
+            numberOfUsers: '',
+            contactDetails: {
+                id: crypto.randomUUID(),
+                name: '',
+                email: '',
+                phone: '',
+                department: '',
+                designation: '',
+                company: ''
+            },
+            renewalNotice: false,
+            noticePeriodDays: ''
+        };
+
+        // Ensure the row is expanded when adding a license
+        setExpandedRows(prev => {
+            const newSet = new Set(prev);
+            newSet.add(rowId);
+            return newSet;
+        });
+
+        setRowLicenses(prev => ({
+            ...prev,
+            [rowId]: [...(prev[rowId] || []), newLicense]
+        }));
+
+        // Clear license validation for this row when adding new license
+        setLicenseValidationTriggered(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(rowId);
+            return newSet;
+        });
+
+        // Mark this row as having pending licenses for validation
+        setPendingLicenseRows(prev => {
+            const newSet = new Set(prev);
+            newSet.add(rowId);
+            return newSet;
+        });
+
+        // Don't trigger auto-save for adding empty license - only when fields are filled
+        // But still update parent state so validation can see the empty license
+        if (onUpdateField) {
+            const currentLicenses = rowLicenses[rowId] || [];
+            const updatedLicenses = [...currentLicenses, newLicense];
+            onUpdateField(rowId, 'licenses', updatedLicenses);
+        }
+        
+        // Don't clear validation errors when adding new license - let existing validation state persist
+        // This allows multiple accounts to maintain their validation highlighting
+        
+        console.log('➕ Added new empty license, updated parent state but preserved validation state:', {
+            rowId,
+            licenseId: newLicenseId
+        });
+    };
+
+    const updateLicense = (rowId: string, licenseId: string, field: keyof License, value: string | boolean) => {
+        setRowLicenses(prev => {
+            const updatedLicenses = {
+                ...prev,
+                [rowId]: (prev[rowId] || []).map(license => 
+                    license.id === licenseId 
+                        ? {...license, [field]: value}
+                        : license
+                )
+            };
+
+            // Check if the license is now complete using the updated state
+            const updatedLicense = updatedLicenses[rowId]?.find(l => l.id === licenseId);
+            if (updatedLicense && updatedLicense.enterprise && updatedLicense.product && updatedLicense.service && 
+                updatedLicense.licenseStartDate && updatedLicense.licenseEndDate && updatedLicense.numberOfUsers &&
+                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays)) {
+                // License is complete, check if all licenses in row are complete
+                const allLicenses = updatedLicenses[rowId] || [];
+                const allComplete = allLicenses.every(l => 
+                    l.enterprise && l.product && l.service && l.licenseStartDate && l.licenseEndDate && l.numberOfUsers &&
+                    (!l.renewalNotice || l.noticePeriodDays)
+                );
+                if (allComplete) {
+                    // Use setTimeout to avoid state update during render
+                    setTimeout(() => {
+                        setPendingLicenseRows(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(rowId);
+                            return newSet;
+                        });
+                    }, 0);
+                }
+            } else if (updatedLicense) {
+                // License is incomplete, ensure it's marked as pending
+                setTimeout(() => {
+                    setPendingLicenseRows(prev => {
+                        const newSet = new Set(prev);
+                        newSet.add(rowId);
+                        return newSet;
+                    });
+                }, 0);
+            }
+
+            return updatedLicenses;
+        });
+
+        // Only trigger auto-save for license updates if ALL mandatory fields are complete
+        // This prevents auto-save from triggering on partial license completion
+        const isValueEmpty = typeof value === 'boolean' ? false : (!value || value.trim() === '');
+        
+        if (!isValueEmpty && onUpdateField) {
+            // Get the updated licenses for this row
+            const updatedRowLicenses = rowLicenses[rowId]?.map(license => 
+                license.id === licenseId 
+                    ? {...license, [field]: value}
+                    : license
+            ) || [];
+            
+            // Check if this specific license now has all mandatory fields completed
+            const updatedLicense = updatedRowLicenses.find(license => license.id === licenseId);
+            const hasAllFields = updatedLicense && 
+                updatedLicense.enterprise?.trim() && 
+                updatedLicense.product?.trim() && 
+                updatedLicense.service?.trim() &&
+                updatedLicense.licenseStartDate?.trim() &&
+                updatedLicense.licenseEndDate?.trim() &&
+                updatedLicense.numberOfUsers?.trim() &&
+                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays?.trim());
+            
+            if (hasAllFields) {
+                console.log('🔄 Triggering auto-save for complete license:', {
+                    rowId,
+                    licenseId,
+                    field,
+                    value,
+                    hasAllFields,
+                    licenseData: updatedLicense
+                });
+                onUpdateField(rowId, 'licenses', updatedRowLicenses);
+            } else {
+                console.log('⏳ License incomplete, not triggering auto-save yet:', {
+                    rowId,
+                    licenseId,
+                    field,
+                    value,
+                    hasAllFields,
+                    licenseData: updatedLicense,
+                    missing: {
+                        enterprise: !updatedLicense?.enterprise?.trim(),
+                        product: !updatedLicense?.product?.trim(),
+                        service: !updatedLicense?.service?.trim(),
+                        licenseStartDate: !updatedLicense?.licenseStartDate?.trim(),
+                        licenseEndDate: !updatedLicense?.licenseEndDate?.trim(),
+                        numberOfUsers: !updatedLicense?.numberOfUsers?.trim(),
+                        noticePeriodDays: updatedLicense?.renewalNotice && !updatedLicense?.noticePeriodDays?.trim()
+                    }
+                });
+            }
+        } else if (isValueEmpty) {
+            console.log('❌ Not triggering auto-save for empty license field:', {
+                rowId,
+                licenseId,
+                field,
+                value,
+                isValueEmpty
+            });
+        }
+    };
+
+    const deleteLicense = async (rowId: string, licenseId: string) => {
+        // Store the deletion context for completion after confirmation
+        setPendingDeleteLicenseId(licenseId);
+        setPendingDeleteRowId(rowId);
+        
+        if (onLicenseDelete) {
+            // Use the parent's animation callback
+            await onLicenseDelete(licenseId);
+        } else {
+            // Direct deletion if no animation callback
+            setRowLicenses(prev => ({
+                ...prev,
+                [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
+            }));
+            
+            // Trigger auto-save for license deletion
+            if (onUpdateField) {
+                const updatedLicenses = (rowLicenses[rowId] || []).filter(license => license.id !== licenseId);
+                onUpdateField(rowId, 'licenses', updatedLicenses);
+            }
+        }
+    };
+
+    // Complete the license deletion when animation and confirmation are done
+    const completeLicenseDeletion = () => {
+        if (pendingDeleteLicenseId && pendingDeleteRowId) {
+            const rowId = pendingDeleteRowId;
+            const licenseId = pendingDeleteLicenseId;
+            
+            setRowLicenses(prev => {
+                const updatedLicenses = {
+                    ...prev,
+                    [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
+                };
+                
+                // Trigger auto-save for license deletion after animation
+                if (onUpdateField) {
+                    onUpdateField(rowId, 'licenses', updatedLicenses[rowId] || []);
+                }
+                
+                return updatedLicenses;
+            });
+            
+            setPendingDeleteLicenseId(null);
+            setPendingDeleteRowId(null);
+        }
+    };
+
+    // Complete license deletion when animations and confirmation are done
+    useEffect(() => {
+        if (onCompleteLicenseDeletion) {
+            onCompleteLicenseDeletion();
+        }
+    }, [onCompleteLicenseDeletion]);
+
+    // Expose the completion function to parent via callback
+    useEffect(() => {
+        if (pendingDeleteLicenseId && pendingDeleteRowId) {
+            // Register the completion function
+            window.completeLicenseDeletion = () => {
+                console.log('🗑️ Completing license deletion in AccountsTable:', pendingDeleteLicenseId);
+                setRowLicenses(prev => ({
+                    ...prev,
+                    [pendingDeleteRowId]: (prev[pendingDeleteRowId] || []).filter(license => license.id !== pendingDeleteLicenseId)
+                }));
+                setPendingDeleteLicenseId(null);
+                setPendingDeleteRowId(null);
+                console.log('✅ License removed from rowLicenses state');
+            };
+        }
+    }, [pendingDeleteLicenseId, pendingDeleteRowId]);
+
+    const isLicenseFieldMissing = (license: License, field: keyof License): boolean => {
+        switch (field) {
+            case 'enterprise':
+            case 'product':
+            case 'service':
+            case 'licenseStartDate':
+            case 'licenseEndDate':
+            case 'numberOfUsers':
+                return !license[field] || license[field].trim() === '';
+            case 'noticePeriodDays':
+                // Only required if renewalNotice is enabled
+                return license.renewalNotice && (!license.noticePeriodDays || license.noticePeriodDays.trim() === '');
+            default:
+                return false;
+        }
+    };
+
+    // License validation effect - notify parent when license validation state changes
+    React.useEffect(() => {
+        if (onLicenseValidationChange) {
+            const incompleteLicenseRows: string[] = [];
+            let hasIncompleteLicenses = false;
+
+            Object.entries(rowLicenses).forEach(([rowId, licenses]) => {
+                const hasIncomplete = licenses.some(license => 
+                    !license.enterprise || !license.product || !license.service || 
+                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                    (license.renewalNotice && !license.noticePeriodDays)
+                );
+                if (hasIncomplete) {
+                    incompleteLicenseRows.push(rowId);
+                    hasIncompleteLicenses = true;
+                }
+            });
+
+            onLicenseValidationChange(hasIncompleteLicenses, incompleteLicenseRows);
+        }
+    }, [rowLicenses, onLicenseValidationChange]);
+
     const [groupBy, setGroupBy] = useState<
-        'none' | 'enterpriseName' | 'productName' | 'serviceName'
+        'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
     >('none');
     // sync external groupBy
     React.useEffect(() => {
@@ -2311,353 +4409,305 @@ export default function AccountsTable({
 
     const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
         () => [
-            // Parent table columns per request
+            // Only the required columns
             'accountName',
             'masterAccount',
-            'country',
-            'addressLine1',
+            'cloudType',
+            'address',
             'technicalUser',
         ],
         [],
     );
     const cols = useMemo(() => {
         const base = (columnOrder || []) as string[];
-        if (!visibleColumns || visibleColumns.length === 0) return base;
+        if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
+        if (visibleColumns.length === 0) return []; // If empty array, show no columns
         const allowed = new Set(visibleColumns as string[]);
         // Keep canonical order from columnOrder; filter by visibility
-        const result = base.filter((c) => allowed.has(c));
-        return result;
+        return base.filter((c) => allowed.has(c));
     }, [visibleColumns, columnOrder]);
 
     const colSizes: Record<string, string> = {
-        masterAccount: '120px',
-        accountName: '120px',
-        country: '100px',
-        addressLine1: '140px',
-        addressLine2: 'minmax(160px,1.1fr)',
-        city: 'minmax(100px,0.9fr)',
-        state: 'minmax(100px,0.9fr)',
-        pincode: 'minmax(100px,0.8fr)',
-        technicalUser: '180px',
+        deleteButton: '8px', // Space for delete button with proper padding
+        accountName: '200px', // Account name column - increased for label + arrows + resize handle
+        masterAccount: '200px', // Master Account column
+        cloudType: '160px', // Cloud Type column
+        address: '80px', // Address column - icon only
+        technicalUser: '80px', // Technical User column - icon only
+        email: '220px', // Email column - increased for label + arrows + resize handle
+        phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
     };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
-    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [subItems, setSubItems] = useState<Record<string, string[]>>({});
-    const [sectionOpen, setSectionOpen] = useState<
-        Record<string, {address: boolean; technical: boolean; license: boolean}>
-    >({});
+
     const [pinFirst, setPinFirst] = useState(true);
     const firstColWidth = '140px'; // enforce fixed width for first column
     const gridTemplate = useMemo(() => {
-        const base = cols.map((c) => colSizes[c]).join(' ');
-        const custom = customColumns.map(() => 'minmax(110px,1fr)').join(' ');
-        const result = [base, custom].filter(Boolean).join(' ');
-        // Force specific template for the expected columns
-        if (
-            cols.length === 5 &&
-            cols.includes('accountName') &&
-            cols.includes('masterAccount') &&
-            cols.includes('technicalUser')
-        ) {
-            return '120px 120px 100px 140px 180px';
-        }
-
-        return result;
+        // Always include delete button column first with fixed width
+        const deleteCol = '32px'; // Fixed width for delete button
+        
+        const base = cols.map((c, index) => {
+            // Use dynamic width if available, otherwise fall back to default
+            const dynamicWidth = colWidths[c];
+            
+            // Define minimum and maximum widths per column
+            const constraints = {
+                accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
+                masterAccount: { min: 190, max: 310 }, // Master Account column constraints
+                cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
+                address: { min: 200, max: 320 }, // Address column constraints
+            };
+            
+            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
+            
+            if (dynamicWidth && dynamicWidth > 0) {
+                // For Services column, use minmax to fill remaining space
+                if (c === 'services') {
+                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
+                }
+                // Clamp the dynamic width within constraints for other columns
+                const clampedWidth = Math.max(
+                    columnConstraints.min, 
+                    Math.min(columnConstraints.max, dynamicWidth)
+                );
+                return `${clampedWidth}px`;
+            }
+            
+            // Use default size from colSizes or fallback to constraint minimum
+            const defaultSize = colSizes[c];
+            if (defaultSize) {
+                // For Services column, use flexible sizing to fill remaining space
+                if (c === 'services' && defaultSize === '1fr') {
+                    return `minmax(${columnConstraints.min}px, 1fr)`;
+                }
+                const numericSize = parseInt(defaultSize.replace('px', ''));
+                if (!isNaN(numericSize)) {
+                    const clampedSize = Math.max(
+                        columnConstraints.min,
+                        Math.min(columnConstraints.max, numericSize)
+                    );
+                    return `${clampedSize}px`;
+                }
+                return defaultSize;
+            }
+            
+            // Final fallback - Services gets remaining space
+            if (c === 'services') {
+                return `minmax(${columnConstraints.min}px, 1fr)`;
+            }
+            return `${columnConstraints.min}px`;
+        });
+        
+        const custom = customColumns.map(() => '110px');
+        const parts = [deleteCol, ...base, ...custom].filter(Boolean);
+        return parts.join(' ');
     }, [cols, customColumns, colWidths, colSizes]);
 
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-    const [contactModal, setContactModal] = useState<{
-        open: boolean;
-        rowId: string | null;
-        licIndex: number | null;
-    }>({open: false, rowId: null, licIndex: null});
-    const [contactDrafts, setContactDrafts] = useState<
-        Array<{contact: string; title: string; email: string; phone: string}>
-    >([{contact: '', title: '', email: '', phone: ''}]);
 
-    useEffect(() => {
-        const handler = (e: any) => {
-            const d = e?.detail || {};
-            setContactDrafts([{contact: '', title: '', email: '', phone: ''}]);
-            setContactModal({
-                open: true,
-                rowId: d.rowId || null,
-                licIndex: d.licIndex ?? null,
-            });
-        };
-        document.addEventListener('contact-modal-open', handler as any);
-        return () =>
-            document.removeEventListener('contact-modal-open', handler as any);
-    }, []);
+    const handleDeleteClick = (rowId: string) => {
+        if (onDelete) {
+            onDelete(rowId);
+        }
+    };
 
-    const contactModalPortal = React.useMemo(() => {
-        if (!contactModal.open) return null;
-        const onClose = () =>
-            setContactModal({open: false, rowId: null, licIndex: null});
-        const onAddRow = () =>
-            setContactDrafts((v) => [
-                ...v,
-                {contact: '', title: '', email: '', phone: ''},
-            ]);
-        const onRemoveRow = (idx: number) =>
-            setContactDrafts((v) => v.filter((_, i) => i !== idx));
-        const emailOk = (e: string) => !e || /.+@.+\..+/.test(String(e).trim());
-        const phoneOk = (p: string) =>
-            !p || /[0-9()+\-\s]{6,}/.test(String(p).trim());
-        const nonEmpty = (d: {
-            contact: string;
-            title: string;
-            email: string;
-            phone: string;
-        }) => (d.contact || d.title || d.email || d.phone).trim?.() !== '';
-        const validDrafts = contactDrafts
-            .filter(nonEmpty)
-            .filter((d) => emailOk(d.email) && phoneOk(d.phone));
-        const canSave = validDrafts.length > 0;
-        const onSave = () => {
-            if (!contactModal.rowId || contactModal.licIndex == null)
-                return onClose();
-            const rowId = contactModal.rowId;
-            const licIndex = contactModal.licIndex;
-            // append each draft as a new contact then persist via existing helpers
-            let baseCount = 0;
-            const row = localRows.find((r) => r.id === rowId) as any;
-            if (row && Array.isArray(row.licenses) && row.licenses[licIndex]) {
-                baseCount = (row.licenses[licIndex].contacts || []).length;
-            }
-            validDrafts.forEach((d, idx) => {
-                addLicenseContactRow(rowId, licIndex);
-                const ci = baseCount + idx;
-                updateLicenseContactField(
-                    rowId,
-                    licIndex,
-                    ci,
-                    'contact',
-                    d.contact || '',
-                );
-                updateLicenseContactField(
-                    rowId,
-                    licIndex,
-                    ci,
-                    'title',
-                    d.title || '',
-                );
-                updateLicenseContactField(
-                    rowId,
-                    licIndex,
-                    ci,
-                    'email',
-                    d.email || '',
-                );
-                updateLicenseContactField(
-                    rowId,
-                    licIndex,
-                    ci,
-                    'phone',
-                    d.phone || '',
-                );
-            });
-            onClose();
+    // ContactModal handlers for license contact details
+    const handleOpenContactModal = (rowId: string, licenseId: string, initialData?: Contact) => {
+        const row = localRows.find(r => r.id === rowId);
+        setContactModalRowId(rowId);
+        setContactModalLicenseId(licenseId);
+        setContactModalAccountName(row?.accountName || '');
+        setContactModalMasterAccount(row?.masterAccount || '');
+        setContactModalData(initialData ? [initialData] : []);
+        setShowContactModal(true);
+    };
+
+    const handleCloseContactModal = () => {
+        setShowContactModal(false);
+        setContactModalData([]);
+        setContactModalRowId(null);
+        setContactModalLicenseId(null);
+        setContactModalAccountName('');
+        setContactModalMasterAccount('');
+    };
+
+    const handleContactModalSave = (contacts: Contact[]) => {
+        if (!contactModalRowId || !contactModalLicenseId) return;
+
+        // Update the license's contact details with the first contact
+        const contactData = contacts.length > 0 ? contacts[0] : {
+            id: crypto.randomUUID(),
+            name: '',
+            email: '',
+            phone: '',
+            department: '',
+            designation: '',
+            company: ''
         };
-        return createPortal(
-            <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4'>
-                <div className='bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden'>
-                    <div className='px-4 py-3 border-b border-slate-200 flex items-center justify-between'>
-                        <div className='text-[14px] font-semibold text-slate-800'>
-                            Contact details
-                        </div>
-                        <button
-                            className='p-1 rounded hover:bg-slate-100'
-                            onClick={onClose}
-                        >
-                            <X className='w-4 h-4' />
-                        </button>
-                    </div>
-                    <div className='p-4 space-y-3'>
-                        <div className='max-h-[52vh] overflow-y-auto pr-1 space-y-2'>
-                            <AnimatePresence initial={false}>
-                                {contactDrafts.map((d, idx) => {
-                                    const emailValid = emailOk(d.email);
-                                    const phoneValid = phoneOk(d.phone);
-                                    return (
-                                        <motion.div
-                                            key={`ct-${idx}`}
-                                            initial={{
-                                                opacity: 0,
-                                                y: 6,
-                                                scale: 0.98,
-                                            }}
-                                            animate={{
-                                                opacity: 1,
-                                                y: 0,
-                                                scale: 1,
-                                            }}
-                                            exit={{
-                                                opacity: 0,
-                                                y: -6,
-                                                scale: 0.98,
-                                            }}
-                                            className='rounded-md border border-slate-200 bg-slate-50/40 px-3 py-2'
-                                        >
-                                            <div className='grid grid-cols-2 gap-2'>
-                                                <input
-                                                    className='border border-slate-300 rounded px-2 py-1 text-[12px]'
-                                                    placeholder='Contact name'
-                                                    value={d.contact}
-                                                    onChange={(e) =>
-                                                        setContactDrafts((v) =>
-                                                            v.map((x, i) =>
-                                                                i === idx
-                                                                    ? {
-                                                                          ...x,
-                                                                          contact:
-                                                                              e
-                                                                                  .target
-                                                                                  .value,
-                                                                      }
-                                                                    : x,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                                <input
-                                                    className='border border-slate-300 rounded px-2 py-1 text-[12px]'
-                                                    placeholder='Title'
-                                                    value={d.title}
-                                                    onChange={(e) =>
-                                                        setContactDrafts((v) =>
-                                                            v.map((x, i) =>
-                                                                i === idx
-                                                                    ? {
-                                                                          ...x,
-                                                                          title: e
-                                                                              .target
-                                                                              .value,
-                                                                      }
-                                                                    : x,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                                <input
-                                                    className={`border rounded px-2 py-1 text-[12px] ${
-                                                        emailValid
-                                                            ? 'border-slate-300'
-                                                            : 'border-rose-400 bg-rose-50/30'
-                                                    }`}
-                                                    placeholder='Email'
-                                                    value={d.email}
-                                                    onChange={(e) =>
-                                                        setContactDrafts((v) =>
-                                                            v.map((x, i) =>
-                                                                i === idx
-                                                                    ? {
-                                                                          ...x,
-                                                                          email: e
-                                                                              .target
-                                                                              .value,
-                                                                      }
-                                                                    : x,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                                <input
-                                                    className={`border rounded px-2 py-1 text-[12px] ${
-                                                        phoneValid
-                                                            ? 'border-slate-300'
-                                                            : 'border-rose-400 bg-rose-50/30'
-                                                    }`}
-                                                    placeholder='Phone'
-                                                    value={d.phone}
-                                                    onChange={(e) =>
-                                                        setContactDrafts((v) =>
-                                                            v.map((x, i) =>
-                                                                i === idx
-                                                                    ? {
-                                                                          ...x,
-                                                                          phone: e
-                                                                              .target
-                                                                              .value,
-                                                                      }
-                                                                    : x,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                            <div className='flex justify-end pt-2'>
-                                                {contactDrafts.length > 1 && (
-                                                    <button
-                                                        className='text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100'
-                                                        onClick={() =>
-                                                            onRemoveRow(idx)
-                                                        }
-                                                        title='Remove contact'
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    );
-                                })}
-                            </AnimatePresence>
-                        </div>
-                        <div className='flex justify-between items-center'>
-                            <button
-                                className='text-[12px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-50'
-                                onClick={onAddRow}
-                            >
-                                Add another
-                            </button>
-                            <div className='space-x-2'>
-                                <button
-                                    className='text-[12px] px-3 py-1 rounded border border-slate-300 hover:bg-slate-50'
-                                    onClick={onClose}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    disabled={!canSave}
-                                    className={`text-[12px] px-3 py-1 rounded ${
-                                        canSave
-                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                            : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                                    }`}
-                                    onClick={onSave}
-                                >
-                                    Save
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>,
-            document.body,
-        );
-    }, [contactModal, contactDrafts, localRows]);
+
+        setRowLicenses(prev => {
+            const rowLicenses = prev[contactModalRowId] || [];
+            const updatedLicenses = rowLicenses.map(license => {
+                if (license.id === contactModalLicenseId) {
+                    return {
+                        ...license,
+                        contactDetails: contactData
+                    };
+                }
+                return license;
+            });
+            
+            return {
+                ...prev,
+                [contactModalRowId]: updatedLicenses
+            };
+        });
+
+        handleCloseContactModal();
+    };
+
     // removed fill down state
 
     const startResize = (
         colKey: string,
-        e: React.MouseEvent<HTMLDivElement>,
+        e: any,
     ) => {
         e.preventDefault();
         e.stopPropagation();
-        const parent = (e.currentTarget as HTMLDivElement).parentElement;
+        
+        const tableContainer = e.currentTarget.closest('.grid');
+        if (!tableContainer) return;
+        
         const startX = e.clientX;
-        const startWidth = parent ? parent.getBoundingClientRect().width : 120;
-        const onMove = (ev: MouseEvent) => {
-            const delta = ev.clientX - startX;
-            const next = Math.max(70, startWidth + delta);
-            setColWidths((m) => ({...m, [colKey]: next}));
+        const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
+        
+        // Define column-specific constraints
+        const constraints = {
+            enterprise: { min: 140, max: 250 }, // Increased min to prevent arrow overlap
+            product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
+            services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
         };
+        
+        const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
+        
+        // Add visual feedback during resize
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        
+        const onMove = (ev: MouseEvent) => {
+            ev.preventDefault();
+            const delta = ev.clientX - startX;
+            const newWidth = Math.max(
+                columnConstraints.min, 
+                Math.min(columnConstraints.max, startWidth + delta)
+            );
+            
+            setColWidths((prev) => ({
+                ...prev,
+                [colKey]: newWidth
+            }));
+            
+            // Trigger scroll check during resize to detect Services column visibility
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is getting hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 10);
+        };
+        
         const onUp = () => {
+            // Remove visual feedback
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            // Final check for scrollbar need after resize is complete
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
+                    // Check if Services content is hidden
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+                    let servicesContentHidden = false;
+                    
+                    servicesColumns.forEach(serviceCol => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
+                            servicesContentHidden = true;
+                        }
+                    });
+                    
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 50);
+            
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
+        
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };
@@ -2670,30 +4720,6 @@ export default function AccountsTable({
             if (next.has(id)) next.delete(id);
             else next.add(id);
             return next;
-        });
-    };
-
-    const isSectionOpen = (
-        id: string,
-        key: 'address' | 'technical' | 'license',
-    ): boolean => {
-        const o = sectionOpen[id];
-        return o ? !!o[key] : false;
-    };
-    const toggleSection = (
-        id: string,
-        key: 'address' | 'technical' | 'license',
-    ) => {
-        setSectionOpen((prev) => {
-            const base = prev[id] || {
-                address: false,
-                technical: false,
-                license: false,
-            };
-            return {
-                ...prev,
-                [id]: {...base, [key]: !base[key]},
-            };
         });
     };
 
@@ -2724,30 +4750,93 @@ export default function AccountsTable({
             return <>{text}</>;
         }
     };
-    const [sortCol, setSortCol] = useState<
+    
+    // Handle delete click - directly call parent's onDelete function
+    
+    // Use external sort state if provided, otherwise fall back to internal state
+    const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
         | 'email'
+        | 'phone'
         | 'status'
         | 'servicesCount'
-        | 'enterpriseName'
-        | 'servicesSummary'
         | null
     >(null);
-    const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+    const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc' | null>(null);
+
+    // Listen for clear sorting events from parent component
+    useEffect(() => {
+        const handleClearSorting = () => {
+            setInternalSortCol(null);
+            setInternalSortDir(null);
+        };
+        
+        window.addEventListener('clearTableSorting', handleClearSorting);
+        
+        return () => {
+            window.removeEventListener('clearTableSorting', handleClearSorting);
+        };
+    }, []);
+
+    // Use external sort state if available, otherwise use internal state
+    const sortCol = externalSortColumn || internalSortCol;
+    const sortDir = externalSortDirection || internalSortDir;
 
     const toggleSort = (
         col:
             | 'accountName'
             | 'email'
+            | 'phone'
             | 'status'
-            | 'servicesCount'
-            | 'enterpriseName'
-            | 'servicesSummary',
+            | 'servicesCount',
+        direction?: 'asc' | 'desc'
     ) => {
-        const nextDir: 'asc' | 'desc' =
-            sortCol === col && sortDir === 'asc' ? 'desc' : 'asc';
-        setSortCol(col);
-        setSortDir(nextDir);
+        let nextDir: 'asc' | 'desc';
+        
+        // Check if external sorting is actively being used (both props provided and not empty)
+        const isExternalSorting = externalSortColumn && externalSortDirection;
+        
+        if (isExternalSorting) {
+            // When external sort is actively controlled, use external state for calculation
+            nextDir = direction || 
+                (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
+            
+            // Notify parent to update external sort state
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
+        } else {
+            // When using internal sort (including first time with no sorting)
+            nextDir = direction ||
+                (internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc');
+            
+            // Update internal state first (this actually sorts the table)
+            setInternalSortCol(col);
+            setInternalSortDir(nextDir);
+            
+            // Then notify parent to update Sort panel (for toolbar sync)
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
+        }
+        
+        // Always dispatch custom event for parent component to listen to
+        notifyParentSortChange(col, nextDir);
+    };
+
+    // Function to notify parent component about sort changes via custom event
+    const notifyParentSortChange = (column: string, direction: 'asc' | 'desc') => {
+        // Dispatch a custom event that the parent can listen to
+        const event = new CustomEvent('enterpriseTableSortChange', {
+            detail: {
+                column,
+                direction
+            },
+            bubbles: true
+        });
+        
+        // Dispatch the event from the document to ensure it reaches the parent
+        document.dispatchEvent(event);
     };
 
     const displayItems = useMemo(() => {
@@ -2765,90 +4854,465 @@ export default function AccountsTable({
         return base;
     }, [orderedItems, sortCol, sortDir]);
 
+    // Group data based on groupBy setting
+    const groupedItems = useMemo(() => {
+        if (groupBy === 'none') {
+            return { 'All Records': displayItems };
+        }
+
+        const groups: Record<string, AccountRow[]> = {};
+        
+        displayItems.forEach((item) => {
+            let groupKey = '';
+            
+            switch (groupBy) {
+                case 'accountName':
+                    groupKey = item.accountName || '(No Account Name)';
+                    break;
+                case 'masterAccount':
+                    groupKey = item.masterAccount || '(No Master Account)';
+                    break;
+                case 'cloudType':
+                    groupKey = item.cloudType || '(No Cloud Type)';
+                    break;
+                case 'address':
+                    groupKey = item.address || '(No Address)';
+                    break;
+                default:
+                    groupKey = 'All Records';
+            }
+            
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+            groups[groupKey].push(item);
+        });
+
+        // Sort group keys alphabetically, but keep "(No ...)" groups at the end
+        const sortedGroups: Record<string, AccountRow[]> = {};
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            const aIsEmpty = a.startsWith('(No ');
+            const bIsEmpty = b.startsWith('(No ');
+            if (aIsEmpty && !bIsEmpty) return 1;
+            if (!aIsEmpty && bIsEmpty) return -1;
+            return a.localeCompare(b);
+        });
+
+        sortedKeys.forEach(key => {
+            sortedGroups[key] = groups[key];
+        });
+
+        return sortedGroups;
+    }, [displayItems, groupBy]);
+
+    // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
+    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    
+    useEffect(() => {
+        const checkScrollNeed = () => {
+            if (!tableContainerRef.current) return;
+            
+            // Get current zoom level
+            const currentZoom = window.devicePixelRatio || 1;
+            const baseZoom = 1;
+            const zoomFactor = currentZoom / baseZoom;
+            
+            // Get viewport dimensions accounting for AI insights panel
+            const viewportWidth = window.innerWidth;
+            const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
+            const availableWidth = viewportWidth - aiPanelWidth;
+            
+            // Check if content width exceeds container width with a larger buffer for hover effects
+            const contentWidth = tableContainerRef.current.scrollWidth;
+            const containerWidth = tableContainerRef.current.clientWidth;
+            
+            // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
+            const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
+            
+            // Only show scrollbar when content genuinely exceeds container accounting for hover effects
+            const isContentOverflowing = contentWidth > containerWidth + hoverBuffer;
+            
+            // Check if Services column content is actually being cut off
+            const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
+            let servicesContentHidden = false;
+            
+            if (servicesColumns.length > 0) {
+                servicesColumns.forEach(serviceCol => {
+                    const serviceElement = serviceCol as HTMLElement;
+                    const serviceRect = serviceElement.getBoundingClientRect();
+                    const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                    
+                    // More reasonable threshold - minimum 300px for services content
+                    const minServicesWidth = 300;
+                    const bufferZone = 15; // Additional buffer for hover effects
+                    
+                    // Only trigger if Services column is actually cut off or too narrow to display content properly
+                    if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
+                        // Additional check: see if there's actually content being cut off
+                        const servicesChips = serviceElement.querySelectorAll('.inline-flex');
+                        if (servicesChips.length > 0) {
+                            servicesChips.forEach(chip => {
+                                const chipRect = chip.getBoundingClientRect();
+                                // Account for hover effects in chip positioning
+                                if (chipRect.right > serviceRect.right - bufferZone) {
+                                    servicesContentHidden = true;
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Show scrollbar only when there's genuine overflow or content is being cut off
+            const needsScrollbar = isContentOverflowing || servicesContentHidden;
+            
+            // Debug logging (remove in production)
+            console.log('Scroll Check:', {
+                contentWidth,
+                containerWidth,
+                hoverBuffer,
+                isContentOverflowing,
+                servicesContentHidden,
+                needsScrollbar
+            });
+            
+            setShouldShowHorizontalScroll(needsScrollbar);
+        };
+        
+        // Check on mount and when table structure changes
+        let scrollCheckTimeout: NodeJS.Timeout;
+        const debouncedScrollCheck = () => {
+            clearTimeout(scrollCheckTimeout);
+            scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
+        };
+        
+        checkScrollNeed();
+        
+        // Use ResizeObserver for better performance
+        const resizeObserver = new ResizeObserver(() => {
+            debouncedScrollCheck(); // Use debounced version
+        });
+        
+        // Use MutationObserver to detect when Services content changes
+        const mutationObserver = new MutationObserver((mutations) => {
+            let shouldCheck = false;
+            mutations.forEach((mutation) => {
+                // Check if Services column content changed
+                if (mutation.target instanceof Element) {
+                    const servicesCol = mutation.target.closest('[data-col="services"]');
+                    if (servicesCol) {
+                        shouldCheck = true;
+                    }
+                }
+            });
+            if (shouldCheck) {
+                debouncedScrollCheck(); // Use debounced version
+            }
+        });
+        
+        if (tableContainerRef.current) {
+            resizeObserver.observe(tableContainerRef.current);
+            mutationObserver.observe(tableContainerRef.current, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            
+            // Also observe all column cells for resize changes
+            const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
+            columnCells.forEach(cell => {
+                if (cell instanceof Element) {
+                    resizeObserver.observe(cell);
+                }
+            });
+        }
+        
+        // Also listen for window resize (zoom changes)
+        window.addEventListener('resize', debouncedScrollCheck);
+        
+        // Listen for zoom via keyboard shortcuts and mouse wheel
+        const handleKeyZoom = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
+                debouncedScrollCheck();
+            }
+        };
+        
+        const handleWheelZoom = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                debouncedScrollCheck();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyZoom);
+        window.addEventListener('wheel', handleWheelZoom, { passive: true });
+        
+        return () => {
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+            window.removeEventListener('resize', debouncedScrollCheck);
+            window.removeEventListener('keydown', handleKeyZoom);
+            window.removeEventListener('wheel', handleWheelZoom);
+            clearTimeout(scrollCheckTimeout);
+        };
+    }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
+    
     return (
         <div className='w-full compact-table safari-tight'>
+            {/* Using browser default scrollbars only */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                    /* Table container with proper scrolling */
+                    div[role="table"] {
+                        position: relative;
+                        overflow-y: visible;
+                        overflow-x: ${shouldShowHorizontalScroll ? 'auto' : 'hidden'};
+                    }
+                    
+                    /* Prevent horizontal scrollbars on table cells and headers (except services) */
+                    [data-col]:not([data-col="services"]) {
+                        overflow-x: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    
+                    /* Specifically prevent scrollbars in column headers */
+                    .bg-slate-50[data-col] {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    /* Header row should not have scrollbars */
+                    .bg-slate-50 > div {
+                        overflow: hidden !important;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    /* Ensure header content fits properly */
+                    .bg-slate-50 .relative {
+                        overflow: hidden;
+                        min-width: 0;
+                    }
+                    
+                    /* Ensure proper grid layout */
+                    .grid {
+                        display: grid;
+                    }
+                    
+                    /* Services column should allow content display within bounds */
+                    [data-col="services"] {
+                        overflow: visible;
+                        white-space: normal;
+                        text-overflow: unset;
+                        position: relative;
+                        max-width: 600px;
+                    }
+                    
+                    /* Services column chips should display full text */
+                    [data-col="services"] .inline-flex {
+                        white-space: nowrap;
+                        text-overflow: unset;
+                        overflow: visible;
+                        min-width: max-content;
+                        flex-shrink: 0;
+                    }
+                    
+                    /* Services column chip text should not be truncated */
+                    [data-col="services"] .inline-flex span {
+                        white-space: nowrap;
+                        overflow: visible;
+                        text-overflow: unset;
+                    }
+                    
+                    /* Services column container should wrap content */
+                    [data-col="services"] > div {
+                        white-space: normal;
+                        overflow: visible;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        position: relative;
+                        max-width: 100%;
+                    }
+                    
+                    /* Ensure dropdowns within Services column stay within bounds */
+                    [data-col="services"] .absolute {
+                        max-width: 100%;
+                        right: auto !important;
+                    }
+                    }
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        max-width: 100%;
+                        box-sizing: border-box;
+                    }
+                    
+                    /* Ensure dropdowns don't extend beyond table container */
+                    .z-\\[9999\\] {
+                        max-width: calc(100vw - 32px) !important;
+                        max-height: calc(100vh - 100px) !important;
+                        overflow: auto !important;
+                    }
+                    
+                    /* Table container should contain overflow */
+                    [role="table"] {
+                        position: relative;
+                        contain: layout style;
+                    }
+                    
+                    /* Hide any scrollbars that might appear in header elements */
+                    .bg-slate-50 {
+                        overflow: hidden;
+                    }
+                `
+            }} />
             <div className='flex items-center justify-between mb-2'>
                 <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'Accounts'}
+                    {title ?? 'Account Management Details'}
                 </h3>
-                <div className='flex items-center gap-2'>
-                    {/* Quick add row button removed per request */}
-                    {!hideControls && (
-                        <div className='flex items-center gap-1 text-[11px]'>
-                            <span className='text-slate-500 mr-1'>
-                                Group by:
-                            </span>
-                            <button
-                                onClick={() => {
-                                    setGroupBy('none');
-                                    onGroupByChange && onGroupByChange('none');
-                                }}
-                                className={`px-2 py-1 rounded-md border ${
-                                    groupBy === 'none'
-                                        ? 'bg-slate-200 border-slate-300'
-                                        : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                None
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setGroupBy('enterpriseName');
-                                    onGroupByChange &&
-                                        onGroupByChange('enterpriseName');
-                                }}
-                                className={`px-2 py-1 rounded-md border ${
-                                    groupBy === 'enterpriseName'
-                                        ? 'bg-slate-200 border-slate-300'
-                                        : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                Enterprise
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setGroupBy('productName');
-                                    onGroupByChange &&
-                                        onGroupByChange('productName');
-                                }}
-                                className={`px-2 py-1 rounded-md border ${
-                                    groupBy === 'productName'
-                                        ? 'bg-slate-200 border-slate-300'
-                                        : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                Product
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setGroupBy('serviceName');
-                                    onGroupByChange &&
-                                        onGroupByChange('serviceName');
-                                }}
-                                className={`px-2 py-1 rounded-md border ${
-                                    groupBy === 'serviceName'
-                                        ? 'bg-slate-200 border-slate-300'
-                                        : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                Service
-                            </button>
-                        </div>
-                    )}
+                <div className='flex items-center space-x-3'>
+                    <motion.button
+                        onClick={expandAllRows}
+                        className="group relative px-4 py-2 text-xs font-semibold text-emerald-700 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 rounded-lg border border-emerald-200 hover:border-emerald-300 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-sm hover:shadow-md"
+                        title="Expand All Accounts"
+                        whileHover={{ scale: 1.02, y: -1 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        style={{ overflow: 'hidden', contain: 'layout' }}
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-100 to-green-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <motion.div
+                            animate={{ 
+                                scale: [1, 1.1, 1],
+                                rotate: [0, 180, 360]
+                            }}
+                            transition={{ 
+                                duration: 2.5, 
+                                repeat: Infinity, 
+                                ease: "easeInOut",
+                                repeatDelay: 1
+                            }}
+                            className="relative z-10 flex items-center justify-center"
+                            style={{ transformOrigin: 'center center' }}
+                        >
+                            <UnfoldVertical className="w-4 h-4" />
+                        </motion.div>
+                        <span className="relative z-10">Expand All</span>
+                    </motion.button>
+                    
+                    <motion.button
+                        onClick={collapseAllRows}
+                        className="group relative px-4 py-2 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md"
+                        title="Collapse All Accounts"
+                        whileHover={{ y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        style={{ 
+                            overflow: 'hidden', 
+                            contain: 'layout style paint',
+                            willChange: 'transform'
+                        }}
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <motion.div
+                            animate={{ 
+                                rotate: [0, 360]
+                            }}
+                            transition={{ 
+                                duration: 4, 
+                                repeat: Infinity, 
+                                ease: "linear"
+                            }}
+                            className="relative z-10 w-4 h-4 flex items-center justify-center flex-shrink-0"
+                            style={{ 
+                                transformOrigin: 'center center',
+                                backfaceVisibility: 'hidden'
+                            }}
+                        >
+                            <FoldVertical className="w-4 h-4" />
+                        </motion.div>
+                        <span className="relative z-10 flex-shrink-0">Collapse All</span>
+                    </motion.button>
                 </div>
             </div>
-            <div role='table' className='p-0 overflow-x-auto'>
-                <div className='w-full relative'>
+            {cols.length === 0 ? (
+                <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
+                    <div className='flex flex-col items-center space-y-4'>
+                        <svg
+                            className='w-12 h-12 text-slate-400'
+                            fill='none'
+                            viewBox='0 0 24 24'
+                            stroke='currentColor'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={1.5}
+                                d='M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
+                            />
+                        </svg>
+                        <div className='space-y-2'>
+                            <h3 className='text-lg font-medium text-slate-900'>
+                                No columns are visible
+                            </h3>
+                            <p className='text-sm text-slate-500 max-w-sm'>
+                                All columns have been hidden. Use the Show/Hide button in the toolbar to select which columns to display, or click the button below to show all columns.
+                            </p>
+                        </div>
+                        {onShowAllColumns && (
+                            <button
+                                onClick={onShowAllColumns}
+                                className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200'
+                            >
+                                <svg
+                                    className='w-4 h-4'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                                    />
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
+                                    />
+                                </svg>
+                                Show All Columns
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div 
+                    ref={tableContainerRef}
+                    role='table' 
+                    className='p-0 w-full'
+                    style={{
+                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
+                        overflowY: 'visible',
+                        maxWidth: '100%',
+                        boxSizing: 'border-box'
+                    }}
+                >
+                <div className='w-full relative' style={{ 
+                    minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
+                    width: '100%' 
+                }}>
                     {(() => {
-                        const cssTemplate = gridTemplate.split('_').join(' ');
                         const defaultLabels: Record<string, string> = {
+                            accountName: 'Account Name',
                             masterAccount: 'Master Account',
-                            accountName: 'Account',
-                            country: 'Country',
-                            addressLine1: 'Address',
+                            cloudType: 'Cloud Type',
+                            address: 'Address',
                             technicalUser: 'Technical User',
-                            state: 'State',
-                            pincode: 'Pin/Zip',
                         };
 
                         // Merge custom labels with defaults
@@ -2858,178 +5322,110 @@ export default function AccountsTable({
                         };
 
                         const iconFor: Record<string, React.ReactNode> = {
-                            masterAccount: (
-                                <Building2 className='h-3.5 w-3.5 text-blue-600' />
-                            ),
                             accountName: (
-                                <FileText className='h-3.5 w-3.5 text-blue-600' />
+                                <User size={14} />
+                            ),
+                            masterAccount: (
+                                <Building2 size={14} />
+                            ),
+                            cloudType: (
+                                <FileText size={14} />
+                            ),
+                            address: (
+                                <MapPin size={14} />
                             ),
                             technicalUser: (
-                                <User className='h-3.5 w-3.5 text-blue-600' />
-                            ),
-                            addressLine1: (
-                                <motion.div
-                                    className='h-3.5 w-3.5 text-blue-600'
-                                    whileHover={{
-                                        scale: 1.2,
-                                        rotate: [0, -5, 5, 0],
-                                        transition: {duration: 0.3},
-                                    }}
-                                >
-                                    <svg
-                                        viewBox='0 0 24 24'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        strokeWidth='2'
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        className='w-full h-full'
-                                    >
-                                        <motion.path
-                                            d='M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z'
-                                            initial={{pathLength: 0}}
-                                            animate={{pathLength: 1}}
-                                            transition={{
-                                                duration: 1,
-                                                delay: 0.2,
-                                            }}
-                                        />
-                                        <motion.circle
-                                            cx='12'
-                                            cy='10'
-                                            r='3'
-                                            initial={{scale: 0}}
-                                            animate={{scale: 1}}
-                                            transition={{
-                                                duration: 0.5,
-                                                delay: 0.5,
-                                            }}
-                                        />
-                                    </svg>
-                                </motion.div>
-                            ),
-                            country: (
-                                <Globe className='h-3.5 w-3.5 text-blue-600' />
-                            ),
-                            addressLine2: (
-                                <Home className='h-3.5 w-3.5 text-blue-600' />
-                            ),
-                            city: (
-                                <MapPin className='h-3.5 w-3.5 text-blue-600' />
-                            ),
-                            state: (
-                                <MapPin className='h-3.5 w-3.5 text-blue-600' />
-                            ),
-                            pincode: (
-                                <MapPin className='h-3.5 w-3.5 text-blue-600' />
+                                <User size={14} />
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white pb-1'>
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
+                                minWidth: 'fit-content', 
+                                width: '100%',
+                                maxWidth: '100%',
+                                overflow: 'hidden' // Ensure content doesn't escape the container
+                            }}>
                                 <div
-                                    className='sticky top-0 z-30 grid w-full overflow-visible gap-0 px-0 py-2 text-xs font-semibold text-slate-900 bg-white/90 supports-[backdrop-filter]:backdrop-blur-sm border-b border-slate-200 divide-x divide-slate-200 shadow-sm'
+                                    className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
                                     style={{
-                                        gridTemplateColumns: cssTemplate,
-                                        gap: '0px',
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%',
+                                        display: 'grid'
                                     }}
                                 >
-                                    {(() => {
-                                        return cols.map((c, idx) => (
-                                            <div
-                                                key={c}
-                                                className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-slate-50 transition-colors duration-150 group ${
-                                                    idx === 0 && pinFirst
-                                                        ? 'sticky left-0 z-20 bg-sky-50/80 backdrop-blur-sm border-l-4 border-l-slate-200 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)] after:content-[" "] after:absolute after:top-0 after:right-0 after:h-full after:w-px after:bg-slate-200'
-                                                        : ''
-                                                }`}
-                                                style={
-                                                    idx === 0
-                                                        ? {
-                                                              width: firstColWidth,
-                                                              minWidth:
-                                                                  firstColWidth,
-                                                              maxWidth:
-                                                                  firstColWidth,
-                                                          }
-                                                        : undefined
-                                                }
-                                            >
-                                                <div className='flex items-center gap-2'>
-                                                    {iconFor[c] && iconFor[c]}
-                                                    <span>
-                                                        {labelFor[c] || c}
-                                                    </span>
-                                                </div>
-                                                {idx === 0 && (
+                                    {/* Delete Button Column Header */}
+                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                        {/* Empty header for delete column */}
+                                    </div>
+                                    
+                                    {cols.map((c, idx) => (
+                                        <div
+                                            key={c}
+                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
+                                                idx === 0 
+                                                    ? 'border-l-0' 
+                                                    : ''
+                                            } ${
+                                                idx === 0 && pinFirst && !shouldShowHorizontalScroll
+                                                    ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                    : ''
+                                            } ${
+                                                c === 'phone' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for Phone column
+                                            }`}
+                                            style={c === 'phone' ? { minWidth: '400px' } : undefined} // Match Phone column minimum width
+                                        >
+                                            <div className='flex items-center gap-2'>
+                                                {iconFor[c] && iconFor[c]}
+                                                <span>{labelFor[c] || c}</span>
+                                            </div>
+                                            {[
+                                                'accountName',
+                                                'masterAccount',
+                                                'cloudType',
+                                                'address',
+                                                'email',
+                                                'phone',
+                                            ].includes(c) && (
+                                                <div className={`inline-flex items-center ml-4 ${c === 'phone' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
                                                     <button
-                                                        className='ml-1 p-1 rounded hover:bg-slate-100 text-blue-600'
-                                                        onClick={() =>
-                                                            setPinFirst(
-                                                                (v) => !v,
-                                                            )
-                                                        }
-                                                        title={
-                                                            pinFirst
-                                                                ? 'Unfreeze column'
-                                                                : 'Freeze column'
-                                                        }
-                                                    >
-                                                        {pinFirst ? (
-                                                            <Pin className='w-3.5 h-3.5' />
-                                                        ) : (
-                                                            <PinOff className='w-3.5 h-3.5' />
-                                                        )}
-                                                    </button>
-                                                )}
-                                                {[
-                                                    'accountName',
-                                                    'email',
-                                                    'enterpriseName',
-                                                ].includes(c) && (
-                                                    <button
-                                                        onClick={() =>
-                                                            toggleSort(c as any)
-                                                        }
-                                                        className='inline-flex items-center -mr-1'
+                                                        onClick={() => toggleSort(c as any, 'asc')}
+                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
                                                     >
                                                         <ArrowUp
-                                                            className={`w-3 h-3 ${
-                                                                sortCol ===
-                                                                    (c as any) &&
-                                                                sortDir ===
-                                                                    'asc'
-                                                                    ? 'text-sky-600'
-                                                                    : 'text-slate-400'
-                                                            }`}
-                                                        />
-                                                        <ArrowDown
-                                                            className={`w-3 h-3 ${
-                                                                sortCol ===
-                                                                    (c as any) &&
-                                                                sortDir ===
-                                                                    'desc'
-                                                                    ? 'text-sky-600'
-                                                                    : 'text-slate-400'
-                                                            }`}
+                                                            size={sortCol === c && sortDir === 'asc' ? 20 : 16}
                                                         />
                                                     </button>
-                                                )}
+                                                    <button
+                                                        onClick={() => toggleSort(c as any, 'desc')}
+                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                    >
+                                                        <ArrowDown
+                                                            size={sortCol === c && sortDir === 'desc' ? 20 : 16}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* Show resize handle for resizable columns but not for Phone (last column) */}
+                                            {['accountName', 'masterAccount', 'cloudType', 'address', 'email'].includes(c) && (
                                                 <div
-                                                    onMouseDown={(e) =>
+                                                    onMouseDown={(e: any) =>
                                                         startResize(c, e)
                                                     }
-                                                    className='ml-auto h-4 w-1.5 cursor-col-resize bg-gradient-to-b from-slate-300 to-slate-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150'
-                                                    title='Resize column'
+                                                    className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                    title={`Resize ${labelFor[c] || c} column`}
+                                                >
+                                                    <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
+                                                </div>
+                                            )}
+                                            {c === 'accountName' && (
+                                                <span
+                                                    aria-hidden
+                                                    className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
                                                 />
-                                                {c === 'accountName' && (
-                                                    <span
-                                                        aria-hidden
-                                                        className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
-                                                    />
-                                                )}
-                                            </div>
-                                        ));
-                                    })()}
+                                            )}
+                                        </div>
+                                    ))}
                                     {customColumns.map((name, idx) => (
                                         <div
                                             key={`custom-${idx}`}
@@ -3044,11 +5440,10 @@ export default function AccountsTable({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <div className='space-y-0 divide-y divide-slate-200'>
+                        <div className='mt-2'>
                             {displayItems.map((r, idx) => (
-                                <>
+                                <div key={r.id}>
                                     <SortableAccountRow
-                                        key={r.id}
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -3056,2769 +5451,248 @@ export default function AccountsTable({
                                         highlightQuery={highlightQuery}
                                         onEdit={onEdit}
                                         onDelete={onDelete}
-                                        onQuickAddRow={onQuickAddRow}
                                         customColumns={customColumns}
                                         pinFirst={pinFirst}
                                         firstColWidth={firstColWidth}
                                         isExpanded={expandedRows.has(r.id)}
-                                        onToggle={toggleExpanded}
+                                        onToggle={toggleRowExpansion}
                                         hideRowExpansion={hideRowExpansion}
-                                        expandedContent={
-                                            <div className='relative bg-white px-2 py-3 pl-6 rounded-md border border-slate-200 shadow-sm'>
-                                                <motion.div
-                                                    layout
-                                                    initial={{
-                                                        scaleY: 0,
-                                                        opacity: 0,
-                                                    }}
-                                                    animate={{
-                                                        scaleY: 1,
-                                                        opacity: 1,
-                                                    }}
-                                                    transition={{
-                                                        duration: 0.28,
-                                                        ease: [
-                                                            0.22, 1, 0.36, 1,
-                                                        ],
-                                                    }}
-                                                    className='absolute left-3 top-0 bottom-0 w-px bg-gradient-to-b from-sky-400 via-emerald-400 to-violet-400 origin-top'
-                                                />
-                                                {/* Address section removed in favor of parent columns */}
-                                                {/* Technical */}
-                                                <div className='relative mb-4'>
-                                                    <motion.div
-                                                        layout
-                                                        initial={{
-                                                            scaleX: 0,
-                                                            opacity: 0,
-                                                        }}
-                                                        animate={{
-                                                            scaleX: isSectionOpen(
-                                                                r.id,
-                                                                'technical',
-                                                            )
-                                                                ? [0, 1]
-                                                                : [1, 0.6],
-                                                            opacity:
-                                                                isSectionOpen(
-                                                                    r.id,
-                                                                    'technical',
-                                                                )
-                                                                    ? [0.4, 1]
-                                                                    : [1, 0.6],
-                                                        }}
-                                                        viewport={{once: true}}
-                                                        transition={{
-                                                            duration: 0.25,
-                                                            ease: 'easeOut',
-                                                        }}
-                                                        className='absolute -left-3 top-4 w-3 h-px bg-gradient-to-r from-sky-400 to-emerald-400 origin-left'
-                                                    />
-                                                    <motion.div
-                                                        layout
-                                                        initial={{
-                                                            scale: 0.6,
-                                                            opacity: 0.6,
-                                                        }}
-                                                        animate={
-                                                            isSectionOpen(
-                                                                r.id,
-                                                                'technical',
-                                                            )
-                                                                ? {
-                                                                      scale: [
-                                                                          0.7,
-                                                                          1.1,
-                                                                          1,
-                                                                      ],
-                                                                      opacity: [
-                                                                          0.7,
-                                                                          1, 1,
-                                                                      ],
-                                                                  }
-                                                                : {
-                                                                      scale: 0.8,
-                                                                      opacity: 0.7,
-                                                                  }
-                                                        }
-                                                        transition={{
-                                                            times: [
-                                                                0, 0.5, 0.8, 1,
-                                                            ],
-                                                            duration: 0.45,
-                                                            ease: 'easeOut',
-                                                        }}
-                                                        className='absolute -left-3 top-3 h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_2px_#fff]'
-                                                    />
-                                                    <div className='flex items-center gap-1 text-[11px] font-semibold text-slate-700 mb-1'>
-                                                        <button
-                                                            className='p-0.5 rounded hover:bg-slate-100'
-                                                            onClick={() =>
-                                                                toggleSection(
-                                                                    r.id,
-                                                                    'technical',
-                                                                )
-                                                            }
-                                                            title='Toggle technical user'
-                                                        >
-                                                            <motion.span
-                                                                initial={false}
-                                                                animate={{
-                                                                    rotate: isSectionOpen(
-                                                                        r.id,
-                                                                        'technical',
-                                                                    )
-                                                                        ? 90
-                                                                        : 0,
-                                                                }}
-                                                                transition={{
-                                                                    type: 'spring',
-                                                                    stiffness: 520,
-                                                                    damping: 30,
-                                                                }}
-                                                                className='inline-flex'
-                                                            >
-                                                                <ChevronRight className='h-3.5 w-3.5 text-blue-600' />
-                                                            </motion.span>
-                                                        </button>
-                                                        Technical User
-                                                    </div>
-                                                    {isSectionOpen(
-                                                        r.id,
-                                                        'technical',
-                                                    ) && (
-                                                        <div className='border rounded-md overflow-hidden'>
-                                                            <div
-                                                                className='grid text-[10px] bg-slate-50 text-slate-700 px-2 py-1 divide-x divide-slate-200'
-                                                                style={{
-                                                                    gridTemplateColumns:
-                                                                        'repeat(9,minmax(100px,1fr))',
-                                                                }}
-                                                            >
-                                                                <div className='flex items-center gap-2'>
-                                                                    <User className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        First
-                                                                        Name
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <User className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Middle
-                                                                        Name
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <User className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Last
-                                                                        Name
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Mail className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Email
-                                                                        Address
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Activity className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Status
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Calendar className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Start
-                                                                        Date
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Calendar className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        End Date
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Key className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Password
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Settings className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Technical
-                                                                        User
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <div
-                                                                className='grid text-[12px] text-slate-800 px-0 py-0 border-t border-slate-200'
-                                                                style={{
-                                                                    gridTemplateColumns:
-                                                                        'repeat(9,minmax(100px,1fr))',
-                                                                }}
-                                                            >
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.firstName ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'firstName',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='First Name'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.middleName ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'middleName',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Middle Name'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.lastName ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'lastName',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Last Name'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.email ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'email',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Email Address'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.status ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'status',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Status'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.startDate ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'startDate',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Start Date'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.endDate ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'endDate',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='End Date'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.password ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'password',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Password'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2'>
-                                                                    <InlineEditableText
-                                                                        value={
-                                                                            r
-                                                                                .technical
-                                                                                ?.technicalUser ||
-                                                                            ''
-                                                                        }
-                                                                        onCommit={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateRowNested(
-                                                                                r.id,
-                                                                                [
-                                                                                    'technical',
-                                                                                    'technicalUser',
-                                                                                ],
-                                                                                v,
-                                                                            )
-                                                                        }
-                                                                        placeholder='Technical User'
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* License */}
-                                                <div className='relative'>
-                                                    <motion.div
-                                                        layout
-                                                        initial={{
-                                                            scaleX: 0,
-                                                            opacity: 0,
-                                                        }}
-                                                        whileInView={{
-                                                            scaleX: 1,
-                                                            opacity: 1,
-                                                        }}
-                                                        viewport={{once: true}}
-                                                        transition={{
-                                                            duration: 0.25,
-                                                        }}
-                                                        className='absolute -left-3 top-4 w-3 h-px bg-gradient-to-r from-violet-400 to-amber-400 origin-left'
-                                                    />
-                                                    <motion.div
-                                                        layout
-                                                        initial={{
-                                                            scale: 0,
-                                                            opacity: 0,
-                                                        }}
-                                                        animate={{
-                                                            scale: 1,
-                                                            opacity: 1,
-                                                        }}
-                                                        transition={{
-                                                            type: 'spring',
-                                                            stiffness: 420,
-                                                            damping: 24,
-                                                        }}
-                                                        className='absolute -left-3 top-3 h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_0_2px_#fff]'
-                                                    />
-                                                    <div className='flex items-center gap-1 text-[11px] font-semibold text-slate-700 mb-1'>
-                                                        <button
-                                                            className='p-0.5 rounded hover:bg-slate-100'
-                                                            onClick={() =>
-                                                                toggleSection(
-                                                                    r.id,
-                                                                    'license',
-                                                                )
-                                                            }
-                                                            title='Toggle license details'
-                                                        >
-                                                            <motion.span
-                                                                initial={false}
-                                                                animate={{
-                                                                    rotate: isSectionOpen(
-                                                                        r.id,
-                                                                        'license',
-                                                                    )
-                                                                        ? 90
-                                                                        : 0,
-                                                                }}
-                                                                transition={{
-                                                                    type: 'spring',
-                                                                    stiffness: 520,
-                                                                    damping: 30,
-                                                                }}
-                                                                className='inline-flex'
-                                                            >
-                                                                <ChevronRight className='h-3.5 w-3.5 text-blue-600' />
-                                                            </motion.span>
-                                                        </button>
-                                                        License Details
-                                                    </div>
-                                                    {isSectionOpen(
-                                                        r.id,
-                                                        'license',
-                                                    ) && (
-                                                        <div className='border rounded-md overflow-hidden bg-gradient-to-b from-white to-slate-50'>
-                                                            {(() => {
-                                                                const hasRenewal =
-                                                                    (
-                                                                        r.licenses ||
-                                                                        []
-                                                                    ).some(
-                                                                        (l) =>
-                                                                            !!l.renewalNotice,
-                                                                    );
-                                                                return (
-                                                                    <div
-                                                                        className='grid text-[10px] bg-slate-100/90 text-slate-800 px-2 py-1 divide-x divide-slate-200'
-                                                                        style={{
-                                                                            gridTemplateColumns:
-                                                                                'repeat(8,minmax(100px,1fr))',
-                                                                        }}
-                                                                    >
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Package className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Product
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Cpu className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Service
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Calendar className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                License
-                                                                                Start
-                                                                                Date
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Calendar className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                License
-                                                                                End
-                                                                                Date
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Users className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Number
-                                                                                of
-                                                                                Users
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Bell className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Renewal
-                                                                                Notice
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Phone className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Contact
-                                                                                Details
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className='flex items-center gap-2'>
-                                                                            <Clock className='h-3 w-3 text-blue-600' />
-                                                                            <span>
-                                                                                Notice
-                                                                                Period
-                                                                                (Days)
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                            {(r.licenses || [])
-                                                                .length > 0 ? (
-                                                                <div className='divide-y divide-slate-200'>
-                                                                    {(() => {
-                                                                        const hasRenewal =
-                                                                            (
-                                                                                r.licenses ||
-                                                                                []
-                                                                            ).some(
-                                                                                (
-                                                                                    l,
-                                                                                ) =>
-                                                                                    !!l.renewalNotice,
-                                                                            );
-                                                                        return (
-                                                                            <>
-                                                                                {(
-                                                                                    r.licenses ||
-                                                                                    []
-                                                                                ).map(
-                                                                                    (
-                                                                                        lic,
-                                                                                        i,
-                                                                                    ) => (
-                                                                                        <div
-                                                                                            key={
-                                                                                                i
-                                                                                            }
-                                                                                            className={`grid text-[12px] text-slate-800 px-0 py-0 border-t border-slate-200 ${
-                                                                                                i %
-                                                                                                    2 ===
-                                                                                                0
-                                                                                                    ? 'bg-white'
-                                                                                                    : 'bg-slate-50/60'
-                                                                                            }`}
-                                                                                            style={{
-                                                                                                gridTemplateColumns:
-                                                                                                    'repeat(8,minmax(100px,1fr))',
-                                                                                            }}
-                                                                                        >
-                                                                                            <div className='px-2 py-2 border-r border-slate-200 min-w-0 overflow-hidden'>
-                                                                                                <AsyncChipSelect
-                                                                                                    type='product'
-                                                                                                    value={
-                                                                                                        lic.product ||
-                                                                                                        ''
-                                                                                                    }
-                                                                                                    onChange={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'product',
-                                                                                                            v ||
-                                                                                                                '',
-                                                                                                        )
-                                                                                                    }
-                                                                                                    placeholder='Select product'
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200 min-w-0 overflow-hidden'>
-                                                                                                <AsyncChipSelect
-                                                                                                    type='service'
-                                                                                                    value={
-                                                                                                        lic.service ||
-                                                                                                        ''
-                                                                                                    }
-                                                                                                    onChange={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'service',
-                                                                                                            v ||
-                                                                                                                '',
-                                                                                                        )
-                                                                                                    }
-                                                                                                    placeholder='Select service'
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                <input
-                                                                                                    type='date'
-                                                                                                    value={
-                                                                                                        lic.licenseStart ||
-                                                                                                        ''
-                                                                                                    }
-                                                                                                    onChange={(
-                                                                                                        e,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'licenseStart',
-                                                                                                            e
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                        )
-                                                                                                    }
-                                                                                                    className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                <input
-                                                                                                    type='date'
-                                                                                                    value={
-                                                                                                        lic.licenseEnd ||
-                                                                                                        ''
-                                                                                                    }
-                                                                                                    onChange={(
-                                                                                                        e,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'licenseEnd',
-                                                                                                            e
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                        )
-                                                                                                    }
-                                                                                                    className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                <InlineEditableText
-                                                                                                    value={
-                                                                                                        typeof lic.users ===
-                                                                                                        'number'
-                                                                                                            ? String(
-                                                                                                                  lic.users,
-                                                                                                              )
-                                                                                                            : ''
-                                                                                                    }
-                                                                                                    onCommit={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'users',
-                                                                                                            parseInt(
-                                                                                                                v ||
-                                                                                                                    '0',
-                                                                                                                10,
-                                                                                                            ),
-                                                                                                        )
-                                                                                                    }
-                                                                                                    placeholder='Users'
-                                                                                                    className='w-full'
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                <label className='inline-flex items-center gap-1 text-[12px] text-slate-700'>
-                                                                                                    <input
-                                                                                                        type='checkbox'
-                                                                                                        defaultChecked={
-                                                                                                            !!lic.renewalNotice
-                                                                                                        }
-                                                                                                        onChange={(
-                                                                                                            e,
-                                                                                                        ) =>
-                                                                                                            updateLicenseField(
-                                                                                                                r.id,
-                                                                                                                i,
-                                                                                                                'renewalNotice',
-                                                                                                                e
-                                                                                                                    .target
-                                                                                                                    .checked,
-                                                                                                            )
-                                                                                                        }
-                                                                                                    />
-                                                                                                    <span>
-                                                                                                        Notify
-                                                                                                    </span>
-                                                                                                </label>
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                <button
-                                                                                                    className={`inline-flex items-center justify-center w-7 h-7 rounded-full border hover:bg-slate-50 ${
-                                                                                                        (
-                                                                                                            lic.contacts ||
-                                                                                                            []
-                                                                                                        )
-                                                                                                            .length >
-                                                                                                        0
-                                                                                                            ? 'border-emerald-400 text-emerald-600'
-                                                                                                            : 'border-slate-300'
-                                                                                                    }`}
-                                                                                                    title='Contact details'
-                                                                                                    onClick={() => {
-                                                                                                        if (
-                                                                                                            typeof document !==
-                                                                                                            'undefined'
-                                                                                                        ) {
-                                                                                                            document.dispatchEvent(
-                                                                                                                new CustomEvent(
-                                                                                                                    'contact-modal-open',
-                                                                                                                    {
-                                                                                                                        detail: {
-                                                                                                                            rowId: r.id,
-                                                                                                                            licIndex:
-                                                                                                                                i,
-                                                                                                                        },
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            );
-                                                                                                        }
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <svg
-                                                                                                        width='14'
-                                                                                                        height='14'
-                                                                                                        viewBox='0 0 24 24'
-                                                                                                        fill='none'
-                                                                                                        xmlns='http://www.w3.org/2000/svg'
-                                                                                                    >
-                                                                                                        <path
-                                                                                                            d='M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Zm0 2c-3.33 0-10 1.667-10 5v2h20v-2c0-3.333-6.67-5-10-5Z'
-                                                                                                            stroke='currentColor'
-                                                                                                            strokeWidth='1.5'
-                                                                                                            strokeLinecap='round'
-                                                                                                            strokeLinejoin='round'
-                                                                                                        />
-                                                                                                    </svg>
-                                                                                                </button>
-                                                                                            </div>
-                                                                                            <div className='px-2 py-2'>
-                                                                                                <InlineEditableText
-                                                                                                    value={
-                                                                                                        lic.noticeDays
-                                                                                                            ? String(
-                                                                                                                  lic.noticeDays,
-                                                                                                              )
-                                                                                                            : ''
-                                                                                                    }
-                                                                                                    onCommit={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'noticeDays',
-                                                                                                            parseInt(
-                                                                                                                v ||
-                                                                                                                    '0',
-                                                                                                                10,
-                                                                                                            ),
-                                                                                                        )
-                                                                                                    }
-                                                                                                    placeholder='Notice Period (Days)'
-                                                                                                    className='w-full'
-                                                                                                />
-                                                                                            </div>
-                                                                                            {/* Per-license Contacts toggle and panel */}
-                                                                                            <div className='col-span-full border-t px-2 py-1'>
-                                                                                                {/* Contact details chevron and panel removed */}
-                                                                                                {false && (
-                                                                                                    <div className='mt-2 border rounded-md overflow-hidden'>
-                                                                                                        <div
-                                                                                                            className='grid text-[10px] bg-slate-50 text-slate-700 px-2 py-1 divide-x divide-slate-200'
-                                                                                                            style={{
-                                                                                                                gridTemplateColumns:
-                                                                                                                    'repeat(4,minmax(140px,1fr))',
-                                                                                                            }}
-                                                                                                        >
-                                                                                                            <div>
-                                                                                                                Contact
-                                                                                                            </div>
-                                                                                                            <div>
-                                                                                                                Title
-                                                                                                            </div>
-                                                                                                            <div>
-                                                                                                                Email
-                                                                                                            </div>
-                                                                                                            <div>
-                                                                                                                Phone
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                        <div className='divide-y border-t border-slate-200'>
-                                                                                                            {(
-                                                                                                                lic.contacts ||
-                                                                                                                []
-                                                                                                            ).map(
-                                                                                                                (
-                                                                                                                    c,
-                                                                                                                    ci,
-                                                                                                                ) => (
-                                                                                                                    <div
-                                                                                                                        key={
-                                                                                                                            ci
-                                                                                                                        }
-                                                                                                                        className='grid text-[12px] text-slate-800 px-0 py-0'
-                                                                                                                        style={{
-                                                                                                                            gridTemplateColumns:
-                                                                                                                                'repeat(4,minmax(140px,1fr))',
-                                                                                                                        }}
-                                                                                                                    >
-                                                                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                                            <InlineEditableText
-                                                                                                                                value={
-                                                                                                                                    c.contact ||
-                                                                                                                                    ''
-                                                                                                                                }
-                                                                                                                                onCommit={(
-                                                                                                                                    v,
-                                                                                                                                ) =>
-                                                                                                                                    updateLicenseContactField(
-                                                                                                                                        r.id,
-                                                                                                                                        i,
-                                                                                                                                        ci,
-                                                                                                                                        'contact',
-                                                                                                                                        v,
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                                placeholder='Contact name'
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                                            <InlineEditableText
-                                                                                                                                value={
-                                                                                                                                    c.title ||
-                                                                                                                                    ''
-                                                                                                                                }
-                                                                                                                                onCommit={(
-                                                                                                                                    v,
-                                                                                                                                ) =>
-                                                                                                                                    updateLicenseContactField(
-                                                                                                                                        r.id,
-                                                                                                                                        i,
-                                                                                                                                        ci,
-                                                                                                                                        'title',
-                                                                                                                                        v,
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                                placeholder='Title'
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                                                            <InlineEditableText
-                                                                                                                                value={
-                                                                                                                                    c.email ||
-                                                                                                                                    ''
-                                                                                                                                }
-                                                                                                                                onCommit={(
-                                                                                                                                    v,
-                                                                                                                                ) =>
-                                                                                                                                    updateLicenseContactField(
-                                                                                                                                        r.id,
-                                                                                                                                        i,
-                                                                                                                                        ci,
-                                                                                                                                        'email',
-                                                                                                                                        v,
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                                placeholder='email@company.com'
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                        <div className='px-2 py-2'>
-                                                                                                                            <InlineEditableText
-                                                                                                                                value={
-                                                                                                                                    c.phone ||
-                                                                                                                                    ''
-                                                                                                                                }
-                                                                                                                                onCommit={(
-                                                                                                                                    v,
-                                                                                                                                ) =>
-                                                                                                                                    updateLicenseContactField(
-                                                                                                                                        r.id,
-                                                                                                                                        i,
-                                                                                                                                        ci,
-                                                                                                                                        'phone',
-                                                                                                                                        v,
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                                placeholder='Phone number'
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                    </div>
-                                                                                                                ),
-                                                                                                            )}
-                                                                                                            <div className='px-2 py-2'>
-                                                                                                                <button
-                                                                                                                    className='inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
-                                                                                                                    onClick={() =>
-                                                                                                                        addLicenseContactRow(
-                                                                                                                            r.id,
-                                                                                                                            i,
-                                                                                                                        )
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    +
-                                                                                                                    Add
-                                                                                                                    contact
-                                                                                                                </button>
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ),
-                                                                                )}
-                                                                            </>
-                                                                        );
-                                                                    })()}
-                                                                    <div className='px-2 py-2'>
-                                                                        <button
-                                                                            className='inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
-                                                                            onClick={() => {
-                                                                                setLocalRows(
-                                                                                    (
-                                                                                        prev,
-                                                                                    ) =>
-                                                                                        prev.map(
-                                                                                            (
-                                                                                                row,
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    row.id !==
-                                                                                                    r.id
-                                                                                                )
-                                                                                                    return row;
-                                                                                                const list =
-                                                                                                    [
-                                                                                                        ...(((
-                                                                                                            row as any
-                                                                                                        )
-                                                                                                            .licenses as any[]) ||
-                                                                                                            []),
-                                                                                                    ];
-                                                                                                list.push(
-                                                                                                    {
-                                                                                                        enterprise:
-                                                                                                            '',
-                                                                                                        product:
-                                                                                                            '',
-                                                                                                        service:
-                                                                                                            '',
-                                                                                                        licenseStart:
-                                                                                                            '',
-                                                                                                        licenseEnd:
-                                                                                                            '',
-                                                                                                        users: 0,
-                                                                                                        renewalNotice:
-                                                                                                            false,
-                                                                                                        noticeDays: 0,
-                                                                                                    } as any,
-                                                                                                );
-                                                                                                return {
-                                                                                                    ...(row as any),
-                                                                                                    licenses:
-                                                                                                        list,
-                                                                                                } as AccountRow;
-                                                                                            },
-                                                                                        ),
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            +
-                                                                            Add
-                                                                            license
-                                                                            row
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div className='border-t'>
-                                                                    {/* Placeholder editable row index 0 */}
-                                                                    <div
-                                                                        className='grid text-[12px] text-slate-800 px-0 py-0'
-                                                                        style={{
-                                                                            gridTemplateColumns: `repeat(${
-                                                                                (
-                                                                                    r.licenses ||
-                                                                                    []
-                                                                                ).some(
-                                                                                    (
-                                                                                        l,
-                                                                                    ) =>
-                                                                                        !!l.renewalNotice,
-                                                                                )
-                                                                                    ? 8
-                                                                                    : 7
-                                                                            },minmax(88px,1fr))`,
-                                                                        }}
-                                                                    >
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <AsyncChipSelect
-                                                                                type='enterprise'
-                                                                                value={
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    v,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'enterprise',
-                                                                                        v ||
-                                                                                            '',
-                                                                                    )
-                                                                                }
-                                                                                placeholder='Select enterprise'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <AsyncChipSelect
-                                                                                type='product'
-                                                                                value={
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    v,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'product',
-                                                                                        v ||
-                                                                                            '',
-                                                                                    )
-                                                                                }
-                                                                                placeholder='Select product'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <AsyncChipSelect
-                                                                                type='service'
-                                                                                value={
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    v,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'service',
-                                                                                        v ||
-                                                                                            '',
-                                                                                    )
-                                                                                }
-                                                                                placeholder='Select service'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <input
-                                                                                type='date'
-                                                                                defaultValue=''
-                                                                                onChange={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'licenseStart',
-                                                                                        e
-                                                                                            .target
-                                                                                            .value,
-                                                                                    )
-                                                                                }
-                                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <input
-                                                                                type='date'
-                                                                                defaultValue=''
-                                                                                onChange={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'licenseEnd',
-                                                                                        e
-                                                                                            .target
-                                                                                            .value,
-                                                                                    )
-                                                                                }
-                                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <input
-                                                                                defaultValue=''
-                                                                                onBlur={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    updateLicenseField(
-                                                                                        r.id,
-                                                                                        0,
-                                                                                        'users',
-                                                                                        parseInt(
-                                                                                            e
-                                                                                                .target
-                                                                                                .value ||
-                                                                                                '0',
-                                                                                            10,
-                                                                                        ),
-                                                                                    )
-                                                                                }
-                                                                                placeholder='Users'
-                                                                                className='w-full'
-                                                                            />
-                                                                        </div>
-                                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                                            <label className='inline-flex items-center gap-1 text-[12px] text-slate-700'>
-                                                                                <input
-                                                                                    type='checkbox'
-                                                                                    defaultChecked={
-                                                                                        false
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e,
-                                                                                    ) =>
-                                                                                        updateLicenseField(
-                                                                                            r.id,
-                                                                                            0,
-                                                                                            'renewalNotice',
-                                                                                            e
-                                                                                                .target
-                                                                                                .checked,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                                <span>
-                                                                                    Notify
-                                                                                </span>
-                                                                            </label>
-                                                                        </div>
-                                                                        {(
-                                                                            r.licenses ||
-                                                                            []
-                                                                        ).some(
-                                                                            (
-                                                                                l,
-                                                                            ) =>
-                                                                                !!l.renewalNotice,
-                                                                        ) && (
-                                                                            <div className='px-2 py-2'>
-                                                                                <InlineEditableText
-                                                                                    value={
-                                                                                        ''
-                                                                                    }
-                                                                                    onCommit={(
-                                                                                        v,
-                                                                                    ) =>
-                                                                                        updateLicenseField(
-                                                                                            r.id,
-                                                                                            0,
-                                                                                            'noticeDays',
-                                                                                            parseInt(
-                                                                                                v ||
-                                                                                                    '0',
-                                                                                                10,
-                                                                                            ),
-                                                                                        )
-                                                                                    }
-                                                                                    placeholder='Days'
-                                                                                    className='w-full'
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className='px-2 py-2'>
-                                                                        <button
-                                                                            className='inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
-                                                                            onClick={() => {
-                                                                                setLocalRows(
-                                                                                    (
-                                                                                        prev,
-                                                                                    ) =>
-                                                                                        prev.map(
-                                                                                            (
-                                                                                                row,
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    row.id !==
-                                                                                                    r.id
-                                                                                                )
-                                                                                                    return row;
-                                                                                                const list =
-                                                                                                    [
-                                                                                                        ...(((
-                                                                                                            row as any
-                                                                                                        )
-                                                                                                            .licenses as any[]) ||
-                                                                                                            []),
-                                                                                                    ];
-                                                                                                list.push(
-                                                                                                    {
-                                                                                                        enterprise:
-                                                                                                            '',
-                                                                                                        product:
-                                                                                                            '',
-                                                                                                        service:
-                                                                                                            '',
-                                                                                                        licenseStart:
-                                                                                                            '',
-                                                                                                        licenseEnd:
-                                                                                                            '',
-                                                                                                        users: 0,
-                                                                                                        renewalNotice:
-                                                                                                            false,
-                                                                                                        noticeDays: 0,
-                                                                                                    } as any,
-                                                                                                );
-                                                                                                return {
-                                                                                                    ...(row as any),
-                                                                                                    licenses:
-                                                                                                        list,
-                                                                                                } as AccountRow;
-                                                                                            },
-                                                                                        ),
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            +
-                                                                            Add
-                                                                            license
-                                                                            row
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                        enableDropdownChips={
+                                            enableDropdownChips
                                         }
+                                        onDropdownOptionUpdate={
+                                            onDropdownOptionUpdate
+                                        }
+                                        onNewItemCreated={onNewItemCreated}
+                                        isCellMissing={isCellMissing}
+                                        compressingRowId={compressingRowId}
+                                        foldingRowId={foldingRowId}
+                                        allRows={rows}
+                                        expandedContent={null}
                                         onUpdateField={updateRowField}
                                         isSelected={selectedRowId === r.id}
-                                        onSelect={(id) => setSelectedRowId(id)}
+                                        onSelect={(id: string) => setSelectedRowId(id)}
                                         onStartFill={() => {}}
                                         inFillRange={false}
+                                        onDeleteClick={handleDeleteClick}
+                                        shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                        onOpenAddressModal={onOpenAddressModal}
+                                        onOpenTechnicalUserModal={onOpenTechnicalUserModal}
                                     />
                                     {expandedRows.has(r.id) && (
-                                        <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
-                                            <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
-                                            {/* Technical User Subtable - COMMENTED OUT AS REQUESTED */}
-                                            {/* <div className='relative mb-4'>
-                                                <div className='absolute -left-3 top-4 w-3 h-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
-                                                <div className='absolute -left-3 top-3 h-2 w-2 rounded-full bg-white border border-slate-300'></div>
-                                                <div className='text-[11px] font-semibold text-slate-800 mb-1'>
-                                                    Technical User
+                                        <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
+                                            {/* Vertical connection line from chevron */}
+                                            <div className="absolute -left-2 top-0 bottom-0 w-px bg-blue-400"></div>
+                                            
+                                            {/* License section header */}
+                                            <div className="p-3 pb-2">
+                                                <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                                    <FileText className="w-4 h-4" />
+                                                    Licenses for {r.accountName || 'Account'}
+                                                </h4>
+                                                
+                                                {/* Render existing licenses */}
+                                                <div className="space-y-2">
+                                                    {(rowLicenses[r.id] || []).map((license) => (
+                                                        <LicenseSubRow
+                                                            key={license.id}
+                                                            license={license}
+                                                            rowId={r.id}
+                                                            onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
+                                                            onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
+                                                            showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
+                                                            isLicenseFieldMissing={isLicenseFieldMissing}
+                                                            compressingLicenseId={compressingLicenseId}
+                                                            foldingLicenseId={foldingLicenseId}
+                                                            onDeleteClick={onLicenseDelete}
+                                                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                                            onNewItemCreated={onNewItemCreated as any}
+                                                            onOpenContactModal={handleOpenContactModal}
+                                                            accounts={rows}
+                                                        />
+                                                    ))}
                                                 </div>
-                                                <div className='border rounded-md overflow-hidden'>
-                                                    <div
-                                                        className='grid text-[10px] bg-slate-50 text-slate-700 px-2 py-1 divide-x divide-slate-200'
-                                                        style={{
-                                                            gridTemplateColumns:
-                                                                'repeat(9,minmax(100px,1fr))',
-                                                        }}
+                                                
+                                                {/* Add New License Button */}
+                                                <div className="mt-4 ml-6">
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.02, y: -1 }}
+                                                        whileTap={{ scale: 0.98 }}
+                                                        onClick={() => addNewLicense(r.id)}
+                                                        disabled={
+                                                            // Check if main row fields are incomplete
+                                                            !isMainRowComplete(r) ||
+                                                            // Check if there are any incomplete licenses in this row
+                                                            (rowLicenses[r.id] || []).some(license => 
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
+                                                            )
+                                                        }
+                                                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
+                                                            (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
+                                                            ))
+                                                            ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
+                                                            : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm hover:shadow-md'
+                                                        }`}
+                                                        title={
+                                                            !isMainRowComplete(r)
+                                                            ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
+                                                            : (rowLicenses[r.id] || []).some(license => 
+                                                                !license.enterprise || !license.product || !license.service ||
+                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                (license.renewalNotice && !license.noticePeriodDays)
+                                                            )
+                                                            ? 'Complete existing licenses before adding new ones'
+                                                            : 'Add New License'
+                                                        }
                                                     >
-                                                        <div className='flex items-center gap-2'>
-                                                            <User className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                First Name
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <User className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Middle Name
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <User className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Last Name
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Mail className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Email Address
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Activity className='h-3 w-3 text-blue-600' />
-                                                            <span>Status</span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Calendar className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Start Date
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Calendar className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                End Date
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Key className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Password
-                                                            </span>
-                                                        </div>
-                                                        <div className='flex items-center gap-2'>
-                                                            <Settings className='h-3 w-3 text-blue-600' />
-                                                            <span>
-                                                                Technical User
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div
-                                                        className='grid text-[12px] text-slate-800 px-0 py-0 border-t border-slate-200'
-                                                        style={{
-                                                            gridTemplateColumns:
-                                                                'repeat(9,minmax(100px,1fr))',
-                                                        }}
-                                                    >
-                                                        <div
-                                                            className='px-2 py-2 border-r border-slate-200'
-                                                            data-tech-row={r.id}
-                                                            data-tech-field='firstName'
-                                                        >
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.firstName ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'firstName',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                onKeyDown={(
-                                                                    e,
-                                                                ) => {
-                                                                    if (
-                                                                        e.key ===
-                                                                        'Tab'
-                                                                    ) {
-                                                                        e.preventDefault();
-                                                                        const technicalFields =
-                                                                            [
-                                                                                'firstName',
-                                                                                'middleName',
-                                                                                'lastName',
-                                                                                'email',
-                                                                                'status',
-                                                                                'startDate',
-                                                                                'endDate',
-                                                                                'password',
-                                                                                'technicalUser',
-                                                                            ];
-                                                                        const currentIndex =
-                                                                            technicalFields.indexOf(
-                                                                                'firstName',
-                                                                            );
-                                                                        const nextIndex =
-                                                                            e.shiftKey
-                                                                                ? currentIndex -
-                                                                                  1
-                                                                                : currentIndex +
-                                                                                  1;
-
-                                                                        if (
-                                                                            nextIndex >=
-                                                                                0 &&
-                                                                            nextIndex <
-                                                                                technicalFields.length
-                                                                        ) {
-                                                                            const nextField =
-                                                                                technicalFields[
-                                                                                    nextIndex
-                                                                                ];
-                                                                            setTimeout(
-                                                                                () => {
-                                                                                    const nextInput =
-                                                                                        document.querySelector(
-                                                                                            `[data-tech-row="${r.id}"][data-tech-field="${nextField}"] input`,
-                                                                                        ) as HTMLInputElement;
-                                                                                    if (
-                                                                                        nextInput
-                                                                                    ) {
-                                                                                        nextInput.focus();
-                                                                                    }
-                                                                                },
-                                                                                10,
-                                                                            );
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='First Name'
-                                                            />
-                                                        </div>
-                                                        <div
-                                                            className='px-2 py-2 border-r border-slate-200'
-                                                            data-tech-row={r.id}
-                                                            data-tech-field='middleName'
-                                                        >
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.middleName ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'middleName',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                onKeyDown={(
-                                                                    e,
-                                                                ) => {
-                                                                    if (
-                                                                        e.key ===
-                                                                        'Tab'
-                                                                    ) {
-                                                                        e.preventDefault();
-                                                                        const technicalFields =
-                                                                            [
-                                                                                'firstName',
-                                                                                'middleName',
-                                                                                'lastName',
-                                                                                'email',
-                                                                                'status',
-                                                                                'startDate',
-                                                                                'endDate',
-                                                                                'password',
-                                                                                'technicalUser',
-                                                                            ];
-                                                                        const currentIndex =
-                                                                            technicalFields.indexOf(
-                                                                                'middleName',
-                                                                            );
-                                                                        const nextIndex =
-                                                                            e.shiftKey
-                                                                                ? currentIndex -
-                                                                                  1
-                                                                                : currentIndex +
-                                                                                  1;
-
-                                                                        if (
-                                                                            nextIndex >=
-                                                                                0 &&
-                                                                            nextIndex <
-                                                                                technicalFields.length
-                                                                        ) {
-                                                                            const nextField =
-                                                                                technicalFields[
-                                                                                    nextIndex
-                                                                                ];
-                                                                            setTimeout(
-                                                                                () => {
-                                                                                    const nextInput =
-                                                                                        document.querySelector(
-                                                                                            `[data-tech-row="${r.id}"][data-tech-field="${nextField}"] input`,
-                                                                                        ) as HTMLInputElement;
-                                                                                    if (
-                                                                                        nextInput
-                                                                                    ) {
-                                                                                        nextInput.focus();
-                                                                                    }
-                                                                                },
-                                                                                10,
-                                                                            );
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Middle Name'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.lastName ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'lastName',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Last Name'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.email ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'email',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Email Address'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.status ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'status',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Status'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                type='date'
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.startDate ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'startDate',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                type='date'
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.endDate ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'endDate',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2 border-r border-slate-200'>
-                                                            <input
-                                                                type='password'
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.password ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'password',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Password'
-                                                            />
-                                                        </div>
-                                                        <div className='px-2 py-2'>
-                                                            <input
-                                                                defaultValue={
-                                                                    r.technical
-                                                                        ?.technicalUser ||
-                                                                    ''
-                                                                }
-                                                                onBlur={(e) =>
-                                                                    updateRowNested(
-                                                                        r.id,
-                                                                        [
-                                                                            'technical',
-                                                                            'technicalUser',
-                                                                        ],
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                placeholder='Technical User'
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div> */}
-                                            {/* License Details Subtable */}
-                                            <div className='relative'>
-                                                <div className='absolute -left-3 top-4 w-3 h-px bg-slate-400'></div>
-                                                <div className='absolute -left-3 top-3 h-2 w-2 rounded-full bg-white border border-slate-300'></div>
-                                                <div className='text-[11px] font-semibold text-slate-800 mb-1'>
-                                                    License Details
-                                                </div>
-                                                <div className='border rounded-md overflow-hidden bg-gradient-to-b from-white to-slate-50'>
-                                                    {(() => {
-                                                        const hasRenewal = (
-                                                            r.licenses || []
-                                                        ).some(
-                                                            (l) =>
-                                                                !!l.renewalNotice,
-                                                        );
-                                                        return (
-                                                            <div
-                                                                className='grid text-[10px] bg-slate-100/90 text-slate-800 px-2 py-1 divide-x divide-slate-200'
-                                                                style={{
-                                                                    gridTemplateColumns:
-                                                                        'repeat(8,minmax(100px,1fr))',
-                                                                }}
-                                                            >
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Package className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Product
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Cpu className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Service
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Calendar className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        License
-                                                                        Start
-                                                                        Date
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Calendar className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        License
-                                                                        End Date
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Users className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Number
-                                                                        of Users
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Bell className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Renewal
-                                                                        Notice
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Phone className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Contact
-                                                                        Details
-                                                                    </span>
-                                                                </div>
-                                                                <div className='flex items-center gap-2'>
-                                                                    <Clock className='h-3 w-3 text-blue-600' />
-                                                                    <span>
-                                                                        Notice
-                                                                        Period
-                                                                        (Days)
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                    {(r.licenses || []).length >
-                                                    0 ? (
-                                                        <div className='divide-y divide-slate-200'>
-                                                            {(() => {
-                                                                const hasRenewal =
-                                                                    (
-                                                                        r.licenses ||
-                                                                        []
-                                                                    ).some(
-                                                                        (l) =>
-                                                                            !!l.renewalNotice,
-                                                                    );
-                                                                return (
-                                                                    <>
-                                                                        {(
-                                                                            r.licenses ||
-                                                                            []
-                                                                        ).map(
-                                                                            (
-                                                                                lic,
-                                                                                i,
-                                                                            ) => (
-                                                                                <div
-                                                                                    key={
-                                                                                        i
-                                                                                    }
-                                                                                    className={`grid text-[12px] text-slate-800 px-0 py-0 border-t border-slate-200 ${
-                                                                                        i %
-                                                                                            2 ===
-                                                                                        0
-                                                                                            ? 'bg-white'
-                                                                                            : 'bg-slate-50/60'
-                                                                                    }`}
-                                                                                    style={{
-                                                                                        gridTemplateColumns: `repeat(${
-                                                                                            hasRenewal
-                                                                                                ? 8
-                                                                                                : 7
-                                                                                        },minmax(88px,1fr))`,
-                                                                                    }}
-                                                                                >
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <AsyncChipSelect
-                                                                                            type='enterprise'
-                                                                                            value={
-                                                                                                lic.enterprise ||
-                                                                                                ''
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'enterprise',
-                                                                                                    v ||
-                                                                                                        '',
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder='Select enterprise'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <AsyncChipSelect
-                                                                                            type='product'
-                                                                                            value={
-                                                                                                lic.product ||
-                                                                                                ''
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'product',
-                                                                                                    v ||
-                                                                                                        '',
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder='Select product'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <AsyncChipSelect
-                                                                                            type='service'
-                                                                                            value={
-                                                                                                lic.service ||
-                                                                                                ''
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'service',
-                                                                                                    v ||
-                                                                                                        '',
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder='Select service'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <input
-                                                                                            type='date'
-                                                                                            value={
-                                                                                                lic.licenseStart ||
-                                                                                                ''
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'licenseStart',
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                )
-                                                                                            }
-                                                                                            className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <input
-                                                                                            type='date'
-                                                                                            value={
-                                                                                                lic.licenseEnd ||
-                                                                                                ''
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'licenseEnd',
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                )
-                                                                                            }
-                                                                                            className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <InlineEditableText
-                                                                                            value={
-                                                                                                typeof lic.users ===
-                                                                                                'number'
-                                                                                                    ? String(
-                                                                                                          lic.users,
-                                                                                                      )
-                                                                                                    : ''
-                                                                                            }
-                                                                                            onCommit={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                updateLicenseField(
-                                                                                                    r.id,
-                                                                                                    i,
-                                                                                                    'users',
-                                                                                                    parseInt(
-                                                                                                        v ||
-                                                                                                            '0',
-                                                                                                        10,
-                                                                                                    ),
-                                                                                                )
-                                                                                            }
-                                                                                            placeholder='Users'
-                                                                                            className='w-full'
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className='px-2 py-2 border-r border-slate-200'>
-                                                                                        <label className='inline-flex items-center gap-1 text-[12px] text-slate-700'>
-                                                                                            <input
-                                                                                                type='checkbox'
-                                                                                                defaultChecked={
-                                                                                                    !!lic.renewalNotice
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    updateLicenseField(
-                                                                                                        r.id,
-                                                                                                        i,
-                                                                                                        'renewalNotice',
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .checked,
-                                                                                                    )
-                                                                                                }
-                                                                                            />
-                                                                                            <span>
-                                                                                                Notify
-                                                                                            </span>
-                                                                                        </label>
-                                                                                    </div>
-                                                                                    {hasRenewal && (
-                                                                                        <div className='px-2 py-2'>
-                                                                                            {lic.renewalNotice ? (
-                                                                                                <InlineEditableText
-                                                                                                    value={
-                                                                                                        lic.noticeDays
-                                                                                                            ? String(
-                                                                                                                  lic.noticeDays,
-                                                                                                              )
-                                                                                                            : ''
-                                                                                                    }
-                                                                                                    onCommit={(
-                                                                                                        v,
-                                                                                                    ) =>
-                                                                                                        updateLicenseField(
-                                                                                                            r.id,
-                                                                                                            i,
-                                                                                                            'noticeDays',
-                                                                                                            parseInt(
-                                                                                                                v ||
-                                                                                                                    '0',
-                                                                                                                10,
-                                                                                                            ),
-                                                                                                        )
-                                                                                                    }
-                                                                                                    placeholder='Days'
-                                                                                                    className='w-full'
-                                                                                                />
-                                                                                            ) : (
-                                                                                                <span className='text-slate-300'>
-                                                                                                    —
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            ),
-                                                                        )}
-                                                                    </>
-                                                                );
-                                                            })()}
-                                                            <div className='px-2 py-2'>
-                                                                <button
-                                                                    className='inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
-                                                                    onClick={() => {
-                                                                        setLocalRows(
-                                                                            (
-                                                                                prev,
-                                                                            ) =>
-                                                                                prev.map(
-                                                                                    (
-                                                                                        row,
-                                                                                    ) => {
-                                                                                        if (
-                                                                                            row.id !==
-                                                                                            r.id
-                                                                                        )
-                                                                                            return row;
-                                                                                        const list =
-                                                                                            [
-                                                                                                ...(((
-                                                                                                    row as any
-                                                                                                )
-                                                                                                    .licenses as any[]) ||
-                                                                                                    []),
-                                                                                            ];
-                                                                                        list.push(
-                                                                                            {
-                                                                                                enterprise:
-                                                                                                    '',
-                                                                                                product:
-                                                                                                    '',
-                                                                                                service:
-                                                                                                    '',
-                                                                                                licenseStart:
-                                                                                                    '',
-                                                                                                licenseEnd:
-                                                                                                    '',
-                                                                                                users: 0,
-                                                                                                renewalNotice:
-                                                                                                    false,
-                                                                                                noticeDays: 0,
-                                                                                            } as any,
-                                                                                        );
-                                                                                        return {
-                                                                                            ...(row as any),
-                                                                                            licenses:
-                                                                                                list,
-                                                                                        } as AccountRow;
-                                                                                    },
-                                                                                ),
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    + Add
-                                                                    license row
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className='border-t'>
-                                                            {/* Placeholder editable row index 0 */}
-                                                            <div
-                                                                className='grid text-[12px] text-slate-800 px-0 py-0'
-                                                                style={{
-                                                                    gridTemplateColumns: `repeat(${
-                                                                        (
-                                                                            r.licenses ||
-                                                                            []
-                                                                        ).some(
-                                                                            (
-                                                                                l,
-                                                                            ) =>
-                                                                                !!l.renewalNotice,
-                                                                        )
-                                                                            ? 8
-                                                                            : 7
-                                                                    },minmax(88px,1fr))`,
-                                                                }}
-                                                            >
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <AsyncChipSelect
-                                                                        type='enterprise'
-                                                                        value={
-                                                                            ''
-                                                                        }
-                                                                        onChange={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'enterprise',
-                                                                                v ||
-                                                                                    '',
-                                                                            )
-                                                                        }
-                                                                        placeholder='Select enterprise'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <AsyncChipSelect
-                                                                        type='product'
-                                                                        value={
-                                                                            ''
-                                                                        }
-                                                                        onChange={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'product',
-                                                                                v ||
-                                                                                    '',
-                                                                            )
-                                                                        }
-                                                                        placeholder='Select product'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <AsyncChipSelect
-                                                                        type='service'
-                                                                        value={
-                                                                            ''
-                                                                        }
-                                                                        onChange={(
-                                                                            v,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'service',
-                                                                                v ||
-                                                                                    '',
-                                                                            )
-                                                                        }
-                                                                        placeholder='Select service'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <input
-                                                                        type='date'
-                                                                        defaultValue=''
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'licenseStart',
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                        className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <input
-                                                                        type='date'
-                                                                        defaultValue=''
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'licenseEnd',
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                        className='w-full bg-white/80 focus:bg-white focus:outline-none'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <input
-                                                                        defaultValue=''
-                                                                        onBlur={(
-                                                                            e,
-                                                                        ) =>
-                                                                            updateLicenseField(
-                                                                                r.id,
-                                                                                0,
-                                                                                'users',
-                                                                                parseInt(
-                                                                                    e
-                                                                                        .target
-                                                                                        .value ||
-                                                                                        '0',
-                                                                                    10,
-                                                                                ),
-                                                                            )
-                                                                        }
-                                                                        placeholder='Users'
-                                                                        className='w-full'
-                                                                    />
-                                                                </div>
-                                                                <div className='px-2 py-2 border-r border-slate-200'>
-                                                                    <label className='inline-flex items-center gap-1 text-[12px] text-slate-700'>
-                                                                        <input
-                                                                            type='checkbox'
-                                                                            defaultChecked={
-                                                                                false
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                updateLicenseField(
-                                                                                    r.id,
-                                                                                    0,
-                                                                                    'renewalNotice',
-                                                                                    e
-                                                                                        .target
-                                                                                        .checked,
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                        <span>
-                                                                            Notify
-                                                                        </span>
-                                                                    </label>
-                                                                </div>
-                                                                {(
-                                                                    r.licenses ||
-                                                                    []
-                                                                ).some(
-                                                                    (l) =>
-                                                                        !!l.renewalNotice,
-                                                                ) && (
-                                                                    <div className='px-2 py-2'>
-                                                                        <InlineEditableText
-                                                                            value={
-                                                                                ''
-                                                                            }
-                                                                            onCommit={(
-                                                                                v,
-                                                                            ) =>
-                                                                                updateLicenseField(
-                                                                                    r.id,
-                                                                                    0,
-                                                                                    'noticeDays',
-                                                                                    parseInt(
-                                                                                        v ||
-                                                                                            '0',
-                                                                                        10,
-                                                                                    ),
-                                                                                )
-                                                                            }
-                                                                            placeholder='Days'
-                                                                            className='w-full'
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className='px-2 py-2'>
-                                                                <button
-                                                                    className='inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50'
-                                                                    onClick={() => {
-                                                                        setLocalRows(
-                                                                            (
-                                                                                prev,
-                                                                            ) =>
-                                                                                prev.map(
-                                                                                    (
-                                                                                        row,
-                                                                                    ) => {
-                                                                                        if (
-                                                                                            row.id !==
-                                                                                            r.id
-                                                                                        )
-                                                                                            return row;
-                                                                                        const list =
-                                                                                            [
-                                                                                                ...(((
-                                                                                                    row as any
-                                                                                                )
-                                                                                                    .licenses as any[]) ||
-                                                                                                    []),
-                                                                                            ];
-                                                                                        list.push(
-                                                                                            {
-                                                                                                enterprise:
-                                                                                                    '',
-                                                                                                product:
-                                                                                                    '',
-                                                                                                service:
-                                                                                                    '',
-                                                                                                licenseStart:
-                                                                                                    '',
-                                                                                                licenseEnd:
-                                                                                                    '',
-                                                                                                users: 0,
-                                                                                                renewalNotice:
-                                                                                                    false,
-                                                                                                noticeDays: 0,
-                                                                                            } as any,
-                                                                                        );
-                                                                                        return {
-                                                                                            ...(row as any),
-                                                                                            licenses:
-                                                                                                list,
-                                                                                        } as AccountRow;
-                                                                                    },
-                                                                                ),
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    + Add
-                                                                    license row
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                        <Plus className="w-4 h-4" />
+                                                        Add New License
+                                                    </motion.button>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
-                                    {idx === displayItems.length - 1 &&
-                                        onQuickAddRow && (
-                                            <motion.div
-                                                key={'quick-add-row'}
-                                                initial={{opacity: 0}}
-                                                animate={{opacity: 1}}
-                                                whileHover={{scale: 1.002}}
-                                                className='w-full grid items-center gap-0 rounded-md border border-dashed border-slate-300 bg-slate-50/40 hover:bg-slate-100/70 cursor-pointer'
-                                                style={{
-                                                    gridTemplateColumns:
-                                                        gridTemplate
-                                                            .split('_')
-                                                            .join(' '),
-                                                }}
-                                                onClick={onQuickAddRow}
-                                                title='Add new row'
-                                            >
-                                                <div className='col-span-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-500 border-t border-dashed border-slate-300'>
-                                                    <Plus className='w-3.5 h-3.5' />
-                                                    <span>Add new row</span>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                </>
+                                </div>
                             ))}
+                            
+                            {/* Add New Row Button */}
+                            {onAddNewRow && (
+                                <div 
+                                    className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%'
+                                    }}
+                                    onClick={onAddNewRow}
+                                >
+                                    {/* Empty delete button space */}
+                                    <div className='flex items-center justify-center px-2 py-1'>
+                                        {/* No delete icon for add row */}
+                                    </div>
+                                    
+                                    {/* Add new row content spanning all columns */}
+                                    <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                        <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                        </svg>
+                                        <span className='italic'>Add New Row</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className='space-y-2 w-max'>
-                            {Object.entries(
-                                orderedItems.reduce(
-                                    (acc: Record<string, AccountRow[]>, it) => {
-                                        const key = String(
-                                            (it as any)[groupBy] ||
-                                                'Unassigned',
-                                        );
-                                        acc[key] = acc[key] || [];
-                                        acc[key].push(it);
-                                        return acc;
-                                    },
-                                    {},
-                                ),
-                            ).map(([grp, list]) => (
-                                <div
-                                    key={grp}
-                                    className='rounded-lg border border-slate-100'
-                                >
-                                    <div className='px-2 py-1.5 text-[11px] font-medium text-blue-600 bg-slate-50 border-b'>
-                                        {grp} • {list.length}
+                        <div className='space-y-4 mt-2'>
+                            {Object.entries(groupedItems).map(([groupName, groupRows]) => (
+                                <div key={groupName} className='border border-slate-200 rounded-lg'>
+                                    {/* Group Header */}
+                                    <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
+                                        <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
+                                            <span>{groupName}</span>
+                                            <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
+                                                {groupRows.length} record{groupRows.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </h4>
                                     </div>
-                                    <div className='space-y-0 divide-y divide-slate-200'>
-                                        {list.map((r, idx) => (
-                                            <>
+                                    
+                                    {/* Group Rows */}
+                                    <div className='border-b border-slate-200 overflow-hidden'>
+                                        {groupRows.map((r, idx) => (
+                                            <div key={r.id}>
                                                 <SortableAccountRow
-                                                    key={r.id}
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
                                                     gridTemplate={gridTemplate}
-                                                    highlightQuery={
-                                                        highlightQuery
-                                                    }
+                                                    highlightQuery={highlightQuery}
                                                     onEdit={onEdit}
                                                     onDelete={onDelete}
-                                                    onQuickAddRow={
-                                                        onQuickAddRow
+                                                    customColumns={customColumns}
+                                                    pinFirst={pinFirst}
+                                                    firstColWidth={firstColWidth}
+                                                    isExpanded={expandedRows.has(r.id)}
+                                                    onToggle={toggleRowExpansion}
+                                                    hideRowExpansion={hideRowExpansion}
+                                                    enableDropdownChips={
+                                                        enableDropdownChips
                                                     }
-                                                    customColumns={
-                                                        customColumns
+                                                    onDropdownOptionUpdate={
+                                                        onDropdownOptionUpdate
                                                     }
-                                                    isExpanded={expandedRows.has(
-                                                        r.id,
-                                                    )}
-                                                    onToggle={toggleExpanded}
-                                                    hideRowExpansion={
-                                                        hideRowExpansion
-                                                    }
+                                                    onNewItemCreated={onNewItemCreated}
+                                                    isCellMissing={isCellMissing}
+                                                    compressingRowId={compressingRowId}
+                                                    foldingRowId={foldingRowId}
+                                                    allRows={rows}
                                                     expandedContent={null}
-                                                    onUpdateField={
-                                                        updateRowField
-                                                    }
-                                                    isSelected={
-                                                        selectedRowId === r.id
-                                                    }
-                                                    onSelect={(id) =>
-                                                        setSelectedRowId(id)
-                                                    }
+                                                    onUpdateField={updateRowField}
+                                                    isSelected={selectedRowId === r.id}
+                                                    onSelect={(id: string) => setSelectedRowId(id)}
                                                     onStartFill={() => {}}
                                                     inFillRange={false}
+                                                    onDeleteClick={handleDeleteClick}
+                                                    shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                                    onOpenAddressModal={onOpenAddressModal}
+                                                    onOpenTechnicalUserModal={onOpenTechnicalUserModal}
                                                 />
-                                                {expandedRows.has(r.id) && (
-                                                    <div
-                                                        className='grid bg-white'
-                                                        style={{
-                                                            gridTemplateColumns:
-                                                                gridTemplate
-                                                                    .split('_')
-                                                                    .join(' '),
-                                                        }}
-                                                    >
-                                                        {(
-                                                            subItems[r.id] || [
-                                                                '',
-                                                                '',
-                                                            ]
-                                                        ).map((_, i) => (
-                                                            <>
-                                                                <div className='relative h-full py-2'>
-                                                                    <div className='absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-slate-400'></div>
-                                                                    <div className='absolute left-1/2 -translate-x-1/2 top-0 w-3 h-px bg-slate-400'></div>
-                                                                </div>
-                                                                {cols.map(
-                                                                    (c, ci) => (
-                                                                        <div
-                                                                            key={`sub-${r.id}-${i}-${c}`}
-                                                                            className='py-2 px-2 bg-white border-t border-slate-200'
-                                                                        >
-                                                                            {ci ===
-                                                                            0 ? (
-                                                                                <input
-                                                                                    value={
-                                                                                        (subItems[
-                                                                                            r
-                                                                                                .id
-                                                                                        ] || [
-                                                                                            '',
-                                                                                            '',
-                                                                                        ])[
-                                                                                            i
-                                                                                        ] ||
-                                                                                        ''
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e,
-                                                                                    ) =>
-                                                                                        setSubItems(
-                                                                                            (
-                                                                                                m,
-                                                                                            ) => {
-                                                                                                const arr =
-                                                                                                    [
-                                                                                                        ...(m[
-                                                                                                            r
-                                                                                                                .id
-                                                                                                        ] || [
-                                                                                                            '',
-                                                                                                            '',
-                                                                                                        ]),
-                                                                                                    ];
-                                                                                                arr[
-                                                                                                    i
-                                                                                                ] =
-                                                                                                    e.target.value;
-                                                                                                return {
-                                                                                                    ...m,
-                                                                                                    [r.id]:
-                                                                                                        arr,
-                                                                                                };
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                    onKeyDown={(
-                                                                                        e,
-                                                                                    ) => {
-                                                                                        if (
-                                                                                            e.key ===
-                                                                                            'Enter'
-                                                                                        ) {
-                                                                                            setSubItems(
-                                                                                                (
-                                                                                                    m,
-                                                                                                ) => ({
-                                                                                                    ...m,
-                                                                                                    [r.id]:
-                                                                                                        [
-                                                                                                            ...(m[
-                                                                                                                r
-                                                                                                                    .id
-                                                                                                            ] || [
-                                                                                                                '',
-                                                                                                                '',
-                                                                                                            ]),
-                                                                                                            '',
-                                                                                                        ],
-                                                                                                }),
-                                                                                            );
-                                                                                        }
-                                                                                    }}
-                                                                                    placeholder='+ Add subitem'
-                                                                                    className='w-full rounded border border-slate-300 px-2 py-1 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200'
-                                                                                />
-                                                                            ) : (
-                                                                                <div className='text-slate-400 text-sm'></div>
-                                                                            )}
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                                {customColumns.map(
-                                                                    (_, ci) => (
-                                                                        <div
-                                                                            key={`subc-${r.id}-${i}-${ci}`}
-                                                                            className='py-2 px-3 bg-white border-t border-slate-200 text-slate-400'
-                                                                        ></div>
-                                                                    ),
-                                                                )}
-                                                                <div className='flex items-center justify-center border-t border-slate-200'>
-                                                                    {i ===
-                                                                    (
-                                                                        subItems[
-                                                                            r.id
-                                                                        ] || [
-                                                                            '',
-                                                                            '',
-                                                                        ]
-                                                                    ).length -
-                                                                        1 ? (
-                                                                        <button
-                                                                            className='h-5 w-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700'
-                                                                            title='Add subitem'
-                                                                            onClick={() =>
-                                                                                setSubItems(
-                                                                                    (
-                                                                                        m,
-                                                                                    ) => ({
-                                                                                        ...m,
-                                                                                        [r.id]:
-                                                                                            [
-                                                                                                ...(m[
-                                                                                                    r
-                                                                                                        .id
-                                                                                                ] || [
-                                                                                                    '',
-                                                                                                    '',
-                                                                                                ]),
-                                                                                                '',
-                                                                                            ],
-                                                                                    }),
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    ) : (
-                                                                        <div />
-                                                                    )}
-                                                                </div>
-                                                            </>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {idx === list.length - 1 &&
-                                                    onQuickAddRow && (
-                                                        <motion.div
-                                                            key={`quick-add-${grp}`}
-                                                            initial={{
-                                                                opacity: 0,
-                                                            }}
-                                                            animate={{
-                                                                opacity: 1,
-                                                            }}
-                                                            whileHover={{
-                                                                scale: 1.002,
-                                                            }}
-                                                            className='w-full grid items-center gap-0 rounded-md border border-dashed border-slate-300 bg-slate-50/40 hover:bg-slate-100/70 cursor-pointer'
-                                                            style={{
-                                                                gridTemplateColumns:
-                                                                    gridTemplate
-                                                                        .split(
-                                                                            '_',
-                                                                        )
-                                                                        .join(
-                                                                            ' ',
-                                                                        ),
-                                                            }}
-                                                            onClick={
-                                                                onQuickAddRow
-                                                            }
-                                                            title='Add new row'
-                                                        >
-                                                            <div className='col-span-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-500 border-t border-dashed border-slate-300'>
-                                                                <Plus className='w-3.5 h-3.5' />
-                                                                <span>
-                                                                    Add new row
-                                                                </span>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                            </>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                             ))}
+                            
+                            {/* Add New Row Button for grouped view */}
+                            {onAddNewRow && (
+                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                    <div 
+                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                        style={{
+                                            gridTemplateColumns: gridTemplate, 
+                                            minWidth: 'max-content',
+                                            width: '100%'
+                                        }}
+                                        onClick={onAddNewRow}
+                                    >
+                                        {/* Empty delete button space */}
+                                        <div className='flex items-center justify-center px-2 py-1'>
+                                            {/* No delete icon for add row */}
+                                        </div>
+                                        
+                                        {/* Add new row content spanning all columns */}
+                                        <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                            </svg>
+                                            <span className='italic'>Add New Row</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
-            </div>
-            {contactModalPortal}
-        </div>
-    );
-}
-
-function DropdownWithCreate({
-    value,
-    placeholder,
-    fetchUrl,
-    labelKey,
-    onChange,
-}: {
-    value: string;
-    placeholder: string;
-    fetchUrl: string;
-    labelKey: string;
-    onChange: (v: string) => void;
-}) {
-    const [open, setOpen] = React.useState(false);
-    const [items, setItems] = React.useState<
-        Array<{id?: string; name: string}>
-    >([]);
-    const [adding, setAdding] = React.useState(false);
-    const [newVal, setNewVal] = React.useState('');
-    const ref = React.useRef<HTMLDivElement>(null);
-    React.useEffect(() => {
-        (async () => {
-            try {
-                const data = await api.get<any[]>(fetchUrl);
-                setItems(
-                    (data || []).map((d) => ({id: d.id, name: d[labelKey]})),
-                );
-            } catch {}
-        })();
-    }, [fetchUrl, labelKey]);
-    React.useEffect(() => {
-        const onDoc = (e: MouseEvent) => {
-            if (!ref.current) return;
-            if (!ref.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', onDoc);
-        return () => document.removeEventListener('mousedown', onDoc);
-    }, []);
-    const selected = value || '';
-    return (
-        <div className='relative' ref={ref}>
-            <button
-                type='button'
-                className='w-full text-left px-2 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[12px] flex items-center justify-between'
-                onClick={() => setOpen((v) => !v)}
-                title={placeholder}
-            >
-                <span
-                    className={selected ? 'text-slate-800' : 'text-slate-400'}
-                >
-                    {selected || placeholder}
-                </span>
-                <span className='ml-2 text-slate-400'>▾</span>
-            </button>
-            {open && (
-                <div className='absolute z-50 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg'>
-                    <div className='max-h-48 overflow-auto py-1 text-[12px]'>
-                        {items.map((it) => (
-                            <button
-                                key={it.id || it.name}
-                                className='block w-full text-left px-3 py-1.5 hover:bg-slate-50'
-                                onClick={() => {
-                                    onChange(it.name);
-                                    setOpen(false);
-                                }}
-                            >
-                                {it.name}
-                            </button>
-                        ))}
-                    </div>
-                    <div className='border-t p-2'>
-                        {!adding ? (
-                            <button
-                                className='text-[12px] text-blue-600 hover:text-slate-800'
-                                onClick={() => setAdding(true)}
-                            >
-                                + Add new
-                            </button>
-                        ) : (
-                            <div className='flex items-center gap-2'>
-                                <input
-                                    value={newVal}
-                                    onChange={(e) => setNewVal(e.target.value)}
-                                    className='flex-1 px-2 py-1 text-[12px] rounded border border-slate-300'
-                                    placeholder={`New ${placeholder.toLowerCase()}`}
-                                />
-                                <button
-                                    className='px-2 py-1 text-[12px] rounded bg-sky-600 text-white hover:bg-sky-700'
-                                    onClick={() => {
-                                        if (!newVal.trim()) return;
-                                        const name = newVal.trim();
-                                        setItems((prev) => [...prev, {name}]);
-                                        onChange(name);
-                                        setNewVal('');
-                                        setAdding(false);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
+            
+            {/* ContactModal for license contact details */}
+            <ContactModal
+                isOpen={showContactModal}
+                onClose={handleCloseContactModal}
+                onSave={handleContactModalSave}
+                accountName={contactModalAccountName}
+                masterAccount={contactModalMasterAccount}
+                initialContacts={contactModalData}
+            />
         </div>
     );
-}
+});
+
+// Set the display name for debugging
+AccountsTable.displayName = 'AccountsTable';
+
+export default AccountsTable;
