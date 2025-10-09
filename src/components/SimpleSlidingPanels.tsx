@@ -14,6 +14,7 @@ import ReusableTableComponent from './reusable/ReusableTableComponent';
 import UserGroups_tableConfig from '../config/UserGroups_tableConfig';
 import Roles_tableConfig from '../config/Roles_tableConfig';
 import ScopeConfig_tableConfig from '../config/ScopeConfig_tableConfig';
+import {useSelectedAccount} from '@/hooks/useSelectedAccount';
 
 interface SimpleSlidingPanelsProps {
     isOpen: boolean;
@@ -34,6 +35,9 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     initialPanel = 'userGroups',
     visiblePanels: visiblePanelsProp,
 }) => {
+    // Get selected account from breadcrumb
+    const selectedAccount = useSelectedAccount();
+
     const [activePanel, setActivePanel] = useState<PanelType>(initialPanel);
     const [selectedRole, setSelectedRole] = useState<any>(null);
     const [visiblePanels, setVisiblePanels] = useState<Set<PanelType>>(
@@ -84,8 +88,33 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
             setLoading(true);
             setError(null);
 
-            console.log('🔄 Fetching groups from API...');
-            const response = await fetch('http://localhost:4000/api/groups');
+            console.log('🔄 Fetching groups from API for account:', {
+                accountId: selectedAccount.id,
+                accountName: selectedAccount.name,
+                isSystiva: selectedAccount.isSystiva,
+            });
+
+            // Build API URL with account context
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const params = new URLSearchParams();
+
+            // Only add account params if not Systiva account
+            if (
+                !selectedAccount.isSystiva &&
+                selectedAccount.id &&
+                selectedAccount.name
+            ) {
+                params.append('accountId', selectedAccount.id);
+                params.append('accountName', selectedAccount.name);
+            }
+
+            const url = `${apiBase}/api/user-management/groups${
+                params.toString() ? `?${params.toString()}` : ''
+            }`;
+            console.log('📡 Fetching groups from:', url);
+
+            const response = await fetch(url);
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch groups: ${response.status}`);
@@ -105,7 +134,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                 (Array.isArray(data) ? data : []).map(async (group: any) => {
                     try {
                         const rolesResponse = await fetch(
-                            `http://localhost:4000/api/user-groups/${group.id}/roles`,
+                            `${apiBase}/api/user-management/groups/${group.id}/roles`,
                         );
                         if (rolesResponse.ok) {
                             const rolesData = await rolesResponse.json();
@@ -141,8 +170,33 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     // Fetch roles from API with scope configuration status
     const fetchRoles = async () => {
         try {
-            console.log('🔄 Fetching roles from API...');
-            const response = await fetch('http://localhost:4000/api/roles');
+            console.log('🔄 Fetching roles from API for account:', {
+                accountId: selectedAccount.id,
+                accountName: selectedAccount.name,
+                isSystiva: selectedAccount.isSystiva,
+            });
+
+            // Build API URL with account context
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const params = new URLSearchParams();
+
+            // Only add account params if not Systiva account
+            if (
+                !selectedAccount.isSystiva &&
+                selectedAccount.id &&
+                selectedAccount.name
+            ) {
+                params.append('accountId', selectedAccount.id);
+                params.append('accountName', selectedAccount.name);
+            }
+
+            const url = `${apiBase}/api/user-management/roles${
+                params.toString() ? `?${params.toString()}` : ''
+            }`;
+            console.log('📡 Fetching roles from:', url);
+
+            const response = await fetch(url);
 
             if (response.ok) {
                 const data = await response.json();
@@ -153,7 +207,7 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
                     (Array.isArray(data) ? data : []).map(async (role: any) => {
                         try {
                             const scopeResponse = await fetch(
-                                `http://localhost:4000/api/roles/${role.id}/scope`,
+                                `${apiBase}/api/user-management/roles/${role.id}/scope`,
                             );
 
                             if (scopeResponse.ok) {
@@ -229,11 +283,15 @@ const SimpleSlidingPanels: React.FC<SimpleSlidingPanelsProps> = ({
     // Fetch data when component opens (but don't override panel settings)
     useEffect(() => {
         if (isOpen) {
+            console.log('🔄 Panel opened, fetching data for account:', {
+                accountId: selectedAccount.id,
+                accountName: selectedAccount.name,
+            });
             fetchUserGroups();
             fetchRoles();
             fetchScopeConfig();
         }
-    }, [isOpen, currentUser]);
+    }, [isOpen, currentUser, selectedAccount.id, selectedAccount.name]);
 
     // Pre-select assigned groups when currentUser changes
     useEffect(() => {
