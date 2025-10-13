@@ -347,7 +347,7 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'enterprise' | 'entity' | 'service' | 'template';
+type CatalogType = 'account' | 'enterprise' | 'entity' | 'service' | 'template';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -627,7 +627,7 @@ function ServicesMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'configuration',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
@@ -655,14 +655,19 @@ function ServicesMultiSelect({
     const moreServicesRef = React.useRef<HTMLButtonElement>(null);
 
     // Helper function to check if a service is in use
+    // Note: Not used in Global Settings context, kept for compatibility
     const isServiceInUse = React.useCallback(
         (serviceName: string): boolean => {
             if (!accounts || accounts.length === 0) return false;
 
-            return accounts.some((account) => {
-                const services =
-                    account.services?.split(', ').filter(Boolean) || [];
-                return services.includes(serviceName);
+            return accounts.some((account: any) => {
+                // For legacy enterprise config rows that have services property
+                if (account.services) {
+                    const services =
+                        account.services?.split(', ').filter(Boolean) || [];
+                    return services.includes(serviceName);
+                }
+                return false;
             });
         },
         [accounts],
@@ -911,7 +916,8 @@ function ServicesMultiSelect({
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
-                    onNewItemCreated('configuration', created);
+                    // In Global Settings context, configuration items are entities
+                    onNewItemCreated('entities', created);
                 }
             }
         } catch (error: any) {
@@ -1237,8 +1243,9 @@ function ServicesMultiSelect({
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
+                                                // In Global Settings context, configuration items are entities
                                                 onNewItemCreated(
-                                                    'configuration',
+                                                    'entities',
                                                     created,
                                                 );
                                             }
@@ -1543,8 +1550,9 @@ function ServicesMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
+                                                            // In Global Settings context, configuration items are entities
                                                             await onDropdownOptionUpdate(
-                                                                'configuration',
+                                                                'entities',
                                                                 'update',
                                                                 opt.name,
                                                                 newName,
@@ -1596,8 +1604,9 @@ function ServicesMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
+                                                            // In Global Settings context, configuration items are entities
                                                             await onDropdownOptionUpdate(
-                                                                'configuration',
+                                                                'entities',
                                                                 'delete',
                                                                 opt.name,
                                                             );
@@ -1770,7 +1779,7 @@ function AsyncChipSelect({
     isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'configuration',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
@@ -1818,17 +1827,19 @@ function AsyncChipSelect({
 
                     if (currentEnterprise) {
                         // Check if this product is already used with the selected enterprise
+                        const accountAny = account as any;
                         const isUsedWithCurrentEnterprise =
                             account.enterprise === currentEnterprise &&
-                            account.product === optionName;
+                            accountAny.product === optionName;
 
                         return isUsedWithCurrentEnterprise;
                     }
                     // If no enterprise is selected yet, don't filter anything
                     return false;
                 } else if (type === 'service') {
+                    const accountAny = account as any;
                     const services =
-                        account.services?.split(', ').filter(Boolean) || [];
+                        accountAny.services?.split(', ').filter(Boolean) || [];
                     return services.includes(optionName);
                 }
                 return false;
@@ -2125,8 +2136,8 @@ function AsyncChipSelect({
                         type === 'enterprise'
                             ? 'enterprises'
                             : type === 'entity'
-                            ? 'products'
-                            : 'configuration';
+                            ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                            : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                     onNewItemCreated(dropdownType, created);
                 }
             }
@@ -2433,8 +2444,8 @@ function AsyncChipSelect({
                                                     type === 'enterprise'
                                                         ? 'enterprises'
                                                         : type === 'entity'
-                                                        ? 'products'
-                                                        : 'configuration';
+                                                        ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                        : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                                                 onNewItemCreated(
                                                     dropdownType,
                                                     created,
@@ -2770,8 +2781,8 @@ function AsyncChipSelect({
                                                                                     ? 'enterprises'
                                                                                     : type ===
                                                                                       'entity'
-                                                                                    ? 'products'
-                                                                                    : 'configuration';
+                                                                                    ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                                                    : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                                                                             onNewItemCreated(
                                                                                 dropdownType,
                                                                                 created,
@@ -2840,8 +2851,8 @@ function AsyncChipSelect({
                                                                                 ? 'enterprises'
                                                                                 : type ===
                                                                                   'entity'
-                                                                                ? 'products'
-                                                                                : 'configuration';
+                                                                                ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                                                : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                                                                         onNewItemCreated(
                                                                             dropdownType,
                                                                             created,
@@ -2973,8 +2984,8 @@ function SortableGlobalSettingsRow({
 }: {
     row: GlobalSettingsRow;
     index: number;
-    onEdit: (id: string) => void;
-    onDelete: (id: string) => void;
+    onEdit?: (id: string) => void;
+    onDelete?: (id: string) => void;
     cols: string[];
     gridTemplate: string;
     highlightQuery?: string;
@@ -3002,7 +3013,7 @@ function SortableGlobalSettingsRow({
     enableInlineEditing?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'configuration',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
@@ -3491,7 +3502,7 @@ function SortableGlobalSettingsRow({
                                 row.configuration || 'Not configured'
                             }
                             configurationDetails={row.configurationDetails}
-                            onIconClick={() => onEdit(row.id)}
+                            onIconClick={() => onEdit?.(row.id)}
                             isConfigured={row.isConfigured}
                         />
                     )}
@@ -3543,7 +3554,50 @@ export default function GlobalSettingsTableV2({
     externalSortDirection,
     onSortChange,
     isAIInsightsPanelOpen = false,
-}: EnterpriseConfigTableProps) {
+}: {
+    rows: GlobalSettingsRow[];
+    onEdit?: (rowId: string) => void;
+    onDelete?: (rowId: string) => void;
+    title?: string;
+    groupByExternal?: 'accountName' | 'enterpriseName' | 'entityName';
+    onGroupByChange?: (
+        groupBy: 'accountName' | 'enterpriseName' | 'entityName' | '',
+    ) => void;
+    hideControls?: boolean;
+    visibleColumns?: Array<
+        'account' | 'enterprise' | 'entity' | 'configuration'
+    >;
+    highlightQuery?: string;
+    customColumnLabels?: Record<string, string>;
+    enableDropdownChips?: boolean;
+    dropdownOptions?: Record<string, any>;
+    onUpdateField?: (rowId: string, field: string, value: any) => void;
+    hideRowExpansion?: boolean;
+    enableInlineEditing?: boolean;
+    incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
+    hasBlankRow?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accounts' | 'enterprises' | 'entities',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accounts' | 'enterprises' | 'entities',
+        item: {id: string; name: string},
+    ) => void;
+    onShowAllColumns?: () => void;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    triggerValidation?: boolean;
+    onValidationComplete?: (hasErrors: boolean) => void;
+    onAddNewRow?: () => void;
+    externalSortColumn?: string;
+    externalSortDirection?: 'asc' | 'desc' | '';
+    onSortChange?: (column: string, direction: 'asc' | 'desc' | '') => void;
+    isAIInsightsPanelOpen?: boolean;
+}) {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(
         new Set(),
@@ -3606,14 +3660,20 @@ export default function GlobalSettingsTableV2({
     };
 
     // Keep a local order for row management. Sync when rows change
-    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
+    const [order, setOrder] = useState<string[]>(() =>
+        rows.map((r: GlobalSettingsRow) => r.id),
+    );
     const [localRows, setLocalRows] = useState<GlobalSettingsRow[]>(rows);
     useEffect(() => {
         // Preserve existing order; append any new ids
         const existing = new Set(order);
         const merged = [
-            ...order.filter((id) => rows.some((r) => r.id === id)),
-            ...rows.filter((r) => !existing.has(r.id)).map((r) => r.id),
+            ...order.filter((id) =>
+                rows.some((r: GlobalSettingsRow) => r.id === id),
+            ),
+            ...rows
+                .filter((r: GlobalSettingsRow) => !existing.has(r.id))
+                .map((r: GlobalSettingsRow) => r.id),
         ];
         setOrder(merged);
         // Deep copy rows to create new references for React updates
@@ -3629,7 +3689,7 @@ export default function GlobalSettingsTableV2({
         if (triggerValidation) {
             const errorRowIds = validateAndHighlightErrors();
             if (onValidationComplete) {
-                onValidationComplete(Array.from(errorRowIds));
+                onValidationComplete(errorRowIds.size > 0);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4213,22 +4273,33 @@ export default function GlobalSettingsTableV2({
         displayItems.forEach((item) => {
             let groupKey = '';
 
-            switch (groupBy) {
+            // Cast to string to handle legacy group by values
+            const groupByValue = groupBy as string;
+
+            switch (groupByValue) {
+                case 'accountName':
+                    groupKey = item.account || '(No Account)';
+                    break;
                 case 'enterpriseName':
                     groupKey = item.enterprise || '(No Enterprise)';
                     break;
+                case 'entityName':
+                    groupKey = item.entity || '(No Entity)';
+                    break;
                 case 'productName':
-                    groupKey = item.product || '(No Product)';
+                    // Legacy support for enterprise config
+                    groupKey = (item as any).product || '(No Product)';
                     break;
                 case 'serviceName':
-                    // For services, we need to handle multiple services per row
-                    if (item.services) {
-                        const services = item.services
+                    // Legacy support for enterprise config - For services, we need to handle multiple services per row
+                    const itemAny = item as any;
+                    if (itemAny.services) {
+                        const services = itemAny.services
                             .split(',')
-                            .map((s) => s.trim())
+                            .map((s: any) => s.trim())
                             .filter(Boolean);
                         if (services.length > 0) {
-                            services.forEach((service) => {
+                            services.forEach((service: any) => {
                                 const serviceKey = service || '(No Service)';
                                 if (!groups[serviceKey]) {
                                     groups[serviceKey] = [];
