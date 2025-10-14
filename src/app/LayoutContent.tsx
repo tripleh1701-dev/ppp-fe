@@ -64,6 +64,14 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
         }
     }, [isMobile, sidebarCollapsed]);
 
+    // Check if we're on a standalone page (like login) that shouldn't have the layout
+    const isStandalonePage = pathname === '/login';
+
+    // If it's a standalone page, just render the children without any layout
+    if (isStandalonePage) {
+        return <>{children}</>;
+    }
+
     return (
         <div className='h-screen flex bg-secondary relative'>
             {/* Navigation Sidebar - Flush with left edge */}

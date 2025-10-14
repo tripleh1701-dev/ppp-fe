@@ -162,7 +162,7 @@ export default function AccessControlPanel({
                         ? 'translate-x-0 opacity-100'
                         : 'translate-x-full opacity-0 pointer-events-none'
                 }`}
-                style={{left: `${sidebarWidth}px`, width: '180px'}}
+                style={{left: `${sidebarWidth}px`, width: '160px'}}
                 aria-hidden={!isOpen}
             >
                 <div className='flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white'>
@@ -196,7 +196,7 @@ export default function AccessControlPanel({
 
                 <div
                     className='p-3 space-y-2 overflow-hidden'
-                    style={{ height: 'calc(100% - 140px)' }}
+                    style={{height: 'calc(100% - 140px)'}}
                 >
                     {cards.map((card, index) => (
                         <div
@@ -220,9 +220,9 @@ export default function AccessControlPanel({
                             />
                             {card.bgIllustration}
                             <div className='relative z-10'>
-                                                            <h3 className='text-[10px] font-semibold text-slate-800 group-hover:text-[#0171EC] transition-colors'>
-                                {card.title}
-                            </h3>
+                                <h3 className='text-[10px] font-semibold text-slate-800 group-hover:text-[#0171EC] transition-colors'>
+                                    {card.title}
+                                </h3>
                             </div>
                             <div className='absolute inset-0 bg-gradient-to-br from-[#0171EC]/0 via-[#0171EC]/10 to-[#05E9FE]/0 opacity-0 group-hover:opacity-100 transition-opacity' />
                         </div>

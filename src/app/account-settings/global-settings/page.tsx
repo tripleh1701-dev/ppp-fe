@@ -1,6 +1,14 @@
 'use client';
 
-import {useEffect, useMemo, useRef, useState, useCallback} from 'react';
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useCallback,
+    useImperativeHandle,
+    forwardRef,
+} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from '@/utils/api';
 import {Icon} from '@/components/Icons';
@@ -16,6 +24,7 @@ import {
     EyeSlashIcon,
     RectangleStackIcon,
     BookmarkIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import GlobalSettingsTableV2, {
     GlobalSettingsRow,
@@ -78,6 +87,7 @@ export default function GlobalSettingsPage() {
     const router = useRouter();
     const [items, setItems] = useState<GlobalSetting[]>([]);
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const inlineEntitiesRef = useRef<{reload: () => void}>(null);
     // Inline create panel state
     // HARDCODED TEST DATA - Set to true to show entities by default
     const [inlineOpen, setInlineOpen] = useState(true);
@@ -582,13 +592,20 @@ export default function GlobalSettingsPage() {
                             Entities
                         </label>
                         <InlineEntities
+                            ref={inlineEntitiesRef}
                             accountId={accountId}
                             accountName={accountName}
                             enterpriseId={enterpriseId}
                             enterpriseName={enterpriseName}
                             onCreated={async () => {
                                 const data = await api.get<GlobalSetting[]>(
-                                    '/api/global-settings',
+                                    `/api/global-settings?accountId=${encodeURIComponent(
+                                        accountId,
+                                    )}&accountName=${encodeURIComponent(
+                                        accountName,
+                                    )}&enterpriseId=${encodeURIComponent(
+                                        enterpriseId,
+                                    )}`,
                                 );
                                 setItems(Array.isArray(data) ? data : []);
                             }}
@@ -715,7 +732,10 @@ export default function GlobalSettingsPage() {
 
                         console.log('✅ Entity deleted successfully');
 
-                        // Page will refresh automatically
+                        // Refresh the entities display by calling the reload method
+                        if (inlineEntitiesRef.current) {
+                            inlineEntitiesRef.current.reload();
+                        }
                     } catch (error) {
                         console.error('❌ Error deleting entity:', error);
                         alert('Failed to delete entity. Please try again.');
@@ -840,21 +860,27 @@ function RowActions({
     );
 }
 
-function InlineEntities({
-    accountId,
-    accountName,
-    enterpriseId,
-    enterpriseName,
-    onCreated,
-    onRequestDelete,
-}: {
-    accountId: string;
-    accountName: string;
-    enterpriseId: string;
-    enterpriseName: string;
-    onCreated: () => void;
-    onRequestDelete: (entity: string) => void;
-}) {
+const InlineEntities = forwardRef<
+    {reload: () => void},
+    {
+        accountId: string;
+        accountName: string;
+        enterpriseId: string;
+        enterpriseName: string;
+        onCreated: () => void;
+        onRequestDelete: (entity: string) => void;
+    }
+>(function InlineEntities(
+    {
+        accountId,
+        accountName,
+        enterpriseId,
+        enterpriseName,
+        onCreated,
+        onRequestDelete,
+    },
+    ref,
+) {
     // Advanced configuration constants
     type CategorySelections = Record<string, string[]>;
     const CATEGORY_OPTIONS: Record<string, string[]> = {
@@ -934,6 +960,7 @@ function InlineEntities({
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     // Advanced UI state
     const [configureEntity, setConfigureEntity] = useState<string | null>(null);
+    const [showConfigurePanel, setShowConfigurePanel] = useState(false);
     const [selectionsByEntity, setSelectionsByEntity] = useState<
         Record<string, CategorySelections>
     >({});
@@ -1113,6 +1140,13 @@ function InlineEntities({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [accountId, enterpriseId, enterpriseName]);
+
+    // Expose reload method to parent via ref
+    useImperativeHandle(ref, () => ({
+        reload: () => {
+            loadEntities().catch(() => {});
+        },
+    }));
 
     // Toolbar handlers
     const closeAllDialogs = () => {
@@ -2470,6 +2504,7 @@ function InlineEntities({
                                     [entity]: prev[entity] || {},
                                 }));
                                 setConfigureEntity(entity);
+                                setShowConfigurePanel(true);
                             }
                         }}
                         onDelete={(rowId: string) => {
@@ -2496,7 +2531,22 @@ function InlineEntities({
                 Tip: Configure one entity, then click &quot;Copy settings&quot;
                 to replicate its selections to other entities.
             </div>
-            {configureEntity && (
+            <ConfigureEntitySlidingPanel
+                isOpen={showConfigurePanel}
+                entityName={configureEntity || ''}
+                categoryOptions={CATEGORY_OPTIONS}
+                optionIcons={OPTION_ICON}
+                selectionsByEntity={selectionsByEntity}
+                setSelectionsByEntity={setSelectionsByEntity}
+                toggleEntitySelection={toggleEntitySelection}
+                setConfiguredEntities={setConfiguredEntities}
+                onClose={() => {
+                    setShowConfigurePanel(false);
+                    setConfigureEntity(null);
+                }}
+            />
+
+            {false && configureEntity && (
                 <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
                     <div className='absolute inset-0 bg-black/50 animate-modal-fade'></div>
                     <div className='relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-light overflow-hidden animate-modal-slide'>
@@ -2862,6 +2912,588 @@ function InlineEntities({
                     </div>
                 </div>
             )}
+        </>
+    );
+});
+
+// Configure Entity Sliding Panel Component
+interface ConfigureEntitySlidingPanelProps {
+    isOpen: boolean;
+    entityName: string;
+    categoryOptions: Record<string, string[]>;
+    optionIcons: Record<string, {name: string}>;
+    selectionsByEntity: Record<string, Record<string, string[]>>;
+    setSelectionsByEntity: React.Dispatch<
+        React.SetStateAction<Record<string, Record<string, string[]>>>
+    >;
+    toggleEntitySelection: (
+        entity: string,
+        category: string,
+        option: string,
+    ) => void;
+    setConfiguredEntities: React.Dispatch<React.SetStateAction<Set<string>>>;
+    onClose: () => void;
+}
+
+function ConfigureEntitySlidingPanel({
+    isOpen,
+    entityName,
+    categoryOptions,
+    optionIcons,
+    selectionsByEntity,
+    setSelectionsByEntity,
+    toggleEntitySelection,
+    setConfiguredEntities,
+    onClose,
+}: ConfigureEntitySlidingPanelProps) {
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+    // Reset active category when panel opens/closes
+    useEffect(() => {
+        if (!isOpen) {
+            setActiveCategory(null);
+        }
+    }, [isOpen]);
+
+    if (!isOpen || !entityName) return null;
+
+    const handleDone = () => {
+        if (entityName) {
+            setConfiguredEntities((prev) => new Set(prev).add(entityName));
+        }
+        onClose();
+    };
+
+    const handleCategoryClick = (category: string) => {
+        setActiveCategory(category);
+        // Scroll to the category row in the table
+        const element = document.getElementById(`category-${category}`);
+        if (element) {
+            element.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    };
+
+    // Category icons mapping - SVG icons
+    const getCategoryIcon = (category: string) => {
+        const iconMap: Record<string, JSX.Element> = {
+            plan: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
+                    />
+                </svg>
+            ),
+            code: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4'
+                    />
+                </svg>
+            ),
+            build: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z'
+                    />
+                </svg>
+            ),
+            test: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                    />
+                </svg>
+            ),
+            release: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M13 10V3L4 14h7v7l9-11h-7z'
+                    />
+                </svg>
+            ),
+            deploy: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z'
+                    />
+                </svg>
+            ),
+            others: (
+                <svg
+                    className='w-full h-full'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
+                    />
+                    <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                    />
+                </svg>
+            ),
+        };
+        return iconMap[category] || iconMap.others;
+    };
+
+    return (
+        <>
+            <div
+                className='fixed inset-0 bg-black bg-opacity-50 z-40'
+                onClick={onClose}
+            />
+            <div className='fixed inset-y-0 right-0 w-[900px] bg-white shadow-2xl z-50 flex'>
+                {/* Left Sidebar - Dark Blue */}
+                <div
+                    className='w-[220px] relative flex flex-col'
+                    style={{
+                        backgroundImage: 'url(/images/logos/sidebar.png)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                    }}
+                >
+                    {/* Title */}
+                    <div className='px-4 py-3 border-b border-white/10'>
+                        <h2 className='text-sm font-semibold text-white flex items-center gap-2'>
+                            <span>Configure Entity</span>
+                            <span className='text-blue-300'>·</span>
+                            <span className='text-blue-200 font-normal text-xs'>
+                                {entityName}
+                            </span>
+                        </h2>
+                    </div>
+
+                    {/* Info Section */}
+                    <div className='flex-1 px-4 py-4 overflow-y-auto'>
+                        <div className='space-y-2.5'>
+                            <div className='bg-white/5 border border-white/10 rounded-lg p-2.5'>
+                                <h3 className='text-[11px] font-semibold text-white mb-1'>
+                                    Configuration Guide
+                                </h3>
+                                <p className='text-[10px] text-slate-300 leading-relaxed'>
+                                    Select the tools and services for each
+                                    category that apply to this entity.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 className='text-[11px] font-semibold text-white mb-1.5 px-0.5'>
+                                    Categories
+                                </h3>
+                                <div className='space-y-1'>
+                                    {Object.keys(categoryOptions).map(
+                                        (category) => {
+                                            const isActive =
+                                                activeCategory === category;
+                                            const selectedCount =
+                                                selectionsByEntity[
+                                                    entityName
+                                                ]?.[category]?.length || 0;
+                                            const totalCount =
+                                                categoryOptions[category]
+                                                    ?.length || 0;
+
+                                            return (
+                                                <button
+                                                    key={category}
+                                                    onClick={() =>
+                                                        handleCategoryClick(
+                                                            category,
+                                                        )
+                                                    }
+                                                    className={`w-full text-left rounded-md p-2 transition-all duration-200 ${
+                                                        isActive
+                                                            ? 'bg-blue-600/90 border-2 border-blue-400'
+                                                            : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <div className='flex items-center gap-2'>
+                                                        <div
+                                                            className={`flex items-center justify-center ${
+                                                                isActive
+                                                                    ? 'text-white'
+                                                                    : 'text-slate-300'
+                                                            }`}
+                                                        >
+                                                            <div className='w-4 h-4'>
+                                                                {getCategoryIcon(
+                                                                    category,
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className='flex-1 min-w-0'>
+                                                            <div
+                                                                className={`text-xs font-medium capitalize ${
+                                                                    isActive
+                                                                        ? 'text-white'
+                                                                        : 'text-slate-200'
+                                                                }`}
+                                                            >
+                                                                {category}
+                                                            </div>
+                                                            <div
+                                                                className={`text-[10px] ${
+                                                                    isActive
+                                                                        ? 'text-blue-200'
+                                                                        : 'text-slate-400'
+                                                                }`}
+                                                            >
+                                                                {selectedCount}/
+                                                                {totalCount}
+                                                            </div>
+                                                        </div>
+                                                        {selectedCount > 0 && (
+                                                            <div className='flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white flex-shrink-0'>
+                                                                <svg
+                                                                    className='w-2.5 h-2.5'
+                                                                    fill='none'
+                                                                    viewBox='0 0 24 24'
+                                                                    stroke='currentColor'
+                                                                    strokeWidth={
+                                                                        3
+                                                                    }
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap='round'
+                                                                        strokeLinejoin='round'
+                                                                        d='M5 13l4 4L19 7'
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Content Area - White */}
+                <div className='flex-1 flex flex-col'>
+                    {/* Close Button */}
+                    <div className='absolute top-5 right-5 z-10'>
+                        <button
+                            onClick={onClose}
+                            className='p-1.5 hover:bg-slate-100 rounded-lg transition-colors'
+                        >
+                            <XMarkIcon className='w-5 h-5 text-slate-600' />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className='flex-1 overflow-y-auto px-6 pt-12 pb-5'>
+                        {/* Categories Table */}
+                        <div className='rounded-2xl border border-slate-200 overflow-hidden bg-white'>
+                            <table className='min-w-full divide-y divide-slate-100'>
+                                <thead className='bg-tertiary/40'>
+                                    <tr>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider w-32'>
+                                            Category
+                                        </th>
+                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
+                                            Tools
+                                        </th>
+                                        <th className='px-4 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider w-28'>
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className='divide-y divide-slate-100'>
+                                    {Object.entries(categoryOptions).map(
+                                        ([category, options]) => {
+                                            const selected =
+                                                selectionsByEntity[
+                                                    entityName
+                                                ]?.[category] || [];
+                                            const isSelected = (opt: string) =>
+                                                selected.includes(opt);
+                                            const isActive =
+                                                activeCategory === category;
+                                            return (
+                                                <tr
+                                                    key={category}
+                                                    id={`category-${category}`}
+                                                    className={`align-top transition-all duration-300 ${
+                                                        isActive
+                                                            ? 'bg-blue-50 border-l-4 border-blue-500'
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <td className='px-6 py-4 whitespace-nowrap text-sm font-semibold capitalize text-primary'>
+                                                        <div className='flex items-center gap-2.5'>
+                                                            <div className='text-slate-600 w-5 h-5'>
+                                                                {getCategoryIcon(
+                                                                    category,
+                                                                )}
+                                                            </div>
+                                                            <span>
+                                                                {category}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className='px-6 py-4'>
+                                                        <div className='flex flex-wrap gap-3'>
+                                                            {options.map(
+                                                                (opt) => {
+                                                                    const Active =
+                                                                        isSelected(
+                                                                            opt,
+                                                                        );
+                                                                    return (
+                                                                        <button
+                                                                            key={
+                                                                                opt
+                                                                            }
+                                                                            type='button'
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                const btn =
+                                                                                    e.currentTarget;
+                                                                                const ripple =
+                                                                                    document.createElement(
+                                                                                        'span',
+                                                                                    );
+                                                                                ripple.className =
+                                                                                    'gs-ripple';
+                                                                                btn.appendChild(
+                                                                                    ripple,
+                                                                                );
+                                                                                setTimeout(
+                                                                                    () => {
+                                                                                        try {
+                                                                                            btn.removeChild(
+                                                                                                ripple,
+                                                                                            );
+                                                                                        } catch {}
+                                                                                    },
+                                                                                    560,
+                                                                                );
+                                                                                toggleEntitySelection(
+                                                                                    entityName,
+                                                                                    category,
+                                                                                    opt,
+                                                                                );
+                                                                            }}
+                                                                            className={`relative inline-flex items-center gap-2 rounded-none border px-3 py-2 text-sm transition-colors duration-150 ${
+                                                                                Active
+                                                                                    ? 'bg-blue-50 text-primary border-blue-500'
+                                                                                    : 'bg-white text-primary border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
+                                                                            }`}
+                                                                        >
+                                                                            <div className='h-6 w-6 flex items-center justify-center'>
+                                                                                <Icon
+                                                                                    name={
+                                                                                        optionIcons[
+                                                                                            opt
+                                                                                        ]
+                                                                                            ?.name ||
+                                                                                        'git'
+                                                                                    }
+                                                                                    size={
+                                                                                        20
+                                                                                    }
+                                                                                    className='text-primary'
+                                                                                />
+                                                                            </div>
+                                                                            <span>
+                                                                                {
+                                                                                    opt
+                                                                                }
+                                                                            </span>
+                                                                            {Active && (
+                                                                                <svg
+                                                                                    className='gs-corner-check-svg'
+                                                                                    viewBox='0 0 24 24'
+                                                                                    aria-hidden='true'
+                                                                                >
+                                                                                    <polygon
+                                                                                        points='24,0 24,24 8,0'
+                                                                                        fill='#1d4ed8'
+                                                                                    />
+                                                                                    <path
+                                                                                        d='M10 11 L13 14 L19 8'
+                                                                                        fill='none'
+                                                                                        stroke='white'
+                                                                                        strokeWidth='2.6'
+                                                                                        strokeLinecap='round'
+                                                                                        strokeLinejoin='round'
+                                                                                    />
+                                                                                </svg>
+                                                                            )}
+                                                                        </button>
+                                                                    );
+                                                                },
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className='px-4 py-4 whitespace-nowrap text-right'>
+                                                        <div className='inline-flex flex-col gap-1.5'>
+                                                            <button
+                                                                className='inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-colors'
+                                                                onClick={() => {
+                                                                    options.forEach(
+                                                                        (
+                                                                            opt,
+                                                                        ) => {
+                                                                            if (
+                                                                                !isSelected(
+                                                                                    opt,
+                                                                                )
+                                                                            ) {
+                                                                                toggleEntitySelection(
+                                                                                    entityName,
+                                                                                    category,
+                                                                                    opt,
+                                                                                );
+                                                                            }
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <svg
+                                                                    className='w-3 h-3'
+                                                                    viewBox='0 0 24 24'
+                                                                    fill='none'
+                                                                    stroke='currentColor'
+                                                                    strokeWidth={
+                                                                        2
+                                                                    }
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap='round'
+                                                                        strokeLinejoin='round'
+                                                                        d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                                                                    />
+                                                                </svg>
+                                                                Select All
+                                                            </button>
+                                                            <button
+                                                                className='inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-red-50 hover:border-red-300 text-slate-700 hover:text-red-700 transition-colors'
+                                                                onClick={() => {
+                                                                    options.forEach(
+                                                                        (
+                                                                            opt,
+                                                                        ) => {
+                                                                            if (
+                                                                                isSelected(
+                                                                                    opt,
+                                                                                )
+                                                                            ) {
+                                                                                toggleEntitySelection(
+                                                                                    entityName,
+                                                                                    category,
+                                                                                    opt,
+                                                                                );
+                                                                            }
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <svg
+                                                                    className='w-3 h-3'
+                                                                    viewBox='0 0 24 24'
+                                                                    fill='none'
+                                                                    stroke='currentColor'
+                                                                    strokeWidth={
+                                                                        2
+                                                                    }
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap='round'
+                                                                        strokeLinejoin='round'
+                                                                        d='M6 18L18 6M6 6l12 12'
+                                                                    />
+                                                                </svg>
+                                                                Clear
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        },
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Footer with Done Button */}
+                    <div className='px-6 py-3.5 border-t border-slate-200 flex items-center justify-end gap-2.5 bg-white'>
+                        <button
+                            onClick={onClose}
+                            className='px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-all duration-200'
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDone}
+                            className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg transition-all duration-200'
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
         </>
     );
 }

@@ -1,13 +1,15 @@
 'use client';
 
-import {useState, useEffect, useCallback, useMemo} from 'react';
+import {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import Link from 'next/link';
 import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
 import SecurityGovernancePanel from './SecurityGovernancePanel';
 import PipelinePanel from './PipelinePanel';
+import BuildsPanel from './BuildsPanel';
 import {motion} from 'framer-motion';
+import {logout} from '@/utils/auth';
 
 interface NavigationItem {
     id: string;
@@ -118,44 +120,43 @@ export default function NavigationSidebar({
     const [isSecurityGovernanceOpen, setIsSecurityGovernanceOpen] =
         useState(false);
     const [isPipelineOpen, setIsPipelineOpen] = useState(false);
+    const [isBuildsOpen, setIsBuildsOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const menuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [currentUser, setCurrentUser] = useState({
-        firstName: 'Nihar',
-        lastName: 'Sharma',
-        emailAddress: 'nihar.sharma@systiva.com',
-        role: 'Administrator',
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
+        role: 'User',
     });
 
-    // Load current user data from API
+    // Cleanup timeout on unmount
     useEffect(() => {
-        const loadCurrentUser = async () => {
+        return () => {
+            if (menuCloseTimeoutRef.current) {
+                clearTimeout(menuCloseTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Load current user data from localStorage (set during login)
+    useEffect(() => {
+        const loadCurrentUser = () => {
             try {
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-                const response = await fetch(
-                    `${apiBase}/api/auth/current-user`,
-                );
-                if (response.ok) {
-                    const userData = await response.json();
+                // Get user from localStorage where it was stored during login
+                const userStr = localStorage.getItem('systiva_user');
+                if (userStr) {
+                    const userData = JSON.parse(userStr);
                     setCurrentUser({
-                        firstName: userData.firstName || 'Nihar',
-                        lastName: userData.lastName || 'Sharma',
-                        emailAddress:
-                            userData.emailAddress || 'nihar.sharma@systiva.com',
-                        role: userData.role || 'Administrator',
+                        firstName: userData.firstName || '',
+                        lastName: userData.lastName || '',
+                        emailAddress: userData.email || '',
+                        role: userData.role || 'User',
                     });
-                } else {
-                    // Fallback to default user if API fails
-                    console.log(
-                        'Using fallback user: Nihar Sharma (Administrator)',
-                    );
                 }
             } catch (error) {
-                console.error(
-                    'Error loading current user, using fallback:',
-                    error,
-                );
-                // Keep the default fallback user (Nihar Sharma)
+                console.error('Error loading current user:', error);
             }
         };
 
@@ -203,6 +204,7 @@ export default function NavigationSidebar({
             if (isAccountSettingsOpen) setIsAccountSettingsOpen(false);
             if (isAccessControlOpen) setIsAccessControlOpen(false);
             if (isSecurityGovernanceOpen) setIsSecurityGovernanceOpen(false);
+            if (isBuildsOpen) setIsBuildsOpen(false);
         }
         setPreviousPathname(currentPath);
     }, [
@@ -211,6 +213,7 @@ export default function NavigationSidebar({
         isAccountSettingsOpen,
         isAccessControlOpen,
         isSecurityGovernanceOpen,
+        isBuildsOpen,
     ]);
 
     // Handle mobile close on navigation
@@ -235,6 +238,7 @@ export default function NavigationSidebar({
                 setIsAccessControlOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -243,6 +247,7 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -251,6 +256,7 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsAccessControlOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -259,6 +265,16 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsAccessControlOpen(false);
                 setIsSecurityGovernanceOpen(false);
+                setIsBuildsOpen(false);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            if (item.id === 'builds') {
+                setIsBuildsOpen(true);
+                setIsAccountSettingsOpen(false); // <-- close other panels
+                setIsAccessControlOpen(false);
+                setIsSecurityGovernanceOpen(false);
+                setIsPipelineOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -267,6 +283,7 @@ export default function NavigationSidebar({
             setIsAccessControlOpen(false);
             setIsSecurityGovernanceOpen(false);
             setIsPipelineOpen(false);
+            setIsBuildsOpen(false);
             handleNavigation(item.href);
         },
         [isMobile, onToggleCollapse, handleNavigation],
@@ -301,8 +318,8 @@ export default function NavigationSidebar({
                 {/* Curved Right Edge / Boundary removed to eliminate white border */}
 
                 {/* Minimal Collapse Handle (middle, outside) */}
-                {!isMobile && (
-                    <div className='absolute -right-4 bottom-20 -translate-y-1/2 z-40 pointer-events-auto group'>
+                {!isMobile && !isUserMenuOpen && (
+                    <div className='absolute -right-4 bottom-40 -translate-y-1/2 z-[60] pointer-events-auto group'>
                         <button
                             onClick={onToggleCollapse}
                             className='relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl hover:scale-110 opacity-100'
@@ -558,15 +575,36 @@ export default function NavigationSidebar({
                     }`}
                 >
                     {/* Keep only profile here to avoid duplicates of settings/access */}
-                    <div className='mt-2'>
+                    <div className='mt-2 relative'>
                         <div
                             className={`flex items-center ${
                                 isCollapsed ? 'justify-center' : 'space-x-3'
-                            } relative`}
-                            onMouseEnter={() =>
-                                isCollapsed && setHoveredItem('user-profile')
+                            } cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors`}
+                            onMouseEnter={() => {
+                                // Clear any pending close timeout
+                                if (menuCloseTimeoutRef.current) {
+                                    clearTimeout(menuCloseTimeoutRef.current);
+                                    menuCloseTimeoutRef.current = null;
+                                }
+                                if (!isCollapsed) setIsUserMenuOpen(true);
+                                if (isCollapsed) setHoveredItem('user-profile');
+                            }}
+                            onMouseLeave={() => {
+                                if (!isCollapsed) {
+                                    // Add delay before closing
+                                    menuCloseTimeoutRef.current = setTimeout(
+                                        () => {
+                                            setIsUserMenuOpen(false);
+                                        },
+                                        200,
+                                    );
+                                }
+                                setHoveredItem(null);
+                            }}
+                            onClick={() =>
+                                !isCollapsed &&
+                                setIsUserMenuOpen(!isUserMenuOpen)
                             }
-                            onMouseLeave={() => setHoveredItem(null)}
                         >
                             <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg flex-shrink-0'>
                                 <span className='text-white font-semibold text-sm'>
@@ -603,6 +641,161 @@ export default function NavigationSidebar({
                                 </div>
                             )}
                         </div>
+
+                        {/* User Dropdown Menu */}
+                        {!isCollapsed && isUserMenuOpen && (
+                            <div
+                                className='absolute bottom-2 left-full ml-1 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 transition-all duration-300 ease-out'
+                                style={{
+                                    animation: 'slideRight 0.3s ease-out',
+                                }}
+                                onMouseEnter={() => {
+                                    // Clear any pending close timeout
+                                    if (menuCloseTimeoutRef.current) {
+                                        clearTimeout(
+                                            menuCloseTimeoutRef.current,
+                                        );
+                                        menuCloseTimeoutRef.current = null;
+                                    }
+                                    setIsUserMenuOpen(true);
+                                }}
+                                onMouseLeave={() => {
+                                    // Add delay before closing
+                                    menuCloseTimeoutRef.current = setTimeout(
+                                        () => {
+                                            setIsUserMenuOpen(false);
+                                        },
+                                        200,
+                                    );
+                                }}
+                            >
+                                <style jsx>{`
+                                    @keyframes slideRight {
+                                        from {
+                                            opacity: 0;
+                                            transform: translateX(-5px)
+                                                scale(0.95);
+                                        }
+                                        to {
+                                            opacity: 1;
+                                            transform: translateX(0) scale(1);
+                                        }
+                                    }
+                                `}</style>
+                                {/* User Info Header */}
+                                <div className='px-3 py-2.5 border-b border-slate-200 bg-slate-50'>
+                                    <div className='flex items-center gap-2.5'>
+                                        <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-md flex-shrink-0'>
+                                            <span className='text-white font-semibold text-sm'>
+                                                {getUserInitials(
+                                                    currentUser.firstName,
+                                                    currentUser.lastName,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className='flex-1 min-w-0'>
+                                            <p className='text-sm font-semibold text-slate-900 truncate'>
+                                                {currentUser.firstName}{' '}
+                                                {currentUser.lastName}
+                                            </p>
+                                            <p className='text-xs text-slate-600 truncate'>
+                                                {currentUser.emailAddress}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Menu Items */}
+                                <div className='py-1'>
+                                    <button
+                                        onClick={() => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            router.push('/profile');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+                                            />
+                                        </svg>
+                                        Profile Overview
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            router.push('/privacy-policy');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                                            />
+                                        </svg>
+                                        Privacy Policy
+                                    </button>
+
+                                    <div className='border-t border-slate-200 my-1'></div>
+
+                                    <button
+                                        onClick={async () => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            await logout();
+                                            router.push('/login');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1'
+                                            />
+                                        </svg>
+                                        Sign Out
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </motion.div>
@@ -639,6 +832,15 @@ export default function NavigationSidebar({
                 <PipelinePanel
                     isOpen={isPipelineOpen}
                     onClose={() => setIsPipelineOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
+            )}
+
+            {/* Builds Panel */}
+            {isBuildsOpen && (
+                <BuildsPanel
+                    isOpen={isBuildsOpen}
+                    onClose={() => setIsBuildsOpen(false)}
                     sidebarWidth={isCollapsed ? 48 : 208}
                 />
             )}
