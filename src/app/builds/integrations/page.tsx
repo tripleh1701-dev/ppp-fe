@@ -444,7 +444,7 @@ export default function Integrations() {
                                 </h3>
                                 <p className='text-gray-600 mb-4 max-w-md mx-auto'>
                                     Get started by creating your first build
-                                    integration. Click the "Create Build" button
+                                    integration. Click the &quot;Create Build&quot; button
                                     above to begin.
                                 </p>
                                 <button
