@@ -153,33 +153,35 @@ export default function PrivacyPolicyPage() {
                         color='blue'
                     >
                         <p className='text-slate-700 mb-4 leading-relaxed'>
-                            Systiva Inc. ("Systiva," "We," "Our," "Us") is
-                            dedicated to protecting the privacy of its
-                            customers, business partners, event attendees, job
-                            applicants, and website visitors. This Systiva
-                            Privacy Statement ("Privacy Statement") reflects our
-                            global privacy practices and standards as of the
-                            last updated date and the preceding 12 months. It
+                            Systiva Inc. (&quot;Systiva,&quot; &quot;We,&quot;
+                            &quot;Our,&quot; &quot;Us&quot;) is dedicated to
+                            protecting the privacy of its customers, business
+                            partners, event attendees, job applicants, and
+                            website visitors. This Systiva Privacy Statement
+                            (&quot;Privacy Statement&quot;) reflects our global
+                            privacy practices and standards as of the last
+                            updated date and the preceding 12 months. It
                             explains how we collect, use, process, store, host,
                             transfer, and disclose information about you when
                             you interact directly with Systiva or our websites,
                             including but not limited to Systiva.io and its
                             subdomains (e.g., public-facing sites and support
                             site), other websites or applications owned and
-                            controlled by Systiva (collectively, the "Website"),
-                            along with our subsidiaries, products, and services
-                            that link to this Privacy Statement (collectively,
-                            the "Service").
+                            controlled by Systiva (collectively, the
+                            &quot;Website&quot;), along with our subsidiaries,
+                            products, and services that link to this Privacy
+                            Statement (collectively, the &quot;Service&quot;).
                         </p>
                         <div className='bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg'>
                             <p className='text-slate-700 leading-relaxed'>
                                 This Privacy Statement applies to Systiva as the
-                                Data Controller of customers' information
+                                Data Controller of customers&apos; information
                                 relating to an identified or identifiable
-                                individual ("Personal Data"). It does NOT apply
-                                when Systiva acts as a Data Processor. Our
-                                Service is not intended for children, and we do
-                                not knowingly collect Personal Data from minors.
+                                individual (&quot;Personal Data&quot;). It does
+                                NOT apply when Systiva acts as a Data Processor.
+                                Our Service is not intended for children, and we
+                                do not knowingly collect Personal Data from
+                                minors.
                             </p>
                         </div>
                     </Section>
@@ -611,8 +613,8 @@ export default function PrivacyPolicyPage() {
                             <Sparkles className='w-6 h-6 text-white animate-pulse' />
                         </div>
                         <p className='text-white/95 mb-6 text-lg drop-shadow'>
-                            We're here to help. Reach out to our privacy team
-                            anytime.
+                            We&apos;re here to help. Reach out to our privacy
+                            team anytime.
                         </p>
                         <button className='px-8 py-4 bg-white text-[#0171EC] font-bold rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-2xl hover:shadow-white/50 hover:scale-110 group/btn'>
                             <span className='flex items-center gap-2'>
