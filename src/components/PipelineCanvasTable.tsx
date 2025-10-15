@@ -1,0 +1,5045 @@
+'use client';
+
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {motion, AnimatePresence} from 'framer-motion';
+import {
+    ArrowUp,
+    ArrowDown,
+    Trash2,
+    Pencil,
+    MoreVertical,
+    ChevronRight,
+    Plus,
+    X,
+    Pin,
+    PinOff,
+    Building2,
+    FileText,
+    MapPin,
+    Home,
+    Globe,
+    User,
+    Mail,
+    Activity,
+    Calendar,
+    Shield,
+    Key,
+    Settings,
+    Package,
+    Cpu,
+    CreditCard,
+    Users,
+    Bell,
+    Clock,
+    Eye,
+} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {api} from '../utils/api';
+
+// Utility function to generate consistent colors for services across the application
+const getServiceColor = (serviceName: string) => {
+    const key = serviceName.toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+
+    // Blueish service color palette - consistent across all components
+    const serviceColors = [
+        {
+            bg: 'bg-blue-50',
+            text: 'text-blue-800',
+            border: 'border-blue-200',
+            tone: 'blue' as const,
+        },
+        {
+            bg: 'bg-sky-50',
+            text: 'text-sky-800',
+            border: 'border-sky-200',
+            tone: 'sky' as const,
+        },
+        {
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-800',
+            border: 'border-indigo-200',
+            tone: 'indigo' as const,
+        },
+        {
+            bg: 'bg-cyan-50',
+            text: 'text-cyan-800',
+            border: 'border-cyan-200',
+            tone: 'cyan' as const,
+        },
+        {
+            bg: 'bg-slate-50',
+            text: 'text-slate-800',
+            border: 'border-slate-200',
+            tone: 'slate' as const,
+        },
+    ];
+
+    return serviceColors[hash % serviceColors.length];
+};
+
+// Chip component for dropdown selections
+const SelectionChip = ({
+    label,
+    onRemove,
+    color = 'blue',
+}: {
+    label: string;
+    onRemove: () => void;
+    color?: 'blue' | 'green' | 'purple';
+}) => {
+    const colorClasses = {
+        blue: 'bg-white text-black',
+        green: 'bg-green-100 text-green-800 border-green-200',
+        purple: 'bg-purple-100 text-purple-800 border-purple-200',
+    };
+
+    return (
+        <span
+            className={`inline-flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
+        >
+            {label}
+            <button
+                onClick={onRemove}
+                className='ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-opacity-20 hover:bg-gray-500'
+            >
+                <X size={10} />
+            </button>
+        </span>
+    );
+};
+
+// Dropdown with chip selection
+const ChipDropdown = ({
+    options,
+    selected,
+    onSelect,
+    onDeselect,
+    placeholder,
+    color = 'blue',
+    multiple = false,
+}: {
+    options: Array<{id: string; name: string}>;
+    selected: string[];
+    onSelect: (id: string, name: string) => void;
+    onDeselect: (id: string) => void;
+    placeholder: string;
+    color?: 'blue' | 'green' | 'purple';
+    multiple?: boolean;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const filteredOptions = options.filter((option) =>
+        option.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
+                setIsOpen(false);
+                setSearchTerm('');
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () =>
+            document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedOptions = options.filter((opt) => selected.includes(opt.id));
+
+    return (
+        <div className='relative w-full' ref={dropdownRef}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className='min-h-[2.5rem] p-2 border border-gray-300 rounded-md cursor-pointer bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            >
+                {selectedOptions.length > 0 ? (
+                    <div className='flex flex-wrap gap-1'>
+                        {selectedOptions.map((option) => (
+                            <SelectionChip
+                                key={option.id}
+                                label={option.name}
+                                color={color}
+                                onRemove={() => onDeselect(option.id)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <span className='text-gray-500 text-sm'>{placeholder}</span>
+                )}
+            </div>
+
+            {isOpen && (
+                <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
+                    <div className='p-2 border-b'>
+                        <input
+                            type='text'
+                            placeholder='Search...'
+                            value={searchTerm}
+                            onChange={(
+                                e: React.ChangeEvent<HTMLInputElement>,
+                            ) => setSearchTerm(e.target.value)}
+                            className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className='max-h-40 overflow-y-auto'>
+                        {filteredOptions.map((option) => {
+                            const isSelected = selected.includes(option.id);
+                            return (
+                                <div
+                                    key={option.id}
+                                    onClick={() => {
+                                        if (isSelected) {
+                                            onDeselect(option.id);
+                                        } else {
+                                            onSelect(option.id, option.name);
+                                            if (!multiple) {
+                                                setIsOpen(false);
+                                            }
+                                        }
+                                    }}
+                                    className={`p-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
+                                        isSelected
+                                            ? 'bg-blue-50 text-blue-600'
+                                            : ''
+                                    }`}
+                                >
+                                    <span>{option.name}</span>
+                                    {isSelected && (
+                                        <span className='text-blue-600'>✓</span>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {filteredOptions.length === 0 && searchTerm && (
+                            <div className='p-2 text-sm text-gray-500'>
+                                No options found
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export interface PipelineCanvasRow {
+    id: string;
+    pipelineName: string;
+    details: string;
+    service: string;
+    status: string;
+    lastUpdated: string;
+    createdBy?: string;
+}
+
+function InlineEditableText({
+    value,
+    onCommit,
+    placeholder,
+    isError = false,
+    renderDisplay,
+    className,
+    dataAttr,
+    onTabNext,
+    onTabPrev,
+}: {
+    value: string;
+    onCommit: (next: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    renderDisplay?: (v: string) => React.ReactNode;
+    className?: string;
+    dataAttr?: string;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [editing, setEditing] = React.useState(false);
+    const [draft, setDraft] = React.useState<string>(value || '');
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    React.useEffect(() => {
+        if (!editing) setDraft(value || '');
+    }, [value, editing]);
+    React.useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    const commit = () => {
+        const next = (draft || '').trim();
+        if (next !== (value || '')) onCommit(next);
+        setEditing(false);
+    };
+    const cancel = () => {
+        setDraft(value || '');
+        setEditing(false);
+    };
+
+    if (editing) {
+        return (
+            <input
+                ref={inputRef}
+                value={draft}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setDraft(e.target.value)
+                }
+                onBlur={commit}
+                onKeyDown={(e: any) => {
+                    if (e.key === 'Enter') commit();
+                    if (e.key === 'Escape') cancel();
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const next = (draft || '').trim();
+                        if (next !== (value || '')) onCommit(next);
+                        setEditing(false);
+                        if (e.shiftKey) onTabPrev && onTabPrev();
+                        else onTabNext && onTabNext();
+                    }
+                }}
+                placeholder={placeholder}
+                className={`min-w-0 w-full rounded-sm border ${
+                    isError
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                        : 'border-blue-300 bg-white'
+                } px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${
+                    isError
+                        ? 'focus:ring-red-200 focus:border-red-500'
+                        : 'focus:ring-blue-200 focus:border-blue-500'
+                } ${className || ''}`}
+                data-inline={dataAttr || undefined}
+            />
+        );
+    }
+    const isEmpty = !value || value.length === 0;
+    return (
+        <span
+            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
+                className || ''
+            }`}
+            onClick={() => setEditing(true)}
+            title={(value || '').toString()}
+            data-inline={dataAttr || undefined}
+            tabIndex={0}
+            onKeyDown={(e: any) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setEditing(true);
+                }
+                if (e.key === 'Tab') {
+                    // Let browser move focus naturally between cells when not editing
+                }
+            }}
+        >
+            {renderDisplay ? renderDisplay(value || '') : value || ''}
+        </span>
+    );
+}
+
+type CatalogType =
+    | 'pipelineName'
+    | 'details'
+    | 'service'
+    | 'status'
+    | 'lastUpdated';
+
+// Modern dropdown option component with edit/delete functionality
+function DropdownOption({
+    option,
+    tone,
+    type,
+    onSelect,
+    onEdit,
+    onDelete,
+    isInUse = false,
+}: {
+    option: {id: string; name: string};
+    tone: {bg: string; hover: string; text: string};
+    type: CatalogType;
+    onSelect: () => void;
+    onEdit: (newName: string) => Promise<void>;
+    onDelete: () => Promise<void>;
+    isInUse?: boolean;
+}) {
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editValue, setEditValue] = React.useState(option.name);
+    const [isHovered, setIsHovered] = React.useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    React.useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
+    const handleSave = async () => {
+        if (editValue.trim() && editValue.trim() !== option.name) {
+            await onEdit(editValue.trim());
+        }
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setEditValue(option.name);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <motion.div
+                initial={{scale: 0.98, opacity: 0}}
+                animate={{scale: 1, opacity: 1}}
+                className='w-full p-2 bg-white border border-blue-200 rounded-lg shadow-sm'
+            >
+                <div className='flex items-center gap-2'>
+                    <input
+                        ref={inputRef}
+                        value={editValue}
+                        onChange={(e: any) => setEditValue(e.target.value)}
+                        onKeyDown={(e: any) => {
+                            if (e.key === 'Enter') handleSave();
+                            if (e.key === 'Escape') handleCancel();
+                        }}
+                        className='flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500'
+                        placeholder=''
+                    />
+                    <button
+                        onClick={handleSave}
+                        className='p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors'
+                        title='Save'
+                    >
+                        <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M5 13l4 4L19 7'
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={handleCancel}
+                        className='p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors'
+                        title='Cancel'
+                    >
+                        <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M6 18L18 6M6 6l12 12'
+                            />
+                        </svg>
+                    </button>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <motion.div
+            initial={{scale: 0.98, opacity: 0}}
+            animate={{scale: 1, opacity: 1}}
+            whileHover={{scale: 1.02, y: -1}}
+            transition={{type: 'spring', stiffness: 400, damping: 25}}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className='relative group'
+        >
+            <button
+                onClick={onSelect}
+                className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-hidden`}
+                style={{wordBreak: 'break-word', overflowWrap: 'break-word'}}
+            >
+                <span className='relative z-10 block truncate pr-16'>
+                    {option.name}
+                </span>
+                <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+            </button>
+
+            {/* Edit/Delete buttons - appear on hover */}
+            <motion.div
+                initial={{opacity: 0, scale: 0.9}}
+                animate={{
+                    opacity: isHovered ? 1 : 0,
+                    scale: isHovered ? 1 : 0.9,
+                }}
+                transition={{duration: 0.15}}
+                className='absolute top-1 right-1 flex gap-1'
+            >
+                <button
+                    onClick={(e: any) => {
+                        e.stopPropagation();
+                        setIsEditing(true);
+                    }}
+                    className='p-1 bg-white/90 hover:bg-white text-gray-600 hover:text-blue-600 rounded shadow-sm hover:shadow transition-all duration-150'
+                    title='Edit'
+                >
+                    <svg
+                        className='w-3 h-3'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                    >
+                        <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2}
+                            d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'
+                        />
+                    </svg>
+                </button>
+                <motion.button
+                    onClick={(e: any) => {
+                        e.stopPropagation();
+                        if (isInUse) {
+                            alert(
+                                `Cannot delete "${option.name}" because it is currently being used in one or more table rows.`,
+                            );
+                            return;
+                        }
+                        if (
+                            confirm(
+                                `Are you sure you want to delete "${option.name}"? This will affect all rows using this ${type}.`,
+                            )
+                        ) {
+                            onDelete();
+                        }
+                    }}
+                    className={`group relative p-1.5 rounded-lg shadow-sm transition-all duration-300 transform ${
+                        isInUse
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-br from-red-50 to-red-100 hover:from-red-500 hover:to-red-600 text-red-500 hover:text-white hover:shadow-lg hover:scale-105 active:scale-95'
+                    }`}
+                    title={
+                        isInUse
+                            ? `Cannot delete - "${option.name}" is in use`
+                            : 'Delete'
+                    }
+                    whileHover={
+                        isInUse
+                            ? {}
+                            : {
+                                  scale: 1.1,
+                                  rotate: [0, -5, 5, 0],
+                                  transition: {duration: 0.3},
+                              }
+                    }
+                    whileTap={
+                        isInUse
+                            ? {}
+                            : {
+                                  scale: 0.9,
+                                  transition: {duration: 0.1},
+                              }
+                    }
+                    disabled={isInUse}
+                >
+                    {/* Animated background glow */}
+                    <div className='absolute inset-0 bg-red-400 rounded-lg opacity-0 group-hover:opacity-20 blur-sm transition-opacity duration-300'></div>
+
+                    {/* Enhanced trash icon with animation */}
+                    <svg
+                        className='w-3.5 h-3.5 relative z-10 transition-transform duration-300 group-hover:animate-pulse'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                    >
+                        {/* Trash lid */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M4 7h16'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.1}}
+                        />
+                        {/* Trash handle */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M10 11v6m4-6v6'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.2}}
+                        />
+                        {/* Trash body */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.3}}
+                        />
+                        {/* Trash top */}
+                        <motion.path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            strokeWidth={2.5}
+                            d='M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3'
+                            initial={{pathLength: 0}}
+                            animate={{pathLength: 1}}
+                            transition={{duration: 0.5, delay: 0.4}}
+                        />
+                    </svg>
+
+                    {/* Ripple effect on click */}
+                    <div className='absolute inset-0 rounded-lg opacity-0 group-active:opacity-30 bg-red-300 animate-ping'></div>
+                </motion.button>
+            </motion.div>
+        </motion.div>
+    );
+}
+
+// Multi-select component specifically for services
+function ServicesMultiSelect({
+    value,
+    onChange,
+    placeholder = 'Select Services',
+    isError = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    pipelines = [],
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        item: {id: string; name: string},
+    ) => void;
+    pipelines?: PipelineCanvasRow[];
+}) {
+    const [open, setOpen] = React.useState(false);
+    const [query, setQuery] = React.useState('');
+    const [options, setOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
+    const [loading, setLoading] = React.useState(false);
+    const [adding, setAdding] = React.useState('');
+    const [showAdder, setShowAdder] = React.useState(false);
+    const [showMoreServices, setShowMoreServices] = React.useState(false);
+    const [moreServicesPos, setMoreServicesPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    const moreServicesRef = React.useRef<HTMLButtonElement>(null);
+
+    // Helper function to check if a service is in use
+    const isServiceInUse = React.useCallback(
+        (serviceName: string): boolean => {
+            if (!pipelines || pipelines.length === 0) return false;
+
+            return pipelines.some((pipeline) => {
+                const services =
+                    pipeline.service?.split(', ').filter(Boolean) || [];
+                return services.includes(serviceName);
+            });
+        },
+        [pipelines],
+    );
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    const [dropdownPos, setDropdownPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+
+    // Parse selected services from comma-separated string
+    const selectedServices = React.useMemo(() => {
+        return value
+            ? value
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+            : [];
+    }, [value]);
+
+    // Responsive display logic
+    // Show maximum 4 value chips, with count indicator for additional chips
+    const [visibleCount, setVisibleCount] = React.useState(4);
+
+    React.useEffect(() => {
+        const updateVisibleCount = () => {
+            if (typeof window === 'undefined') return;
+            // Always show maximum 4 chips regardless of screen size
+            setVisibleCount(4);
+        };
+
+        updateVisibleCount();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', updateVisibleCount);
+            return () =>
+                window.removeEventListener('resize', updateVisibleCount);
+        }
+    }, []);
+
+    const loadOptions = React.useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await api.get<Array<{id: string; name: string}>>(
+                `/api/pipeline-services${
+                    query ? `?search=${encodeURIComponent(query)}` : ''
+                }`,
+            );
+            // Filter out already selected services
+            const filteredData = (data || []).filter(
+                (option) => !selectedServices.includes(option.name),
+            );
+            setOptions(filteredData);
+        } catch (_e) {
+            setOptions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [query, selectedServices]);
+
+    React.useEffect(() => {
+        if (!open) return;
+        loadOptions();
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect && typeof window !== 'undefined') {
+            // Find table container for better positioning
+            const tableContainer =
+                containerRef.current?.closest('[role="table"]') ||
+                containerRef.current?.closest('.overflow-auto') ||
+                document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+
+            const width = 256;
+            // Constrain within table bounds
+            const tableRightBound = tableRect.right - width - 16;
+            const maxLeft = Math.min(
+                tableRightBound,
+                window.innerWidth - width - 16,
+            );
+            const minLeft = Math.max(tableRect.left + 16, 16);
+            const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
+
+            const tableBottomBound = Math.min(
+                tableRect.bottom - 50,
+                window.innerHeight - 200,
+            );
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
+            setDropdownPos({top, left, width});
+        }
+    }, [open, loadOptions]);
+
+    // Position the more services dropdown
+    React.useEffect(() => {
+        if (showMoreServices && moreServicesRef.current) {
+            const rect = moreServicesRef.current.getBoundingClientRect();
+
+            // Find the table container to ensure dropdown stays within table bounds
+            const tableContainer =
+                moreServicesRef.current.closest('[role="table"]') ||
+                moreServicesRef.current.closest('.overflow-auto') ||
+                document.body;
+            const tableRect = tableContainer.getBoundingClientRect();
+
+            // Calculate width with stricter table container constraints
+            const maxWidth = Math.min(
+                280,
+                tableRect.width * 0.4,
+                window.innerWidth * 0.3,
+            );
+            const width = Math.max(180, Math.min(maxWidth, rect.width));
+
+            // Ensure dropdown stays strictly within table container horizontally
+            const idealLeft = rect.left;
+            const tableRightBound = tableRect.right - width - 16; // More margin from table edge
+            const maxLeft = Math.min(
+                tableRightBound,
+                window.innerWidth - width - 16,
+            );
+            const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
+            const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+
+            // Ensure dropdown stays within both table and viewport vertically
+            const tableBottomBound = Math.min(
+                tableRect.bottom - 50,
+                window.innerHeight - 200,
+            );
+            const top = Math.min(tableBottomBound, rect.bottom + 8);
+            setMoreServicesPos({top, left, width});
+        }
+    }, [showMoreServices]);
+
+    React.useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+                setShowAdder(false);
+                setAdding('');
+                setShowMoreServices(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    const addNew = async () => {
+        const name = (adding || query || '').trim();
+        if (!name) return;
+
+        // Check for existing entries (case-insensitive)
+        const existingMatch = options.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            // If exact match exists, add it to selection instead of creating new
+            toggleService(existingMatch.name);
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+
+            // Focus next row's first field (Pipeline Name) after selecting existing service
+            const currentElement = inputRef?.current;
+            if (currentElement) {
+                // Find the closest div with data-row-id attribute
+                const currentRowDiv = currentElement.closest('[data-row-id]');
+                const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+
+                if (currentRowId) {
+                    // Find the next row (increment the row number)
+                    const currentRowNum = parseInt(currentRowId);
+                    const nextRowId = (currentRowNum + 1).toString();
+
+                    // Find the pipeline name column in the next row
+                    const nextRowDiv = document.querySelector(
+                        `[data-row-id="${nextRowId}"][data-col="pipelineName"]`,
+                    );
+                    const nextInput = nextRowDiv?.querySelector(
+                        'input',
+                    ) as HTMLInputElement;
+
+                    if (nextInput) {
+                        // Use requestAnimationFrame to ensure DOM is updated
+                        requestAnimationFrame(() => {
+                            nextInput.focus();
+                            nextInput.click();
+                        });
+                    }
+                }
+            }
+            return;
+        }
+
+        try {
+            const created = await api.post<{id: string; name: string}>(
+                '/api/pipeline-services',
+                {name},
+            );
+            if (created) {
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === created!.id);
+                    return exists ? prev : [...prev, created!];
+                });
+                // Automatically add the new service to selection
+                toggleService(created.name);
+                setShowAdder(false);
+                setAdding('');
+                setQuery('');
+
+                // Focus next row's first field (Pipeline Name) after adding new service
+                const currentElement = inputRef?.current;
+                if (currentElement) {
+                    // Find the closest div with data-row-id attribute
+                    const currentRowDiv =
+                        currentElement.closest('[data-row-id]');
+                    const currentRowId =
+                        currentRowDiv?.getAttribute('data-row-id');
+
+                    if (currentRowId) {
+                        // Find the next row (increment the row number)
+                        const currentRowNum = parseInt(currentRowId);
+                        const nextRowId = (currentRowNum + 1).toString();
+
+                        // Find the pipeline name column in the next row
+                        const nextRowDiv = document.querySelector(
+                            `[data-row-id="${nextRowId}"][data-col="pipelineName"]`,
+                        );
+                        const nextInput = nextRowDiv?.querySelector(
+                            'input',
+                        ) as HTMLInputElement;
+
+                        if (nextInput) {
+                            // Use requestAnimationFrame to ensure DOM is updated
+                            requestAnimationFrame(() => {
+                                nextInput.focus();
+                                nextInput.click();
+                            });
+                        }
+                    }
+                }
+
+                // Notify parent component about the new item
+                if (onNewItemCreated) {
+                    onNewItemCreated('service', created);
+                }
+            }
+        } catch (error: any) {
+            // Handle duplicate error from backend
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                // Try to find the existing item and add it to selection
+                const existingItem = options.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    toggleService(existingItem.name);
+
+                    // Focus next row's first field (Pipeline Name) after selecting existing service
+                    const currentElement = inputRef?.current;
+                    if (currentElement) {
+                        // Find the closest div with data-row-id attribute
+                        const currentRowDiv =
+                            currentElement.closest('[data-row-id]');
+                        const currentRowId =
+                            currentRowDiv?.getAttribute('data-row-id');
+
+                        if (currentRowId) {
+                            // Find the next row (increment the row number)
+                            const currentRowNum = parseInt(currentRowId);
+                            const nextRowId = (currentRowNum + 1).toString();
+
+                            // Find the pipeline name column in the next row
+                            const nextRowDiv = document.querySelector(
+                                `[data-row-id="${nextRowId}"][data-col="pipelineName"]`,
+                            );
+                            const nextInput = nextRowDiv?.querySelector(
+                                'input',
+                            ) as HTMLInputElement;
+
+                            if (nextInput) {
+                                // Use requestAnimationFrame to ensure DOM is updated
+                                requestAnimationFrame(() => {
+                                    nextInput.focus();
+                                    nextInput.click();
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+        }
+    };
+
+    const toggleService = (serviceName: string) => {
+        const isSelected = selectedServices.includes(serviceName);
+        let newServices;
+        if (isSelected) {
+            newServices = selectedServices.filter((s) => s !== serviceName);
+        } else {
+            newServices = [...selectedServices, serviceName];
+        }
+        onChange(newServices.join(', '));
+    };
+
+    const removeService = (serviceName: string) => {
+        const newServices = selectedServices.filter((s) => s !== serviceName);
+        onChange(newServices.join(', '));
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative flex items-center gap-1 group/item'
+        >
+            <div className='flex items-center gap-1'>
+                {selectedServices
+                    .slice(0, visibleCount)
+                    .map((service, index) => {
+                        // Use consistent color function
+                        const colorTheme = getServiceColor(service);
+
+                        return (
+                            <motion.span
+                                key={service}
+                                initial={{scale: 0.95, opacity: 0}}
+                                animate={{scale: 1, opacity: 1}}
+                                whileHover={{
+                                    y: -1,
+                                    boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                                }}
+                                transition={{
+                                    type: 'spring',
+                                    stiffness: 480,
+                                    damping: 30,
+                                }}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                title={service}
+                            >
+                                <span className='flex-1'>{service}</span>
+                                <button
+                                    onClick={() => removeService(service)}
+                                    className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded-sm'
+                                    aria-label='Remove'
+                                    style={{
+                                        minWidth: '20px',
+                                        minHeight: '20px',
+                                    }}
+                                >
+                                    <X size={12} />
+                                </button>
+                            </motion.span>
+                        );
+                    })}
+                {selectedServices.length > visibleCount && (
+                    <div className='relative'>
+                        <button
+                            ref={moreServicesRef}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                setShowMoreServices(!showMoreServices);
+                            }}
+                            className='inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
+                        >
+                            +{selectedServices.length - visibleCount}
+                        </button>
+
+                        {/* Dropdown for additional services */}
+                        {showMoreServices &&
+                            moreServicesPos &&
+                            createPortal(
+                                <div
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) =>
+                                        e.stopPropagation()
+                                    }
+                                    onClick={(e: any) => e.stopPropagation()}
+                                    style={{
+                                        position: 'fixed',
+                                        top: Math.min(
+                                            moreServicesPos.top,
+                                            window.innerHeight - 200,
+                                        ),
+                                        left: Math.min(
+                                            moreServicesPos.left,
+                                            window.innerWidth - 250,
+                                        ),
+                                        width: Math.min(
+                                            moreServicesPos.width,
+                                            240,
+                                        ),
+                                        maxWidth: '240px',
+                                    }}
+                                >
+                                    <div className='p-3'>
+                                        <div className='text-xs font-medium text-slate-700 mb-2'>
+                                            Additional Services (
+                                            {selectedServices.length -
+                                                visibleCount}
+                                            )
+                                        </div>
+                                        <div className='space-y-1 max-h-32 overflow-y-auto'>
+                                            {selectedServices
+                                                .slice(visibleCount)
+                                                .map((service, idx) => {
+                                                    const colorTheme =
+                                                        getServiceColor(
+                                                            service,
+                                                        );
+                                                    return (
+                                                        <div
+                                                            key={`additional-${idx}`}
+                                                            className='flex items-center justify-between group/additional'
+                                                        >
+                                                            <span
+                                                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                                            >
+                                                                {service}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    removeService(
+                                                                        service,
+                                                                    );
+                                                                    // Close dropdown if no more additional services
+                                                                    if (
+                                                                        selectedServices.length -
+                                                                            1 <=
+                                                                        visibleCount
+                                                                    ) {
+                                                                        setShowMoreServices(
+                                                                            false,
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                                aria-label='Remove'
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </div>
+                                </div>,
+                                document.body,
+                            )}
+                    </div>
+                )}
+
+                {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
+                {selectedServices.length === 0 || open || isError ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            setQuery(e.target.value);
+                            setOpen(true);
+                        }}
+                        onFocus={() => {
+                            setOpen(true);
+                            setShowMoreServices(false); // Close the more services dropdown
+                        }}
+                        onKeyDown={async (e: any) => {
+                            // Helper function to navigate to next row's pipeline name field
+                            const navigateToNextRow = (
+                                currentElement: HTMLInputElement,
+                            ) => {
+                                // Find the closest div with data-col attribute (current column)
+                                const currentColDiv =
+                                    currentElement.closest('[data-col]');
+                                const currentRowId =
+                                    currentColDiv?.getAttribute('data-row-id');
+
+                                if (currentRowId) {
+                                    // For services column, move to next row's first column (pipeline name)
+                                    // Find next row by looking for the next row ID
+                                    const allRows =
+                                        document.querySelectorAll(
+                                            '[data-row-id]',
+                                        );
+                                    const currentRowIndex = Array.from(
+                                        allRows,
+                                    ).findIndex(
+                                        (row) =>
+                                            row.getAttribute('data-row-id') ===
+                                            currentRowId,
+                                    );
+
+                                    // Find next row's pipeline name column
+                                    const nextRowElements = Array.from(
+                                        allRows,
+                                    ).slice(currentRowIndex + 1);
+                                    const nextPipelineNameCol =
+                                        nextRowElements.find(
+                                            (row) =>
+                                                row.getAttribute('data-col') ===
+                                                'pipelineName',
+                                        );
+                                    const nextInput =
+                                        nextPipelineNameCol?.querySelector(
+                                            'input',
+                                        ) as HTMLInputElement;
+
+                                    if (nextInput) {
+                                        // Use requestAnimationFrame to ensure DOM is updated
+                                        requestAnimationFrame(() => {
+                                            nextInput.focus();
+                                            nextInput.click();
+                                        });
+                                    }
+                                }
+                            };
+
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault(); // Prevent form submission
+                                e.stopPropagation(); // Stop event bubbling
+
+                                // Check for exact match first
+                                const exactMatch = options.find(
+                                    (opt) =>
+                                        opt.name.toLowerCase() ===
+                                        query.toLowerCase().trim(),
+                                );
+
+                                if (exactMatch) {
+                                    // Add existing service and navigate
+                                    toggleService(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    navigateToNextRow(
+                                        e.target as HTMLInputElement,
+                                    );
+                                } else {
+                                    // Create new service (same logic as addNew function)
+                                    try {
+                                        const created = await api.post<{
+                                            id: string;
+                                            name: string;
+                                        }>('/api/pipeline-services', {
+                                            name: query.trim(),
+                                        });
+
+                                        if (created) {
+                                            setOptions((prev) => {
+                                                const exists = prev.some(
+                                                    (o) => o.id === created!.id,
+                                                );
+                                                return exists
+                                                    ? prev
+                                                    : [...prev, created!];
+                                            });
+                                            // Add the new service to selection
+                                            toggleService(created.name);
+                                            setQuery('');
+                                            setOpen(false);
+
+                                            // Navigate to next row
+                                            navigateToNextRow(
+                                                e.target as HTMLInputElement,
+                                            );
+
+                                            // Notify parent component about the new item
+                                            if (onNewItemCreated) {
+                                                onNewItemCreated(
+                                                    'service',
+                                                    created,
+                                                );
+                                            }
+                                        }
+                                    } catch (error: any) {
+                                        // Handle duplicate error from backend
+                                        if (
+                                            error?.message?.includes(
+                                                'already exists',
+                                            ) ||
+                                            error?.message?.includes(
+                                                'duplicate',
+                                            )
+                                        ) {
+                                            // Try to find the existing item and add it to selection
+                                            const existingItem = options.find(
+                                                (opt) =>
+                                                    opt.name.toLowerCase() ===
+                                                    query.toLowerCase(),
+                                            );
+                                            if (existingItem) {
+                                                toggleService(
+                                                    existingItem.name,
+                                                );
+                                                setQuery('');
+                                                setOpen(false);
+                                                navigateToNextRow(
+                                                    e.target as HTMLInputElement,
+                                                );
+                                            }
+                                        } else {
+                                            console.error(
+                                                'Failed to create service:',
+                                                error,
+                                            );
+                                        }
+                                    }
+                                }
+                            } else if (e.key === 'Tab' && query.trim()) {
+                                // Check for exact match in all options when Tab is pressed
+                                const exactMatch = options.find(
+                                    (opt) =>
+                                        opt.name.toLowerCase() ===
+                                        query.toLowerCase().trim(),
+                                );
+                                if (exactMatch) {
+                                    e.preventDefault(); // Prevent default Tab behavior
+                                    e.stopPropagation(); // Stop event bubbling
+
+                                    // Add the service first
+                                    toggleService(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+
+                                    // Navigate to next row
+                                    navigateToNextRow(
+                                        e.target as HTMLInputElement,
+                                    );
+                                } else {
+                                    // No exact match found - prevent Tab and show message to use Enter or Add button
+                                    e.preventDefault(); // Prevent default Tab behavior
+                                    e.stopPropagation(); // Stop event bubbling
+                                    console.log(
+                                        'Tab blocked: Please press Enter or click Add button to create new service, or change the value',
+                                    );
+                                    // Keep focus on current field
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            }
+                        }}
+                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${
+                            isError
+                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                : 'border-blue-300 bg-white hover:bg-slate-50'
+                        } focus:outline-none focus:ring-2 ${
+                            isError
+                                ? 'focus:ring-red-200 focus:border-red-500'
+                                : 'focus:ring-blue-200 focus:border-blue-500'
+                        } text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        placeholder=''
+                    />
+                ) : (
+                    /* Show "Add more" button when services are selected and not actively typing */
+                    <button
+                        onClick={() => {
+                            setOpen(true);
+                            setQuery('');
+                            setShowMoreServices(false); // Close the more services dropdown
+                            // Focus the input field when "Add more" is clicked
+                            setTimeout(() => {
+                                inputRef.current?.focus();
+                            }, 10);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${
+                            isError
+                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'
+                        } transition-colors ${
+                            isError
+                                ? 'text-red-700 hover:bg-red-100'
+                                : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        + Add more
+                    </button>
+                )}
+            </div>
+
+            {open &&
+                dropdownPos &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxWidth: '300px',
+                        }}
+                    >
+                        <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
+                        <div className='py-1 text-[12px] px-3 space-y-2'>
+                            {loading ? (
+                                <div className='px-3 py-2 text-slate-500'>
+                                    Loading…
+                                </div>
+                            ) : (
+                                (() => {
+                                    const filteredOptions = options.filter(
+                                        (opt) => {
+                                            // First apply search filter
+                                            const matchesSearch = query
+                                                ? opt.name
+                                                      .toLowerCase()
+                                                      .includes(
+                                                          query.toLowerCase(),
+                                                      )
+                                                : true;
+
+                                            return matchesSearch;
+                                        },
+                                    );
+
+                                    const hasExactMatch =
+                                        query &&
+                                        options.some(
+                                            (opt) =>
+                                                opt.name.toLowerCase() ===
+                                                query.toLowerCase().trim(),
+                                        );
+
+                                    const showAddNew =
+                                        query.trim() && !hasExactMatch;
+
+                                    if (showAddNew) {
+                                        return (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const created =
+                                                            await api.post<{
+                                                                id: string;
+                                                                name: string;
+                                                            }>(
+                                                                '/api/pipeline-services',
+                                                                {
+                                                                    name: query.trim(),
+                                                                },
+                                                            );
+                                                        if (created) {
+                                                            setOptions(
+                                                                (prev) => [
+                                                                    ...prev,
+                                                                    created,
+                                                                ],
+                                                            );
+                                                            toggleService(
+                                                                created.name,
+                                                            );
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to create service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                                className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
+                                            >
+                                                <div className='flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'>
+                                                    <Plus size={12} />
+                                                </div>
+                                                <div className='flex-1'>
+                                                    <span className='text-sm text-blue-600 font-medium'>
+                                                        Add &quot;{query}&quot;
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    }
+
+                                    if (filteredOptions.length === 0) {
+                                        return (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                No matches
+                                            </div>
+                                        );
+                                    }
+
+                                    return filteredOptions.map((opt, idx) => {
+                                        const isSelected =
+                                            selectedServices.includes(opt.name);
+                                        const palette = [
+                                            {
+                                                bg: 'bg-blue-100',
+                                                hover: 'hover:bg-blue-200',
+                                                text: 'text-blue-700',
+                                            },
+                                            {
+                                                bg: 'bg-cyan-100',
+                                                hover: 'hover:bg-cyan-200',
+                                                text: 'text-cyan-700',
+                                            },
+                                            {
+                                                bg: 'bg-sky-100',
+                                                hover: 'hover:bg-sky-200',
+                                                text: 'text-sky-700',
+                                            },
+                                            {
+                                                bg: 'bg-indigo-100',
+                                                hover: 'hover:bg-indigo-200',
+                                                text: 'text-indigo-700',
+                                            },
+                                        ];
+                                        const tone =
+                                            palette[idx % palette.length];
+
+                                        return (
+                                            <DropdownOption
+                                                key={opt.id}
+                                                option={opt}
+                                                tone={tone}
+                                                type='service'
+                                                isInUse={isServiceInUse(
+                                                    opt.name,
+                                                )}
+                                                onSelect={() =>
+                                                    toggleService(opt.name)
+                                                }
+                                                onEdit={async (newName) => {
+                                                    try {
+                                                        // Update via API
+                                                        await api.put(
+                                                            `/api/pipeline-services/${opt.id}`,
+                                                            {
+                                                                name: newName,
+                                                            },
+                                                        );
+
+                                                        // Update local options
+                                                        setOptions((prev) =>
+                                                            prev.map((o) =>
+                                                                o.id === opt.id
+                                                                    ? {
+                                                                          ...o,
+                                                                          name: newName,
+                                                                      }
+                                                                    : o,
+                                                            ),
+                                                        );
+
+                                                        // Update selected services if this one was selected
+                                                        if (
+                                                            selectedServices.includes(
+                                                                opt.name,
+                                                            )
+                                                        ) {
+                                                            const updatedServices =
+                                                                selectedServices.map(
+                                                                    (s) =>
+                                                                        s ===
+                                                                        opt.name
+                                                                            ? newName
+                                                                            : s,
+                                                                );
+                                                            onChange(
+                                                                updatedServices.join(
+                                                                    ', ',
+                                                                ),
+                                                            );
+                                                        }
+
+                                                        // Notify parent component to update all rows
+                                                        if (
+                                                            onDropdownOptionUpdate
+                                                        ) {
+                                                            await onDropdownOptionUpdate(
+                                                                'service',
+                                                                'update',
+                                                                opt.name,
+                                                                newName,
+                                                            );
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to update service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                                onDelete={async () => {
+                                                    try {
+                                                        // Delete via API
+                                                        await api.del(
+                                                            `/api/pipeline-services/${opt.id}`,
+                                                        );
+
+                                                        // Remove from local options
+                                                        setOptions((prev) =>
+                                                            prev.filter(
+                                                                (o) =>
+                                                                    o.id !==
+                                                                    opt.id,
+                                                            ),
+                                                        );
+
+                                                        // Remove from selected services if it was selected
+                                                        if (
+                                                            selectedServices.includes(
+                                                                opt.name,
+                                                            )
+                                                        ) {
+                                                            const updatedServices =
+                                                                selectedServices.filter(
+                                                                    (s) =>
+                                                                        s !==
+                                                                        opt.name,
+                                                                );
+                                                            onChange(
+                                                                updatedServices.join(
+                                                                    ', ',
+                                                                ),
+                                                            );
+                                                        }
+
+                                                        // Notify parent component to update all rows
+                                                        if (
+                                                            onDropdownOptionUpdate
+                                                        ) {
+                                                            await onDropdownOptionUpdate(
+                                                                'service',
+                                                                'delete',
+                                                                opt.name,
+                                                            );
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(
+                                                            'Failed to delete service:',
+                                                            error,
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        );
+                                    });
+                                })()
+                            )}
+                        </div>
+                        {/* Only show bottom Add button when dropdown is open but no query is typed */}
+                        {!query.trim() && (
+                            <div className='border-t border-slate-200 px-3 py-2'>
+                                <button
+                                    onClick={() => {
+                                        setAdding('');
+                                        setShowAdder(true);
+                                    }}
+                                    className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
+                                >
+                                    <Plus size={14} />
+                                    <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
+                                        Add new service
+                                    </span>
+                                </button>
+                                {showAdder && (
+                                    <div className='mt-2 overflow-hidden'>
+                                        {(() => {
+                                            const similarMatch = adding.trim()
+                                                ? options.find(
+                                                      (opt) =>
+                                                          opt.name.toLowerCase() ===
+                                                          adding
+                                                              .trim()
+                                                              .toLowerCase(),
+                                                  )
+                                                : null;
+
+                                            return (
+                                                <>
+                                                    <div className='flex items-center gap-2'>
+                                                        <motion.input
+                                                            initial={{
+                                                                x: -12,
+                                                                opacity: 0,
+                                                            }}
+                                                            animate={{
+                                                                x: 0,
+                                                                opacity: 1,
+                                                            }}
+                                                            transition={{
+                                                                type: 'spring',
+                                                                stiffness: 420,
+                                                                damping: 28,
+                                                            }}
+                                                            value={adding}
+                                                            onChange={(
+                                                                e: any,
+                                                            ) =>
+                                                                setAdding(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            onKeyDown={(
+                                                                e: any,
+                                                            ) => {
+                                                                if (
+                                                                    e.key ===
+                                                                    'Enter'
+                                                                )
+                                                                    addNew();
+                                                                if (
+                                                                    e.key ===
+                                                                    'Escape'
+                                                                )
+                                                                    setShowAdder(
+                                                                        false,
+                                                                    );
+                                                            }}
+                                                            placeholder=''
+                                                            className={`flex-1 rounded border px-2 py-1 text-[12px] ${
+                                                                similarMatch
+                                                                    ? 'border-amber-400 bg-amber-50'
+                                                                    : 'border-slate-300'
+                                                            }`}
+                                                        />
+                                                        <button
+                                                            onClick={addNew}
+                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] ${
+                                                                similarMatch
+                                                                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                                                    : 'bg-violet-600 hover:bg-violet-700 text-white'
+                                                            }`}
+                                                        >
+                                                            {similarMatch
+                                                                ? 'Add Existing'
+                                                                : 'Add'}
+                                                        </button>
+                                                    </div>
+                                                    {similarMatch && (
+                                                        <motion.div
+                                                            initial={{
+                                                                opacity: 0,
+                                                                height: 0,
+                                                            }}
+                                                            animate={{
+                                                                opacity: 1,
+                                                                height: 'auto',
+                                                            }}
+                                                            className='mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800'
+                                                        >
+                                                            <span className='font-medium'>
+                                                                ⚠️ Similar
+                                                                service exists:
+                                                            </span>{' '}
+                                                            &quot;
+                                                            {similarMatch.name}
+                                                            &quot;
+                                                            <br />
+                                                            <span className='text-amber-600'>
+                                                                Click &quot;Add
+                                                                Existing&quot;
+                                                                to select it
+                                                                instead of
+                                                                creating a
+                                                                duplicate.
+                                                            </span>
+                                                        </motion.div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>,
+                    document.body,
+                )}
+        </div>
+    );
+}
+
+function AsyncChipSelect({
+    type,
+    value,
+    onChange,
+    placeholder,
+    isError = false,
+    compact,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    pipelines = [],
+    currentRowId,
+    currentRowPipelineName,
+    currentRowDetails,
+}: {
+    type: CatalogType;
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    compact?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        item: {id: string; name: string},
+    ) => void;
+    pipelines?: PipelineCanvasRow[];
+    currentRowId?: string;
+    currentRowPipelineName?: string;
+    currentRowDetails?: string;
+}) {
+    const [open, setOpen] = React.useState(false);
+    const [current, setCurrent] = React.useState<string | undefined>(value);
+    const [query, setQuery] = React.useState('');
+    const [options, setOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
+    const [allOptions, setAllOptions] = React.useState<
+        {id: string; name: string}[]
+    >([]);
+    const [loading, setLoading] = React.useState(false);
+    const [adding, setAdding] = React.useState('');
+    const [showAdder, setShowAdder] = React.useState(false);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    // Helper function to check if an option is in use (with composite key constraint)
+    const isOptionInUse = React.useCallback(
+        (optionName: string): boolean => {
+            if (!pipelines || pipelines.length === 0) return false;
+
+            return pipelines.some((pipeline) => {
+                // Skip the current row being edited
+                if (currentRowId && pipeline.id === currentRowId) {
+                    return false;
+                }
+
+                if (type === 'pipelineName') {
+                    // Never filter pipeline names - show all options
+                    return false;
+                } else if (type === 'details') {
+                    // For details, check if this detail is already paired with the current pipeline name
+                    const currentPipelineName = currentRowPipelineName || '';
+
+                    if (currentPipelineName) {
+                        // Check if this detail is already used with the selected pipeline
+                        const isUsedWithCurrentPipeline =
+                            pipeline.pipelineName === currentPipelineName &&
+                            pipeline.details === optionName;
+
+                        return isUsedWithCurrentPipeline;
+                    }
+                    // If no pipeline name is selected yet, don't filter anything
+                    return false;
+                } else if (type === 'service') {
+                    const services =
+                        pipeline.service?.split(', ').filter(Boolean) || [];
+                    return services.includes(optionName);
+                }
+                return false;
+            });
+        },
+        [pipelines, type, currentRowId, currentRowPipelineName],
+    );
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const [dropdownPosition, setDropdownPosition] = React.useState<
+        'below' | 'above'
+    >('below');
+    const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    // Portal-based dropdown to avoid table clipping
+
+    // Function to calculate optimal dropdown position
+    const calculateDropdownPosition = React.useCallback(() => {
+        if (!containerRef.current) return;
+
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer =
+            containerRef.current.closest('.compact-table') ||
+            containerRef.current.closest('[role="table"]') ||
+            containerRef.current.closest('.rounded-xl') ||
+            containerRef.current.closest('.overflow-auto') ||
+            containerRef.current.closest('.w-full.compact-table') ||
+            document.querySelector('.compact-table') ||
+            document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(
+            120,
+            tableRect.width - 64,
+            viewportWidth - 64,
+        ); // Reduced to match dropdown width
+        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+
+        // Ensure dropdown stays within table container horizontally with more padding
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(
+            tableRect.right - width - 32,
+            viewportWidth - width - 32,
+        ); // More padding
+        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        let top;
+        if (
+            spaceBelow >= dropdownHeight ||
+            (spaceBelow >= spaceAbove && spaceBelow >= 150)
+        ) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+            // Ensure it doesn't go below table bounds
+            if (top + dropdownHeight > tableRect.bottom) {
+                top = Math.max(
+                    tableRect.top + 10,
+                    containerRect.top - dropdownHeight - 4,
+                );
+                setDropdownPosition('above');
+            }
+        } else {
+            setDropdownPosition('above');
+            top = Math.max(
+                tableRect.top + 10,
+                containerRect.top - dropdownHeight - 4,
+            );
+        }
+
+        // Final constraint to ensure dropdown is within table bounds
+        top = Math.max(top, tableRect.top + 10);
+        top = Math.min(top, tableRect.bottom - 100);
+
+        setDropdownPortalPos({top, left, width});
+        console.log('📍 Dropdown position calculated:', {
+            top,
+            left,
+            width,
+            position: spaceBelow >= dropdownHeight ? 'below' : 'above',
+            tableRect,
+        });
+    }, []);
+
+    // Calculate position when dropdown opens
+    React.useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            // Recalculate on scroll or resize
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    // Separate function to load all options (called once when dropdown opens)
+    const loadAllOptions = React.useCallback(async () => {
+        setLoading(true);
+        try {
+            let allData: Array<{id: string; name: string}> = [];
+
+            console.log(`Loading options for type: ${type}`);
+
+            if (type === 'details') {
+                console.log('Calling API: /api/pipeline-details');
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
+                        '/api/pipeline-details',
+                    )) || [];
+            } else if (type === 'service') {
+                console.log('Calling API: /api/pipeline-services');
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
+                        '/api/pipeline-services',
+                    )) || [];
+            } else {
+                console.log('Calling API: /api/pipelines');
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
+                        '/api/pipelines',
+                    )) || [];
+            }
+
+            console.log(
+                `API call successful for ${type}, got ${allData.length} items:`,
+                allData,
+            );
+            setAllOptions(allData);
+        } catch (error) {
+            console.error(`API call failed for ${type}:`, error);
+            setAllOptions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [type]);
+
+    // Function to filter options based on current query and other criteria
+    const filterOptions = React.useCallback(() => {
+        if (allOptions.length === 0) return;
+
+        let filtered = allOptions;
+
+        // Apply search filter
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter((opt) =>
+                opt.name.toLowerCase().startsWith(queryLower),
+            );
+
+            // Sort filtered results: exact matches first, then alphabetical
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+
+                // Exact match comes first
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+
+                // Otherwise alphabetical order
+                return aLower.localeCompare(bLower);
+            });
+        }
+
+        // Apply usage filter for details
+        if (type === 'details') {
+            filtered = filtered.filter((detail) => !isOptionInUse(detail.name));
+        }
+
+        setOptions(filtered);
+    }, [allOptions, query, type, isOptionInUse]);
+
+    // Filter options when query or allOptions change
+    React.useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    // Load options when dropdown opens
+    React.useEffect(() => {
+        if (open && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, loadAllOptions]);
+
+    // Reload options when currentRowPipelineName changes (for details filtering)
+    React.useEffect(() => {
+        if (type === 'details' && currentRowPipelineName) {
+            // Reset allOptions to force reload with new pipeline context
+            setAllOptions([]);
+        }
+    }, [currentRowPipelineName, type]);
+
+    React.useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+                setShowAdder(false);
+                setAdding('');
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    const addNew = async () => {
+        const name = (adding || query || '').trim();
+        if (!name) return;
+
+        // Check for existing entries (case-insensitive)
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            // If exact match exists, select it instead of creating new
+            onChange(existingMatch.name);
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+            setOpen(false);
+            return;
+        }
+
+        try {
+            let created: {id: string; name: string} | null = null;
+            if (type === 'details') {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/pipeline-details',
+                    {name},
+                );
+            } else if (type === 'service') {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/pipeline-services',
+                    {name},
+                );
+            } else {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/pipelines',
+                    {name},
+                );
+            }
+            if (created) {
+                // Inject newly created into the current dropdown list and select it
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === created!.id);
+                    return exists ? prev : [...prev, created!];
+                });
+                // Also add to allOptions for future exact match checking
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === created!.id);
+                    return exists ? prev : [...prev, created!];
+                });
+                onChange(created.name);
+                setShowAdder(false);
+                setAdding('');
+                setQuery('');
+                setOpen(false);
+
+                // Notify parent component about the new item
+                if (onNewItemCreated) {
+                    const dropdownType =
+                        type === 'pipelineName'
+                            ? 'pipelineNames'
+                            : type === 'details'
+                            ? 'details'
+                            : 'service';
+                    onNewItemCreated(dropdownType, created);
+                }
+            }
+        } catch (error: any) {
+            console.error(`Failed to create ${type}:`, error);
+            // Handle duplicate error from backend
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                // Try to find the existing item and select it
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setOpen(false);
+                }
+            }
+        } finally {
+            setShowAdder(false);
+            setAdding('');
+            setQuery('');
+        }
+    };
+
+    React.useEffect(() => {
+        setCurrent(value);
+    }, [value]);
+
+    const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
+    return (
+        <div
+            ref={containerRef}
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%'}}
+        >
+            <div
+                className='relative w-full flex items-center gap-1'
+                style={{width: '100%'}}
+            >
+                {/* Show selected value as chip when there's a value and not actively typing */}
+                {(current || value) && !open && (
+                    <motion.span
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
+                        style={{width: '100%', minWidth: '100%'}}
+                        title={current || value}
+                        onClick={(e: any) => {
+                            const target = e.target as HTMLElement;
+                            if (!target.closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>
+                            {current || value}
+                        </span>
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                )}
+
+                {/* Show input when no value selected or actively typing */}
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+
+                            // Always open dropdown when typing
+                            setOpen(true);
+
+                            // Load options if not already loaded
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
+                            }
+
+                            // Clear current selection if user clears the input completely
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            // Open dropdown on focus to show available options immediately
+                            setOpen(true);
+
+                            // Load options if not already loaded
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
+                            }
+                        }}
+                        onKeyDown={async (e: any) => {
+                            // Helper function to navigate to next field
+                            const navigateToNextField = (
+                                currentElement: HTMLInputElement,
+                            ) => {
+                                // Find the closest div with data-col attribute (current column)
+                                const currentColDiv =
+                                    currentElement.closest('[data-col]');
+                                const currentRowId =
+                                    currentColDiv?.getAttribute('data-row-id');
+
+                                if (currentRowId && currentColDiv) {
+                                    const currentCol =
+                                        currentColDiv.getAttribute('data-col');
+                                    let nextCol = '';
+
+                                    // Determine next column based on current column
+                                    if (currentCol === 'pipelineName') {
+                                        nextCol = 'details';
+                                    } else if (currentCol === 'details') {
+                                        nextCol = 'service';
+                                    }
+
+                                    if (nextCol) {
+                                        // Find the next column in the same row
+                                        const nextColDiv =
+                                            document.querySelector(
+                                                `[data-row-id="${currentRowId}"][data-col="${nextCol}"]`,
+                                            );
+
+                                        if (nextCol === 'service') {
+                                            // For Services column, we need to handle both input and button cases
+                                            let nextInput =
+                                                nextColDiv?.querySelector(
+                                                    'input',
+                                                ) as HTMLInputElement;
+                                            const addMoreButton =
+                                                nextColDiv?.querySelector(
+                                                    'button',
+                                                ) as HTMLButtonElement;
+
+                                            console.log(
+                                                'Navigating to Services field:',
+                                                {
+                                                    nextColDiv: !!nextColDiv,
+                                                    nextInput: !!nextInput,
+                                                    addMoreButton:
+                                                        !!addMoreButton,
+                                                    rowId: currentRowId,
+                                                },
+                                            );
+
+                                            if (!nextInput && addMoreButton) {
+                                                // If no input visible, click the "Add more" button to show input
+                                                console.log(
+                                                    'Clicking Add more button to show Services input',
+                                                );
+                                                addMoreButton.click();
+                                                // Wait for the input to appear and then focus it
+                                                setTimeout(() => {
+                                                    nextInput =
+                                                        nextColDiv?.querySelector(
+                                                            'input',
+                                                        ) as HTMLInputElement;
+                                                    console.log(
+                                                        'After clicking button, input found:',
+                                                        !!nextInput,
+                                                    );
+                                                    if (nextInput) {
+                                                        nextInput.focus();
+                                                        nextInput.click();
+                                                        console.log(
+                                                            'Services input focused successfully',
+                                                        );
+                                                    }
+                                                }, 100); // Increased timeout for better reliability
+                                            } else if (nextInput) {
+                                                // Input is already visible, focus it
+                                                console.log(
+                                                    'Services input already visible, focusing',
+                                                );
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                    console.log(
+                                                        'Services input focused directly',
+                                                    );
+                                                });
+                                            } else {
+                                                console.log(
+                                                    'Could not find Services input or button',
+                                                );
+                                            }
+                                        } else {
+                                            // For other columns, just find the input
+                                            const nextInput =
+                                                nextColDiv?.querySelector(
+                                                    'input',
+                                                ) as HTMLInputElement;
+
+                                            if (nextInput) {
+                                                // Use requestAnimationFrame to ensure DOM is updated
+                                                requestAnimationFrame(() => {
+                                                    nextInput.focus();
+                                                    nextInput.click();
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault(); // Prevent form submission
+                                e.stopPropagation(); // Stop event bubbling
+
+                                // Check for exact match first
+                                const exactMatch = allOptions.find(
+                                    (opt) =>
+                                        opt.name.toLowerCase() ===
+                                        query.toLowerCase().trim(),
+                                );
+
+                                if (exactMatch) {
+                                    // Select existing value and navigate
+                                    onChange(exactMatch.name);
+                                    setCurrent(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    navigateToNextField(
+                                        e.target as HTMLInputElement,
+                                    );
+                                } else {
+                                    // Create new entry (same logic as Add button)
+                                    try {
+                                        let created: {
+                                            id: string;
+                                            name: string;
+                                        } | null = null;
+
+                                        if (type === 'pipelineName') {
+                                            created = await api.post<{
+                                                id: string;
+                                                name: string;
+                                            }>('/api/pipelines', {
+                                                name: query.trim(),
+                                            });
+                                        } else if (type === 'details') {
+                                            created = await api.post<{
+                                                id: string;
+                                                name: string;
+                                            }>('/api/pipeline-details', {
+                                                name: query.trim(),
+                                            });
+                                        } else if (type === 'service') {
+                                            created = await api.post<{
+                                                id: string;
+                                                name: string;
+                                            }>('/api/pipeline-services', {
+                                                name: query.trim(),
+                                            });
+                                        }
+
+                                        if (created) {
+                                            setOptions((prev) => [
+                                                ...prev,
+                                                created!,
+                                            ]);
+                                            setAllOptions((prev) => [
+                                                ...prev,
+                                                created!,
+                                            ]);
+                                            onChange(created.name);
+                                            setCurrent(created.name);
+                                            setQuery('');
+                                            setOpen(false);
+
+                                            // Navigate to next field
+                                            navigateToNextField(
+                                                e.target as HTMLInputElement,
+                                            );
+
+                                            // Notify parent component about the new item
+                                            if (onNewItemCreated) {
+                                                const dropdownType =
+                                                    type === 'pipelineName'
+                                                        ? 'pipelineNames'
+                                                        : type === 'details'
+                                                        ? 'details'
+                                                        : 'service';
+                                                onNewItemCreated(
+                                                    dropdownType,
+                                                    created,
+                                                );
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error(
+                                            `Failed to create ${type}:`,
+                                            error,
+                                        );
+                                    }
+                                }
+                            } else if (e.key === 'Tab') {
+                                // Always handle Tab with our custom navigation
+                                e.preventDefault(); // Always prevent default Tab behavior
+                                e.stopPropagation(); // Stop event bubbling
+
+                                if (query.trim()) {
+                                    // Check for exact match in all options when Tab is pressed
+                                    const exactMatch = allOptions.find(
+                                        (opt) =>
+                                            opt.name.toLowerCase() ===
+                                            query.toLowerCase().trim(),
+                                    );
+
+                                    if (exactMatch) {
+                                        // Set the value first
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+
+                                        // Navigate to next field
+                                        navigateToNextField(
+                                            e.target as HTMLInputElement,
+                                        );
+                                    } else {
+                                        // No exact match found - commit the current query value and move to next field
+                                        console.log(
+                                            'Tab: Moving to next field and committing current query value:',
+                                            query.trim(),
+                                        );
+
+                                        // Commit the current query value (even if it doesn't match existing options)
+                                        onChange(query.trim());
+                                        setCurrent(query.trim());
+                                        setQuery('');
+                                        setOpen(false);
+
+                                        navigateToNextField(
+                                            e.target as HTMLInputElement,
+                                        );
+                                    }
+                                } else {
+                                    // Empty field - just navigate to next field
+                                    setOpen(false);
+                                    navigateToNextField(
+                                        e.target as HTMLInputElement,
+                                    );
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            }
+                        }}
+                        onBlur={() => {
+                            setTimeout(() => {
+                                if (!open) {
+                                    const exactMatch = allOptions.find(
+                                        (opt) =>
+                                            opt.name.toLowerCase() ===
+                                            (query || '').toLowerCase().trim(),
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                    } else if (
+                                        query &&
+                                        query !== (current || value)
+                                    ) {
+                                        // Keep the typed value for potential creation
+                                    } else if (!query) {
+                                        setQuery('');
+                                    }
+                                    setQuery('');
+                                }
+                            }, 150);
+                        }}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${
+                            isError
+                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                : 'border-blue-300 bg-white hover:bg-slate-50'
+                        } text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${
+                            isError
+                                ? 'focus:ring-red-200 focus:border-red-500'
+                                : 'focus:ring-blue-200 focus:border-blue-500'
+                        }`}
+                        placeholder=''
+                    />
+                ) : null}
+            </div>
+
+            {/* Full Autocomplete Dropdown - Portal Based */}
+            {open &&
+                dropdownPortalPos &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: `${Math.min(
+                                dropdownPortalPos.width,
+                                180,
+                            )}px`,
+                            maxWidth: '180px',
+                            minWidth: '140px',
+                        }}
+                    >
+                        <div className='py-1'>
+                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
+                                {loading ? (
+                                    <div className='px-3 py-2 text-slate-500'>
+                                        Loading…
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        // Filter options that match the query (show all if no query)
+                                        const filteredOptions = query.trim()
+                                            ? options
+                                                  .filter(
+                                                      (opt) =>
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .startsWith(
+                                                                  query.toLowerCase(),
+                                                              ) ||
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .includes(
+                                                                  query.toLowerCase(),
+                                                              ),
+                                                  )
+                                                  .sort((a, b) => {
+                                                      const aLower =
+                                                          a.name.toLowerCase();
+                                                      const bLower =
+                                                          b.name.toLowerCase();
+                                                      const queryLower =
+                                                          query.toLowerCase();
+
+                                                      // Prioritize starts with matches
+                                                      const aStartsWith =
+                                                          aLower.startsWith(
+                                                              queryLower,
+                                                          );
+                                                      const bStartsWith =
+                                                          bLower.startsWith(
+                                                              queryLower,
+                                                          );
+
+                                                      if (
+                                                          aStartsWith &&
+                                                          !bStartsWith
+                                                      )
+                                                          return -1;
+                                                      if (
+                                                          bStartsWith &&
+                                                          !aStartsWith
+                                                      )
+                                                          return 1;
+
+                                                      return aLower.localeCompare(
+                                                          bLower,
+                                                      );
+                                                  })
+                                            : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+
+                                        console.log(
+                                            `Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`,
+                                            filteredOptions,
+                                        );
+
+                                        // Check if query exactly matches an existing option
+                                        const exactMatch = query.trim()
+                                            ? options.find(
+                                                  (opt) =>
+                                                      opt.name.toLowerCase() ===
+                                                      query
+                                                          .toLowerCase()
+                                                          .trim(),
+                                              )
+                                            : null;
+
+                                        const showCreateNew =
+                                            query.trim() && !exactMatch;
+
+                                        return (
+                                            <div>
+                                                {/* Show existing matching options */}
+                                                {filteredOptions.length > 0 && (
+                                                    <div>
+                                                        {filteredOptions.map(
+                                                            (opt, idx) => (
+                                                                <div
+                                                                    key={opt.id}
+                                                                    onClick={() => {
+                                                                        onChange(
+                                                                            opt.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            opt.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+                                                                    }}
+                                                                    className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
+                                                                >
+                                                                    {opt.name}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Show "Create New" option */}
+                                                {showCreateNew && (
+                                                    <div className='border-t border-slate-200'>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    let created: {
+                                                                        id: string;
+                                                                        name: string;
+                                                                    } | null =
+                                                                        null;
+
+                                                                    if (
+                                                                        type ===
+                                                                        'pipelineName'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/pipelines',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'details'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/pipeline-details',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'service'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/pipeline-services',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    }
+
+                                                                    if (
+                                                                        created
+                                                                    ) {
+                                                                        // Update options list
+                                                                        setOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+                                                                        setAllOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+
+                                                                        // Set the new value
+                                                                        onChange(
+                                                                            created.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            created.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+
+                                                                        // Notify parent component
+                                                                        if (
+                                                                            onNewItemCreated
+                                                                        ) {
+                                                                            const dropdownType =
+                                                                                type ===
+                                                                                'pipelineName'
+                                                                                    ? 'pipelineNames'
+                                                                                    : type ===
+                                                                                      'details'
+                                                                                    ? 'details'
+                                                                                    : 'service';
+                                                                            onNewItemCreated(
+                                                                                dropdownType,
+                                                                                created,
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.log(
+                                                                        `API creation failed for ${type}, creating local entry`,
+                                                                    );
+
+                                                                    // Fallback: create a local entry when API fails
+                                                                    const newId = `local-${Date.now()}-${Math.random()
+                                                                        .toString(
+                                                                            36,
+                                                                        )
+                                                                        .substr(
+                                                                            2,
+                                                                            9,
+                                                                        )}`;
+                                                                    const created =
+                                                                        {
+                                                                            id: newId,
+                                                                            name: query.trim(),
+                                                                        };
+
+                                                                    // Update options list
+                                                                    setOptions(
+                                                                        (
+                                                                            prev,
+                                                                        ) => [
+                                                                            ...prev,
+                                                                            created,
+                                                                        ],
+                                                                    );
+                                                                    setAllOptions(
+                                                                        (
+                                                                            prev,
+                                                                        ) => [
+                                                                            ...prev,
+                                                                            created,
+                                                                        ],
+                                                                    );
+
+                                                                    // Set the new value
+                                                                    onChange(
+                                                                        created.name,
+                                                                    );
+                                                                    setCurrent(
+                                                                        created.name,
+                                                                    );
+                                                                    setQuery(
+                                                                        '',
+                                                                    );
+                                                                    setOpen(
+                                                                        false,
+                                                                    );
+
+                                                                    // Notify parent component
+                                                                    if (
+                                                                        onNewItemCreated
+                                                                    ) {
+                                                                        const dropdownType =
+                                                                            type ===
+                                                                            'pipelineName'
+                                                                                ? 'pipelineNames'
+                                                                                : type ===
+                                                                                  'details'
+                                                                                ? 'details'
+                                                                                : 'service';
+                                                                        onNewItemCreated(
+                                                                            dropdownType,
+                                                                            created,
+                                                                        );
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
+                                                        >
+                                                            + Create &quot;
+                                                            {query.trim()}&quot;
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Show "No results" message */}
+                                                {filteredOptions.length === 0 &&
+                                                    !showCreateNew && (
+                                                        <div className='px-3 py-2 text-center text-sm text-slate-500'>
+                                                            {query.trim() ? (
+                                                                <div>
+                                                                    No {type}s
+                                                                    found
+                                                                    matching
+                                                                    &quot;
+                                                                    {query}
+                                                                    &quot;
+                                                                </div>
+                                                            ) : (
+                                                                <div>
+                                                                    No {type}s
+                                                                    available
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        );
+                                    })()
+                                )}
+                            </div>
+                        </div>
+                    </div>,
+                    document.body,
+                )}
+        </div>
+    );
+}
+
+interface PipelineCanvasTableProps {
+    rows: PipelineCanvasRow[];
+    onEdit: (id: string) => void;
+    onDelete: (id: string) => void;
+    title?: string;
+    groupByExternal?: 'none' | 'pipelineName' | 'service' | 'status';
+    onGroupByChange?: (
+        g: 'none' | 'pipelineName' | 'service' | 'status',
+    ) => void;
+    hideControls?: boolean;
+    visibleColumns?: Array<
+        | 'pipelineName'
+        | 'details'
+        | 'service'
+        | 'status'
+        | 'lastUpdated'
+        | 'createdBy'
+        | 'actions'
+    >;
+    highlightQuery?: string;
+    customColumnLabels?: Record<string, string>;
+    enableDropdownChips?: boolean;
+    dropdownOptions?: {
+        services?: Array<{id: string; name: string}>;
+        statuses?: Array<{id: string; name: string}>;
+    };
+    onUpdateField?: (rowId: string, field: string, value: any) => void;
+    hideRowExpansion?: boolean;
+    enableInlineEditing?: boolean;
+    incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
+    hasBlankRow?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        item: {id: string; name: string},
+    ) => void;
+    onShowAllColumns?: () => void;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    triggerValidation?: boolean; // Trigger validation highlighting
+    onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
+    onAddNewRow?: () => void; // Callback to add a new row
+    externalSortColumn?: string; // External sort column from parent
+    externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
+    onSortChange?: (column: string, direction: 'asc' | 'desc') => void; // Callback when sort changes from column headers
+    isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
+}
+
+function SortablePipelineCanvasRow({
+    row,
+    index,
+    onEdit,
+    onDelete,
+    cols,
+    gridTemplate,
+    highlightQuery,
+    customColumns = [],
+    isExpanded,
+    onToggle,
+    expandedContent,
+    onUpdateField,
+    isSelected,
+    onSelect,
+    onStartFill,
+    inFillRange,
+    pinFirst,
+    firstColWidth,
+    hideRowExpansion = false,
+    enableDropdownChips = false,
+    shouldShowHorizontalScroll = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    isCellMissing = () => false,
+    compressingRowId = null,
+    foldingRowId = null,
+    allRows = [],
+    onDeleteClick,
+}: {
+    row: PipelineCanvasRow;
+    index: number;
+    onEdit: (id: string) => void;
+    onDelete: (id: string) => void;
+    cols: string[];
+    gridTemplate: string;
+    highlightQuery?: string;
+    customColumns?: string[];
+    isExpanded: boolean;
+    onToggle: (id: string) => void;
+    expandedContent?: React.ReactNode;
+    onUpdateField: (
+        rowId: string,
+        key: keyof PipelineCanvasRow,
+        value: any,
+    ) => void;
+    isSelected: boolean;
+    onSelect: (id: string) => void;
+    onStartFill: (
+        rowId: string,
+        col: keyof PipelineCanvasRow,
+        value: string,
+    ) => void;
+    inFillRange: boolean;
+    pinFirst?: boolean;
+    firstColWidth?: string;
+    hideRowExpansion?: boolean;
+    enableDropdownChips?: boolean;
+    shouldShowHorizontalScroll?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'pipelineNames' | 'details' | 'service',
+        item: {id: string; name: string},
+    ) => void;
+    isCellMissing?: (rowId: string, field: string) => boolean;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    allRows?: PipelineCanvasRow[];
+    onDeleteClick?: (rowId: string) => void;
+}) {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [menuUp, setMenuUp] = useState(false);
+    const actionsRef = useRef<HTMLDivElement>(null);
+    const [menuPos, setMenuPos] = useState<{top: number; left: number} | null>(
+        null,
+    );
+    const [isRowHovered, setIsRowHovered] = useState(false);
+
+    // Tab navigation state and logic
+    const editableCols = cols.filter((col) =>
+        [
+            'pipelineName',
+            'details',
+            'service',
+            'status',
+            'lastUpdated',
+        ].includes(col),
+    );
+
+    const createTabNavigation = (currentCol: string) => {
+        const currentIndex = editableCols.indexOf(currentCol);
+
+        const onTabNext = () => {
+            const nextIndex = currentIndex + 1;
+            if (nextIndex < editableCols.length) {
+                const nextCol = editableCols[nextIndex];
+                // Focus the next cell
+                setTimeout(() => {
+                    // First try to find an existing input (if already in edit mode)
+                    let nextInput = document.querySelector(
+                        `[data-row-id="${row.id}"][data-col="${nextCol}"] input`,
+                    ) as HTMLInputElement;
+
+                    if (nextInput) {
+                        nextInput.focus();
+                    } else {
+                        // If no input found, trigger edit mode by clicking the InlineEditableText span
+                        const nextCellSpan = document.querySelector(
+                            `[data-row-id="${row.id}"][data-col="${nextCol}"] span[data-inline]`,
+                        ) as HTMLElement;
+                        if (nextCellSpan) {
+                            nextCellSpan.click();
+                            // After click, try to find the input again
+                            setTimeout(() => {
+                                nextInput = document.querySelector(
+                                    `[data-row-id="${row.id}"][data-col="${nextCol}"] input`,
+                                ) as HTMLInputElement;
+                                if (nextInput) {
+                                    nextInput.focus();
+                                    nextInput.select(); // Select all text for immediate editing
+                                }
+                            }, 50);
+                        }
+                    }
+                }, 10);
+            }
+        };
+
+        const onTabPrev = () => {
+            const prevIndex = currentIndex - 1;
+            if (prevIndex >= 0) {
+                const prevCol = editableCols[prevIndex];
+                // Focus the previous cell
+                setTimeout(() => {
+                    // First try to find an existing input (if already in edit mode)
+                    let prevInput = document.querySelector(
+                        `[data-row-id="${row.id}"][data-col="${prevCol}"] input`,
+                    ) as HTMLInputElement;
+
+                    if (prevInput) {
+                        prevInput.focus();
+                    } else {
+                        // If no input found, trigger edit mode by clicking the InlineEditableText span
+                        const prevCellSpan = document.querySelector(
+                            `[data-row-id="${row.id}"][data-col="${prevCol}"] span[data-inline]`,
+                        ) as HTMLElement;
+                        if (prevCellSpan) {
+                            prevCellSpan.click();
+                            // After click, try to find the input again
+                            setTimeout(() => {
+                                prevInput = document.querySelector(
+                                    `[data-row-id="${row.id}"][data-col="${prevCol}"] input`,
+                                ) as HTMLInputElement;
+                                if (prevInput) {
+                                    prevInput.focus();
+                                    prevInput.select(); // Select all text for immediate editing
+                                }
+                            }, 50);
+                        }
+                    }
+                }, 10);
+            }
+        };
+
+        return {onTabNext, onTabPrev};
+    };
+
+    const toggleMenu = () => {
+        const rect = actionsRef.current?.getBoundingClientRect();
+        if (rect) {
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setMenuUp(spaceBelow < 160);
+            const dropdownHeight = 120;
+            const width = 112; // w-28
+            const top =
+                spaceBelow < 160
+                    ? rect.top - 8 - dropdownHeight
+                    : rect.bottom + 8;
+            const left = Math.max(8, rect.right - width);
+            setMenuPos({top, left});
+        }
+        setMenuOpen((s) => !s);
+    };
+    const highlightText = (text: string) => {
+        const q = (highlightQuery || '').trim();
+        if (!q) return <>{text}</>;
+        try {
+            const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(${esc})`, 'ig');
+            const parts = text.split(re);
+            return (
+                <>
+                    {parts.map((part, i) =>
+                        re.test(part) ? (
+                            <mark
+                                key={i}
+                                className='bg-yellow-200 px-0.5 rounded'
+                            >
+                                {part}
+                            </mark>
+                        ) : (
+                            <span key={i}>{part}</span>
+                        ),
+                    )}
+                </>
+            );
+        } catch {
+            return <>{text}</>;
+        }
+    };
+    const Chip = ({
+        text,
+        tone,
+    }: {
+        text: string;
+        tone: 'slate' | 'blue' | 'sky' | 'indigo' | 'cyan';
+    }) => {
+        const toneMap: Record<
+            string,
+            {bg: string; text: string; border: string; dot: string}
+        > = {
+            blue: {
+                bg: 'bg-white',
+                text: 'text-black',
+                border: '',
+                dot: 'bg-blue-400',
+            },
+            sky: {
+                bg: 'bg-sky-50',
+                text: 'text-sky-800',
+                border: 'border-sky-200',
+                dot: 'bg-sky-400',
+            },
+            indigo: {
+                bg: 'bg-indigo-50',
+                text: 'text-indigo-800',
+                border: 'border-indigo-200',
+                dot: 'bg-indigo-400',
+            },
+            cyan: {
+                bg: 'bg-cyan-50',
+                text: 'text-cyan-800',
+                border: 'border-cyan-200',
+                dot: 'bg-cyan-400',
+            },
+            slate: {
+                bg: 'bg-slate-50',
+                text: 'text-slate-800',
+                border: 'border-slate-200',
+                dot: 'bg-slate-400',
+            },
+        };
+        const t = toneMap[tone] || toneMap.slate;
+        return (
+            <motion.span
+                initial={{scale: 0.95, opacity: 0}}
+                animate={{scale: 1, opacity: 1}}
+                whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
+                transition={{type: 'spring', stiffness: 480, damping: 30}}
+                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis rounded ${t.bg} ${t.text} ${t.border}`}
+                title={text}
+            >
+                <span className='truncate'>{text}</span>
+            </motion.span>
+        );
+    };
+
+    return (
+        <div
+            id={row.id}
+            data-pipeline-id={row.id}
+            onMouseEnter={() => setIsRowHovered(true)}
+            onMouseLeave={() => setIsRowHovered(false)}
+            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+                isSelected
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200'
+                    : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
+            } ${
+                index % 2 === 0
+                    ? isSelected
+                        ? ''
+                        : 'bg-white'
+                    : isSelected
+                    ? ''
+                    : 'bg-slate-50/70'
+            } ${isSelected ? 'border-blue-300' : 'border-slate-200'} ${
+                inFillRange ? 'bg-primary-50/40' : ''
+            } ${isExpanded ? 'bg-primary-50' : ''} ${
+                compressingRowId === row.id
+                    ? 'transform scale-x-75 transition-all duration-500 ease-out'
+                    : ''
+            } ${
+                foldingRowId === row.id
+                    ? 'opacity-0 transform scale-y-50 transition-all duration-300'
+                    : ''
+            }`}
+            style={{
+                gridTemplateColumns: gridTemplate,
+                willChange: 'transform',
+                display: 'grid',
+                minWidth: 'max-content',
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
+            }}
+            onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
+                onSelect(row.id);
+            }}
+        >
+            {/* Action Buttons Column - Always first */}
+            <div className='flex items-center justify-center gap-1 px-1'>
+                {isRowHovered && (
+                    <>
+                        <motion.button
+                            initial={{opacity: 0, scale: 0.8}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.8}}
+                            whileHover={{scale: 1.1}}
+                            whileTap={{scale: 0.95}}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                // Open pipeline canvas in new tab or navigate
+                                window.open(
+                                    `/pipelines/canvas?pipelineId=${row.id}`,
+                                    '_blank',
+                                );
+                            }}
+                            className='group/view flex items-center justify-center w-4 h-4 text-blue-500 hover:text-white border border-blue-300 hover:border-blue-500 bg-white hover:bg-blue-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md transform'
+                            title='View pipeline'
+                        >
+                            <Eye className='w-2.5 h-2.5 transition-transform duration-200' />
+                        </motion.button>
+                        <motion.button
+                            initial={{opacity: 0, scale: 0.8}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.8}}
+                            whileHover={{scale: 1.1}}
+                            whileTap={{scale: 0.95}}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                if (onDeleteClick) {
+                                    onDeleteClick(row.id);
+                                }
+                            }}
+                            className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out no-drag shadow-sm hover:shadow-md transform'
+                            title='Delete row'
+                        >
+                            <svg
+                                className='w-2 h-2 transition-transform duration-200'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2.5'
+                                viewBox='0 0 24 24'
+                                xmlns='http://www.w3.org/2000/svg'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    d='M6 12h12'
+                                />
+                            </svg>
+                        </motion.button>
+                    </>
+                )}
+            </div>
+            {cols.includes('pipelineName') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
+                        pinFirst && !shouldShowHorizontalScroll
+                            ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                            : ''
+                    } ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                >
+                    {!hideRowExpansion && (
+                        <button
+                            className={`h-5 w-5 rounded text-blue-600 hover:bg-blue-100 ${
+                                isExpanded ? '' : ''
+                            }`}
+                            onClick={() => onToggle(row.id)}
+                            title='Toggle subitems'
+                        >
+                            <motion.span
+                                initial={false}
+                                animate={{rotate: isExpanded ? 90 : 0}}
+                                transition={{
+                                    type: 'spring',
+                                    stiffness: 520,
+                                    damping: 30,
+                                }}
+                                className='inline-flex'
+                            >
+                                <ChevronRight size={16} />
+                            </motion.span>
+                        </button>
+                    )}
+                    <div
+                        className='text-slate-700 text-[12px] w-full px-2 py-1'
+                        data-row-id={row.id}
+                        data-col='pipelineName'
+                        style={{width: '100%'}}
+                    >
+                        {/* Read-only: Pipeline name cannot be edited once saved */}
+                        <span className='truncate block'>
+                            {row.pipelineName || '-'}
+                        </span>
+                    </div>
+                </div>
+            )}
+            {cols.includes('details') && (
+                <div
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='details'
+                    style={{width: '100%'}}
+                >
+                    {/* Read-only: Details cannot be edited once saved */}
+                    <span className='truncate block'>{row.details || '-'}</span>
+                </div>
+            )}
+            {cols.includes('service') && (
+                <div
+                    className={`text-slate-700 text-[12px] px-2 py-1 w-full border-r border-slate-200 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='service'
+                    style={{
+                        width: '100%',
+                    }}
+                >
+                    {/* Read-only: Service cannot be edited once saved */}
+                    <span className='truncate block'>{row.service || '-'}</span>
+                </div>
+            )}
+            {cols.includes('status') && (
+                <div
+                    className='relative w-full border-r border-slate-200 overflow-hidden group/status'
+                    data-row-id={row.id}
+                    data-col='status'
+                    style={{width: '100%', height: '100%'}}
+                >
+                    <button
+                        onClick={() => {
+                            const newStatus =
+                                row.status === 'Active' ? 'Inactive' : 'Active';
+                            onUpdateField(row.id, 'status', newStatus);
+                        }}
+                        className={`relative w-full h-full text-xs font-semibold transition-all duration-300 flex items-center justify-center ${
+                            row.status === 'Active'
+                                ? 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 text-blue-700 hover:from-blue-200 hover:via-blue-100 hover:to-blue-200'
+                                : 'bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 text-gray-600 hover:from-gray-200 hover:via-gray-100 hover:to-gray-200'
+                        }`}
+                        style={{
+                            minHeight: '100%',
+                        }}
+                    >
+                        <span className='relative z-10'>
+                            {row.status === 'Active' ? 'Active' : 'Inactive'}
+                        </span>
+                        {/* Modern shimmer sweep effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 pointer-events-none overflow-hidden transition-opacity duration-300`}
+                            style={{
+                                background:
+                                    row.status === 'Active'
+                                        ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)'
+                                        : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer 1.8s ease-in-out infinite',
+                            }}
+                        />
+                        {/* Glow border effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 transition-opacity duration-300 pointer-events-none ${
+                                row.status === 'Active'
+                                    ? 'shadow-[inset_0_0_15px_rgba(59,130,246,0.4)]'
+                                    : 'shadow-[inset_0_0_15px_rgba(107,114,128,0.3)]'
+                            }`}
+                        />
+                    </button>
+                </div>
+            )}
+            {cols.includes('lastUpdated') && (
+                <div
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='lastUpdated'
+                    style={{width: '100%'}}
+                >
+                    <InlineEditableText
+                        value={row.lastUpdated || ''}
+                        onCommit={(v) =>
+                            onUpdateField(row.id, 'lastUpdated', v)
+                        }
+                        className='text-[12px]'
+                        placeholder='Last Updated'
+                        dataAttr={`lastUpdated-${row.id}`}
+                    />
+                </div>
+            )}
+            {cols.includes('createdBy') && (
+                <div
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='createdBy'
+                    style={{width: '100%'}}
+                >
+                    {/* Read-only: Created By cannot be edited */}
+                    <span className='truncate block'>
+                        {row.createdBy || '-'}
+                    </span>
+                </div>
+            )}
+            {cols.includes('actions') && (
+                <div
+                    className={`text-slate-700 text-[12px] w-full px-2 py-1 flex items-center justify-center ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='actions'
+                    style={{width: '100%'}}
+                >
+                    <button
+                        onClick={() =>
+                            window.open(
+                                `/pipelines/canvas?pipelineId=${row.id}`,
+                                '_blank',
+                            )
+                        }
+                        className='p-1 hover:bg-blue-100 rounded transition-colors'
+                        title='View pipeline in canvas'
+                    >
+                        <Eye size={16} className='text-blue-600' />
+                    </button>
+                </div>
+            )}
+            {!hideRowExpansion && isExpanded && expandedContent && (
+                <motion.div
+                    className='col-span-full'
+                    initial={{opacity: 0, y: -4}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{duration: 0.18, ease: [0.22, 1, 0.36, 1]}}
+                >
+                    {expandedContent}
+                </motion.div>
+            )}
+        </div>
+    );
+}
+
+export default function PipelineCanvasTable({
+    rows,
+    onEdit,
+    onDelete,
+    title,
+    groupByExternal,
+    onGroupByChange,
+    hideControls,
+    visibleColumns,
+    highlightQuery,
+    customColumnLabels,
+    enableDropdownChips = false,
+    dropdownOptions = {},
+    onUpdateField,
+    hideRowExpansion = false,
+    enableInlineEditing = true,
+    incompleteRowIds = [],
+    showValidationErrors = false,
+    hasBlankRow = false,
+    onDropdownOptionUpdate,
+    onNewItemCreated,
+    onShowAllColumns,
+    compressingRowId = null,
+    foldingRowId = null,
+    triggerValidation = false,
+    onValidationComplete,
+    onAddNewRow,
+    externalSortColumn,
+    externalSortDirection,
+    onSortChange,
+    isAIInsightsPanelOpen = false,
+}: PipelineCanvasTableProps) {
+    // Local validation state to track rows with errors
+    const [validationErrors, setValidationErrors] = useState<Set<string>>(
+        new Set(),
+    );
+
+    // Helper function to check if a field is missing/invalid
+    const isFieldMissing = (row: PipelineCanvasRow, field: string): boolean => {
+        switch (field) {
+            case 'pipelineName':
+                return !row.pipelineName || row.pipelineName.trim() === '';
+            case 'details':
+                return !row.details || row.details.trim() === '';
+            case 'service':
+                return !row.service || row.service.trim() === '';
+            default:
+                return false;
+        }
+    };
+
+    // Enhanced helper function to check if a cell should be highlighted as missing
+    const isCellMissing = (rowId: string, field: string) => {
+        const row = localRows.find((r) => r.id === rowId);
+        if (!row) return false;
+
+        // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
+        // This prevents new rows from inheriting validation styling from previous validation sessions
+        if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
+            return false;
+        }
+
+        // Check if this row has validation errors (either from parent or local validation)
+        const hasValidationError =
+            showValidationErrors &&
+            (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
+
+        if (!hasValidationError) return false;
+
+        // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
+        // including completely blank rows
+        return isFieldMissing(row, field);
+    };
+
+    // Function to validate all rows and highlight missing fields
+    const validateAndHighlightErrors = () => {
+        const errorRowIds = new Set<string>();
+
+        localRows.forEach((row) => {
+            // Check if any required field is missing
+            if (
+                isFieldMissing(row, 'pipelineName') ||
+                isFieldMissing(row, 'details') ||
+                isFieldMissing(row, 'service')
+            ) {
+                errorRowIds.add(row.id);
+            }
+        });
+
+        setValidationErrors(errorRowIds);
+        return errorRowIds;
+    };
+
+    // Keep a local order for row management. Sync when rows change
+    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
+    const [localRows, setLocalRows] = useState<PipelineCanvasRow[]>(rows);
+    useEffect(() => {
+        // Preserve existing order; append any new ids
+        const existing = new Set(order);
+        const merged = [
+            ...order.filter((id) => rows.some((r) => r.id === id)),
+            ...rows.filter((r) => !existing.has(r.id)).map((r) => r.id),
+        ];
+        setOrder(merged);
+        // Deep copy rows to create new references for React updates
+        const cloned = rows.map((r) => ({
+            ...r,
+        })) as PipelineCanvasRow[];
+        setLocalRows(cloned);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rows.map((r) => r.id).join(',')]);
+
+    // Effect to trigger validation when requested
+    useEffect(() => {
+        if (triggerValidation) {
+            const errorRowIds = validateAndHighlightErrors();
+            if (onValidationComplete) {
+                onValidationComplete(Array.from(errorRowIds));
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [triggerValidation]);
+
+    // Effect to highlight errors when incompleteRowIds changes from parent
+    useEffect(() => {
+        if (showValidationErrors && incompleteRowIds.length > 0) {
+            // Also trigger local validation to ensure all missing fields are highlighted
+            validateAndHighlightErrors();
+        } else {
+            // Clear validation errors when not showing validation or no incomplete rows from parent
+            // Only update if there are errors to clear (prevents unnecessary re-renders)
+            setValidationErrors((prev) => (prev.size > 0 ? new Set() : prev));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [incompleteRowIds, showValidationErrors]);
+
+    const orderedItems = useMemo(
+        () =>
+            order
+                .map((id) => localRows.find((r) => r.id === id))
+                .filter(Boolean) as PipelineCanvasRow[],
+        [order, localRows],
+    );
+
+    // Persist helpers
+    // Debounced autosave per-row to avoid excessive API traffic
+    const saveTimersRef = useRef<Record<string, any>>({});
+    const latestRowRef = useRef<Record<string, PipelineCanvasRow>>({});
+    function schedulePersist(row: PipelineCanvasRow, delay = 600) {
+        const rowId = String(row.id);
+        latestRowRef.current[rowId] = row;
+        if (saveTimersRef.current[rowId])
+            clearTimeout(saveTimersRef.current[rowId]);
+        saveTimersRef.current[rowId] = setTimeout(() => {
+            const latest = latestRowRef.current[rowId];
+            if (latest) void persistPipelineCanvasRow(latest);
+        }, delay);
+    }
+    useEffect(() => {
+        return () => {
+            // cleanup pending timers on unmount without forcing save
+            Object.values(saveTimersRef.current).forEach((t) =>
+                clearTimeout(t),
+            );
+        };
+    }, []);
+    async function persistPipelineCanvasRow(row: PipelineCanvasRow) {
+        try {
+            // Skip auto-save for temporary rows - let the parent handle pipeline linkage auto-save
+            if (String(row.id || '').startsWith('tmp-')) {
+                console.log(
+                    '⏭️ Skipping old auto-save for temporary row, letting linkage auto-save handle it:',
+                    row.id,
+                );
+                return;
+            }
+            const core = {
+                // Core fields for pipeline canvas
+                pipelineName: row.pipelineName,
+                details: row.details,
+                service: row.service,
+            } as any;
+            // Map UI state into backend details JSON expected by server
+            const details = {
+                // Pipeline canvas specific fields
+                pipelineName: row.pipelineName || '',
+                details: row.details || '',
+                service: row.service || '',
+            } as any;
+            // Handle existing (non-temporary) rows
+            // Check if we're on pipeline canvas page
+            if (
+                typeof window !== 'undefined' &&
+                window.location.pathname.includes('/pipelines/summary')
+            ) {
+                console.log(
+                    '🔄 Updating pipeline data instead of direct save:',
+                    row.id,
+                );
+
+                // For pipeline canvas, update via the parent's onUpdateField
+                // The parent component will handle the pipeline updates
+                console.log(
+                    '⏭️ Skipping direct API call for pipeline canvas page',
+                );
+                return;
+            }
+
+            // For pipeline canvas, all persistence is handled by parent component
+            console.log(
+                '⏭️ Skipping API call - pipeline canvas handled by parent',
+            );
+            return;
+        } catch (_e) {
+            // TODO: surface toast; keep silent here to avoid blocking UI
+        }
+    }
+
+    function updateRowField(
+        rowId: string,
+        key: keyof PipelineCanvasRow,
+        value: any,
+    ) {
+        let changed: PipelineCanvasRow | null = null;
+        setLocalRows((prev) =>
+            prev.map((r) => {
+                if (r.id !== rowId) return r;
+                const next = {...r, [key]: value} as PipelineCanvasRow;
+                changed = next;
+                return next;
+            }),
+        );
+        if (changed) schedulePersist(changed);
+
+        // Also call the parent's onUpdateField function if provided
+        if (onUpdateField) {
+            console.log('🔗 Calling parent onUpdateField:', {
+                rowId,
+                key,
+                value,
+            });
+            onUpdateField(rowId, key as string, value);
+        }
+    }
+    const [groupBy, setGroupBy] = useState<
+        'none' | 'pipelineName' | 'service' | 'status'
+    >('none');
+    // sync external groupBy
+    React.useEffect(() => {
+        if (groupByExternal) setGroupBy(groupByExternal);
+    }, [groupByExternal]);
+
+    const columnOrder: PipelineCanvasTableProps['visibleColumns'] = useMemo(
+        () => [
+            // All columns for pipeline canvas
+            'pipelineName',
+            'details',
+            'service',
+            'status',
+            'lastUpdated',
+            'createdBy',
+            'actions',
+        ],
+        [],
+    );
+    const cols = useMemo(() => {
+        const base = (columnOrder || []) as string[];
+        if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
+        if (visibleColumns.length === 0) return []; // If empty array, show no columns
+        const allowed = new Set(visibleColumns as string[]);
+        // Keep canonical order from columnOrder; filter by visibility
+        return base.filter((c) => allowed.has(c));
+    }, [visibleColumns, columnOrder]);
+
+    const colSizes: Record<string, string> = {
+        deleteButton: '8px', // Space for delete button with proper padding
+        pipelineName: '200px', // Pipeline name column
+        details: '200px', // Details column
+        service: '150px', // Service column (reduced for better separation)
+        status: '120px', // Status column
+        lastUpdated: '160px', // Last updated column
+        createdBy: '180px', // Created by column
+        actions: '100px', // Actions column with view icon
+    };
+    const [customColumns, setCustomColumns] = useState<string[]>([]);
+    const [colWidths, setColWidths] = useState<Record<string, number>>({});
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [subItems, setSubItems] = useState<Record<string, string[]>>({});
+
+    const [pinFirst, setPinFirst] = useState(true);
+    const firstColWidth = '140px'; // enforce fixed width for first column
+    const gridTemplate = useMemo(() => {
+        // Always include delete button column first with fixed width
+        const deleteCol = '32px'; // Fixed width for delete button
+
+        const base = cols.map((c, index) => {
+            // Use dynamic width if available, otherwise fall back to default
+            const dynamicWidth = colWidths[c];
+
+            // Define minimum and maximum widths per column
+            const constraints = {
+                pipelineName: {min: 140, max: 250}, // Increased min width to prevent arrow overlap
+                details: {min: 140, max: 280}, // Reduced max width to prevent overflow
+                service: {min: 120, max: 200}, // Reduced to show proper column separators
+            };
+
+            const columnConstraints = constraints[
+                c as keyof typeof constraints
+            ] || {min: 100, max: 250};
+
+            if (dynamicWidth && dynamicWidth > 0) {
+                // Clamp the dynamic width within constraints for all columns
+                const clampedWidth = Math.max(
+                    columnConstraints.min,
+                    Math.min(columnConstraints.max, dynamicWidth),
+                );
+                return `${clampedWidth}px`;
+            }
+
+            // Use default size from colSizes or fallback to constraint minimum
+            const defaultSize = colSizes[c];
+            if (defaultSize) {
+                const numericSize = parseInt(defaultSize.replace('px', ''));
+                if (!isNaN(numericSize)) {
+                    const clampedSize = Math.max(
+                        columnConstraints.min,
+                        Math.min(columnConstraints.max, numericSize),
+                    );
+                    return `${clampedSize}px`;
+                }
+                return defaultSize;
+            }
+
+            // Final fallback - use minimum from constraints
+            return `${columnConstraints.min}px`;
+        });
+
+        const custom = customColumns.map(() => '110px');
+        const parts = [deleteCol, ...base, ...custom].filter(Boolean);
+        return parts.join(' ');
+    }, [cols, customColumns, colWidths, colSizes]);
+
+    const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+    const handleDeleteClick = (rowId: string) => {
+        if (onDelete) {
+            onDelete(rowId);
+        }
+    };
+
+    // removed fill down state
+
+    const startResize = (colKey: string, e: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const tableContainer = e.currentTarget.closest('.grid');
+        if (!tableContainer) return;
+
+        const startX = e.clientX;
+        const startWidth =
+            colWidths[colKey] ||
+            parseInt(colSizes[colKey]?.replace('px', '') || '140') ||
+            140;
+
+        // Define column-specific constraints
+        const constraints = {
+            pipelineName: {min: 140, max: 250}, // Increased min to prevent arrow overlap
+            details: {min: 140, max: 280}, // Reduced max to prevent over-expansion
+            service: {min: 500, max: 2000}, // Increased minimum to ensure Service content visibility when scrolled
+        };
+
+        const columnConstraints = constraints[
+            colKey as keyof typeof constraints
+        ] || {min: 100, max: 250};
+
+        // Add visual feedback during resize
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const onMove = (ev: MouseEvent) => {
+            ev.preventDefault();
+            const delta = ev.clientX - startX;
+            const newWidth = Math.max(
+                columnConstraints.min,
+                Math.min(columnConstraints.max, startWidth + delta),
+            );
+
+            setColWidths((prev) => ({
+                ...prev,
+                [colKey]: newWidth,
+            }));
+
+            // Trigger scroll check during resize to detect Services column visibility
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth =
+                        tableContainerRef.current.clientWidth;
+
+                    // Check if Services content is getting hidden
+                    const servicesColumns =
+                        tableContainerRef.current.querySelectorAll(
+                            '[data-col="services"]',
+                        );
+                    let servicesContentHidden = false;
+
+                    servicesColumns.forEach((serviceCol) => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect =
+                            serviceElement.getBoundingClientRect();
+                        const containerRect =
+                            tableContainerRef.current!.getBoundingClientRect();
+
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+
+                        if (
+                            serviceRect.right > containerRect.right ||
+                            serviceRect.width < widthThreshold
+                        ) {
+                            servicesContentHidden = true;
+                        }
+                    });
+
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+
+                    const needsScrollbar =
+                        contentWidth * zoomAdjustedThreshold > containerWidth ||
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen &&
+                            contentWidth > availableWidth * 0.9);
+
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 10);
+        };
+
+        const onUp = () => {
+            // Remove visual feedback
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            // Final check for scrollbar need after resize is complete
+            setTimeout(() => {
+                if (tableContainerRef.current) {
+                    const contentWidth = tableContainerRef.current.scrollWidth;
+                    const containerWidth =
+                        tableContainerRef.current.clientWidth;
+
+                    // Check if Services content is hidden
+                    const servicesColumns =
+                        tableContainerRef.current.querySelectorAll(
+                            '[data-col="services"]',
+                        );
+                    let servicesContentHidden = false;
+
+                    servicesColumns.forEach((serviceCol) => {
+                        const serviceElement = serviceCol as HTMLElement;
+                        const serviceRect =
+                            serviceElement.getBoundingClientRect();
+                        const containerRect =
+                            tableContainerRef.current!.getBoundingClientRect();
+
+                        // Enhanced threshold based on zoom and AI panel state
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        let widthThreshold = 500; // Increased base threshold for better content visibility
+                        if (isZoomedIn) widthThreshold += 50;
+                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+
+                        if (
+                            serviceRect.right > containerRect.right ||
+                            serviceRect.width < widthThreshold
+                        ) {
+                            servicesContentHidden = true;
+                        }
+                    });
+
+                    // Enhanced scrollbar logic with zoom and AI panel considerations
+                    const currentZoom = window.devicePixelRatio || 1;
+                    const isZoomedIn = currentZoom > 1.1;
+                    const viewportWidth = window.innerWidth;
+                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                    const availableWidth = viewportWidth - aiPanelWidth;
+                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+
+                    const needsScrollbar =
+                        contentWidth * zoomAdjustedThreshold > containerWidth ||
+                        servicesContentHidden ||
+                        (isZoomedIn && contentWidth > availableWidth * 0.95) ||
+                        (isAIInsightsPanelOpen &&
+                            contentWidth > availableWidth * 0.9);
+
+                    setShouldShowHorizontalScroll(needsScrollbar);
+                }
+            }, 50);
+
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
+
+    // removed fill handlers
+
+    const toggleExpanded = (id: string) => {
+        setExpandedRows((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const highlightText = (text: string) => {
+        const q = (highlightQuery || '').trim();
+        if (!q) return <>{text}</>;
+        try {
+            const esc = q.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+            const re = new RegExp(`(${esc})`, 'ig');
+            const parts = text.split(re);
+            return (
+                <>
+                    {parts.map((part, i) =>
+                        re.test(part) ? (
+                            <mark
+                                key={i}
+                                className='bg-yellow-200 px-0.5 rounded'
+                            >
+                                {part}
+                            </mark>
+                        ) : (
+                            <span key={i}>{part}</span>
+                        ),
+                    )}
+                </>
+            );
+        } catch {
+            return <>{text}</>;
+        }
+    };
+
+    // Handle delete click - directly call parent's onDelete function
+
+    // Use external sort state if provided, otherwise fall back to internal state
+    const [internalSortCol, setInternalSortCol] = useState<
+        'pipelineName' | 'details' | 'service' | 'status' | 'lastUpdated' | null
+    >(null);
+    const [internalSortDir, setInternalSortDir] = useState<
+        'asc' | 'desc' | null
+    >(null);
+
+    // Listen for clear sorting events from parent component
+    useEffect(() => {
+        const handleClearSorting = () => {
+            setInternalSortCol(null);
+            setInternalSortDir(null);
+        };
+
+        window.addEventListener('clearTableSorting', handleClearSorting);
+
+        return () => {
+            window.removeEventListener('clearTableSorting', handleClearSorting);
+        };
+    }, []);
+
+    // Use external sort state if available, otherwise use internal state
+    const sortCol = externalSortColumn || internalSortCol;
+    const sortDir = externalSortDirection || internalSortDir;
+
+    const toggleSort = (
+        col: 'pipelineName' | 'details' | 'service' | 'status' | 'lastUpdated',
+        direction?: 'asc' | 'desc',
+    ) => {
+        let nextDir: 'asc' | 'desc';
+
+        // Check if external sorting is actively being used (both props provided and not empty)
+        const isExternalSorting = externalSortColumn && externalSortDirection;
+
+        if (isExternalSorting) {
+            // When external sort is actively controlled, use external state for calculation
+            nextDir =
+                direction ||
+                (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
+
+            // Notify parent to update external sort state
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
+        } else {
+            // When using internal sort (including first time with no sorting)
+            nextDir =
+                direction ||
+                (internalSortCol === col && internalSortDir === 'asc'
+                    ? 'desc'
+                    : 'asc');
+
+            // Update internal state first (this actually sorts the table)
+            setInternalSortCol(col);
+            setInternalSortDir(nextDir);
+
+            // Then notify parent to update Sort panel (for toolbar sync)
+            if (onSortChange) {
+                onSortChange(col, nextDir);
+            }
+        }
+
+        // Always dispatch custom event for parent component to listen to
+        notifyParentSortChange(col, nextDir);
+    };
+
+    // Function to notify parent component about sort changes via custom event
+    const notifyParentSortChange = (
+        column: string,
+        direction: 'asc' | 'desc',
+    ) => {
+        // Dispatch a custom event that the parent can listen to
+        const event = new CustomEvent('pipelineTableSortChange', {
+            detail: {
+                column,
+                direction,
+            },
+            bubbles: true,
+        });
+
+        // Dispatch the event from the document to ensure it reaches the parent
+        document.dispatchEvent(event);
+    };
+
+    const displayItems = useMemo(() => {
+        const base = [...orderedItems];
+        if (!sortCol || !sortDir) return base;
+        base.sort((a, b) => {
+            const av = String((a as any)[sortCol] ?? '');
+            const bv = String((b as any)[sortCol] ?? '');
+            const comp = av.localeCompare(bv, undefined, {
+                numeric: true,
+                sensitivity: 'base',
+            });
+            return sortDir === 'asc' ? comp : -comp;
+        });
+        return base;
+    }, [orderedItems, sortCol, sortDir]);
+
+    // Group data based on groupBy setting
+    const groupedItems = useMemo(() => {
+        if (groupBy === 'none') {
+            return {'All Records': displayItems};
+        }
+
+        const groups: Record<string, PipelineCanvasRow[]> = {};
+
+        displayItems.forEach((item) => {
+            let groupKey = '';
+
+            switch (groupBy) {
+                case 'pipelineName':
+                    groupKey = item.pipelineName || '(No Pipeline Name)';
+                    break;
+                case 'service':
+                    // For services, we need to handle multiple services per row
+                    if (item.service) {
+                        const services = item.service
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        if (services.length > 0) {
+                            services.forEach((service) => {
+                                const serviceKey = service || '(No Service)';
+                                if (!groups[serviceKey]) {
+                                    groups[serviceKey] = [];
+                                }
+                                groups[serviceKey].push(item);
+                            });
+                            return; // Don't add to default group
+                        }
+                    }
+                    groupKey = '(No Service)';
+                    break;
+                case 'status':
+                    groupKey = item.status || '(No Status)';
+                    break;
+                default:
+                    groupKey = 'All Records';
+            }
+
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+            groups[groupKey].push(item);
+        });
+
+        // Sort group keys alphabetically, but keep "(No ...)" groups at the end
+        const sortedGroups: Record<string, PipelineCanvasRow[]> = {};
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            const aIsEmpty = a.startsWith('(No ');
+            const bIsEmpty = b.startsWith('(No ');
+            if (aIsEmpty && !bIsEmpty) return 1;
+            if (!aIsEmpty && bIsEmpty) return -1;
+            return a.localeCompare(b);
+        });
+
+        sortedKeys.forEach((key) => {
+            sortedGroups[key] = groups[key];
+        });
+
+        return sortedGroups;
+    }, [displayItems, groupBy]);
+
+    // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
+    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] =
+        useState(false);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const checkScrollNeed = () => {
+            if (!tableContainerRef.current) return;
+
+            // Get current zoom level
+            const currentZoom = window.devicePixelRatio || 1;
+            const baseZoom = 1;
+            const zoomFactor = currentZoom / baseZoom;
+
+            // Get viewport dimensions accounting for AI insights panel
+            const viewportWidth = window.innerWidth;
+            const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
+            const availableWidth = viewportWidth - aiPanelWidth;
+
+            // Check if content width exceeds container width with a larger buffer for hover effects
+            const contentWidth = tableContainerRef.current.scrollWidth;
+            const containerWidth = tableContainerRef.current.clientWidth;
+
+            // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
+            const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
+
+            // Only show scrollbar when content genuinely exceeds container accounting for hover effects
+            const isContentOverflowing =
+                contentWidth > containerWidth + hoverBuffer;
+
+            // Check if Services column content is actually being cut off
+            const servicesColumns = tableContainerRef.current.querySelectorAll(
+                '[data-col="services"]',
+            );
+            let servicesContentHidden = false;
+
+            if (servicesColumns.length > 0) {
+                servicesColumns.forEach((serviceCol) => {
+                    const serviceElement = serviceCol as HTMLElement;
+                    const serviceRect = serviceElement.getBoundingClientRect();
+                    const containerRect =
+                        tableContainerRef.current!.getBoundingClientRect();
+
+                    // More reasonable threshold - minimum 300px for services content
+                    const minServicesWidth = 300;
+                    const bufferZone = 15; // Additional buffer for hover effects
+
+                    // Only trigger if Services column is actually cut off or too narrow to display content properly
+                    if (
+                        serviceRect.right > containerRect.right - bufferZone ||
+                        serviceRect.width < minServicesWidth
+                    ) {
+                        // Additional check: see if there's actually content being cut off
+                        const servicesChips =
+                            serviceElement.querySelectorAll('.inline-flex');
+                        if (servicesChips.length > 0) {
+                            servicesChips.forEach((chip) => {
+                                const chipRect = chip.getBoundingClientRect();
+                                // Account for hover effects in chip positioning
+                                if (
+                                    chipRect.right >
+                                    serviceRect.right - bufferZone
+                                ) {
+                                    servicesContentHidden = true;
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            // Show scrollbar only when there's genuine overflow or content is being cut off
+            const needsScrollbar =
+                isContentOverflowing || servicesContentHidden;
+
+            // Only update state if the value has changed (prevents infinite re-renders)
+            setShouldShowHorizontalScroll((prev) =>
+                prev !== needsScrollbar ? needsScrollbar : prev,
+            );
+        };
+
+        // Check on mount and when table structure changes
+        let scrollCheckTimeout: NodeJS.Timeout;
+        const debouncedScrollCheck = () => {
+            clearTimeout(scrollCheckTimeout);
+            scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
+        };
+
+        checkScrollNeed();
+
+        // Use ResizeObserver for better performance
+        const resizeObserver = new ResizeObserver(() => {
+            debouncedScrollCheck(); // Use debounced version
+        });
+
+        // Use MutationObserver to detect when Services content changes
+        const mutationObserver = new MutationObserver((mutations) => {
+            let shouldCheck = false;
+            mutations.forEach((mutation) => {
+                // Check if Services column content changed
+                if (mutation.target instanceof Element) {
+                    const servicesCol = mutation.target.closest(
+                        '[data-col="services"]',
+                    );
+                    if (servicesCol) {
+                        shouldCheck = true;
+                    }
+                }
+            });
+            if (shouldCheck) {
+                debouncedScrollCheck(); // Use debounced version
+            }
+        });
+
+        if (tableContainerRef.current) {
+            resizeObserver.observe(tableContainerRef.current);
+            mutationObserver.observe(tableContainerRef.current, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class'],
+            });
+
+            // Also observe all column cells for resize changes
+            const columnCells =
+                tableContainerRef.current.querySelectorAll('[data-col]');
+            columnCells.forEach((cell) => {
+                if (cell instanceof Element) {
+                    resizeObserver.observe(cell);
+                }
+            });
+        }
+
+        // Also listen for window resize (zoom changes)
+        window.addEventListener('resize', debouncedScrollCheck);
+
+        // Listen for zoom via keyboard shortcuts and mouse wheel
+        const handleKeyZoom = (e: KeyboardEvent) => {
+            if (
+                (e.ctrlKey || e.metaKey) &&
+                (e.key === '+' || e.key === '-' || e.key === '0')
+            ) {
+                debouncedScrollCheck();
+            }
+        };
+
+        const handleWheelZoom = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                debouncedScrollCheck();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyZoom);
+        window.addEventListener('wheel', handleWheelZoom, {passive: true});
+
+        return () => {
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+            window.removeEventListener('resize', debouncedScrollCheck);
+            window.removeEventListener('keydown', handleKeyZoom);
+            window.removeEventListener('wheel', handleWheelZoom);
+            clearTimeout(scrollCheckTimeout);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAIInsightsPanelOpen]); // colWidths removed - ResizeObserver handles column width changes automatically
+
+    return (
+        <div className='w-full compact-table safari-tight'>
+            {/* Using browser default scrollbars only */}
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                    /* Table container with proper scrolling */
+                    div[role="table"] {
+                        position: relative;
+                        overflow-y: visible;
+                        overflow-x: ${
+                            shouldShowHorizontalScroll ? 'auto' : 'hidden'
+                        };
+                    }
+
+                    /* Prevent horizontal scrollbars on table cells and headers (except services) */
+                    [data-col]:not([data-col="services"]) {
+                        overflow-x: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+
+                    /* Specifically prevent scrollbars in column headers */
+                    .bg-slate-50[data-col] {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    /* Header row should not have scrollbars */
+                    .bg-slate-50 > div {
+                        overflow: hidden !important;
+                        text-overflow: ellipsis;
+                    }
+
+                    /* Ensure header content fits properly */
+                    .bg-slate-50 .relative {
+                        overflow: hidden;
+                        min-width: 0;
+                    }
+
+                    /* Ensure proper grid layout */
+                    .grid {
+                        display: grid;
+                    }
+
+                    /* Services column should allow content display within bounds */
+                    [data-col="services"] {
+                        overflow: visible;
+                        white-space: normal;
+                        text-overflow: unset;
+                        position: relative;
+                        max-width: 600px;
+                    }
+
+                    /* Services column chips should display full text */
+                    [data-col="services"] .inline-flex {
+                        white-space: nowrap;
+                        text-overflow: unset;
+                        overflow: visible;
+                        min-width: max-content;
+                        flex-shrink: 0;
+                    }
+
+                    /* Services column chip text should not be truncated */
+                    [data-col="services"] .inline-flex span {
+                        white-space: nowrap;
+                        overflow: visible;
+                        text-overflow: unset;
+                    }
+
+                    /* Services column container should wrap content */
+                    [data-col="services"] > div {
+                        white-space: normal;
+                        overflow: visible;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        position: relative;
+                        max-width: 100%;
+                    }
+
+                    /* Ensure dropdowns within Services column stay within bounds */
+                    [data-col="services"] .absolute {
+                        max-width: 100%;
+                        right: auto !important;
+                    }
+                    }
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                        max-width: 100%;
+                        box-sizing: border-box;
+                    }
+
+                    /* Ensure dropdowns don't extend beyond table container */
+                    .z-\\[9999\\] {
+                        max-width: calc(100vw - 32px) !important;
+                        max-height: calc(100vh - 100px) !important;
+                        overflow: auto !important;
+                    }
+
+                    /* Table container should contain overflow */
+                    [role="table"] {
+                        position: relative;
+                        contain: layout style;
+                    }
+
+                    /* Hide any scrollbars that might appear in header elements */
+                    .bg-slate-50 {
+                        overflow: hidden;
+                    }
+
+                    /* Shimmer animation for hover effect */
+                    @keyframes shimmer {
+                        0% {
+                            background-position: 200% 0;
+                        }
+                        100% {
+                            background-position: -200% 0;
+                        }
+                    }
+                `,
+                }}
+            />
+            <div className='flex items-center justify-between mb-2'>
+                <h3 className='text-sm font-semibold text-slate-800'>
+                    {title ?? 'Pipeline Canvas Details'}
+                </h3>
+            </div>
+            {cols.length === 0 ? (
+                <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
+                    <div className='flex flex-col items-center space-y-4'>
+                        <svg
+                            className='w-12 h-12 text-slate-400'
+                            fill='none'
+                            viewBox='0 0 24 24'
+                            stroke='currentColor'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={1.5}
+                                d='M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
+                            />
+                        </svg>
+                        <div className='space-y-2'>
+                            <h3 className='text-lg font-medium text-slate-900'>
+                                No columns are visible
+                            </h3>
+                            <p className='text-sm text-slate-500 max-w-sm'>
+                                All columns have been hidden. Use the Show/Hide
+                                button in the toolbar to select which columns to
+                                display, or click the button below to show all
+                                columns.
+                            </p>
+                        </div>
+                        {onShowAllColumns && (
+                            <button
+                                onClick={onShowAllColumns}
+                                className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200'
+                            >
+                                <svg
+                                    className='w-4 h-4'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                                    />
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
+                                    />
+                                </svg>
+                                Show All Columns
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div
+                    ref={tableContainerRef}
+                    role='table'
+                    className='p-0 w-full'
+                    style={{
+                        overflowX: shouldShowHorizontalScroll
+                            ? 'auto'
+                            : 'visible',
+                        overflowY: 'visible',
+                        maxWidth: '100%',
+                        boxSizing: 'border-box',
+                    }}
+                >
+                    <div
+                        className='w-full relative'
+                        style={{
+                            minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
+                            width: '100%',
+                        }}
+                    >
+                        {(() => {
+                            const defaultLabels: Record<string, string> = {
+                                pipelineName: 'Pipeline Name',
+                                details: 'Details',
+                                service: 'Service',
+                                status: 'Status',
+                                lastUpdated: 'Last Updated',
+                                createdBy: 'Created By',
+                                actions: 'Actions',
+                            };
+
+                            // Merge custom labels with defaults
+                            const labelFor: Record<string, string> = {
+                                ...defaultLabels,
+                                ...customColumnLabels,
+                            };
+
+                            const iconFor: Record<string, React.ReactNode> = {
+                                pipelineName: <Activity size={14} />,
+                                details: <FileText size={14} />,
+                                service: <Globe size={14} />,
+                                status: <Shield size={14} />,
+                                lastUpdated: <Clock size={14} />,
+                                createdBy: <User size={14} />,
+                                actions: <Eye size={14} />,
+                            };
+                            return (
+                                <div
+                                    className='rounded-xl border border-slate-300 shadow-sm bg-white'
+                                    style={{
+                                        minWidth: 'fit-content',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden', // Ensure content doesn't escape the container
+                                    }}
+                                >
+                                    <div
+                                        className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
+                                        style={{
+                                            gridTemplateColumns: gridTemplate,
+                                            minWidth: 'max-content',
+                                            width: '100%',
+                                            display: 'grid',
+                                        }}
+                                    >
+                                        {/* Delete Button Column Header */}
+                                        <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                            {/* Empty header for delete column */}
+                                        </div>
+
+                                        {cols.map((c, idx) => (
+                                            <div
+                                                key={c}
+                                                className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden border-r border-slate-200 ${
+                                                    idx === 0
+                                                        ? 'border-l-0'
+                                                        : ''
+                                                } ${
+                                                    idx === 0 &&
+                                                    pinFirst &&
+                                                    !shouldShowHorizontalScroll
+                                                        ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                        : ''
+                                                }`}
+                                            >
+                                                <div className='flex items-center gap-2'>
+                                                    {iconFor[c] && iconFor[c]}
+                                                    <span>
+                                                        {labelFor[c] || c}
+                                                    </span>
+                                                </div>
+                                                {[
+                                                    'pipelineName',
+                                                    'details',
+                                                    'service',
+                                                    'status',
+                                                    'lastUpdated',
+                                                    'createdBy',
+                                                ].includes(c) && (
+                                                    <div className='inline-flex items-center absolute right-8 top-1/2 -translate-y-1/2'>
+                                                        <button
+                                                            onClick={() =>
+                                                                toggleSort(
+                                                                    c as any,
+                                                                    'asc',
+                                                                )
+                                                            }
+                                                            className={`${
+                                                                sortCol === c &&
+                                                                sortDir ===
+                                                                    'asc'
+                                                                    ? 'text-blue-600 font-bold'
+                                                                    : 'text-slate-400'
+                                                            } transition-all duration-200 hover:text-slate-600`}
+                                                        >
+                                                            <ArrowUp
+                                                                size={
+                                                                    sortCol ===
+                                                                        c &&
+                                                                    sortDir ===
+                                                                        'asc'
+                                                                        ? 20
+                                                                        : 16
+                                                                }
+                                                            />
+                                                        </button>
+                                                        <button
+                                                            onClick={() =>
+                                                                toggleSort(
+                                                                    c as any,
+                                                                    'desc',
+                                                                )
+                                                            }
+                                                            className={`${
+                                                                sortCol === c &&
+                                                                sortDir ===
+                                                                    'desc'
+                                                                    ? 'text-blue-600 font-bold'
+                                                                    : 'text-slate-400'
+                                                            } transition-all duration-200 hover:text-slate-600`}
+                                                        >
+                                                            <ArrowDown
+                                                                size={
+                                                                    sortCol ===
+                                                                        c &&
+                                                                    sortDir ===
+                                                                        'desc'
+                                                                        ? 20
+                                                                        : 16
+                                                                }
+                                                            />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {/* Show blue separator for all columns except the last one (actions) */}
+                                                {c !== 'actions' && (
+                                                    <span
+                                                        aria-hidden
+                                                        className='pointer-events-none absolute right-0 top-0 h-full w-px bg-gradient-to-b from-blue-400 to-blue-500 opacity-60'
+                                                    />
+                                                )}
+                                            </div>
+                                        ))}
+                                        {customColumns.map((name, idx) => (
+                                            <div
+                                                key={`custom-${idx}`}
+                                                className='min-w-0'
+                                            >
+                                                {name}
+                                            </div>
+                                        ))}
+                                        {/* trailing add column removed */}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        {groupBy === 'none' ? (
+                            <div className='mt-2'>
+                                {displayItems.map((r, idx) => (
+                                    <div key={r.id}>
+                                        <SortablePipelineCanvasRow
+                                            row={r}
+                                            index={idx}
+                                            cols={cols}
+                                            gridTemplate={gridTemplate}
+                                            highlightQuery={highlightQuery}
+                                            onEdit={onEdit}
+                                            onDelete={onDelete}
+                                            customColumns={customColumns}
+                                            pinFirst={pinFirst}
+                                            firstColWidth={firstColWidth}
+                                            isExpanded={expandedRows.has(r.id)}
+                                            onToggle={toggleExpanded}
+                                            hideRowExpansion={hideRowExpansion}
+                                            enableDropdownChips={
+                                                enableDropdownChips
+                                            }
+                                            onDropdownOptionUpdate={
+                                                onDropdownOptionUpdate
+                                            }
+                                            onNewItemCreated={onNewItemCreated}
+                                            isCellMissing={isCellMissing}
+                                            compressingRowId={compressingRowId}
+                                            foldingRowId={foldingRowId}
+                                            allRows={rows}
+                                            expandedContent={null}
+                                            onUpdateField={updateRowField}
+                                            isSelected={selectedRowId === r.id}
+                                            onSelect={(id) =>
+                                                setSelectedRowId(id)
+                                            }
+                                            onStartFill={() => {}}
+                                            inFillRange={false}
+                                            onDeleteClick={handleDeleteClick}
+                                            shouldShowHorizontalScroll={
+                                                shouldShowHorizontalScroll
+                                            }
+                                        />
+                                        {expandedRows.has(r.id) && (
+                                            <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
+                                                <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
+                                                <div className='text-sm text-slate-600'>
+                                                    Expanded content for
+                                                    pipeline details and stages.
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {/* Add New Row Button */}
+                                {onAddNewRow && (
+                                    <div
+                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                        style={{
+                                            gridTemplateColumns: gridTemplate,
+                                            minWidth: 'max-content',
+                                            width: '100%',
+                                        }}
+                                        onClick={onAddNewRow}
+                                    >
+                                        {/* Empty delete button space */}
+                                        <div className='flex items-center justify-center px-2 py-1'>
+                                            {/* No delete icon for add row */}
+                                        </div>
+
+                                        {/* Add new row content spanning all columns */}
+                                        <div
+                                            className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium'
+                                            style={{
+                                                gridColumn: `span ${cols.length}`,
+                                            }}
+                                        >
+                                            <svg
+                                                className='w-4 h-4'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                                stroke='currentColor'
+                                            >
+                                                <path
+                                                    strokeLinecap='round'
+                                                    strokeLinejoin='round'
+                                                    strokeWidth={2}
+                                                    d='M12 4v16m8-8H4'
+                                                />
+                                            </svg>
+                                            <span className='italic'>
+                                                Add New Row
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className='space-y-4 mt-2'>
+                                {Object.entries(groupedItems).map(
+                                    ([groupName, groupRows]) => (
+                                        <div
+                                            key={groupName}
+                                            className='border border-slate-200 rounded-lg'
+                                        >
+                                            {/* Group Header */}
+                                            <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
+                                                <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
+                                                    <span>{groupName}</span>
+                                                    <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
+                                                        {groupRows.length}{' '}
+                                                        record
+                                                        {groupRows.length !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                </h4>
+                                            </div>
+
+                                            {/* Group Rows */}
+                                            <div className='border-b border-slate-200 overflow-hidden'>
+                                                {groupRows.map((r, idx) => (
+                                                    <div key={r.id}>
+                                                        <SortablePipelineCanvasRow
+                                                            row={r}
+                                                            index={idx}
+                                                            cols={cols}
+                                                            gridTemplate={
+                                                                gridTemplate
+                                                            }
+                                                            highlightQuery={
+                                                                highlightQuery
+                                                            }
+                                                            onEdit={onEdit}
+                                                            onDelete={onDelete}
+                                                            customColumns={
+                                                                customColumns
+                                                            }
+                                                            pinFirst={pinFirst}
+                                                            firstColWidth={
+                                                                firstColWidth
+                                                            }
+                                                            isExpanded={expandedRows.has(
+                                                                r.id,
+                                                            )}
+                                                            onToggle={
+                                                                toggleExpanded
+                                                            }
+                                                            hideRowExpansion={
+                                                                hideRowExpansion
+                                                            }
+                                                            enableDropdownChips={
+                                                                enableDropdownChips
+                                                            }
+                                                            onDropdownOptionUpdate={
+                                                                onDropdownOptionUpdate
+                                                            }
+                                                            onNewItemCreated={
+                                                                onNewItemCreated
+                                                            }
+                                                            isCellMissing={
+                                                                isCellMissing
+                                                            }
+                                                            compressingRowId={
+                                                                compressingRowId
+                                                            }
+                                                            foldingRowId={
+                                                                foldingRowId
+                                                            }
+                                                            allRows={rows}
+                                                            expandedContent={
+                                                                null
+                                                            }
+                                                            onUpdateField={
+                                                                updateRowField
+                                                            }
+                                                            isSelected={
+                                                                selectedRowId ===
+                                                                r.id
+                                                            }
+                                                            onSelect={(id) =>
+                                                                setSelectedRowId(
+                                                                    id,
+                                                                )
+                                                            }
+                                                            onStartFill={() => {}}
+                                                            inFillRange={false}
+                                                            onDeleteClick={
+                                                                handleDeleteClick
+                                                            }
+                                                            shouldShowHorizontalScroll={
+                                                                shouldShowHorizontalScroll
+                                                            }
+                                                        />
+                                                        {expandedRows.has(
+                                                            r.id,
+                                                        ) && (
+                                                            <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
+                                                                <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
+                                                                <div className='text-sm text-slate-600'>
+                                                                    Expanded
+                                                                    content for
+                                                                    pipeline
+                                                                    details and
+                                                                    stages.
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ),
+                                )}
+
+                                {/* Add New Row Button for grouped view */}
+                                {onAddNewRow && (
+                                    <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                        <div
+                                            className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                            style={{
+                                                gridTemplateColumns:
+                                                    gridTemplate,
+                                                minWidth: 'max-content',
+                                                width: '100%',
+                                            }}
+                                            onClick={onAddNewRow}
+                                        >
+                                            {/* Empty delete button space */}
+                                            <div className='flex items-center justify-center px-2 py-1'>
+                                                {/* No delete icon for add row */}
+                                            </div>
+
+                                            {/* Add new row content spanning all columns */}
+                                            <div
+                                                className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium'
+                                                style={{
+                                                    gridColumn: `span ${cols.length}`,
+                                                }}
+                                            >
+                                                <svg
+                                                    className='w-4 h-4'
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M12 4v16m8-8H4'
+                                                    />
+                                                </svg>
+                                                <span className='italic'>
+                                                    Add New Row
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

@@ -16,45 +16,44 @@ const nodeIcons = {
 
     // Plan
     plan_jira: 'jira',
+    plan_azure_devops: 'azdo',
     plan_trello: 'trello',
     plan_asana: 'asana',
 
     // Code (Version Control)
     code_github: 'github',
     code_gitlab: 'gitlab',
+    code_azure_repos: 'azure',
     code_bitbucket: 'bitbucket',
-    code_svn: 'svn',
-    code_mercurial: 'mercurial',
-    code_perforce: 'perforce',
+    code_sonarqube: 'sonarqube',
 
     // Build (CI/CD)
     build_jenkins: 'jenkins',
     build_github_actions: 'github',
-    build_azure_pipelines: 'azure',
     build_circleci: 'circleci',
-    build_travis: 'travis',
-    build_gitlab_ci: 'gitlab',
-    build_teamcity: 'teamcity',
-    build_bamboo: 'jenkins', // Using jenkins as fallback for Bamboo
+    build_aws_codebuild: 'aws',
+    build_google_cloud_build: 'cloudbuild',
+    build_azure_devops: 'azdo',
 
     // Test
-    test_jest: 'jest',
-    test_selenium: 'selenium',
     test_cypress: 'cypress',
-    test_mocha: 'mocha',
-    test_playwright: 'playwright',
-    test_testng: 'testng',
-    test_puppeteer: 'cypress', // Using cypress as fallback for Puppeteer
+    test_selenium: 'selenium',
+    test_jest: 'jest',
+    test_tricentis_tosca: 'asana',
+
+    // Release
+    release_argo_cd: 'argo',
+    release_servicenow: 'slack',
+    release_azure_devops: 'azdo',
 
     // Deploy
     deploy_kubernetes: 'kubernetes',
     deploy_helm: 'helm',
-    deploy_aws: 'aws',
-    deploy_docker: 'docker',
-    deploy_ansible: 'ansible',
     deploy_terraform: 'terraform',
-    deploy_gcp: 'gcp',
-    deploy_azure: 'azure',
+    deploy_ansible: 'ansible',
+    deploy_docker: 'docker',
+    deploy_aws_codepipeline: 'codepipeline',
+    deploy_cloudfoundry: 'cloudfoundry',
 
     // Monitor
     monitor_prometheus: 'prometheus',
@@ -74,11 +73,6 @@ const nodeIcons = {
     approval_manual: 'manualapproval',
     approval_slack: 'slack',
     approval_teams: 'teams',
-
-    // Release
-    release_docker: 'docker',
-    release_npm: 'npm',
-    release_maven: 'maven',
 
     // Annotation types
     note: 'stickynote',

@@ -126,6 +126,8 @@ function WorkflowBuilderContent({
     const [reactFlowInstance, setReactFlowInstance] =
         useState<ReactFlowInstance | null>(null);
     const [showPanels, setShowPanels] = useState(false);
+    const [showNotification, setShowNotification] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
 
     // State for toolbar functionality
     type BackgroundType = 'dots' | 'lines' | 'cross' | 'solid';
@@ -201,6 +203,78 @@ function WorkflowBuilderContent({
     );
 
     useEffect(() => {
+        const loadPipelineFromDatabase = async (pipelineId: string) => {
+            try {
+                console.log('🔄 Loading pipeline from database:', pipelineId);
+
+                // Fetch pipeline data from backend
+                const response = await fetch(
+                    `http://localhost:4000/api/pipeline-canvas/${pipelineId}`,
+                );
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to fetch pipeline: ${response.statusText}`,
+                    );
+                }
+
+                const pipelineData = await response.json();
+                console.log('✅ Pipeline data loaded:', pipelineData);
+
+                // Set pipeline metadata
+                if (pipelineData.pipelineName) {
+                    setPipelineName(pipelineData.pipelineName);
+                }
+                if (pipelineData.details) {
+                    setDescription(pipelineData.details);
+                }
+                if (pipelineData.service) {
+                    setDeploymentType(pipelineData.service);
+                }
+                if (pipelineData.entity) {
+                    setEntity(pipelineData.entity);
+                }
+
+                // Parse YAML content and reconstruct nodes/edges
+                if (pipelineData.yamlContent) {
+                    console.log('📄 Parsing YAML content...');
+                    const {
+                        nodes: parsedNodes,
+                        edges: parsedEdges,
+                        metadata,
+                    } = convertFromYAML(pipelineData.yamlContent);
+
+                    console.log('✅ YAML parsed successfully:', {
+                        nodes: parsedNodes.length,
+                        edges: parsedEdges.length,
+                        metadata,
+                    });
+
+                    // Set nodes and edges
+                    if (parsedNodes && parsedNodes.length > 0) {
+                        setNodes(parsedNodes);
+                    }
+                    if (parsedEdges && parsedEdges.length > 0) {
+                        setEdges(parsedEdges);
+                    }
+
+                    // Set metadata from YAML if available
+                    if (metadata) {
+                        if (metadata.name) setPipelineName(metadata.name);
+                        if (metadata.description)
+                            setDescription(metadata.description);
+                        if (metadata.entity) setEntity(metadata.entity);
+                        if (metadata.deploymentType)
+                            setDeploymentType(metadata.deploymentType);
+                    }
+                } else {
+                    console.warn('⚠️ No YAML content found in pipeline data');
+                }
+            } catch (error) {
+                console.error('❌ Error loading pipeline:', error);
+                alert('Failed to load pipeline. Please try again.');
+            }
+        };
+
         if (templateData) {
             // Use provided template data (for embedded view)
             setMode(templateData.mode || PIPELINE_MODES.PREVIEW);
@@ -222,6 +296,15 @@ function WorkflowBuilderContent({
             // Use URL parameters (for direct navigation)
             const urlParamsData = parseURLParams(window.location.search);
             const params = new URLSearchParams(window.location.search);
+
+            // Check if pipelineId parameter exists (for viewing saved pipeline)
+            const pipelineId = params.get('pipelineId');
+
+            if (pipelineId) {
+                console.log('🔍 Pipeline ID detected in URL:', pipelineId);
+                loadPipelineFromDatabase(pipelineId);
+                return; // Skip URL parameter processing when loading from database
+            }
 
             setUrlParams(params);
             setMode(urlParamsData.mode);
@@ -267,6 +350,214 @@ function WorkflowBuilderContent({
         PIPELINE_DEFAULTS.DEPLOYMENT_TYPE,
     );
     const [description, setDescription] = useState('');
+
+    // Dynamic dropdown options from API
+    const [serviceOptions, setServiceOptions] = useState<
+        Array<{id: string; name: string}>
+    >([]);
+    const [entityOptions, setEntityOptions] = useState<
+        Array<{id: string; name: string}>
+    >([]);
+    const [loadingServices, setLoadingServices] = useState(true);
+    const [loadingEntities, setLoadingEntities] = useState(false);
+
+    // Fetch services from API
+    useEffect(() => {
+        const fetchServices = async () => {
+            try {
+                setLoadingServices(true);
+                const response = await fetch(
+                    'http://localhost:4000/api/services',
+                );
+                const data = await response.json();
+                setServiceOptions(data || []);
+            } catch (error) {
+                console.error('Error fetching services:', error);
+                setServiceOptions([]);
+            } finally {
+                setLoadingServices(false);
+            }
+        };
+        fetchServices();
+    }, []);
+
+    // Fetch entities from global settings based on selected account and enterprise
+    useEffect(() => {
+        const fetchEntities = async () => {
+            try {
+                setLoadingEntities(true);
+
+                // Get account and enterprise from localStorage
+                const accountId =
+                    window.localStorage.getItem('selectedAccountId');
+                const accountName = window.localStorage.getItem(
+                    'selectedAccountName',
+                );
+                const enterpriseId = window.localStorage.getItem(
+                    'selectedEnterpriseId',
+                );
+
+                // Only fetch if we have the required context
+                if (!accountId || !accountName || !enterpriseId) {
+                    console.log(
+                        'Missing account/enterprise context for fetching entities',
+                    );
+                    setEntityOptions([]);
+                    setLoadingEntities(false);
+                    return;
+                }
+
+                const response = await fetch(
+                    `http://localhost:4000/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
+                        accountName,
+                    )}&enterpriseId=${enterpriseId}`,
+                );
+                const data = await response.json();
+
+                // Transform the response to match our format
+                if (Array.isArray(data)) {
+                    setEntityOptions(
+                        data.map((entity: any) => ({
+                            id: entity.entityName || entity.name || entity,
+                            name: entity.entityName || entity.name || entity,
+                        })),
+                    );
+                } else {
+                    setEntityOptions([]);
+                }
+            } catch (error) {
+                console.error('Error fetching entities:', error);
+                setEntityOptions([]);
+            } finally {
+                setLoadingEntities(false);
+            }
+        };
+        fetchEntities();
+    }, []); // Can add dependencies like [accountId, enterpriseId] if needed later
+
+    // State for enabled connectors based on global settings
+    const [enabledConnectors, setEnabledConnectors] = useState<string[]>([]);
+
+    // Mapping from Global Settings tool names to Connector Panel names
+    // Since we've synchronized the configuration, tools now have exact matches
+    const mapGlobalSettingsToConnectorNames = (toolName: string): string[] => {
+        // All tool names now match exactly between global settings and connector panel
+        return [toolName];
+    };
+
+    // Fetch global settings configuration for the selected entity
+    useEffect(() => {
+        const fetchGlobalSettingsConfig = async () => {
+            try {
+                // Get account, enterprise, and entity from localStorage
+                const accountId =
+                    window.localStorage.getItem('selectedAccountId');
+                const accountName = window.localStorage.getItem(
+                    'selectedAccountName',
+                );
+                const enterpriseId = window.localStorage.getItem(
+                    'selectedEnterpriseId',
+                );
+
+                // Use the entity from the component state
+                if (!accountId || !accountName || !enterpriseId || !entity) {
+                    console.log(
+                        '⚠️ Missing context for fetching global settings config',
+                    );
+                    setEnabledConnectors([]); // No restrictions if no entity selected
+                    return;
+                }
+
+                console.log('🔄 Fetching global settings for entity:', entity);
+
+                const response = await fetch(
+                    `http://localhost:4000/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
+                        accountName,
+                    )}&enterpriseId=${enterpriseId}`,
+                );
+                const data = await response.json();
+                console.log(
+                    '📦 [WorkflowBuilder] Raw global settings data:',
+                    data,
+                );
+
+                // Find the configuration for the selected entity
+                const entityConfig = Array.isArray(data)
+                    ? data.find(
+                          (item: any) =>
+                              item.entityName === entity ||
+                              item.name === entity,
+                      )
+                    : null;
+
+                console.log('🔍 [WorkflowBuilder] Looking for entity:', entity);
+                console.log(
+                    '📋 [WorkflowBuilder] Available entities:',
+                    Array.isArray(data)
+                        ? data.map((item: any) => item.entityName || item.name)
+                        : [],
+                );
+                console.log(
+                    '🎯 [WorkflowBuilder] Found entity config:',
+                    entityConfig,
+                );
+
+                if (entityConfig && entityConfig.configuration) {
+                    // Extract all enabled tools from all categories and map them to connector names
+                    const enabled: string[] = [];
+                    const configuredCategories: string[] = []; // Track which categories are in global settings
+
+                    console.log(
+                        '📂 [WorkflowBuilder] Configuration structure:',
+                        entityConfig.configuration,
+                    );
+                    Object.entries(entityConfig.configuration).forEach(
+                        ([category, tools]: [string, any]) => {
+                            console.log(`  📁 Category "${category}":`, tools);
+                            configuredCategories.push(category.toLowerCase());
+                            if (Array.isArray(tools)) {
+                                // Map each tool name to connector name(s)
+                                tools.forEach((tool: string) => {
+                                    const connectorNames =
+                                        mapGlobalSettingsToConnectorNames(tool);
+                                    enabled.push(...connectorNames);
+                                });
+                            }
+                        },
+                    );
+
+                    // Remove duplicates
+                    const uniqueEnabled = Array.from(new Set(enabled));
+
+                    console.log(
+                        '✅ Enabled connectors for entity:',
+                        entity,
+                        uniqueEnabled,
+                    );
+                    console.log(
+                        '📋 Configured categories in global settings:',
+                        configuredCategories,
+                    );
+
+                    // Store both enabled connectors and configured categories
+                    // We'll pass configured categories separately
+                    setEnabledConnectors(uniqueEnabled);
+                } else {
+                    console.log(
+                        '⚠️ No configuration found for entity:',
+                        entity,
+                    );
+                    setEnabledConnectors([]); // Allow all if no config found
+                }
+            } catch (error) {
+                console.error('Error fetching global settings config:', error);
+                setEnabledConnectors([]); // Allow all on error
+            }
+        };
+
+        fetchGlobalSettingsConfig();
+    }, [entity]); // Re-fetch when entity changes
+
     const [pipelineState, setPipelineState] = useState(true);
     const [showSaveDropdown, setShowSaveDropdown] = useState(false);
 
@@ -1095,7 +1386,50 @@ function WorkflowBuilderContent({
 
     return (
         <div className='flex flex-col h-full bg-gray-50'>
-            <style>{modernArrowStyles + connectionStyles}</style>
+            <style>{`
+                ${modernArrowStyles}
+                ${connectionStyles}
+
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                }
+
+                .animate-slideDown {
+                    animation: slideDown 0.3s ease-out;
+                }
+            `}</style>
+
+            {/* Success Notification */}
+            {showNotification && (
+                <div className='fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] animate-slideDown'>
+                    <div className='bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3'>
+                        <svg
+                            className='w-6 h-6'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                        >
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                strokeWidth={2}
+                                d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                        </svg>
+                        <span className='font-medium'>
+                            {notificationMessage}
+                        </span>
+                    </div>
+                </div>
+            )}
+
             {/* Pipeline Header - Below Breadcrumbs */}
             <div className='bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0 shadow-sm'>
                 <div className='flex items-center justify-between gap-4'>
@@ -1136,14 +1470,16 @@ function WorkflowBuilderContent({
                                     e: React.ChangeEvent<HTMLSelectElement>,
                                 ) => setDeploymentType(e.target.value)}
                                 className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
-                                disabled={isReadOnly}
+                                disabled={isReadOnly || loadingServices}
                             >
-                                {DEPLOYMENT_TYPES.map((option) => (
-                                    <option
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
+                                <option value=''>
+                                    {loadingServices
+                                        ? 'Loading services...'
+                                        : 'Select Service'}
+                                </option>
+                                {serviceOptions.map((option) => (
+                                    <option key={option.id} value={option.name}>
+                                        {option.name}
                                     </option>
                                 ))}
                             </select>
@@ -1163,17 +1499,18 @@ function WorkflowBuilderContent({
                                     e: React.ChangeEvent<HTMLSelectElement>,
                                 ) => setEntity(e.target.value)}
                                 className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
-                                disabled={isReadOnly}
+                                disabled={isReadOnly || loadingEntities}
                             >
-                                <option value=''>Select Entity</option>
-                                <option value='Customer'>Customer</option>
-                                <option value='Product'>Product</option>
-                                <option value='Order'>Order</option>
-                                <option value='Invoice'>Invoice</option>
-                                <option value='Employee'>Employee</option>
-                                <option value='Vendor'>Vendor</option>
-                                <option value='Contract'>Contract</option>
-                                <option value='Asset'>Asset</option>
+                                <option value=''>
+                                    {loadingEntities
+                                        ? 'Loading entities...'
+                                        : 'Select Entity'}
+                                </option>
+                                {entityOptions.map((option) => (
+                                    <option key={option.id} value={option.name}>
+                                        {option.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -1252,12 +1589,189 @@ function WorkflowBuilderContent({
                                     </svg>
                                 </button>
                                 {showSaveDropdown && (
-                                    <div className='absolute top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20'>
+                                    <div className='absolute top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20'>
                                         <button
-                                            onClick={() =>
-                                                savePipelineAsTemplate(false)
-                                            }
-                                            className='w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 rounded-t-lg transition-colors'
+                                            onClick={async () => {
+                                                setShowSaveDropdown(false);
+                                                // Save to DynamoDB
+                                                try {
+                                                    // Validate that we have nodes to save
+                                                    if (
+                                                        !nodes ||
+                                                        nodes.length === 0
+                                                    ) {
+                                                        alert(
+                                                            'No pipeline stages to save. Please add some stages first.',
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    // Get account and enterprise from localStorage
+                                                    const accountId =
+                                                        window.localStorage.getItem(
+                                                            'selectedAccountId',
+                                                        );
+                                                    const accountName =
+                                                        window.localStorage.getItem(
+                                                            'selectedAccountName',
+                                                        );
+                                                    const enterpriseId =
+                                                        window.localStorage.getItem(
+                                                            'selectedEnterpriseId',
+                                                        );
+                                                    const enterpriseName =
+                                                        window.localStorage.getItem(
+                                                            'selectedEnterpriseName',
+                                                        );
+
+                                                    // Get user info from localStorage
+                                                    const userStr =
+                                                        window.localStorage.getItem(
+                                                            'systiva_user',
+                                                        );
+                                                    const userData = userStr
+                                                        ? JSON.parse(userStr)
+                                                        : null;
+                                                    const userEmail =
+                                                        userData?.email ||
+                                                        'unknown';
+
+                                                    // Validate required fields
+                                                    if (
+                                                        !accountId ||
+                                                        !enterpriseId
+                                                    ) {
+                                                        alert(
+                                                            'Please select an account and enterprise from the breadcrumb before saving.',
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    if (
+                                                        !pipelineName ||
+                                                        !deploymentType ||
+                                                        !entity
+                                                    ) {
+                                                        alert(
+                                                            'Please fill in Pipeline Name, Service, and Entity fields before saving.',
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    const metadata = {
+                                                        name: pipelineName,
+                                                        description:
+                                                            description ||
+                                                            'Saved pipeline',
+                                                        enterprise:
+                                                            enterpriseName ||
+                                                            'Default',
+                                                        entity:
+                                                            entity || 'Default',
+                                                        deploymentType:
+                                                            (deploymentType ||
+                                                                'Integration') as
+                                                                | 'Integration'
+                                                                | 'Extension',
+                                                    };
+
+                                                    console.log(
+                                                        '💾 Saving pipeline with',
+                                                        nodes.length,
+                                                        'stages',
+                                                    );
+                                                    const yamlContent =
+                                                        convertToYAML(
+                                                            nodes,
+                                                            edges,
+                                                            metadata,
+                                                        );
+
+                                                    // Save to DynamoDB via API
+                                                    const pipelineData = {
+                                                        pipelineName:
+                                                            pipelineName,
+                                                        details:
+                                                            description || '',
+                                                        service: deploymentType,
+                                                        entity: entity,
+                                                        status: 'Active',
+                                                        accountId: accountId,
+                                                        accountName:
+                                                            accountName,
+                                                        enterpriseId:
+                                                            enterpriseId,
+                                                        enterpriseName:
+                                                            enterpriseName,
+                                                        yamlContent:
+                                                            yamlContent,
+                                                        createdBy: userEmail,
+                                                    };
+
+                                                    console.log(
+                                                        '💾 Saving pipeline to DynamoDB:',
+                                                        pipelineData,
+                                                    );
+
+                                                    const response =
+                                                        await fetch(
+                                                            'http://localhost:4000/api/pipeline-canvas',
+                                                            {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type':
+                                                                        'application/json',
+                                                                },
+                                                                body: JSON.stringify(
+                                                                    pipelineData,
+                                                                ),
+                                                            },
+                                                        );
+
+                                                    if (!response.ok) {
+                                                        throw new Error(
+                                                            `Failed to save pipeline: ${response.statusText}`,
+                                                        );
+                                                    }
+
+                                                    const savedPipeline =
+                                                        await response.json();
+                                                    console.log(
+                                                        '✅ Pipeline saved successfully:',
+                                                        savedPipeline,
+                                                    );
+
+                                                    // Show success notification
+                                                    setNotificationMessage(
+                                                        `Pipeline "${pipelineName}" saved successfully`,
+                                                    );
+                                                    setShowNotification(true);
+
+                                                    // Hide notification and redirect after 2 seconds
+                                                    setTimeout(() => {
+                                                        setShowNotification(
+                                                            false,
+                                                        );
+                                                        window.location.href =
+                                                            '/pipelines/summary';
+                                                    }, 2000);
+                                                } catch (error) {
+                                                    console.error(
+                                                        '❌ Save error:',
+                                                        error,
+                                                    );
+                                                    alert(
+                                                        '❌ Failed to save pipeline.\n' +
+                                                            (error instanceof
+                                                            Error
+                                                                ? error.message
+                                                                : String(
+                                                                      error,
+                                                                  )),
+                                                    );
+                                                }
+                                            }}
+                                            className='w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-green-50 rounded-t-lg transition-colors font-semibold'
                                         >
                                             <span className='inline-flex items-center gap-1'>
                                                 <svg
@@ -1273,13 +1787,14 @@ function WorkflowBuilderContent({
                                                         d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v3'
                                                     />
                                                 </svg>
-                                                Save Pipeline
+                                                💾 Save to DynamoDB
                                             </span>
                                         </button>
                                         <button
-                                            onClick={() =>
-                                                savePipelineAsTemplate(true)
-                                            }
+                                            onClick={() => {
+                                                setShowSaveDropdown(false);
+                                                savePipelineAsTemplate(true);
+                                            }}
                                             className='w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors'
                                         >
                                             <span className='inline-flex items-center gap-1'>
@@ -1296,7 +1811,7 @@ function WorkflowBuilderContent({
                                                         d='M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3M8 7V5a2 2 0 012-2h6l4 4v6a2 2 0 01-2 2h-2'
                                                     />
                                                 </svg>
-                                                Save As Copy
+                                                📋 Save as Template
                                             </span>
                                         </button>
                                     </div>
@@ -1622,12 +2137,60 @@ function WorkflowBuilderContent({
                                     return;
                                 }
 
+                                // Get account and enterprise from localStorage
+                                const accountId =
+                                    window.localStorage.getItem(
+                                        'selectedAccountId',
+                                    );
+                                const accountName = window.localStorage.getItem(
+                                    'selectedAccountName',
+                                );
+                                const enterpriseId =
+                                    window.localStorage.getItem(
+                                        'selectedEnterpriseId',
+                                    );
+                                const enterpriseName =
+                                    window.localStorage.getItem(
+                                        'selectedEnterpriseName',
+                                    );
+
+                                // Get user info from localStorage
+                                const userStr =
+                                    window.localStorage.getItem('systiva_user');
+                                const userData = userStr
+                                    ? JSON.parse(userStr)
+                                    : null;
+                                const userEmail = userData?.email || 'unknown';
+
+                                // Validate required fields
+                                if (!accountId || !enterpriseId) {
+                                    alert(
+                                        'Please select an account and enterprise from the breadcrumb before saving.',
+                                    );
+                                    return;
+                                }
+
+                                if (
+                                    !pipelineName ||
+                                    !deploymentType ||
+                                    !entity
+                                ) {
+                                    alert(
+                                        'Please fill in Pipeline Name, Service, and Entity fields before saving.',
+                                    );
+                                    return;
+                                }
+
                                 const metadata = {
-                                    name: `Pipeline-${Date.now()}`,
-                                    description: 'Saved pipeline',
-                                    enterprise: enterprise || 'Default',
+                                    name: pipelineName,
+                                    description:
+                                        description || 'Saved pipeline',
+                                    enterprise: enterpriseName || 'Default',
                                     entity: entity || 'Default',
-                                    deploymentType: 'Integration' as const,
+                                    deploymentType: (deploymentType ||
+                                        'Integration') as
+                                        | 'Integration'
+                                        | 'Extension',
                                 };
 
                                 console.log(
@@ -1641,12 +2204,50 @@ function WorkflowBuilderContent({
                                     metadata,
                                 );
 
-                                await savePipelineYAML(
-                                    'current-pipeline',
-                                    yamlContent,
+                                // Save to DynamoDB via API
+                                const pipelineData = {
+                                    pipelineName: pipelineName,
+                                    details: description || '',
+                                    service: deploymentType,
+                                    entity: entity,
+                                    status: 'Active',
+                                    accountId: accountId,
+                                    accountName: accountName,
+                                    enterpriseId: enterpriseId,
+                                    enterpriseName: enterpriseName,
+                                    yamlContent: yamlContent,
+                                    createdBy: userEmail,
+                                };
+
+                                console.log(
+                                    'Saving pipeline to DynamoDB:',
+                                    pipelineData,
                                 );
 
-                                // Show success message with more details
+                                const response = await fetch(
+                                    'http://localhost:4000/api/pipeline-canvas',
+                                    {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify(pipelineData),
+                                    },
+                                );
+
+                                if (!response.ok) {
+                                    throw new Error(
+                                        `Failed to save pipeline: ${response.statusText}`,
+                                    );
+                                }
+
+                                const savedPipeline = await response.json();
+                                console.log(
+                                    'Pipeline saved successfully:',
+                                    savedPipeline,
+                                );
+
+                                // Show success message
                                 const stageNames = nodes
                                     .map(
                                         (node) =>
@@ -1655,12 +2256,18 @@ function WorkflowBuilderContent({
                                     )
                                     .join(', ');
                                 alert(
-                                    `Pipeline saved successfully!\n\nStages included: ${stageNames}\nTotal stages: ${nodes.length}`,
+                                    `Pipeline saved successfully!\n\nPipeline Name: ${pipelineName}\nStages included: ${stageNames}\nTotal stages: ${nodes.length}`,
                                 );
+
+                                // Redirect to summary page
+                                window.location.href = '/pipelines/summary';
                             } catch (error) {
                                 console.error('Save error:', error);
                                 alert(
-                                    'Failed to save pipeline. Please check the console for details.',
+                                    'Failed to save pipeline. Please check the console for details.\n' +
+                                        (error instanceof Error
+                                            ? error.message
+                                            : String(error)),
                                 );
                             }
                         }}
@@ -1817,6 +2424,7 @@ function WorkflowBuilderContent({
                                 console.log('Connector selected:', nodeType);
                             }}
                             onDragStart={onDragStart}
+                            enabledConnectors={enabledConnectors}
                         />
                     </div>
                 )}

@@ -81,7 +81,7 @@ const pipelineCards = [
     {
         id: 'pipeline-canvas',
         title: 'Pipeline Canvas',
-        href: '/pipelines/canvas',
+        href: '/pipelines/summary',
         bgColor: 'bg-blue-50',
         bgIllustration: <BgStack />,
     },
@@ -113,7 +113,7 @@ export default function PipelinePanel({
 
         switch (cardId) {
             case 'pipeline-canvas':
-                router.push('/pipelines/canvas');
+                router.push('/pipelines/summary');
                 break;
             case 'pipeline-templates':
                 router.push('/pipelines/templates');

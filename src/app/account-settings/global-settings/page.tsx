@@ -26,6 +26,12 @@ import {
     BookmarkIcon,
     XMarkIcon,
 } from '@heroicons/react/24/outline';
+import {
+    CATEGORY_TOOLS,
+    TOOLS_CONFIG,
+    CATEGORY_COLORS as SHARED_CATEGORY_COLORS,
+    CATEGORY_ORDER,
+} from '@/config/toolsConfig';
 import GlobalSettingsTableV2, {
     GlobalSettingsRow,
 } from '@/components/GlobalSettingsTableV2';
@@ -43,7 +49,6 @@ interface GlobalSetting {
         test: string[];
         release: string[];
         deploy: string[];
-        others: string[];
     };
 }
 
@@ -205,24 +210,8 @@ export default function GlobalSettingsPage() {
     }, []);
 
     // Hoverable configuration pill for main list rows
-    const LIST_CATEGORY_COLORS: Record<string, string> = {
-        plan: '#6366F1',
-        code: '#22C55E',
-        build: '#F59E0B',
-        test: '#06B6D4',
-        release: '#EC4899',
-        deploy: '#8B5CF6',
-        others: '#64748B',
-    };
-    const LIST_CATEGORY_ORDER = [
-        'plan',
-        'code',
-        'build',
-        'test',
-        'release',
-        'deploy',
-        'others',
-    ];
+    const LIST_CATEGORY_COLORS = SHARED_CATEGORY_COLORS;
+    const LIST_CATEGORY_ORDER = CATEGORY_ORDER;
     function GSPill({
         categories,
         label,
@@ -883,75 +872,18 @@ const InlineEntities = forwardRef<
 ) {
     // Advanced configuration constants
     type CategorySelections = Record<string, string[]>;
-    const CATEGORY_OPTIONS: Record<string, string[]> = {
-        plan: ['Jira', 'Azure DevOps', 'Trello', 'Asana', 'Other'],
-        code: [
-            'GitHub',
-            'GitLab',
-            'Azure Repos',
-            'Bitbucket',
-            'SonarQube',
-            'Other',
-        ],
-        build: [
-            'Jenkins',
-            'GitHub Actions',
-            'CircleCI',
-            'AWS CodeBuild',
-            'Google Cloud Build',
-            'Azure DevOps',
-            'Other',
-        ],
-        test: ['Cypress', 'Selenium', 'Jest', 'Tricentis Tosca', 'Other'],
-        release: ['Argo CD', 'ServiceNow', 'Azure DevOps', 'Other'],
-        deploy: [
-            'Kubernetes',
-            'Helm',
-            'Terraform',
-            'Ansible',
-            'Docker',
-            'AWS CodePipeline',
-            'Other',
-        ],
-        others: ['Prometheus', 'Grafana', 'Slack', 'Other'],
-    };
-    const OPTION_ICON: Record<string, {name: string}> = {
-        Jira: {name: 'jira'},
-        GitHub: {name: 'github'},
-        'GitHub Actions': {name: 'github'},
-        GitLab: {name: 'gitlab'},
-        'Azure Repos': {name: 'azure'},
-        'Azure DevOps': {name: 'azdo'},
-        Bitbucket: {name: 'bitbucket'},
-        'AWS CodeBuild': {name: 'aws'},
-        'Google Cloud Build': {name: 'cloudbuild'},
-        'AWS CodePipeline': {name: 'codepipeline'},
-        CircleCI: {name: 'circleci'},
-        Cypress: {name: 'cypress'},
-        Selenium: {name: 'selenium'},
-        Jest: {name: 'jest'},
-        'Argo CD': {name: 'argo'},
-        ServiceNow: {name: 'slack'},
-        Kubernetes: {name: 'kubernetes'},
-        Helm: {name: 'helm'},
-        Terraform: {name: 'terraform'},
-        Ansible: {name: 'ansible'},
-        Docker: {name: 'docker'},
-        Prometheus: {name: 'prometheus'},
-        Grafana: {name: 'grafana'},
-        SonarQube: {name: 'sonarqube'},
-        Slack: {name: 'slack'},
-        Other: {name: 'maven'},
-    };
-    const CATEGORY_COLORS: Record<string, string> = {
-        plan: '#6366F1',
-        code: '#22C55E',
-        build: '#F59E0B',
-        test: '#06B6D4',
-        release: '#EC4899',
-        deploy: '#8B5CF6',
-        others: '#64748B',
-    };
+    // Use shared configuration from toolsConfig
+    const CATEGORY_OPTIONS = CATEGORY_TOOLS;
+    // Generate OPTION_ICON from shared TOOLS_CONFIG
+    const OPTION_ICON: Record<string, {name: string}> = Object.entries(
+        TOOLS_CONFIG,
+    ).reduce((acc, [toolName, config]) => {
+        acc[toolName] = {name: config.iconName};
+        return acc;
+    }, {} as Record<string, {name: string}>);
+
+    // Use shared category colors
+    const CATEGORY_COLORS = SHARED_CATEGORY_COLORS;
 
     // Entities loaded from DynamoDB
     const [options, setOptions] = useState<string[]>([]);
@@ -1076,7 +1008,6 @@ const InlineEntities = forwardRef<
                         test: string[];
                         release: string[];
                         deploy: string[];
-                        others: string[];
                     };
                 }>
             >(
@@ -1255,7 +1186,6 @@ const InlineEntities = forwardRef<
                     test: [],
                     release: [],
                     deploy: [],
-                    others: [],
                 },
             }));
 
@@ -1490,7 +1420,7 @@ const InlineEntities = forwardRef<
                                                             width,
                                                             backgroundColor:
                                                                 CATEGORY_COLORS[
-                                                                    cat
+                                                                    cat as keyof typeof CATEGORY_COLORS
                                                                 ],
                                                         }}
                                                     />
@@ -1582,7 +1512,6 @@ const InlineEntities = forwardRef<
                 test: [],
                 release: [],
                 deploy: [],
-                others: [],
             },
         });
         onCreated();
@@ -1645,7 +1574,6 @@ const InlineEntities = forwardRef<
                                             test: [],
                                             release: [],
                                             deploy: [],
-                                            others: [],
                                         },
                                     });
 
@@ -2425,7 +2353,6 @@ const InlineEntities = forwardRef<
                                             test: [],
                                             release: [],
                                             deploy: [],
-                                            others: [],
                                         },
                                     });
 
@@ -3066,28 +2993,8 @@ function ConfigureEntitySlidingPanel({
                     />
                 </svg>
             ),
-            others: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
-                    />
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-                    />
-                </svg>
-            ),
         };
-        return iconMap[category] || iconMap.others;
+        return iconMap[category] || iconMap.plan;
     };
 
     return (
@@ -3334,10 +3241,10 @@ function ConfigureEntitySlidingPanel({
                                                                                     opt,
                                                                                 );
                                                                             }}
-                                                                            className={`relative inline-flex items-center gap-2 rounded-none border px-3 py-2 text-sm transition-colors duration-150 ${
+                                                                            className={`relative inline-flex items-center gap-2.5 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all duration-150 overflow-hidden ${
                                                                                 Active
-                                                                                    ? 'bg-blue-50 text-primary border-blue-500'
-                                                                                    : 'bg-white text-primary border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
+                                                                                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-900 border-blue-400 shadow-sm'
+                                                                                    : 'bg-white text-slate-700 border-slate-300 hover:border-blue-300 hover:bg-blue-50/40'
                                                                             }`}
                                                                         >
                                                                             <div className='h-6 w-6 flex items-center justify-center'>
@@ -3352,10 +3259,20 @@ function ConfigureEntitySlidingPanel({
                                                                                     size={
                                                                                         20
                                                                                     }
-                                                                                    className='text-primary'
+                                                                                    className={
+                                                                                        Active
+                                                                                            ? 'text-blue-700'
+                                                                                            : 'text-slate-600'
+                                                                                    }
                                                                                 />
                                                                             </div>
-                                                                            <span>
+                                                                            <span
+                                                                                className={
+                                                                                    Active
+                                                                                        ? 'text-blue-900'
+                                                                                        : 'text-slate-700'
+                                                                                }
+                                                                            >
                                                                                 {
                                                                                     opt
                                                                                 }
@@ -3365,16 +3282,24 @@ function ConfigureEntitySlidingPanel({
                                                                                     className='gs-corner-check-svg'
                                                                                     viewBox='0 0 24 24'
                                                                                     aria-hidden='true'
+                                                                                    style={{
+                                                                                        position:
+                                                                                            'absolute',
+                                                                                        top: '-1px',
+                                                                                        right: '-1px',
+                                                                                        width: '24px',
+                                                                                        height: '24px',
+                                                                                    }}
                                                                                 >
                                                                                     <polygon
-                                                                                        points='24,0 24,24 8,0'
-                                                                                        fill='#1d4ed8'
+                                                                                        points='24,0 24,24 0,0'
+                                                                                        fill='#3b82f6'
                                                                                     />
                                                                                     <path
-                                                                                        d='M10 11 L13 14 L19 8'
+                                                                                        d='M13 7 L16 10 L21 5'
                                                                                         fill='none'
                                                                                         stroke='white'
-                                                                                        strokeWidth='2.6'
+                                                                                        strokeWidth='2'
                                                                                         strokeLinecap='round'
                                                                                         strokeLinejoin='round'
                                                                                     />

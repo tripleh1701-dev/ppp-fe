@@ -3,6 +3,7 @@
 import React, {useState, useRef, useCallback, useEffect} from 'react';
 import {WorkflowNodeType} from '@/types/workflow';
 import {Icon} from './Icons';
+import {CATEGORY_TOOLS, TOOLS_CONFIG} from '@/config/toolsConfig';
 
 // CSS animations for connector panel with immediate effects
 const animationStyles = `
@@ -62,95 +63,28 @@ const animationStyles = `
     opacity: 1;
     transform: translateY(-50%) translateX(0);
   }
-  @keyframes connectorFadeIn {
-    0% {
-      opacity: 0;
-      transform: translateY(20px) scale(0.9);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
+  /* Animations removed for cleaner UI */
 
-  @keyframes connectorSlideUp {
-    0% {
-      opacity: 0;
-      transform: translateY(30px) scale(0.8);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  @keyframes connectorPulse {
-    0%, 100% {
-      transform: scale(1);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    50% {
-      transform: scale(1.02);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-    }
-  }
-
-  @keyframes iconFloat {
-    0%, 100% {
-      transform: translateY(0px);
-    }
-    50% {
-      transform: translateY(-5px);
-    }
-  }
-
-  .connector-fade-in {
-    animation: connectorFadeIn 0.6s ease-out forwards;
-    animation-fill-mode: both;
-  }
-
-  .connector-slide-up {
-    animation: connectorSlideUp 0.8s ease-out forwards;
-    animation-fill-mode: both;
-  }
-
-  .connector-pulse {
-    animation: connectorPulse 2s ease-in-out infinite;
-  }
-
-  .icon-float {
-    animation: iconFloat 3s ease-in-out infinite;
-  }
-
-  /* Enhanced hover effects */
+  /* Simplified hover effects */
   .connector-card {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease-in-out;
   }
 
   .connector-card:hover {
-    transform: translateY(-8px) scale(1.05);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
   .category-card {
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease-in-out;
   }
 
   .category-card:hover {
-    transform: translateY(-12px) scale(1.08) rotateY(5deg);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
-  /* Staggered animation delays */
-  .connector-card:nth-child(1) { animation-delay: 0ms; }
-  .connector-card:nth-child(2) { animation-delay: 100ms; }
-  .connector-card:nth-child(3) { animation-delay: 200ms; }
-  .connector-card:nth-child(4) { animation-delay: 300ms; }
-  .connector-card:nth-child(5) { animation-delay: 400ms; }
-  .connector-card:nth-child(6) { animation-delay: 500ms; }
-  .connector-card:nth-child(7) { animation-delay: 600ms; }
-  .connector-card:nth-child(8) { animation-delay: 700ms; }
-  .connector-card:nth-child(9) { animation-delay: 800ms; }
+  /* Staggered animation delays removed */
 `;
 
 // Connector categories with their respective connectors
@@ -492,6 +426,12 @@ const CONNECTOR_CATEGORIES = {
                 icon: <Icon name='jira' className='w-8 h-8' />,
             },
             {
+                id: 'plan-azure-devops',
+                name: 'Azure DevOps',
+                type: 'plan_azure_devops' as WorkflowNodeType,
+                icon: <Icon name='azdo' className='w-8 h-8' />,
+            },
+            {
                 id: 'plan-trello',
                 name: 'Trello',
                 type: 'plan_trello' as WorkflowNodeType,
@@ -574,28 +514,22 @@ const CONNECTOR_CATEGORIES = {
                 icon: <Icon name='gitlab' className='w-8 h-8' />,
             },
             {
+                id: 'code-azure-repos',
+                name: 'Azure Repos',
+                type: 'code_azure_repos' as WorkflowNodeType,
+                icon: <Icon name='azure' className='w-8 h-8' />,
+            },
+            {
                 id: 'code-bitbucket',
                 name: 'Bitbucket',
                 type: 'code_bitbucket' as WorkflowNodeType,
                 icon: <Icon name='bitbucket' className='w-8 h-8' />,
             },
             {
-                id: 'code-svn',
-                name: 'SVN (Subversion)',
-                type: 'code_svn' as WorkflowNodeType,
-                icon: <Icon name='svn' className='w-8 h-8' />,
-            },
-            {
-                id: 'code-mercurial',
-                name: 'Mercurial',
-                type: 'code_mercurial' as WorkflowNodeType,
-                icon: <Icon name='mercurial' className='w-8 h-8' />,
-            },
-            {
-                id: 'code-perforce',
-                name: 'Perforce',
-                type: 'code_perforce' as WorkflowNodeType,
-                icon: <Icon name='perforce' className='w-8 h-8' />,
+                id: 'code-sonarqube',
+                name: 'SonarQube',
+                type: 'code_sonarqube' as WorkflowNodeType,
+                icon: <Icon name='sonarqube' className='w-8 h-8' />,
             },
         ],
     },
@@ -630,40 +564,28 @@ const CONNECTOR_CATEGORIES = {
                 icon: <Icon name='github' className='w-8 h-8' />,
             },
             {
-                id: 'build-azure',
-                name: 'Azure Pipelines',
-                type: 'build_azure_pipelines' as WorkflowNodeType,
-                icon: <Icon name='azure' className='w-8 h-8' />,
-            },
-            {
                 id: 'build-circleci',
                 name: 'CircleCI',
                 type: 'build_circleci' as WorkflowNodeType,
                 icon: <Icon name='circleci' className='w-8 h-8' />,
             },
             {
-                id: 'build-travis',
-                name: 'Travis CI',
-                type: 'build_travis' as WorkflowNodeType,
-                icon: <Icon name='travis' className='w-8 h-8' />,
+                id: 'build-aws-codebuild',
+                name: 'AWS CodeBuild',
+                type: 'build_aws_codebuild' as WorkflowNodeType,
+                icon: <Icon name='aws' className='w-8 h-8' />,
             },
             {
-                id: 'build-gitlab-ci',
-                name: 'GitLab CI',
-                type: 'build_gitlab_ci' as WorkflowNodeType,
-                icon: <Icon name='gitlab' className='w-8 h-8' />,
+                id: 'build-google-cloud-build',
+                name: 'Google Cloud Build',
+                type: 'build_google_cloud_build' as WorkflowNodeType,
+                icon: <Icon name='cloudbuild' className='w-8 h-8' />,
             },
             {
-                id: 'build-teamcity',
-                name: 'TeamCity',
-                type: 'build_teamcity' as WorkflowNodeType,
-                icon: <Icon name='teamcity' className='w-8 h-8' />,
-            },
-            {
-                id: 'build-bamboo',
-                name: 'Bamboo',
-                type: 'build_bamboo' as WorkflowNodeType,
-                icon: <Icon name='jenkins' className='w-8 h-8' />,
+                id: 'build-azure-devops',
+                name: 'Azure DevOps',
+                type: 'build_azure_devops' as WorkflowNodeType,
+                icon: <Icon name='azdo' className='w-8 h-8' />,
             },
         ],
     },
@@ -724,10 +646,10 @@ const CONNECTOR_CATEGORIES = {
         ),
         connectors: [
             {
-                id: 'test-jest',
-                name: 'Jest',
-                type: 'test_jest' as WorkflowNodeType,
-                icon: <Icon name='jest' className='w-8 h-8' />,
+                id: 'test-cypress',
+                name: 'Cypress',
+                type: 'test_cypress' as WorkflowNodeType,
+                icon: <Icon name='cypress' className='w-8 h-8' />,
             },
             {
                 id: 'test-selenium',
@@ -736,46 +658,16 @@ const CONNECTOR_CATEGORIES = {
                 icon: <Icon name='selenium' className='w-8 h-8' />,
             },
             {
-                id: 'test-cypress',
-                name: 'Cypress',
-                type: 'test_cypress' as WorkflowNodeType,
-                icon: <Icon name='cypress' className='w-8 h-8' />,
+                id: 'test-jest',
+                name: 'Jest',
+                type: 'test_jest' as WorkflowNodeType,
+                icon: <Icon name='jest' className='w-8 h-8' />,
             },
             {
-                id: 'test-mocha',
-                name: 'Mocha',
-                type: 'test_mocha' as WorkflowNodeType,
-                icon: (
-                    <img
-                        src='/images/logos/mocha.svg'
-                        alt='Mocha'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'test-playwright',
-                name: 'Playwright',
-                type: 'test_playwright' as WorkflowNodeType,
-                icon: (
-                    <img
-                        src='/images/logos/playwright.svg'
-                        alt='Playwright'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'test-testng',
-                name: 'TestNG',
-                type: 'test_testng' as WorkflowNodeType,
-                icon: <Icon name='testng' className='w-8 h-8' />,
-            },
-            {
-                id: 'test-puppeteer',
-                name: 'Puppeteer',
-                type: 'test_puppeteer' as WorkflowNodeType,
-                icon: <Icon name='cypress' className='w-8 h-8' />,
+                id: 'test-tricentis-tosca',
+                name: 'Tricentis Tosca',
+                type: 'test_tricentis_tosca' as WorkflowNodeType,
+                icon: <Icon name='asana' className='w-8 h-8' />,
             },
         ],
     },
@@ -875,22 +767,34 @@ const CONNECTOR_CATEGORIES = {
                 icon: <Icon name='helm' className='w-8 h-8' />,
             },
             {
-                id: 'deploy-aws',
-                name: 'AWS',
-                type: 'deploy_aws' as WorkflowNodeType,
-                icon: <Icon name='aws' className='w-8 h-8' />,
+                id: 'deploy-terraform',
+                name: 'Terraform',
+                type: 'deploy_terraform' as WorkflowNodeType,
+                icon: <Icon name='terraform' className='w-8 h-8' />,
             },
             {
-                id: 'deploy-gcp',
-                name: 'Google Cloud',
-                type: 'deploy_gcp' as WorkflowNodeType,
-                icon: <Icon name='gcp' className='w-8 h-8' />,
+                id: 'deploy-ansible',
+                name: 'Ansible',
+                type: 'deploy_ansible' as WorkflowNodeType,
+                icon: <Icon name='ansible' className='w-8 h-8' />,
             },
             {
-                id: 'deploy-azure',
-                name: 'Azure',
-                type: 'deploy_azure' as WorkflowNodeType,
-                icon: <Icon name='azure' className='w-8 h-8' />,
+                id: 'deploy-docker',
+                name: 'Docker',
+                type: 'deploy_docker' as WorkflowNodeType,
+                icon: <Icon name='docker' className='w-8 h-8' />,
+            },
+            {
+                id: 'deploy-aws-codepipeline',
+                name: 'AWS CodePipeline',
+                type: 'deploy_aws_codepipeline' as WorkflowNodeType,
+                icon: <Icon name='codepipeline' className='w-8 h-8' />,
+            },
+            {
+                id: 'deploy-cloudfoundry',
+                name: 'Cloud Foundry',
+                type: 'deploy_cloudfoundry' as WorkflowNodeType,
+                icon: <Icon name='cloudfoundry' className='w-8 h-8' />,
             },
         ],
     },
@@ -1076,36 +980,81 @@ const CONNECTOR_CATEGORIES = {
         ),
         connectors: [
             {
-                id: 'release-docker',
-                name: 'Docker Registry',
-                type: 'release_docker' as WorkflowNodeType,
-                icon: <Icon name='docker' className='w-8 h-8' />,
+                id: 'release-argo-cd',
+                name: 'Argo CD',
+                type: 'release_argo_cd' as WorkflowNodeType,
+                icon: <Icon name='argo' className='w-8 h-8' />,
             },
             {
-                id: 'release-npm',
-                name: 'NPM Registry',
-                type: 'release_npm' as WorkflowNodeType,
-                icon: <Icon name='npm' className='w-8 h-8' />,
+                id: 'release-servicenow',
+                name: 'ServiceNow',
+                type: 'release_servicenow' as WorkflowNodeType,
+                icon: <Icon name='slack' className='w-8 h-8' />,
             },
             {
-                id: 'release-maven',
-                name: 'Maven Central',
-                type: 'release_maven' as WorkflowNodeType,
-                icon: <Icon name='maven' className='w-8 h-8' />,
+                id: 'release-azure-devops',
+                name: 'Azure DevOps',
+                type: 'release_azure_devops' as WorkflowNodeType,
+                icon: <Icon name='azdo' className='w-8 h-8' />,
             },
         ],
     },
 };
 
+// Filter connectors to only show tools from shared CATEGORY_TOOLS configuration
+const FILTERED_CONNECTOR_CATEGORIES = Object.entries(
+    CONNECTOR_CATEGORIES,
+).reduce((acc, [categoryKey, categoryData]) => {
+    if (
+        categoryKey === 'showAll' ||
+        categoryKey === 'node' ||
+        categoryKey === 'approval'
+    ) {
+        // Keep showAll, node, and approval as-is (not in global settings)
+        (acc as any)[categoryKey] = categoryData;
+        return acc;
+    }
+
+    // For other categories, filter connectors based on shared config
+    const allowedToolNames =
+        CATEGORY_TOOLS[categoryKey as keyof typeof CATEGORY_TOOLS] || [];
+    const filteredConnectors = categoryData.connectors.filter((connector) => {
+        // Check if connector name is in the allowed tools list (exact match)
+        return allowedToolNames.some(
+            (toolName) =>
+                toolName.toLowerCase() === connector.name.toLowerCase(),
+        );
+    });
+
+    (acc as any)[categoryKey] = {
+        ...categoryData,
+        connectors: filteredConnectors,
+    };
+    return acc;
+}, {} as typeof CONNECTOR_CATEGORIES);
+
 interface ConnectorSlidingPanelProps {
     onConnectorSelect: (connectorType: WorkflowNodeType) => void;
     onDragStart: (event: React.DragEvent, nodeType: WorkflowNodeType) => void;
+    enabledConnectors?: string[]; // List of enabled connector names from global settings
 }
 
 const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
     onConnectorSelect,
     onDragStart,
+    enabledConnectors = [], // Default to empty array (allow all if not specified)
 }) => {
+    // Debug: Log enabled connectors
+    useEffect(() => {
+        console.log(
+            '🔧 [ConnectorPanel] Enabled connectors list:',
+            enabledConnectors,
+        );
+        console.log(
+            '🔧 [ConnectorPanel] Total enabled:',
+            enabledConnectors.length,
+        );
+    }, [enabledConnectors]);
     const [isHovered, setIsHovered] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(
         null,
@@ -1148,17 +1097,67 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
     };
 
     const getAllConnectors = () => {
-        return Object.values(CONNECTOR_CATEGORIES)
+        return Object.values(FILTERED_CONNECTOR_CATEGORIES)
             .filter((cat) => cat.name !== 'Show All')
             .flatMap((category) => category.connectors);
+    };
+
+    // Categories that should be checked against global settings
+    // Categories NOT in this list (like "node") will always be enabled
+    const CATEGORIES_IN_GLOBAL_SETTINGS = [
+        'plan',
+        'code',
+        'build',
+        'test',
+        'deploy',
+        'release',
+        'approval',
+    ];
+
+    // Helper function to get the category of a connector by name
+    const getConnectorCategory = (connectorName: string): string | null => {
+        for (const [categoryKey, category] of Object.entries(
+            FILTERED_CONNECTOR_CATEGORIES,
+        )) {
+            if (categoryKey === 'showAll') continue;
+            if (category.connectors.some((c) => c.name === connectorName)) {
+                return categoryKey;
+            }
+        }
+        return null;
+    };
+
+    // Helper function to check if a connector is enabled based on global settings
+    const isConnectorEnabled = (connectorName: string) => {
+        // Get the category this connector belongs to
+        const category = getConnectorCategory(connectorName);
+
+        // If category is not in global settings (like "node"), always enable
+        if (
+            category &&
+            !CATEGORIES_IN_GLOBAL_SETTINGS.includes(category.toLowerCase())
+        ) {
+            return true;
+        }
+
+        // If no enabledConnectors list provided (empty array), allow all connectors
+        if (enabledConnectors.length === 0) {
+            return true; // Allow all if no restrictions
+        }
+
+        // Check if connector name is in the enabled list (case insensitive)
+        const isEnabled = enabledConnectors.some(
+            (enabled) => enabled.toLowerCase() === connectorName.toLowerCase(),
+        );
+        return isEnabled;
     };
 
     const getDisplayedConnectors = () => {
         let connectors;
         if (selectedCategory && selectedCategory !== 'showAll') {
             connectors =
-                CONNECTOR_CATEGORIES[
-                    selectedCategory as keyof typeof CONNECTOR_CATEGORIES
+                FILTERED_CONNECTOR_CATEGORIES[
+                    selectedCategory as keyof typeof FILTERED_CONNECTOR_CATEGORIES
                 ]?.connectors || [];
         } else {
             // When selectedCategory is null (Show All clicked), return all connectors
@@ -1733,8 +1732,8 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                                     </svg>
                                     {selectedCategory &&
                                     selectedCategory !== 'showAll'
-                                        ? CONNECTOR_CATEGORIES[
-                                              selectedCategory as keyof typeof CONNECTOR_CATEGORIES
+                                        ? FILTERED_CONNECTOR_CATEGORIES[
+                                              selectedCategory as keyof typeof FILTERED_CONNECTOR_CATEGORIES
                                           ]?.name + ' Connectors'
                                         : 'Connectors'}
                                 </h4>
@@ -1818,7 +1817,9 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                             <div className='flex-1 overflow-y-auto'>
                                 {isShowingAll ? (
                                     // Show All: Display with category separators
-                                    Object.entries(CONNECTOR_CATEGORIES)
+                                    Object.entries(
+                                        FILTERED_CONNECTOR_CATEGORIES,
+                                    )
                                         .filter(([key]) => key !== 'showAll')
                                         .map(([key, category]) => {
                                             // Filter connectors by search query (case insensitive)
@@ -1852,49 +1853,91 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                                                             (
                                                                 connector,
                                                                 index,
-                                                            ) => (
-                                                                <div
-                                                                    key={
-                                                                        connector.id
-                                                                    }
-                                                                    draggable
-                                                                    onDragStart={(
-                                                                        e,
-                                                                    ) =>
-                                                                        onDragStart(
-                                                                            e,
-                                                                            connector.type,
-                                                                        )
-                                                                    }
-                                                                    onClick={() =>
-                                                                        onConnectorSelect(
-                                                                            connector.type,
-                                                                        )
-                                                                    }
-                                                                    className='connector-card connector-fade-in flex flex-col items-center p-3 border-2 border-gray-200 rounded-xl cursor-move bg-white hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
-                                                                >
-                                                                    <div className='icon-float w-14 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center mb-2 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group-hover:scale-125 group-hover:rotate-6 transition-all duration-300 ease-out shadow-md group-hover:shadow-lg'>
-                                                                        {connector.icon ? (
-                                                                            <div className='w-10 h-10 flex items-center justify-center'>
-                                                                                {
-                                                                                    connector.icon
-                                                                                }
-                                                                            </div>
-                                                                        ) : (
-                                                                            <span className='text-primary-600 text-xs'>
-                                                                                {
-                                                                                    category.icon
-                                                                                }
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <span className='text-xs text-gray-800 text-center font-semibold leading-tight group-hover:text-blue-800 group-hover:scale-105 transition-all duration-300 ease-out'>
-                                                                        {
-                                                                            connector.name
+                                                            ) => {
+                                                                const isEnabled =
+                                                                    isConnectorEnabled(
+                                                                        connector.name,
+                                                                    );
+                                                                return (
+                                                                    <div
+                                                                        key={
+                                                                            connector.id
                                                                         }
-                                                                    </span>
-                                                                </div>
-                                                            ),
+                                                                        draggable={
+                                                                            isEnabled
+                                                                        }
+                                                                        onDragStart={(
+                                                                            e,
+                                                                        ) => {
+                                                                            if (
+                                                                                isEnabled
+                                                                            ) {
+                                                                                onDragStart(
+                                                                                    e,
+                                                                                    connector.type,
+                                                                                );
+                                                                            } else {
+                                                                                e.preventDefault();
+                                                                            }
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            if (
+                                                                                isEnabled
+                                                                            ) {
+                                                                                onConnectorSelect(
+                                                                                    connector.type,
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        className={`connector-card flex flex-col items-center p-3 border-2 border-gray-200 rounded-xl ${
+                                                                            isEnabled
+                                                                                ? 'cursor-move bg-white hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
+                                                                                : 'cursor-not-allowed bg-gray-100 opacity-50 relative'
+                                                                        }`}
+                                                                        title={
+                                                                            isEnabled
+                                                                                ? connector.name
+                                                                                : `${connector.name} (Not configured in Global Settings)`
+                                                                        }
+                                                                    >
+                                                                        {!isEnabled && (
+                                                                            <div className='absolute inset-0 bg-gray-900/20 rounded-xl flex items-center justify-center backdrop-blur-[1px] z-10'>
+                                                                                <svg
+                                                                                    className='w-6 h-6 text-gray-600'
+                                                                                    fill='currentColor'
+                                                                                    viewBox='0 0 20 20'
+                                                                                >
+                                                                                    <path
+                                                                                        fillRule='evenodd'
+                                                                                        d='M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z'
+                                                                                        clipRule='evenodd'
+                                                                                    />
+                                                                                </svg>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className='w-14 h-14 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center mb-2 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 transition-all duration-300 ease-out shadow-md group-hover:shadow-lg'>
+                                                                            {connector.icon ? (
+                                                                                <div className='w-10 h-10 flex items-center justify-center'>
+                                                                                    {
+                                                                                        connector.icon
+                                                                                    }
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className='text-primary-600 text-xs'>
+                                                                                    {
+                                                                                        category.icon
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className='text-xs text-gray-800 text-center font-semibold leading-tight group-hover:text-blue-800 group-hover:scale-105 transition-all duration-300 ease-out'>
+                                                                            {
+                                                                                connector.name
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            },
                                                         )}
                                                     </div>
                                                 </div>
@@ -1904,58 +1947,96 @@ const ConnectorSlidingPanel: React.FC<ConnectorSlidingPanelProps> = ({
                                     // Category view: Display as grid
                                     <div className='grid grid-cols-2 gap-3'>
                                         {getDisplayedConnectors().map(
-                                            (connector, index) => (
-                                                <div
-                                                    key={connector.id}
-                                                    draggable
-                                                    onDragStart={(e) =>
-                                                        onDragStart(
-                                                            e,
-                                                            connector.type,
-                                                        )
-                                                    }
-                                                    onClick={() =>
-                                                        onConnectorSelect(
-                                                            connector.type,
-                                                        )
-                                                    }
-                                                    className='category-card connector-slide-up flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl cursor-move bg-gradient-to-br from-white to-gray-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
-                                                >
-                                                    <div className='connector-pulse w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 group- group-hover:rotate-12 transition-all duration-500 ease-out shadow-lg group-hover:shadow-2xl'>
-                                                        {connector.icon ? (
-                                                            <div className='w-12 h-12 flex items-center justify-center'>
-                                                                {connector.icon}
+                                            (connector, index) => {
+                                                const isEnabled =
+                                                    isConnectorEnabled(
+                                                        connector.name,
+                                                    );
+                                                return (
+                                                    <div
+                                                        key={connector.id}
+                                                        draggable={isEnabled}
+                                                        onDragStart={(e) => {
+                                                            if (isEnabled) {
+                                                                onDragStart(
+                                                                    e,
+                                                                    connector.type,
+                                                                );
+                                                            } else {
+                                                                e.preventDefault();
+                                                            }
+                                                        }}
+                                                        onClick={() => {
+                                                            if (isEnabled) {
+                                                                onConnectorSelect(
+                                                                    connector.type,
+                                                                );
+                                                            }
+                                                        }}
+                                                        className={`category-card flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl ${
+                                                            isEnabled
+                                                                ? 'cursor-move bg-gradient-to-br from-white to-gray-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400 group'
+                                                                : 'cursor-not-allowed bg-gray-100 opacity-50 relative'
+                                                        }`}
+                                                        title={
+                                                            isEnabled
+                                                                ? connector.name
+                                                                : `${connector.name} (Not configured in Global Settings)`
+                                                        }
+                                                    >
+                                                        {!isEnabled && (
+                                                            <div className='absolute inset-0 bg-gray-900/20 rounded-xl flex items-center justify-center backdrop-blur-[1px] z-10'>
+                                                                <svg
+                                                                    className='w-8 h-8 text-gray-600'
+                                                                    fill='currentColor'
+                                                                    viewBox='0 0 20 20'
+                                                                >
+                                                                    <path
+                                                                        fillRule='evenodd'
+                                                                        d='M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z'
+                                                                        clipRule='evenodd'
+                                                                    />
+                                                                </svg>
                                                             </div>
-                                                        ) : (
-                                                            <span className='text-primary-600 text-sm'>
-                                                                {
-                                                                    CONNECTOR_CATEGORIES[
-                                                                        Object.keys(
-                                                                            CONNECTOR_CATEGORIES,
-                                                                        ).find(
-                                                                            (
-                                                                                key,
-                                                                            ) =>
-                                                                                CONNECTOR_CATEGORIES[
-                                                                                    key as keyof typeof CONNECTOR_CATEGORIES
-                                                                                ].connectors.some(
-                                                                                    (
-                                                                                        c,
-                                                                                    ) =>
-                                                                                        c.id ===
-                                                                                        connector.id,
-                                                                                ),
-                                                                        ) as keyof typeof CONNECTOR_CATEGORIES
-                                                                    ]?.icon
-                                                                }
-                                                            </span>
                                                         )}
+                                                        <div className='w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-gradient-to-br group-hover:from-blue-200 group-hover:to-indigo-200 transition-all duration-300 ease-out shadow-lg'>
+                                                            {connector.icon ? (
+                                                                <div className='w-12 h-12 flex items-center justify-center'>
+                                                                    {
+                                                                        connector.icon
+                                                                    }
+                                                                </div>
+                                                            ) : (
+                                                                <span className='text-primary-600 text-sm'>
+                                                                    {
+                                                                        FILTERED_CONNECTOR_CATEGORIES[
+                                                                            Object.keys(
+                                                                                FILTERED_CONNECTOR_CATEGORIES,
+                                                                            ).find(
+                                                                                (
+                                                                                    key,
+                                                                                ) =>
+                                                                                    FILTERED_CONNECTOR_CATEGORIES[
+                                                                                        key as keyof typeof FILTERED_CONNECTOR_CATEGORIES
+                                                                                    ].connectors.some(
+                                                                                        (
+                                                                                            c,
+                                                                                        ) =>
+                                                                                            c.id ===
+                                                                                            connector.id,
+                                                                                    ),
+                                                                            ) as keyof typeof FILTERED_CONNECTOR_CATEGORIES
+                                                                        ]?.icon
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className='text-sm text-gray-800 text-center font-bold group-hover:text-blue-800 group- group-hover:tracking-wider transition-all duration-300 ease-out'>
+                                                            {connector.name}
+                                                        </span>
                                                     </div>
-                                                    <span className='text-sm text-gray-800 text-center font-bold group-hover:text-blue-800 group- group-hover:tracking-wider transition-all duration-300 ease-out'>
-                                                        {connector.name}
-                                                    </span>
-                                                </div>
-                                            ),
+                                                );
+                                            },
                                         )}
                                     </div>
                                 )}

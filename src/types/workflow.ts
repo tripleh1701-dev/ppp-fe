@@ -7,34 +7,43 @@ export type WorkflowNodeType =
     | 'node_prod'
     // Plan
     | 'plan_jira'
+    | 'plan_azure_devops'
     | 'plan_trello'
     | 'plan_asana'
     // Code
     | 'code_github'
     | 'code_gitlab'
+    | 'code_azure_repos'
     | 'code_bitbucket'
+    | 'code_sonarqube'
     // Build
     | 'build_jenkins'
     | 'build_github_actions'
-    | 'build_azure_pipelines'
+    | 'build_circleci'
+    | 'build_aws_codebuild'
+    | 'build_google_cloud_build'
+    | 'build_azure_devops'
     // Test
-    | 'test_jest'
-    | 'test_selenium'
     | 'test_cypress'
+    | 'test_selenium'
+    | 'test_jest'
+    | 'test_tricentis_tosca'
+    // Release
+    | 'release_argo_cd'
+    | 'release_servicenow'
+    | 'release_azure_devops'
     // Deploy
     | 'deploy_kubernetes'
     | 'deploy_helm'
-    | 'deploy_aws'
-    | 'deploy_gcp'
-    | 'deploy_azure'
+    | 'deploy_terraform'
+    | 'deploy_ansible'
+    | 'deploy_docker'
+    | 'deploy_aws_codepipeline'
+    | 'deploy_cloudfoundry'
     // Approval
     | 'approval_manual'
     | 'approval_slack'
     | 'approval_teams'
-    // Release
-    | 'release_docker'
-    | 'release_npm'
-    | 'release_maven'
     // Annotations
     | 'note'
     | 'comment';

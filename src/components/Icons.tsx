@@ -128,6 +128,16 @@ export const HelmIcon = ({className = '', size = 24}: IconProps) => (
     />
 );
 
+// Cloud Foundry Logo
+export const CloudFoundryIcon = ({className = '', size = 24}: IconProps) => (
+    <ImgIcon
+        src='/images/logos/cloudfoundry.svg'
+        alt='Cloud Foundry'
+        size={size}
+        className={className}
+    />
+);
+
 // Jest Logo
 export const JestIcon = ({className = '', size = 24}: IconProps) => (
     <svg
@@ -1537,6 +1547,7 @@ export const Icon = ({name, className = '', size = 24}: IconComponentProps) => {
         jenkins: JenkinsIcon,
         kubernetes: KubernetesIcon,
         helm: HelmIcon,
+        cloudfoundry: CloudFoundryIcon,
         jest: JestIcon,
         cypress: CypressIcon,
         selenium: SeleniumIcon,

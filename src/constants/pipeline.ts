@@ -48,34 +48,43 @@ export const NODE_LABELS: Record<WorkflowNodeType, string> = {
     node_prod: 'Production',
     // Plan
     plan_jira: 'Jira',
+    plan_azure_devops: 'Azure DevOps',
     plan_trello: 'Trello',
     plan_asana: 'Asana',
     // Code
     code_github: 'GitHub',
     code_gitlab: 'GitLab',
+    code_azure_repos: 'Azure Repos',
     code_bitbucket: 'Bitbucket',
+    code_sonarqube: 'SonarQube',
     // Build
     build_jenkins: 'Jenkins',
     build_github_actions: 'GitHub Actions',
-    build_azure_pipelines: 'Azure Pipelines',
+    build_circleci: 'CircleCI',
+    build_aws_codebuild: 'AWS CodeBuild',
+    build_google_cloud_build: 'Google Cloud Build',
+    build_azure_devops: 'Azure Pipelines',
     // Test
-    test_jest: 'Jest',
-    test_selenium: 'Selenium',
     test_cypress: 'Cypress',
+    test_selenium: 'Selenium',
+    test_jest: 'Jest',
+    test_tricentis_tosca: 'Tricentis Tosca',
+    // Release
+    release_argo_cd: 'Argo CD',
+    release_servicenow: 'ServiceNow',
+    release_azure_devops: 'Azure DevOps Release',
     // Deploy
     deploy_kubernetes: 'Kubernetes',
     deploy_helm: 'Helm',
-    deploy_aws: 'AWS',
-    deploy_gcp: 'Google Cloud',
-    deploy_azure: 'Azure',
+    deploy_terraform: 'Terraform',
+    deploy_ansible: 'Ansible',
+    deploy_docker: 'Docker',
+    deploy_aws_codepipeline: 'AWS CodePipeline',
+    deploy_cloudfoundry: 'Cloud Foundry',
     // Approval
     approval_manual: 'Manual Approval',
     approval_slack: 'Slack Approval',
     approval_teams: 'Teams Approval',
-    // Release
-    release_docker: 'Docker',
-    release_npm: 'NPM',
-    release_maven: 'Maven',
     // Annotations
     note: 'Sticky Note',
     comment: 'Comment',
