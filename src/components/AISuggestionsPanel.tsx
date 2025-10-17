@@ -69,6 +69,28 @@ export default function AISuggestionsPanel({
         })();
     }, [pathname]);
 
+    // Listen for custom events to control AI panel state
+    useEffect(() => {
+        const handleCollapseAIPanel = () => {
+            setIsCollapsed(true);
+        };
+
+        const handleExpandAIPanel = () => {
+            setIsCollapsed(false);
+        };
+
+        window.addEventListener('collapseAIPanel', handleCollapseAIPanel);
+        window.addEventListener('expandAIPanel', handleExpandAIPanel);
+
+        return () => {
+            window.removeEventListener(
+                'collapseAIPanel',
+                handleCollapseAIPanel,
+            );
+            window.removeEventListener('expandAIPanel', handleExpandAIPanel);
+        };
+    }, []);
+
     const allItems: SuggestionItem[] = useMemo(() => {
         const base: SuggestionItem[] = [
             {

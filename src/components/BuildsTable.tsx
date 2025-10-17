@@ -2340,12 +2340,12 @@ function AsyncChipSelect({
         const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
 
         // Prefer below if there's enough space, otherwise use above if there's more space above
-        // For cloudType, always prefer below unless there's really no space
+        // For entity and pipeline, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'entity';
+        const forceBelow = type === 'entity' || type === 'pipeline';
 
         if (forceBelow && spaceBelow >= 100) {
-            // For cloudType, show below if there's at least 100px space
+            // For entity and pipeline, show below if there's at least 100px space
             setDropdownPosition('below');
             top = containerRect.bottom + 4;
         } else if (
@@ -2354,8 +2354,8 @@ function AsyncChipSelect({
         ) {
             setDropdownPosition('below');
             top = containerRect.bottom + 4;
-            // Ensure it doesn't go below table bounds
-            if (top + dropdownHeight > tableRect.bottom) {
+            // For entity/pipeline, don't reposition above even if it goes below table bounds
+            if (!forceBelow && top + dropdownHeight > tableRect.bottom) {
                 top = Math.max(
                     tableRect.top + 10,
                     containerRect.top - dropdownHeight - 4,
@@ -2363,16 +2363,25 @@ function AsyncChipSelect({
                 setDropdownPosition('above');
             }
         } else {
-            setDropdownPosition('above');
-            top = Math.max(
-                tableRect.top + 10,
-                containerRect.top - dropdownHeight - 4,
-            );
+            // Only use above positioning if not entity/pipeline
+            if (forceBelow) {
+                setDropdownPosition('below');
+                top = containerRect.bottom + 4;
+            } else {
+                setDropdownPosition('above');
+                top = Math.max(
+                    tableRect.top + 10,
+                    containerRect.top - dropdownHeight - 4,
+                );
+            }
         }
 
-        // Final constraint to ensure dropdown is within table bounds
-        top = Math.max(top, tableRect.top + 10);
-        top = Math.min(top, tableRect.bottom - 100);
+        // Final constraint to ensure dropdown is within viewport
+        // For entity/pipeline, prioritize below positioning
+        if (!forceBelow) {
+            top = Math.max(top, tableRect.top + 10);
+            top = Math.min(top, tableRect.bottom - 100);
+        }
 
         setDropdownPortalPos({top, left, width});
         console.log('📍 Dropdown position calculated:', {
@@ -2405,19 +2414,20 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
 
-            console.log(`Loading options for type: ${type}`);
+            console.log(`🔄 Loading options for type: ${type}`);
+            console.log('📦 Available dropdownOptions:', dropdownOptions);
 
             // Use dropdownOptions if available for accountName
             if (type === 'buildName' && dropdownOptions?.buildNames) {
                 allData = dropdownOptions.buildNames;
                 console.log(
-                    `Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                    `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
                     allData,
                 );
             } else if (type === 'pipeline' && dropdownOptions?.pipelines) {
                 allData = dropdownOptions.pipelines;
                 console.log(
-                    `Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                    `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
                     allData,
                 );
             } else if (type === 'entity') {
@@ -2428,11 +2438,14 @@ function AsyncChipSelect({
                 ) {
                     allData = dropdownOptions.entities;
                     console.log(
-                        `Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                        `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
                         allData,
                     );
                 } else {
-                    console.log('Using fallback predefined cloudType options');
+                    console.warn(
+                        `⚠️ No entities in dropdownOptions, using fallback. dropdownOptions?.entities:`,
+                        dropdownOptions?.entities,
+                    );
                     allData = [
                         {id: 'private-cloud', name: 'Private Cloud'},
                         {id: 'public-cloud', name: 'Public Cloud'},
@@ -2520,12 +2533,12 @@ function AsyncChipSelect({
         }
     }, [open, allOptions.length, loadAllOptions]);
 
-    // Load cloudType options immediately on mount since they're predefined
+    // Load entity/pipeline options immediately on mount and reload when dropdownOptions change
     React.useEffect(() => {
-        if (type === 'entity' && allOptions.length === 0) {
+        if (type === 'entity' || type === 'pipeline') {
             loadAllOptions();
         }
-    }, [type, allOptions.length, loadAllOptions]);
+    }, [type, loadAllOptions, dropdownOptions]);
 
     // Remove unused effect for email filtering
     // React.useEffect was here for email/build filtering - no longer needed
@@ -2720,8 +2733,11 @@ function AsyncChipSelect({
                             }
                         }}
                         onClick={(e: any) => {
-                            // For cloudType, also allow single click to open dropdown
-                            if (type === 'entity' && allOptions.length > 0) {
+                            // For entity and pipeline, also allow single click to open dropdown
+                            if (
+                                (type === 'entity' || type === 'pipeline') &&
+                                allOptions.length > 0
+                            ) {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
                                     setQuery('');
@@ -2738,8 +2754,8 @@ function AsyncChipSelect({
                         <span className='flex-1 truncate pointer-events-none'>
                             {current || value}
                         </span>
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'entity' && (
+                        {/* Dropdown arrow for entity and pipeline */}
+                        {(type === 'entity' || type === 'pipeline') && (
                             <ChevronDown
                                 size={12}
                                 className='text-slate-400 flex-shrink-0 ml-1'
@@ -2786,14 +2802,25 @@ function AsyncChipSelect({
                                 }
                             }}
                             onBlur={(e: any) => {
-                                // Create chip from entered text when focus is lost
-                                const newValue = query.trim();
-                                if (newValue) {
-                                    onChange(newValue);
-                                    setCurrent(newValue);
-                                    setQuery('');
-                                }
-                                setOpen(false);
+                                // Delay closing to allow click events on dropdown items to fire
+                                setTimeout(() => {
+                                    // Create chip from entered text when focus is lost
+                                    // Only if the dropdown is still open (not closed by selection)
+                                    if (open) {
+                                        const newValue = query.trim();
+                                        if (
+                                            newValue &&
+                                            type !== 'entity' &&
+                                            type !== 'pipeline'
+                                        ) {
+                                            // Don't auto-create for entity/pipeline
+                                            onChange(newValue);
+                                            setCurrent(newValue);
+                                            setQuery('');
+                                        }
+                                        setOpen(false);
+                                    }
+                                }, 200);
                             }}
                             onFocus={() => {
                                 // Only open dropdown on focus if there are options to show
@@ -2845,10 +2872,16 @@ function AsyncChipSelect({
                                     ? 'focus:ring-red-200 focus:border-red-500'
                                     : 'focus:ring-blue-200 focus:border-blue-500'
                             }`}
-                            placeholder=''
+                            placeholder={
+                                type === 'entity'
+                                    ? placeholder || 'Select entity...'
+                                    : type === 'pipeline'
+                                    ? placeholder || 'Select pipeline...'
+                                    : placeholder || ''
+                            }
                         />
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'entity' && (
+                        {/* Dropdown arrow for entity and pipeline */}
+                        {(type === 'entity' || type === 'pipeline') && (
                             <button
                                 type='button'
                                 onClick={(e) => {
@@ -2983,6 +3016,10 @@ function AsyncChipSelect({
                                                                 <div
                                                                     key={opt.id}
                                                                     onClick={() => {
+                                                                        console.log(
+                                                                            `✅ ${type} selected:`,
+                                                                            opt.name,
+                                                                        );
                                                                         onChange(
                                                                             opt.name,
                                                                         );
@@ -2995,6 +3032,12 @@ function AsyncChipSelect({
                                                                         setOpen(
                                                                             false,
                                                                         );
+                                                                    }}
+                                                                    onMouseDown={(
+                                                                        e,
+                                                                    ) => {
+                                                                        // Prevent blur event on input
+                                                                        e.preventDefault();
                                                                     }}
                                                                     className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
                                                                 >
@@ -3345,7 +3388,9 @@ interface BuildsTableProps {
     foldingStageId?: string | null;
     triggerValidation?: boolean; // Trigger validation highlighting
     onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
-    onAddNewRow?: () => void; // Callback to add a new row
+    onAddNewRow?: () => void;
+    onBuildDetailClick?: (rowId: string) => void;
+    getBuildCount?: (rowId: string) => number; // Callback to add a new row
     externalSortColumn?: string; // External sort column from parent
     externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
     onSortChange?: (column: string, direction: 'asc' | 'desc') => void; // Callback when sort changes from column headers
@@ -3514,6 +3559,9 @@ function SortableBuildRow({
     onDeleteClick,
     onOpenAddressModal,
     onOpenTechnicalUserModal,
+    dropdownOptions,
+    onBuildDetailClick,
+    buildCount = 0,
 }: {
     row: BuildRow;
     index: number;
@@ -3553,6 +3601,14 @@ function SortableBuildRow({
     onDeleteClick?: (rowId: string) => void;
     onOpenAddressModal?: (row: BuildRow) => void;
     onOpenTechnicalUserModal?: (row: BuildRow) => void;
+    dropdownOptions?: {
+        buildNames?: Array<{id: string; name: string}>;
+        entities?: Array<{id: string; name: string}>;
+        pipelines?: Array<{id: string; name: string}>;
+        statuses?: Array<{id: string; name: string}>;
+    };
+    onBuildDetailClick?: (rowId: string) => void;
+    buildCount?: number;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -4001,37 +4057,28 @@ function SortableBuildRow({
                     style={{width: '100%'}}
                 >
                     {enableDropdownChips ? (
-                        <SimpleDropdown
+                        <AsyncChipSelect
+                            type='entity'
                             value={(row as any).entity || ''}
-                            options={[
-                                {
-                                    value: 'Private Cloud',
-                                    label: 'Private Cloud',
-                                },
-                                {value: 'Public Cloud', label: 'Public Cloud'},
-                            ]}
                             onChange={(v) => {
                                 console.log(
-                                    '🔥 CRITICAL: CloudType dropdown onChange called:',
-                                    v,
+                                    '🔥 Entity onChange called:',
+                                    v || '',
                                     'for row:',
                                     row.id,
                                 );
-                                console.log(
-                                    '🔥 CRITICAL: Current row.entity before update:',
-                                    (row as any).entity,
-                                );
-                                console.log(
-                                    '🔥 CRITICAL: Calling onUpdateField with:',
-                                    row.id,
-                                    'entity',
-                                    v || '',
-                                );
                                 onUpdateField(row.id, 'entity' as any, v || '');
+                                console.log(
+                                    '✅ onUpdateField called for entity',
+                                );
                             }}
-                            placeholder='Select...'
-                            className=''
+                            placeholder='Select entity...'
                             isError={isCellMissing(row.id, 'entity')}
+                            dropdownOptions={{
+                                buildNames: dropdownOptions?.buildNames || [],
+                                entities: dropdownOptions?.entities || [],
+                                pipelines: dropdownOptions?.pipelines || []
+                            }}
                             {...createTabNavigation('entity')}
                         />
                     ) : (
@@ -4041,9 +4088,9 @@ function SortableBuildRow({
                                 onUpdateField(row.id, 'entity' as any, v)
                             }
                             className='text-[12px]'
-                            dataAttr={`cloudType-${row.id}`}
+                            dataAttr={`entity-${row.id}`}
                             isError={isCellMissing(row.id, 'entity')}
-                            placeholder='Select cloud type'
+                            placeholder='Enter entity'
                             {...createTabNavigation('entity')}
                         />
                     )}
@@ -4051,7 +4098,7 @@ function SortableBuildRow({
             )}
             {cols.includes('pipeline') && (
                 <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
                             ? 'bg-blue-50'
                             : index % 2 === 0
@@ -4062,45 +4109,99 @@ function SortableBuildRow({
                     data-col='pipeline'
                     style={{width: '100%'}}
                 >
-                    <button
-                        onClick={() => onOpenAddressModal?.(row)}
-                        className='group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md'
-                        title={`Manage pipeline for ${
-                            row.buildName || 'this build'
-                        }`}
-                        tabIndex={-1}
-                    >
-                        <MapPin className='w-5 h-5 text-blue-600 group-hover:text-blue-700' />
-                        {(row as any).pipeline && (
-                            <div className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></div>
-                        )}
-                    </button>
+                    {enableDropdownChips ? (
+                        <AsyncChipSelect
+                            type='pipeline'
+                            value={(row as any).pipeline || ''}
+                            onChange={(v) => {
+                                console.log(
+                                    '🔥 Pipeline onChange called:',
+                                    v || '',
+                                    'for row:',
+                                    row.id,
+                                );
+                                onUpdateField(
+                                    row.id,
+                                    'pipeline' as any,
+                                    v || '',
+                                );
+                                console.log(
+                                    '✅ onUpdateField called for pipeline',
+                                );
+                            }}
+                            placeholder='Select pipeline...'
+                            isError={isCellMissing(row.id, 'pipeline')}
+                            dropdownOptions={{
+                                buildNames: dropdownOptions?.buildNames || [],
+                                entities: dropdownOptions?.entities || [],
+                                pipelines: dropdownOptions?.pipelines || []
+                            }}
+                            {...createTabNavigation('pipeline')}
+                        />
+                    ) : (
+                        <InlineEditableText
+                            value={(row as any).pipeline || ''}
+                            onCommit={(v) =>
+                                onUpdateField(row.id, 'pipeline' as any, v)
+                            }
+                            className='text-[12px]'
+                            dataAttr={`pipeline-${row.id}`}
+                            isError={isCellMissing(row.id, 'pipeline')}
+                            placeholder='Enter pipeline'
+                            {...createTabNavigation('pipeline')}
+                        />
+                    )}
                 </div>
             )}
             {cols.includes('status') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected
-                            ? 'bg-blue-50'
-                            : index % 2 === 0
-                            ? 'bg-white'
-                            : 'bg-slate-50/70'
-                    }`}
+                    className='relative w-full border-r border-slate-200 overflow-hidden group/status'
                     data-row-id={row.id}
                     data-col='status'
-                    style={{width: '100%'}}
+                    style={{width: '100%', height: '100%'}}
                 >
-                    <InlineEditableText
-                        value={row.status || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'status' as any, v)
-                        }
-                        className='text-[12px]'
-                        dataAttr={`status-${row.id}`}
-                        isError={isCellMissing(row.id, 'status')}
-                        placeholder='Enter status'
-                        {...createTabNavigation('status')}
-                    />
+                    <button
+                        onClick={() => {
+                            const newStatus =
+                                row.status === 'Active' ? 'Inactive' : 'Active';
+                            console.log(
+                                `🔄 Status toggled: ${row.status} → ${newStatus}`,
+                            );
+                            onUpdateField(row.id, 'status', newStatus);
+                        }}
+                        className={`relative w-full h-full text-xs font-semibold transition-all duration-300 flex items-center justify-center ${
+                            row.status === 'Active'
+                                ? 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 text-blue-700 hover:from-blue-200 hover:via-blue-100 hover:to-blue-200'
+                                : 'bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 text-gray-600 hover:from-gray-200 hover:via-gray-100 hover:to-gray-200'
+                        }`}
+                        style={{
+                            minHeight: '100%',
+                        }}
+                    >
+                        <span className='relative z-10'>
+                            {row.status === 'Active' ? 'Active' : 'Inactive'}
+                        </span>
+                        {/* Modern shimmer sweep effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 pointer-events-none overflow-hidden transition-opacity duration-300`}
+                            style={{
+                                background:
+                                    row.status === 'Active'
+                                        ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)'
+                                        : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer 1.8s ease-in-out infinite',
+                            }}
+                        />
+                        {/* Glow border effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 transition-opacity duration-300 pointer-events-none ${
+                                row.status === 'Active'
+                                    ? 'shadow-[inset_0_0_15px_rgba(59,130,246,0.4)]'
+                                    : 'shadow-[inset_0_0_15px_rgba(107,114,128,0.3)]'
+                            }`}
+                        />
+                    </button>
                 </div>
             )}
             {cols.includes('artifact') && (
@@ -4131,7 +4232,7 @@ function SortableBuildRow({
             )}
             {cols.includes('build') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`group relative text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 cursor-pointer hover:bg-blue-50/50 transition-colors ${
                         isSelected
                             ? 'bg-blue-50'
                             : index % 2 === 0
@@ -4142,17 +4243,38 @@ function SortableBuildRow({
                     data-col='build'
                     style={{width: '100%'}}
                 >
-                    <InlineEditableText
-                        value={row.build || ''}
-                        onCommit={(v) =>
-                            onUpdateField(row.id, 'build' as any, v)
-                        }
-                        className='text-[12px]'
-                        dataAttr={`build-${row.id}`}
-                        isError={isCellMissing(row.id, 'build')}
-                        placeholder='Enter build'
-                        {...createTabNavigation('build')}
-                    />
+                    <div className='flex items-center justify-between gap-2'>
+                        <div className='flex items-center gap-2 flex-1'>
+                            <span className='text-sm font-semibold text-blue-600'>
+                                {buildCount || 0}
+                            </span>
+                            <span className='text-xs text-gray-500'>
+                                builds
+                            </span>
+                        </div>
+                        <button
+                            className='opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-out p-1 hover:bg-blue-100 rounded-md text-blue-600 flex-shrink-0'
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onBuildDetailClick?.(row.id);
+                            }}
+                            title='View build details'
+                        >
+                            <svg
+                                className='w-4 h-4'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M12 4v16m8-8H4'
+                                />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             )}
             {/* actions column removed */}
@@ -4208,6 +4330,8 @@ const BuildsTable = forwardRef<any, BuildsTableProps>(
             isAIInsightsPanelOpen = false,
             onOpenAddressModal,
             onOpenTechnicalUserModal,
+            onBuildDetailClick,
+            getBuildCount,
         },
         ref,
     ) => {
@@ -5610,7 +5734,7 @@ const BuildsTable = forwardRef<any, BuildsTableProps>(
                         >
                             {(() => {
                                 const defaultLabels: Record<string, string> = {
-                                    buildName: 'Build Name',
+                                    buildName: 'Job Name',
                                     description: 'Description',
                                     entity: 'Entity',
                                     pipeline: 'Pipeline',
@@ -5869,6 +5993,17 @@ const BuildsTable = forwardRef<any, BuildsTableProps>(
                                                 onOpenTechnicalUserModal={
                                                     onOpenTechnicalUserModal
                                                 }
+                                                dropdownOptions={
+                                                    dropdownOptions
+                                                }
+                                                onBuildDetailClick={
+                                                    onBuildDetailClick
+                                                }
+                                                buildCount={
+                                                    getBuildCount
+                                                        ? getBuildCount(r.id)
+                                                        : 0
+                                                }
                                             />
                                             {expandedRows.has(r.id) && (
                                                 <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
@@ -6090,6 +6225,9 @@ const BuildsTable = forwardRef<any, BuildsTableProps>(
                                                                 }
                                                                 onOpenTechnicalUserModal={
                                                                     onOpenTechnicalUserModal
+                                                                }
+                                                                dropdownOptions={
+                                                                    dropdownOptions
                                                                 }
                                                             />
                                                         </div>
