@@ -462,6 +462,23 @@ export default function ManageAccounts() {
         sortColumn && sortDirection ? `${sortColumn}-${sortDirection}` : '',
     ]);
 
+    // Memoize the rows to avoid creating new objects on every render
+    const accountTableRows = React.useMemo(() => {
+        return processedConfigs.map<AccountRow>((a: any) => ({
+            id: a.id || '',
+            accountName: a.accountName || '',
+            masterAccount: a.masterAccount || '',
+            cloudType: a.cloudType || '',
+            email: a.email || '',
+            phone: a.phone || '',
+            address: a.address || '',
+            addresses: a.addresses || [],
+            addressData: a.addressData,
+            technicalUsers: a.technicalUsers || [],
+            licenses: a.licenses || [],
+        }));
+    }, [processedConfigs]);
+
     // Helper functions for filter management
     const applyFilters = (filters: Record<string, any>) => {
         setActiveFilters(filters);
@@ -823,11 +840,9 @@ export default function ManageAccounts() {
                 );
             }
 
-            console.log('🎉 New account saved automatically!');
-            
-            
+            console.log(' New account saved automatically!');
         } catch (error) {
-            console.error('❌ Auto-save failed:', error);
+            console.error(' Auto-save failed:', error);
         } finally {
             // Remove from saving state
             setSavingRows((prev) => {
@@ -2282,45 +2297,62 @@ export default function ManageAccounts() {
                         '📊 Loaded accounts from API:',
                         data?.length || 0,
                     );
+                    console.log(
+                        '📊 Raw API response (first account):',
+                        data?.[0],
+                    );
 
                     // Ensure all accounts have required fields
-                    accountsData = (data || []).map((account: any) => ({
-                        ...account,
-                        masterAccount: account.masterAccount || '',
-                        cloudType: account.cloudType || '',
-                        country: account.country || '',
-                        addresses: account.addresses || [],
-                        // Transform license field names from backend to frontend format
-                        licenses: (account.licenses || []).map(
-                            (license: any) => ({
-                                id: license.id,
-                                enterprise: license.enterprise || '',
-                                product: license.product || '',
-                                service: license.service || '',
-                                licenseStartDate:
-                                    license.licenseStart ||
-                                    license.licenseStartDate ||
-                                    '',
-                                licenseEndDate:
-                                    license.licenseEnd ||
-                                    license.licenseEndDate ||
-                                    '',
-                                numberOfUsers:
-                                    license.users ||
-                                    license.numberOfUsers ||
-                                    '',
-                                contactDetails:
-                                    license.contactDetails ||
-                                    license.contacts ||
-                                    {},
-                                renewalNotice: license.renewalNotice || false,
-                                noticePeriodDays:
-                                    license.noticePeriod?.toString() ||
-                                    license.noticePeriodDays ||
-                                    '',
-                            }),
-                        ),
-                    }));
+                    accountsData = (data || []).map((account: any) => {
+                        console.log(
+                            `📊 Account ${account.accountName} addresses:`,
+                            account.addresses,
+                        );
+                        return {
+                            ...account,
+                            masterAccount: account.masterAccount || '',
+                            cloudType: account.cloudType || '',
+                            country: account.country || '',
+                            addresses: account.addresses || [],
+                            // Transform license field names from backend to frontend format
+                            licenses: (account.licenses || []).map(
+                                (license: any) => ({
+                                    id: license.id,
+                                    enterprise: license.enterprise || '',
+                                    product: license.product || '',
+                                    service: license.service || '',
+                                    licenseStartDate:
+                                        license.licenseStart ||
+                                        license.licenseStartDate ||
+                                        '',
+                                    licenseEndDate:
+                                        license.licenseEnd ||
+                                        license.licenseEndDate ||
+                                        '',
+                                    numberOfUsers:
+                                        license.users ||
+                                        license.numberOfUsers ||
+                                        '',
+                                    contactDetails: license.contactDetails ||
+                                        license.contacts || {
+                                            id: '',
+                                            name: '',
+                                            email: '',
+                                            phone: '',
+                                            department: '',
+                                            designation: '',
+                                            company: '',
+                                        },
+                                    renewalNotice:
+                                        license.renewalNotice || false,
+                                    noticePeriodDays:
+                                        license.noticePeriod?.toString() ||
+                                        license.noticePeriodDays ||
+                                        '',
+                                }),
+                            ),
+                        };
+                    });
                 } catch (error) {
                     console.error(
                         '❌ Error fetching accounts from API:',
@@ -2346,26 +2378,102 @@ export default function ManageAccounts() {
                     return;
                 }
 
+                // Fetch technical users for each account with delay to avoid rate limiting
+                const accountsWithTechnicalUsers: any[] = [];
+                for (let i = 0; i < accountsData.length; i++) {
+                    const account = accountsData[i];
+                    try {
+                        const techUsersResponse = await fetch(
+                            `${apiBase}/api/users?accountId=${
+                                account.id
+                            }&accountName=${encodeURIComponent(
+                                account.accountName,
+                            )}`,
+                        );
+
+                        let technicalUsers: any[] = [];
+                        if (techUsersResponse.ok) {
+                            const allUsers = await techUsersResponse.json();
+                            technicalUsers = allUsers.filter(
+                                (u: any) => u.technicalUser === true,
+                            );
+                        }
+
+                        accountsWithTechnicalUsers.push({
+                            ...account,
+                            technicalUsers,
+                        });
+                    } catch (error) {
+                        console.warn(
+                            `⚠️ Could not fetch technical users for account ${account.accountName}:`,
+                            error,
+                        );
+                        accountsWithTechnicalUsers.push({
+                            ...account,
+                            technicalUsers: [],
+                        });
+                    }
+
+                    // Add a small delay between requests to avoid rate limiting
+                    if (i < accountsData.length - 1) {
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 100),
+                        );
+                    }
+                }
+
                 // Transform account data to AccountRow format
-                const transformedAccounts = accountsData
-                    .map((account: any, index: number) => ({
-                        id: account.id,
-                        accountName: account.accountName || '',
-                        masterAccount: account.masterAccount || '',
-                        cloudType: account.cloudType || '',
-                        address: account.address || '',
-                        country: account.country || '',
-                        email: account.email || '',
-                        phone: account.phone || '',
-                        addresses: account.addresses || [],
-                        licenses: account.licenses || [],
-                        technicalUsername: account.technicalUsername || '',
-                        technicalUserId: account.technicalUserId || '',
-                        // Store creation time and display order for stable sorting
-                        createdAt: account.createdAt,
-                        updatedAt: account.updatedAt,
-                        displayOrder: index, // Preserve original order
-                    }))
+                const transformedAccounts = accountsWithTechnicalUsers
+                    .map((account: any, index: number) => {
+                        const addressData =
+                            account.addresses && account.addresses.length > 0
+                                ? account.addresses[0]
+                                : null;
+
+                        // Construct formatted address string from addressData if not provided
+                        let formattedAddress = account.address || '';
+                        if (!formattedAddress && addressData) {
+                            formattedAddress = `${
+                                addressData.addressLine1 || ''
+                            }, ${addressData.city || ''}, ${
+                                addressData.state || ''
+                            } ${addressData.zipCode || ''}`
+                                .trim()
+                                .replace(/,\s*,/g, ',')
+                                .replace(/,\s*$/, '')
+                                .replace(/^\s*,\s*/, '');
+                        }
+
+                        console.log(
+                            `📊 Transformed account ${account.accountName}:`,
+                            {
+                                addressData,
+                                formattedAddress,
+                                technicalUsersCount:
+                                    account.technicalUsers?.length || 0,
+                            },
+                        );
+                        return {
+                            id: account.id,
+                            accountName: account.accountName || '',
+                            masterAccount: account.masterAccount || '',
+                            cloudType: account.cloudType || '',
+                            address: formattedAddress,
+                            country: account.country || '',
+                            email: account.email || '',
+                            phone: account.phone || '',
+                            addresses: account.addresses || [],
+                            addressData: addressData,
+                            licenses: account.licenses || [],
+                            technicalUsers: account.technicalUsers || [],
+                            technicalUsername: account.technicalUsername || '',
+                            technicalUserId: account.technicalUserId || '',
+                            // Store creation time and display order for stable sorting
+                            createdAt: account.createdAt,
+                            updatedAt: account.updatedAt,
+                            displayOrder: index, // Preserve original order
+                        };
+                    })
                     // Sort by creation time first, then by display order for stable ordering
                     .sort((a: any, b: any) => {
                         const timeA = new Date(a.createdAt).getTime();
@@ -2673,7 +2781,9 @@ export default function ManageAccounts() {
 
         // Check for incomplete licenses
         if (hasIncompleteLicenses) {
-            setValidationMessage('Please complete all license fields before adding a new row.');
+            setValidationMessage(
+                'Please complete all license fields before adding a new row.',
+            );
             setShowValidationErrors(true); // Enable red border highlighting for validation errors
             setShowValidationModal(true);
             return;
@@ -2731,13 +2841,20 @@ export default function ManageAccounts() {
 
     // Address modal functions
     const handleOpenAddressModal = (row: AccountRow) => {
+        console.log('📍 Opening address modal for row:', {
+            id: row.id,
+            accountName: row.accountName,
+            addressData: (row as any).addressData,
+            addresses: (row as any).addresses,
+        });
         setSelectedAccountForAddress({
             id: row.id,
             accountName: row.accountName || '',
             masterAccount: row.masterAccount || '',
             address: row.address || '',
-            addressData: (row as any).addressData
-        });
+            addressData: (row as any).addressData,
+            addresses: (row as any).addresses,
+        } as any);
         setIsAddressModalOpen(true);
     };
 
@@ -2746,36 +2863,103 @@ export default function ManageAccounts() {
         setSelectedAccountForAddress(null);
     };
 
-    const handleSaveAddresses = (addresses: any[]) => {
+    const handleSaveAddresses = async (addresses: any[]) => {
         if (!selectedAccountForAddress) return;
 
-        // Store the full address object instead of concatenating to string
+        const accountId = selectedAccountForAddress.id;
         const addressData = addresses.length > 0 ? addresses[0] : null;
-       
 
-        // Update the account with the new address data
-        // Update the account with the new address data
-        setAccounts((prev) => {
-            const updated = prev.map((account) =>
-                account.id === selectedAccountForAddress.id
-                    ? {
-                          ...account,
-                          address: addressData ? `${addressData.addressLine1}, ${addressData.city}, ${addressData.state} ${addressData.zipCode}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '') : '',
-                          addressData: addressData, // Store full address object
-                          updatedAt: new Date().toISOString()
-                      }
-                    : account,
+        console.log(
+            '💾 Saving addresses for account:',
+            accountId,
+            'Addresses:',
+            addresses,
+        );
+
+        // Persist to DynamoDB via API
+        try {
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const response = await fetch(`${apiBase}/api/accounts`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: accountId,
+                    addresses: addresses,
+                    address: addressData
+                        ? `${addressData.addressLine1}, ${addressData.city}, ${addressData.state} ${addressData.zipCode}`
+                              .trim()
+                              .replace(/,\s*,/g, ',')
+                              .replace(/,\s*$/, '')
+                        : '',
+                    addressLine1: addressData?.addressLine1 || '',
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    'Failed to update account addresses in DynamoDB',
+                );
+            }
+
+            console.log(
+                `✅ Address saved to DynamoDB for account ${accountId}`,
             );
-            const sorted = sortConfigsByDisplayOrder(updated);
-            saveAccountsToStorage(sorted);
-            return sorted;
-        });
 
-        console.log('💾 Address saved for account:', selectedAccountForAddress.id, 'Address data:', addressData);
+            // Reload fresh account data from database
+            console.log(`🔄 Reloading account data from database...`);
+            const accountResponse = await fetch(
+                `${apiBase}/api/accounts/${accountId}`,
+            );
+
+            if (accountResponse.ok) {
+                const freshAccount = await accountResponse.json();
+                console.log(`✅ Reloaded account data from database`);
+
+                // Update local state with fresh data from database
+                setAccounts((prev) => {
+                    const updated = prev.map((account) =>
+                        account.id === accountId
+                            ? {
+                                  ...account,
+                                  addresses: freshAccount.addresses || [],
+                                  address: freshAccount.address || '',
+                                  addressData:
+                                      freshAccount.addresses &&
+                                      freshAccount.addresses.length > 0
+                                          ? freshAccount.addresses[0]
+                                          : null,
+                                  updatedAt: new Date().toISOString(),
+                              }
+                            : account,
+                    );
+                    const sorted = sortConfigsByDisplayOrder(updated);
+                    saveAccountsToStorage(sorted);
+                    return sorted;
+                });
+            }
+
+            // Wait a moment for React to process the state update, then close the modal
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            handleCloseAddressModal();
+        } catch (error) {
+            console.error('Error saving address to DynamoDB:', error);
+            // You might want to show a toast notification here to inform the user
+        }
     };
 
     // Technical User modal functions
     const handleOpenTechnicalUserModal = (row: AccountRow) => {
+        console.log('👤 Opening technical user modal for row:', {
+            id: row.id,
+            accountName: row.accountName,
+            technicalUsers: (row as any).technicalUsers,
+            technicalUsername: (row as any).technicalUsername,
+            technicalUserId: (row as any).technicalUserId,
+            allKeys: Object.keys(row),
+        });
         setSelectedAccountForTechnicalUser({
             id: row.id,
             accountName: row.accountName || '',
@@ -2790,31 +2974,170 @@ export default function ManageAccounts() {
         setSelectedAccountForTechnicalUser(null);
     };
 
-    const handleSaveTechnicalUsers = (users: TechnicalUser[]) => {
+    const handleSaveTechnicalUsers = async (users: TechnicalUser[]) => {
         if (!selectedAccountForTechnicalUser) return;
 
-        // Update the account with the new technical users
-        setAccounts((prev) => {
-            const updated = prev.map((account) =>
-                account.id === selectedAccountForTechnicalUser.id
-                    ? {
-                          ...account,
-                          technicalUsers: users,
-                          updatedAt: new Date().toISOString(),
-                      }
-                    : account,
-            );
-            const sorted = sortConfigsByDisplayOrder(updated);
-            saveAccountsToStorage(sorted);
-            return sorted;
-        });
-
         console.log(
-            '💾 Technical users saved for account:',
+            '💾 Saving technical users for account:',
             selectedAccountForTechnicalUser.id,
             'Users:',
             users,
         );
+
+        // Persist technical users to DynamoDB via User Management API
+        try {
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const accountId = selectedAccountForTechnicalUser.id;
+            const accountName = selectedAccountForTechnicalUser.accountName;
+
+            // Get existing technical users for this account
+            const existingResponse = await fetch(
+                `${apiBase}/api/users?accountId=${accountId}&accountName=${encodeURIComponent(
+                    accountName,
+                )}`,
+            );
+
+            let existingTechnicalUsers: any[] = [];
+            if (existingResponse.ok) {
+                const allUsers = await existingResponse.json();
+                existingTechnicalUsers = allUsers.filter(
+                    (u: any) => u.technicalUser === true,
+                );
+            }
+
+            // Delete removed technical users
+            const existingIds = existingTechnicalUsers.map((u) => u.id);
+            const newIds = users.map((u) => u.id);
+            const removedIds = existingIds.filter((id) => !newIds.includes(id));
+
+            console.log(
+                `🗑️ Deleting ${removedIds.length} removed technical user(s)`,
+            );
+            for (const userId of removedIds) {
+                try {
+                    // Backend expects accountId and accountName as query parameters
+                    const deleteUrl = `${apiBase}/api/users/${userId}?accountId=${accountId}&accountName=${encodeURIComponent(
+                        accountName,
+                    )}`;
+                    const deleteResponse = await fetch(deleteUrl, {
+                        method: 'DELETE',
+                        headers: {'Content-Type': 'application/json'},
+                    });
+
+                    if (!deleteResponse.ok) {
+                        console.error(
+                            `❌ Failed to delete technical user ${userId}:`,
+                            await deleteResponse.text(),
+                        );
+                    } else {
+                        console.log(
+                            `✅ Successfully deleted technical user ${userId} from database`,
+                        );
+                    }
+                } catch (error) {
+                    console.error(
+                        `❌ Error deleting technical user ${userId}:`,
+                        error,
+                    );
+                }
+            }
+
+            // Create or update technical users
+            for (const user of users) {
+                const userData = {
+                    firstName: user.firstName,
+                    middleName: user.middleName || '',
+                    lastName: user.lastName,
+                    emailAddress: user.emailAddress,
+                    status: user.status ? 'Active' : 'Inactive',
+                    startDate: user.startDate,
+                    endDate: user.endDate,
+                    password: user.password,
+                    technicalUser: true,
+                    assignedUserGroups: user.assignedUserGroup
+                        ? [user.assignedUserGroup]
+                        : [],
+                    selectedAccountId: accountId,
+                    selectedAccountName: accountName,
+                };
+
+                if (existingIds.includes(user.id)) {
+                    // Update existing user
+                    const response = await fetch(
+                        `${apiBase}/api/users/${user.id}`,
+                        {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(userData),
+                        },
+                    );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `Failed to update technical user ${user.id}`,
+                        );
+                    }
+                    console.log(`✅ Updated technical user ${user.id}`);
+                } else {
+                    // Create new user
+                    const response = await fetch(`${apiBase}/api/users`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(userData),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to create technical user');
+                    }
+                    console.log(`✅ Created technical user`);
+                }
+            }
+
+            // Reload technical users from database to get fresh data
+            console.log(`🔄 Reloading technical users from database...`);
+            const reloadResponse = await fetch(
+                `${apiBase}/api/users?accountId=${accountId}&accountName=${encodeURIComponent(
+                    accountName,
+                )}`,
+            );
+            const reloadedUsers = reloadResponse.ok
+                ? await reloadResponse.json()
+                : [];
+            const freshTechnicalUsers = reloadedUsers.filter(
+                (u: any) => u.technicalUser === true,
+            );
+            console.log(
+                `✅ Reloaded ${freshTechnicalUsers.length} technical user(s) from database`,
+            );
+
+            // Update local state with fresh data from database
+            setAccounts((prev) => {
+                const updated = prev.map((account) =>
+                    account.id === selectedAccountForTechnicalUser.id
+                        ? {
+                              ...account,
+                              technicalUsers: freshTechnicalUsers,
+                              updatedAt: new Date().toISOString(),
+                          }
+                        : account,
+                );
+                const sorted = sortConfigsByDisplayOrder(updated);
+                saveAccountsToStorage(sorted);
+                return sorted;
+            });
+
+            console.log(
+                `✅ All technical users saved successfully for account ${accountId}`,
+            );
+
+            // Wait a moment for React to process the state update, then close the modal
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            handleCloseTechnicalUserModal();
+        } catch (error) {
+            console.error('Error saving technical users:', error);
+            // You might want to show a toast notification here to inform the user
+        }
     };
 
     return (
@@ -3661,19 +3984,7 @@ export default function ManageAccounts() {
                                 <AccountsTable
                                     ref={accountsTableRef}
                                     isAIInsightsPanelOpen={!isAIPanelCollapsed}
-                                    rows={processedConfigs.map<AccountRow>(
-                                        (a: any) => ({
-                                            id: a.id || '',
-                                            accountName: a.accountName || '',
-                                            masterAccount:
-                                                a.masterAccount || '',
-                                            cloudType: a.cloudType || '',
-                                            email: a.email || '',
-                                            phone: a.phone || '',
-                                            address: a.address || '',
-                                            licenses: a.licenses || [],
-                                        }),
-                                    )}
+                                    rows={accountTableRows}
                                     onEdit={(id) => {
                                         const cfg = accounts.find(
                                             (x) => x.id === id,
@@ -4362,16 +4673,27 @@ export default function ManageAccounts() {
             )}
 
             {/* Address Modal */}
-            {selectedAccountForAddress && (
-                <AddressModal
-                    isOpen={isAddressModalOpen}
-                    onClose={handleCloseAddressModal}
-                    onSave={handleSaveAddresses}
-                    accountName={selectedAccountForAddress.accountName}
-                    masterAccount={selectedAccountForAddress.masterAccount}
-                    initialAddresses={selectedAccountForAddress.addressData ? [selectedAccountForAddress.addressData] : []}
-                />
-            )}
+            {selectedAccountForAddress &&
+                (() => {
+                    const initialAddresses =
+                        (selectedAccountForAddress as any).addresses || [];
+                    console.log(
+                        '📍 Rendering AddressModal with initialAddresses:',
+                        initialAddresses,
+                    );
+                    return (
+                        <AddressModal
+                            isOpen={isAddressModalOpen}
+                            onClose={handleCloseAddressModal}
+                            onSave={handleSaveAddresses}
+                            accountName={selectedAccountForAddress.accountName}
+                            masterAccount={
+                                selectedAccountForAddress.masterAccount
+                            }
+                            initialAddresses={initialAddresses}
+                        />
+                    );
+                })()}
 
             {/* Technical User Modal */}
             {selectedAccountForTechnicalUser && (
