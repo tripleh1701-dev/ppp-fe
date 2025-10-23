@@ -223,10 +223,6 @@ export default function ManageRoles() {
     const loadRolesRequestId = useRef(0);
 
     // Load initial data
-    useEffect(() => {
-        loadRoles();
-    }, []);
-
     // Load roles data from API
     const loadRoles = useCallback(async () => {
         setLoading(true);
@@ -364,7 +360,7 @@ export default function ManageRoles() {
             isSystiva: selectedAccount.isSystiva,
         });
         loadRoles();
-    }, [selectedAccount.id, selectedAccount.name, loadRoles]);
+    }, [selectedAccount.id, selectedAccount.name, selectedAccount.isSystiva, loadRoles]);
 
     // Debounced auto-save (10-second timer with countdown)
     const debouncedAutoSave = useCallback(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
@@ -3047,8 +3047,12 @@ export default function EnterpriseConfigTable({
         return isFieldMissing(row, field);
     };
 
+    // Keep a local order for row management. Sync when rows change
+    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
+    const [localRows, setLocalRows] = useState<EnterpriseConfigRow[]>(rows);
+
     // Function to validate all rows and highlight missing fields
-    const validateAndHighlightErrors = () => {
+    const validateAndHighlightErrors = useCallback(() => {
         const errorRowIds = new Set<string>();
         
         localRows.forEach(row => {
@@ -3062,11 +3066,7 @@ export default function EnterpriseConfigTable({
         
         setValidationErrors(errorRowIds);
         return errorRowIds;
-    };
-
-    // Keep a local order for row management. Sync when rows change
-    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
-    const [localRows, setLocalRows] = useState<EnterpriseConfigRow[]>(rows);
+    }, [localRows]);
     useEffect(() => {
         // Preserve existing order; append any new ids
         const existing = new Set(order);
@@ -3091,7 +3091,7 @@ export default function EnterpriseConfigTable({
                 onValidationComplete(Array.from(errorRowIds));
             }
         }
-    }, [triggerValidation]);
+    }, [triggerValidation, validateAndHighlightErrors, onValidationComplete]);
 
     // Effect to highlight errors when incompleteRowIds changes from parent
     useEffect(() => {
@@ -3102,7 +3102,7 @@ export default function EnterpriseConfigTable({
             // Clear validation errors when not showing validation or no incomplete rows from parent
             setValidationErrors(new Set());
         }
-    }, [incompleteRowIds, showValidationErrors]);
+    }, [incompleteRowIds, showValidationErrors, validateAndHighlightErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -3129,7 +3129,8 @@ export default function EnterpriseConfigTable({
     useEffect(() => {
         return () => {
             // cleanup pending timers on unmount without forcing save
-            Object.values(saveTimersRef.current).forEach((t) =>
+            const currentTimers = saveTimersRef.current;
+            Object.values(currentTimers).forEach((t) =>
                 clearTimeout(t),
             );
         };
@@ -3234,12 +3235,12 @@ export default function EnterpriseConfigTable({
         return base.filter((c) => allowed.has(c));
     }, [visibleColumns, columnOrder]);
 
-    const colSizes: Record<string, string> = {
+    const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
         enterprise: '180px', // Reduced width to give more space for Services column
         product: '200px', // Further reduced width for product names
         services: 'minmax(600px, 1fr)', // Increased minimum width to 600px for more space
-    };
+    } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());

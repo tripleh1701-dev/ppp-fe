@@ -2,6 +2,8 @@
 
 import React, {useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
+import './Manage_User/TableComponent.css';
+
 import { generateId } from '@/utils/id-generator';
 import {
     ArrowUp,
@@ -42,12 +44,14 @@ import {
     Layers,
     FoldVertical,
     UnfoldVertical,
+    AtSign,
+    CheckCircle,
+    Lock,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
 import DateChipSelect from './DateChipSelect';
-import ContactModal from './ContactModal';
 
 // Utility function to generate consistent colors for account data across the application
 const getAccountColor = (accountName: string) => {
@@ -294,7 +298,7 @@ const SelectionChip = ({
 
     return (
         <span
-            className={`inline-flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
+            className={`w-full flex items-center px-2 py-1 text-xs font-medium ${colorClasses[color]} mr-1 mb-1 rounded`}
         >
             {label}
             <button
@@ -430,39 +434,181 @@ const ChipDropdown = ({
 
 export interface AccountRow {
     id: string;
-    // New simplified fields - primary data model
-    accountName: string;
-    masterAccount: string;
-    cloudType: string;
-    address: string;
-    technicalUsers?: any[]; // Add technical users field
-    // Add licenses array for expandable sub-rows
-    licenses?: License[];
+    // User management fields
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    emailAddress: string;
+    status: 'ACTIVE' | 'INACTIVE';
+    startDate: string;
+    endDate?: string;
+    password?: string;
+    technicalUser?: boolean;
+    assignedUserGroups?: string[];
 }
 
-// License interface for sub-rows
-interface Contact {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    department: string;
-    designation: string;
-    company: string;
-}
+// Validation functions for user management fields
+const validateFirstName = (value: string): string | null => {
+    console.log('validateFirstName called with:', value);
+    
+    if (!value || value.trim().length === 0) {
+        console.log('Validation failed: empty value');
+        return 'First name is required';
+    }
+    
+    const trimmedValue = value.trim();
+    
+    if (trimmedValue.length < 2) {
+        console.log('Validation failed: too short');
+        return 'First name must be at least 2 characters long';
+    }
+    
+    if (trimmedValue.length > 50) {
+        console.log('Validation failed: too long');
+        return 'First name must not exceed 50 characters';
+    }
+    
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(trimmedValue)) {
+        console.log('Validation failed: invalid characters');
+        return 'First name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+    
+    console.log('Validation passed');
+    return null;
+};
 
-export interface License {
-    id: string;
-    enterprise: string;
-    product: string;
-    service: string;
-    licenseStartDate: string;
-    licenseEndDate: string;
-    numberOfUsers: string;
-    contactDetails: Contact;
-    renewalNotice: boolean;
-    noticePeriodDays?: string;
-}
+// Real-time validation function to filter characters as user types
+const filterFirstNameInput = (value: string): string => {
+    // Only allow letters, spaces, hyphens, and apostrophes
+    // Remove anything that is not a letter (a-z, A-Z), space, hyphen, or apostrophe
+    console.log('🔤 FILTER FIRST NAME - Input:', value);
+    const filtered = value.replace(/[^a-zA-Z\s\-']/g, '');
+    console.log('🔤 FILTER FIRST NAME - Result:', filtered);
+    console.trace('🔤 Filter function call stack');
+    return filtered;
+};
+
+const validateMiddleName = (value: string): string | null => {
+    // Middle name is optional, so empty is valid
+    if (!value || value.trim().length === 0) {
+        return null;
+    }
+    
+    const trimmedValue = value.trim();
+    
+    if (trimmedValue.length < 2) {
+        return 'Middle name must be at least 2 characters long';
+    }
+    
+    if (trimmedValue.length > 50) {
+        return 'Middle name must not exceed 50 characters';
+    }
+    
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(trimmedValue)) {
+        return 'Middle name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+    
+    return null;
+};
+
+// Real-time validation function to filter characters for middle name
+const filterMiddleNameInput = (value: string): string => {
+    // Only allow letters, spaces, hyphens, and apostrophes
+    return value.replace(/[^a-zA-Z\s\-']/g, '');
+};
+
+const validateLastName = (value: string): string | null => {
+    if (!value || value.trim().length === 0) {
+        return 'Last name is required';
+    }
+    
+    const trimmedValue = value.trim();
+    
+    if (trimmedValue.length < 2) {
+        return 'Last name must be at least 2 characters long';
+    }
+    
+    if (trimmedValue.length > 50) {
+        return 'Last name must not exceed 50 characters';
+    }
+    
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(trimmedValue)) {
+        return 'Last name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+    
+    return null;
+};
+
+// Real-time validation function to filter characters for last name
+const filterLastNameInput = (value: string): string => {
+    // Only allow letters, spaces, hyphens, and apostrophes
+    return value.replace(/[^a-zA-Z\s\-']/g, '');
+};
+
+const validateEmail = (value: string): string | null => {
+    if (!value || value.trim().length === 0) {
+        return 'Email address is required';
+    }
+    
+    const trimmedValue = value.trim();
+    
+    if (trimmedValue.length < 5) {
+        return 'Email address must be at least 5 characters long';
+    }
+    
+    if (trimmedValue.length > 254) {
+        return 'Email address must not exceed 254 characters';
+    }
+    
+    // RFC 5322 compliant email regex (simplified but comprehensive)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    
+    if (!emailRegex.test(trimmedValue)) {
+        return 'Please enter a valid email address';
+    }
+    
+    return null;
+};
+
+const validatePassword = (value: string): string | null => {
+    if (!value || value.trim().length === 0) {
+        return 'Password is required';
+    }
+    
+    if (value.length < 8) {
+        return 'Password must be at least 8 characters long';
+    }
+    
+    if (value.length > 128) {
+        return 'Password must not exceed 128 characters';
+    }
+    
+    const hasUpperCase = /[A-Z]/.test(value);
+    const hasLowerCase = /[a-z]/.test(value);
+    const hasNumbers = /\d/.test(value);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
+    
+    if (!hasUpperCase) {
+        return 'Password must contain at least one uppercase letter';
+    }
+    
+    if (!hasLowerCase) {
+        return 'Password must contain at least one lowercase letter';
+    }
+    
+    if (!hasNumbers) {
+        return 'Password must contain at least one number';
+    }
+    
+    if (!hasSpecialChar) {
+        return 'Password must contain at least one special character';
+    }
+    
+    return null;
+};
 
 function InlineEditableText({
     value,
@@ -472,8 +618,12 @@ function InlineEditableText({
     renderDisplay,
     className,
     dataAttr,
+    type = 'text',
     onTabNext,
     onTabPrev,
+    validateFn,
+    errorMessage,
+    filterFn,
 }: {
     value: string;
     onCommit: (next: string) => void;
@@ -482,22 +632,77 @@ function InlineEditableText({
     renderDisplay?: (v: string) => React.ReactNode;
     className?: string;
     dataAttr?: string;
+    type?: string;
     onTabNext?: () => void;
     onTabPrev?: () => void;
+    validateFn?: (value: string) => string | null;
+    errorMessage?: string;
+    filterFn?: (value: string) => string;
 }) {
+    console.log('🎯 InlineEditableText RENDERED with:', { value, placeholder, dataAttr, hasFilterFn: !!filterFn, hasValidateFn: !!validateFn });
+    console.log('🎯 FILTER FUNCTION IS:', filterFn ? filterFn.toString().substring(0, 100) : 'NOT PROVIDED');
     const [editing, setEditing] = React.useState(false);
     const [draft, setDraft] = React.useState<string>(value || '');
+    const [validationError, setValidationError] = React.useState<string | null>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
+    
     React.useEffect(() => {
-        if (!editing) setDraft(value || '');
-    }, [value, editing]);
+        if (!editing) {
+            // Apply filter to initial value when not editing
+            const filteredValue = filterFn ? filterFn(value || '') : (value || '');
+            setDraft(filteredValue);
+        }
+    }, [value, editing, filterFn]);
     React.useEffect(() => {
-        if (editing) inputRef.current?.focus();
+        if (editing) {
+            inputRef.current?.focus();
+            
+            // Filter the draft value when entering edit mode
+            if (filterFn && draft) {
+                const filteredDraft = filterFn(draft);
+                if (filteredDraft !== draft) {
+                    setDraft(filteredDraft);
+                }
+            }
+            
+            // Validate immediately when entering edit mode if there's existing content
+            if (draft && validateFn) {
+                const error = validateFn(draft);
+                if (error) {
+                    setValidationError(error);
+                }
+            }
+        }
     }, [editing]);
 
+    // Clear validation error when user starts typing
+    React.useEffect(() => {
+        if (draft !== value && validationError) {
+            setValidationError(null);
+        }
+    }, [draft, value, validationError]);
+
     const commit = () => {
-        const next = (draft || '').trim();
+        let next = (draft || '').trim();
+        
+        // Apply filter before validation and commit
+        if (filterFn) {
+            next = filterFn(next);
+            console.log('Filtered value in commit:', next);
+        }
+        
+        // Validate if validation function is provided
+        if (validateFn) {
+            const error = validateFn(next);
+            if (error) {
+                setValidationError(error);
+                return; // Don't commit if validation fails
+            }
+        }
+        
+        console.log('Committing filtered value:', next);
         if (next !== (value || '')) onCommit(next);
+        setValidationError(null);
         setEditing(false);
     };
     const cancel = () => {
@@ -507,29 +712,102 @@ function InlineEditableText({
 
     if (editing) {
         return (
-            <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={(e: any) => {
-                    if (e.key === 'Enter') commit();
-                    if (e.key === 'Escape') cancel();
-                    if (e.key === 'Tab') {
-                        e.preventDefault();
-                        const next = (draft || '').trim();
-                        if (next !== (value || '')) onCommit(next);
-                        setEditing(false);
-                        if (e.shiftKey) onTabPrev && onTabPrev();
-                        else onTabNext && onTabNext();
-                    }
-                }}
-                placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
-                    className || ''
-                }`}
-                data-inline={dataAttr || undefined}
-            />
+            <div className="relative">
+                <input
+                    ref={inputRef}
+                    value={draft}
+                    onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                        const target = e.target as HTMLInputElement;
+                        const cursorPos = target.selectionStart;
+                        console.log('🔥 ON INPUT TRIGGERED (first input) with value:', target.value);
+                        const newValue = filterFn ? filterFn(target.value) : target.value;
+                        console.log('🔥 ON INPUT Setting draft to (first input):', newValue);
+                        setDraft(newValue);
+                        
+                        // Restore cursor position after filtering
+                        setTimeout(() => {
+                            if (target.selectionStart !== null && cursorPos !== null) {
+                                const lengthDiff = target.value.length - newValue.length;
+                                const newCursorPos = Math.max(0, cursorPos - lengthDiff);
+                                target.setSelectionRange(newCursorPos, newCursorPos);
+                            }
+                        }, 0);
+                    }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        // Keep for compatibility but onInput should handle the filtering
+                        console.log('onChange also triggered');
+                    }}
+                    onBlur={() => {
+                        let next = (draft || '').trim();
+                        console.log('onBlur (first input) triggered with draft:', draft);
+                        
+                        // Apply filter before validation
+                        if (filterFn) {
+                            next = filterFn(next);
+                            console.log('Filtered value on blur (first input):', next);
+                            setDraft(next); // Update draft with filtered value
+                        }
+                        
+                        // Validate on blur if validation function is provided
+                        if (validateFn) {
+                            const error = validateFn(next);
+                            if (error) {
+                                setValidationError(error);
+                                return; // Keep editing mode if validation fails
+                            }
+                        }
+                        
+                        commit();
+                    }}
+                    onKeyDown={(e: any) => {
+                        if (e.key === 'Enter') {
+                            const next = (draft || '').trim();
+                            
+                            // Validate before committing on Enter
+                            if (validateFn) {
+                                const error = validateFn(next);
+                                if (error) {
+                                    setValidationError(error);
+                                    return; // Don't commit if validation fails
+                                }
+                            }
+                            
+                            commit();
+                        }
+                        if (e.key === 'Escape') cancel();
+                        if (e.key === 'Tab') {
+                            e.preventDefault();
+                            const next = (draft || '').trim();
+                            
+                            // Validate before moving to next field on Tab
+                            if (validateFn) {
+                                const error = validateFn(next);
+                                if (error) {
+                                    setValidationError(error);
+                                    return; // Don't move to next field if validation fails
+                                }
+                            }
+                            
+                            if (next !== (value || '')) onCommit(next);
+                            setValidationError(null);
+                            setEditing(false);
+                            if (e.shiftKey) onTabPrev && onTabPrev();
+                            else onTabNext && onTabNext();
+                        }
+                    }}
+                    placeholder={placeholder}
+                    className={`min-w-0 w-full rounded-sm border ${(isError || validationError) ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${(isError || validationError) ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                        className || ''
+                    }`}
+                    data-inline={dataAttr || undefined}
+                    title={validationError || undefined}
+                />
+                {validationError && (
+                    <div className="absolute top-full left-0 z-50 mt-1 text-xs text-red-600 bg-white border border-red-300 rounded px-2 py-1 shadow-lg max-w-xs">
+                        {validationError}
+                    </div>
+                )}
+            </div>
         );
     }
     const isEmpty = !value || value.length === 0;
@@ -537,39 +815,129 @@ function InlineEditableText({
     // Show input immediately for empty fields (like Enterprise Configuration)
     if (editing || isEmpty) {
         return (
-            <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
-                onBlur={commit}
-                onFocus={() => setEditing(true)}
-                onKeyDown={(e: any) => {
-                    if (e.key === 'Enter') commit();
-                    if (e.key === 'Escape') cancel();
-                    if (e.key === 'Tab') {
-                        e.preventDefault();
-                        const next = (draft || '').trim();
-                        if (next !== (value || '')) onCommit(next);
-                        setEditing(false);
-                        if (e.shiftKey) onTabPrev && onTabPrev();
-                        else onTabNext && onTabNext();
-                    }
-                }}
-                placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
-                    className || ''
-                }`}
-                data-inline={dataAttr || undefined}
-            />
+            <div className="relative">
+                <input
+                    ref={inputRef}
+                    type={type}
+                    value={draft}
+                    onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                        const target = e.target as HTMLInputElement;
+                        const cursorPos = target.selectionStart;
+                        console.log('🔥 ON INPUT TRIGGERED (second input) with value:', target.value);
+                        const newValue = filterFn ? filterFn(target.value) : target.value;
+                        console.log('🔥 ON INPUT Setting draft to (second input):', newValue);
+                        setDraft(newValue);
+                        
+                        // Restore cursor position after filtering
+                        setTimeout(() => {
+                            if (target.selectionStart !== null && cursorPos !== null) {
+                                const lengthDiff = target.value.length - newValue.length;
+                                const newCursorPos = Math.max(0, cursorPos - lengthDiff);
+                                target.setSelectionRange(newCursorPos, newCursorPos);
+                            }
+                        }, 0);
+                    }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        // Keep for compatibility but onInput should handle the filtering
+                        console.log('onChange also triggered (second input)');
+                    }}
+                    onBlur={() => {
+                        let next = (draft || '').trim();
+                        console.log('onBlur (second input) triggered with draft:', draft, 'trimmed:', next);
+                        
+                        // Apply filter before validation
+                        if (filterFn) {
+                            next = filterFn(next);
+                            console.log('Filtered value on blur (second input):', next);
+                            setDraft(next); // Update draft with filtered value
+                        }
+                        
+                        // Validate on blur if validation function is provided
+                        if (validateFn) {
+                            console.log('Running validation on (second input):', next);
+                            const error = validateFn(next);
+                            console.log('Validation result (second input):', error);
+                            if (error) {
+                                setValidationError(error);
+                                console.log('Validation failed, staying in edit mode (second input)');
+                                return; // Keep editing mode if validation fails
+                            }
+                        }
+                        
+                        console.log('Committing value (second input)');
+                        commit();
+                    }}
+                    onFocus={() => setEditing(true)}
+                    onKeyDown={(e: any) => {
+                        if (e.key === 'Enter') {
+                            const next = (draft || '').trim();
+                            
+                            // Validate before committing on Enter
+                            if (validateFn) {
+                                const error = validateFn(next);
+                                if (error) {
+                                    setValidationError(error);
+                                    return; // Don't commit if validation fails
+                                }
+                            }
+                            
+                            commit();
+                        }
+                        if (e.key === 'Escape') cancel();
+                        if (e.key === 'Tab') {
+                            e.preventDefault();
+                            const next = (draft || '').trim();
+                            
+                            // Validate before moving to next field on Tab
+                            if (validateFn) {
+                                const error = validateFn(next);
+                                if (error) {
+                                    setValidationError(error);
+                                    return; // Don't move to next field if validation fails
+                                }
+                            }
+                            
+                            if (next !== (value || '')) onCommit(next);
+                            setValidationError(null);
+                            setEditing(false);
+                            if (e.shiftKey) onTabPrev && onTabPrev();
+                            else onTabNext && onTabNext();
+                        }
+                    }}
+                    placeholder={placeholder}
+                    className={`min-w-0 w-full rounded-sm border ${(isError || validationError) ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${(isError || validationError) ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                        className || ''
+                    }`}
+                    data-inline={dataAttr || undefined}
+                    title={validationError || undefined}
+                />
+                {validationError && (
+                    <div className="absolute top-full left-0 z-50 mt-1 text-xs text-red-600 bg-white border border-red-300 rounded px-2 py-1 shadow-lg max-w-xs">
+                        {validationError}
+                    </div>
+                )}
+            </div>
         );
     }
     
     // Show display mode for non-empty fields
     return (
-        <span
-            className={`group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text ${
+        <motion.span
+            initial={{scale: 0.95, opacity: 0}}
+            animate={{scale: 1, opacity: 1}}
+            whileHover={{
+                y: -1,
+                boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+            }}
+            transition={{
+                type: 'spring',
+                stiffness: 480,
+                damping: 30,
+            }}
+            className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative cursor-text ${
                 className || ''
             }`}
+            style={{width: '100%', minWidth: '100%'}}
             onDoubleClick={() => setEditing(true)}
             title={`Double-click to edit: ${(value || '').toString()}`}
             data-inline={dataAttr || undefined}
@@ -587,13 +955,135 @@ function InlineEditableText({
             {renderDisplay ? (
                 renderDisplay(value || '')
             ) : (
-                <span>{value || ''}</span>
+                <span className='flex-1 truncate pointer-events-none'>{value || ''}</span>
             )}
+        </motion.span>
+    );
+}
+
+// Simple chip input component without dropdown functionality
+function SimpleChipInput({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    onTabNext,
+    onTabPrev,
+}: {
+    value?: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!editing) setDraft(value || '');
+    }, [value, editing]);
+
+    useEffect(() => {
+        if (editing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [editing]);
+
+    const commit = () => {
+        const trimmed = draft.trim();
+        if (trimmed !== (value || '')) {
+            onChange(trimmed);
+        }
+        setEditing(false);
+    };
+
+    const cancel = () => {
+        setDraft(value || '');
+        setEditing(false);
+    };
+
+    if (editing) {
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                        e.preventDefault();
+                        commit();
+                        if (e.key === 'Tab' && e.shiftKey) {
+                            onTabPrev && onTabPrev();
+                        } else {
+                            onTabNext && onTabNext();
+                        }
+                    } else if (e.key === 'Escape') {
+                        cancel();
+                    }
+                }}
+                onBlur={commit}
+                placeholder={placeholder}
+                className={`min-w-0 w-full rounded-sm border ${
+                    isError 
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                        : 'border-blue-300 bg-white'
+                } px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${
+                    isError 
+                        ? 'focus:ring-red-200 focus:border-red-500' 
+                        : 'focus:ring-blue-200 focus:border-blue-500'
+                }`}
+            />
+        );
+    }
+
+    const isEmpty = !value || value.length === 0;
+    const displayValue = value || '';
+
+    if (isEmpty) {
+        return (
+            <div
+                className="w-full flex items-center bg-white border border-blue-300 rounded-sm px-2 py-1 hover:bg-slate-50 hover:border-blue-400 transition-all duration-150 cursor-text min-h-[28px]"
+                onDoubleClick={() => setEditing(true)}
+                title="Double-click to enter value"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setEditing(true);
+                    }
+                }}
+            >
+                <span className="text-[12px] text-slate-300 leading-[14px]">
+                    {placeholder || ''}
+                </span>
+            </div>
+        );
+    }
+
+    // Display the same as Enterprise Config table - simple span with hover effects
+    return (
+        <span
+            className="group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text"
+            onDoubleClick={() => setEditing(true)}
+            title="Double-click to edit"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setEditing(true);
+                }
+            }}
+        >
+            {displayValue}
         </span>
     );
 }
 
-type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template';
+type CatalogType = 'firstName' | 'middleName' | 'lastName' | 'emailAddress' | 'status' | 'startDate' | 'endDate' | 'password' | 'technicalUser' | 'assignedUserGroups';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -852,12 +1342,14 @@ function DropdownOption({
                     <div className='absolute inset-0 rounded-lg opacity-0 group-active:opacity-30 bg-red-300 animate-ping'></div>
                 </motion.button>
             </motion.div>
+
+
         </motion.div>
     );
 }
 
-// Multi-select component specifically for phone numbers
-function PhoneMultiSelect({
+// Multi-select component specifically for user groups
+function UserGroupMultiSelect({
     value,
     onChange,
     placeholder = 'Select Services',
@@ -871,13 +1363,13 @@ function PhoneMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'firstNames' | 'middleNames' | 'lastNames' | 'emails' | 'statusTypes' | 'passwords' | 'technicalUserTypes' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'firstNames' | 'middleNames' | 'lastNames' | 'emails' | 'statusTypes' | 'passwords' | 'technicalUserTypes' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     accounts?: AccountRow[];
@@ -898,13 +1390,13 @@ function PhoneMultiSelect({
     } | null>(null);
     const moreServicesRef = React.useRef<HTMLButtonElement>(null);
 
-    // Helper function to check if a phone number is in use
-    const isPhoneInUse = React.useCallback(
-        (phoneNumber: string): boolean => {
+    // Helper function to check if a user group is in use
+    const isUserGroupInUse = React.useCallback(
+        (userGroupName: string): boolean => {
             if (!accounts || accounts.length === 0) return false;
 
             return accounts.some((account) => {
-                // Since phone is no longer used, always return false
+                // Since user groups are not restricted, always return false
                 return false;
             });
         },
@@ -920,8 +1412,8 @@ function PhoneMultiSelect({
         width: number;
     } | null>(null);
 
-    // Parse selected phones from comma-separated string
-    const selectedPhones = React.useMemo(() => {
+    // Parse selected user groups from comma-separated string
+    const selectedUserGroups = React.useMemo(() => {
         return value
             ? value
                   .split(',')
@@ -934,23 +1426,23 @@ function PhoneMultiSelect({
     // Show maximum 4 value chips, with count indicator for additional chips
     const [visibleCount, setVisibleCount] = React.useState(4);
 
-    // Helper function to remove a phone number
-    const removePhone = React.useCallback((phoneToRemove: string) => {
-        const newServices = selectedPhones.filter((s: string) => s !== phoneToRemove);
+    // Helper function to remove a user group
+    const removeUserGroup = React.useCallback((userGroupToRemove: string) => {
+        const newServices = selectedUserGroups.filter((s: string) => s !== userGroupToRemove);
         onChange(newServices.join(', '));
-    }, [selectedPhones, onChange]);
+    }, [selectedUserGroups, onChange]);
 
-    // Helper function to toggle a phone number selection
-    const togglePhone = React.useCallback((phoneName: string) => {
-        const isSelected = selectedPhones.includes(phoneName);
+    // Helper function to toggle a user group selection
+    const toggleUserGroup = React.useCallback((userGroupName: string) => {
+        const isSelected = selectedUserGroups.includes(userGroupName);
         let newServices;
         if (isSelected) {
-            newServices = selectedPhones.filter((s: string) => s !== phoneName);
+            newServices = selectedUserGroups.filter((s: string) => s !== userGroupName);
         } else {
-            newServices = [...selectedPhones, phoneName];
+            newServices = [...selectedUserGroups, userGroupName];
         }
         onChange(newServices.join(', '));
-    }, [selectedPhones, onChange]);
+    }, [selectedUserGroups, onChange]);
 
     React.useEffect(() => {
         const updateVisibleCount = () => {
@@ -971,13 +1463,13 @@ function PhoneMultiSelect({
         setLoading(true);
         try {
             const data = await api.get<Array<{id: string; name: string}>>(
-                `/api/phones${
+                `/api/userGroups${
                     query ? `?search=${encodeURIComponent(query)}` : ''
                 }`,
             );
-            // Filter out already selected phones
+            // Filter out already selected user groups
             const filteredData = (data || []).filter(
-                (option: any) => !selectedPhones.includes(option.name),
+                (option: any) => !selectedUserGroups.includes(option.name),
             );
             setOptions(filteredData);
         } catch (_e) {
@@ -985,7 +1477,7 @@ function PhoneMultiSelect({
         } finally {
             setLoading(false);
         }
-    }, [query, selectedPhones]);
+    }, [query, selectedUserGroups]);
 
     React.useEffect(() => {
         if (!open) return;
@@ -1144,7 +1636,7 @@ function PhoneMultiSelect({
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
-                    onNewItemCreated('phones', created);
+                    onNewItemCreated('userGroups', created);
                 }
             }
         } catch (error: any) {
@@ -1158,7 +1650,7 @@ function PhoneMultiSelect({
                     (opt) => opt.name.toLowerCase() === name.toLowerCase(),
                 );
                 if (existingItem) {
-                    togglePhone(existingItem.name);
+                    toggleUserGroup(existingItem.name);
                     
                     // Focus next row's first field (Enterprise) after selecting existing service
                     const currentElement = inputRef?.current;
@@ -1194,18 +1686,18 @@ function PhoneMultiSelect({
     };
 
     const toggleService = (serviceName: string) => {
-        const isSelected = selectedPhones.includes(serviceName);
+        const isSelected = selectedUserGroups.includes(serviceName);
         let newServices;
         if (isSelected) {
-            newServices = selectedPhones.filter((s: string) => s !== serviceName);
+            newServices = selectedUserGroups.filter((s: string) => s !== serviceName);
         } else {
-            newServices = [...selectedPhones, serviceName];
+            newServices = [...selectedUserGroups, serviceName];
         }
         onChange(newServices.join(', '));
     };
 
     const removeService = (serviceName: string) => {
-        const newServices = selectedPhones.filter((s: string) => s !== serviceName);
+        const newServices = selectedUserGroups.filter((s: string) => s !== serviceName);
         onChange(newServices.join(', '));
     };
 
@@ -1215,7 +1707,7 @@ function PhoneMultiSelect({
             className='relative flex items-center gap-1 group/item'
         >
             <div className='flex items-center gap-1'>
-                {selectedPhones
+                {selectedUserGroups
                     .slice(0, visibleCount)
                     .map((service: string, index: number) => {
                         // Use consistent color function
@@ -1235,7 +1727,7 @@ function PhoneMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] border rounded ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
+                                className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
                                 title={service}
                             >
                                 <span className='flex-1'>{service}</span>
@@ -1250,7 +1742,7 @@ function PhoneMultiSelect({
                             </motion.span>
                         );
                     })}
-                {selectedPhones.length > visibleCount && (
+                {selectedUserGroups.length > visibleCount && (
                     <div className='relative'>
                         <button
                             ref={moreServicesRef}
@@ -1258,9 +1750,9 @@ function PhoneMultiSelect({
                                 e.stopPropagation();
                                 setShowMoreServices(!showMoreServices);
                             }}
-                            className='inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
+                            className='w-full flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold leading-tight border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-colors min-w-[40px] justify-center'
                         >
-                            +{selectedPhones.length - visibleCount}
+                            +{selectedUserGroups.length - visibleCount}
                         </button>
                         
                         {/* Dropdown for additional services */}
@@ -1280,24 +1772,24 @@ function PhoneMultiSelect({
                                 >
                                     <div className='p-3'>
                                         <div className='text-xs font-medium text-slate-700 mb-2'>
-                                            Additional Phones ({selectedPhones.length - visibleCount})
+                                            Additional User Groups ({selectedUserGroups.length - visibleCount})
                                         </div>
                                         <div className='space-y-1 max-h-32 overflow-y-auto'>
-                                            {selectedPhones.slice(visibleCount).map((phone, idx) => {
-                                                const colorTheme = getAccountColor(phone);
+                                            {selectedUserGroups.slice(visibleCount).map((userGroup, idx) => {
+                                                const colorTheme = getAccountColor(userGroup);
                                                 return (
                                                     <div 
                                                         key={`additional-${idx}`}
-                                                        className='flex items-center justify-between group/additional'
+                                                        className='flex items-center group/additional w-full'
                                                     >
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}>
-                                                            {phone}
+                                                        <span className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'>
+                                                            {userGroup}
                                                         </span>
                                                         <button
                                                             onClick={() => {
-                                                                removePhone(phone);
-                                                                // Close dropdown if no more additional phones
-                                                                if (selectedPhones.length - 1 <= visibleCount) {
+                                                                removeUserGroup(userGroup);
+                                                                // Close dropdown if no more Additional User Groups
+                                                                if (selectedUserGroups.length - 1 <= visibleCount) {
                                                                     setShowMoreServices(false);
                                                                 }
                                                             }}
@@ -1319,7 +1811,7 @@ function PhoneMultiSelect({
                 )}
                 
                 {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
-                {selectedPhones.length === 0 || open || isError ? (
+                {selectedUserGroups.length === 0 || open || isError ? (
                     <input
                         ref={inputRef}
                         value={query}
@@ -1381,15 +1873,16 @@ function PhoneMultiSelect({
                                 } else {
                                     // Create new service (same logic as addNew function)
                                     try {
-                        const created = await api.post<{ id: string; name: string; }>('/api/phones', {
+                        const created = await api.post<{ id: string; name: string; }>('/api/userGroups', {
                             name: query.trim(),
-                        });                                        if (created) {
+                        });
+                        if (created) {
                                             setOptions((prev) => {
                                                 const exists = prev.some((o) => o.id === created!.id);
                                                 return exists ? prev : [...prev, created!];
                                             });
                                             // Add the new service to selection
-                                            togglePhone(created.name);
+                                            toggleUserGroup(created.name);
                                             setQuery('');
                                             setOpen(false);
                                             
@@ -1398,7 +1891,7 @@ function PhoneMultiSelect({
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
-                                                onNewItemCreated('phones', created);
+                                                onNewItemCreated('userGroups', created);
                                             }
                                         }
                                     } catch (error: any) {
@@ -1409,7 +1902,7 @@ function PhoneMultiSelect({
                                                 (opt) => opt.name.toLowerCase() === query.toLowerCase(),
                                             );
                                             if (existingItem) {
-                                                togglePhone(existingItem.name);
+                                                toggleUserGroup(existingItem.name);
                                                 setQuery('');
                                                 setOpen(false);
                                                 navigateToNextRow(e.target as HTMLInputElement);
@@ -1579,7 +2072,7 @@ function PhoneMultiSelect({
 
                                     return filteredOptions.map((opt, idx) => {
                                         const isSelected =
-                                            selectedPhones.includes(opt.name);
+                                            selectedUserGroups.includes(opt.name);
                                         const palette = [
                                             {
                                                 bg: 'bg-blue-100',
@@ -1610,8 +2103,8 @@ function PhoneMultiSelect({
                                                 key={opt.id}
                                                 option={opt}
                                                 tone={tone}
-                                                type='template'
-                                                isInUse={isPhoneInUse(
+                                                type='assignedUserGroups'
+                                                isInUse={isUserGroupInUse(
                                                     opt.name,
                                                 )}
                                                 onSelect={() =>
@@ -1641,12 +2134,12 @@ function PhoneMultiSelect({
 
                                                         // Update selected services if this one was selected
                                                         if (
-                                                            selectedPhones.includes(
+                                                            selectedUserGroups.includes(
                                                                 opt.name,
                                                             )
                                                         ) {
                                                             const updatedServices =
-                                                                selectedPhones.map(
+                                                                selectedUserGroups.map(
                                                                     (s: string) =>
                                                                         s ===
                                                                         opt.name
@@ -1665,7 +2158,7 @@ function PhoneMultiSelect({
                                                             onDropdownOptionUpdate
                                                         ) {
                                                             await onDropdownOptionUpdate(
-                                                                'phones',
+                                                                'userGroups',
                                                                 'update',
                                                                 opt.name,
                                                                 newName,
@@ -1696,12 +2189,12 @@ function PhoneMultiSelect({
 
                                                         // Remove from selected services if it was selected
                                                         if (
-                                                            selectedPhones.includes(
+                                                            selectedUserGroups.includes(
                                                                 opt.name,
                                                             )
                                                         ) {
                                                             const updatedServices =
-                                                                selectedPhones.filter(
+                                                                selectedUserGroups.filter(
                                                                     (s: string) =>
                                                                         s !==
                                                                         opt.name,
@@ -1718,7 +2211,7 @@ function PhoneMultiSelect({
                                                             onDropdownOptionUpdate
                                                         ) {
                                                             await onDropdownOptionUpdate(
-                                                                'phones',
+                                                                'userGroups',
                                                                 'delete',
                                                                 opt.name,
                                                             );
@@ -1864,128 +2357,6 @@ function PhoneMultiSelect({
     );
 }
 
-// Simple chip input component without dropdown functionality
-function SimpleChipInput({
-    value,
-    onChange,
-    placeholder = '',
-    isError = false,
-    onTabNext,
-    onTabPrev,
-}: {
-    value?: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    isError?: boolean;
-    onTabNext?: () => void;
-    onTabPrev?: () => void;
-}) {
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState(value || '');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (!editing) setDraft(value || '');
-    }, [value, editing]);
-
-    useEffect(() => {
-        if (editing) {
-            inputRef.current?.focus();
-            inputRef.current?.select();
-        }
-    }, [editing]);
-
-    const commit = () => {
-        const trimmed = draft.trim();
-        if (trimmed !== (value || '')) {
-            onChange(trimmed);
-        }
-        setEditing(false);
-    };
-
-    const cancel = () => {
-        setDraft(value || '');
-        setEditing(false);
-    };
-
-    if (editing) {
-        return (
-            <input
-                ref={inputRef}
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === 'Tab') {
-                        e.preventDefault();
-                        commit();
-                        if (e.key === 'Tab' && e.shiftKey) {
-                            onTabPrev && onTabPrev();
-                        } else {
-                            onTabNext && onTabNext();
-                        }
-                    } else if (e.key === 'Escape') {
-                        cancel();
-                    }
-                }}
-                onBlur={commit}
-                placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${
-                    isError 
-                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
-                        : 'border-blue-300 bg-white'
-                } px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${
-                    isError 
-                        ? 'focus:ring-red-200 focus:border-red-500' 
-                        : 'focus:ring-blue-200 focus:border-blue-500'
-                }`}
-            />
-        );
-    }
-
-    const isEmpty = !value || value.length === 0;
-    const displayValue = value || '';
-
-    if (isEmpty) {
-        return (
-            <div
-                className="w-full flex items-center bg-white border border-blue-300 rounded-sm px-2 py-1 hover:bg-slate-50 hover:border-blue-400 transition-all duration-150 cursor-text min-h-[28px]"
-                onDoubleClick={() => setEditing(true)}
-                title="Double-click to enter value"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        setEditing(true);
-                    }
-                }}
-            >
-                <span className="text-[12px] text-slate-300 leading-[14px]">
-                    {placeholder || ''}
-                </span>
-            </div>
-        );
-    }
-
-    // Display the same as Enterprise Config table - simple span with hover effects
-    return (
-        <span
-            className="group/ie inline-flex min-w-0 items-center truncate rounded-sm px-1 -mx-1 -my-0.5 hover:ring-1 hover:ring-slate-300 hover:bg-white/60 cursor-text"
-            onDoubleClick={() => setEditing(true)}
-            title="Double-click to edit"
-            tabIndex={0}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    setEditing(true);
-                }
-            }}
-        >
-            {displayValue}
-        </span>
-    );
-}
-
 function AsyncChipSelect({
     type,
     value,
@@ -2002,6 +2373,7 @@ function AsyncChipSelect({
     dropdownOptions,
     onTabNext,
     onTabPrev,
+    onFocus,
 }: {
     type: CatalogType;
     value?: string;
@@ -2009,14 +2381,15 @@ function AsyncChipSelect({
     placeholder?: string;
     isError?: boolean;
     compact?: boolean;
+    onFocus?: () => void;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        type: 'firstNames' | 'middleNames' | 'lastNames' | 'statusTypes' | 'emails' | 'passwords' | 'technicalUserTypes' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
+        type: 'firstNames' | 'middleNames' | 'lastNames' | 'statusTypes' | 'emails' | 'passwords' | 'technicalUserTypes' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     accounts?: AccountRow[];
@@ -2024,9 +2397,14 @@ function AsyncChipSelect({
     currentRowEnterprise?: string;
     currentRowProduct?: string;
     dropdownOptions?: {
-        accountNames: Array<{id: string; name: string}>;
-        cloudTypes: Array<{id: string; name: string}>;
-        addresses: Array<{id: string; name: string}>;
+        firstNames: Array<{id: string; name: string}>;
+        middleNames: Array<{id: string; name: string}>;
+        lastNames: Array<{id: string; name: string}>;
+        statusTypes: Array<{id: string; name: string}>;
+        emails: Array<{id: string; name: string}>;
+        passwords: Array<{id: string; name: string}>;
+        technicalUserTypes: Array<{id: string; name: string}>;
+        userGroups: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -2056,11 +2434,14 @@ function AsyncChipSelect({
                     return false;
                 }
 
-                if (type === 'accountName') {
-                    // Never filter account names - show all options
+                if (type === 'firstName') {
+                    // Never filter first names - show all options
                     return false;
-                } else if (type === 'address') {
-                    // For addresses, show all options (no filtering needed)
+                } else if (type === 'lastName') {
+                    // Never filter last names - show all options
+                    return false;
+                } else if (type === 'emailAddress') {
+                    // Never filter email addresses - show all options
                     return false;
                 }
                 return false;
@@ -2111,12 +2492,12 @@ function AsyncChipSelect({
         const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
         
         // Prefer below if there's enough space, otherwise use above if there's more space above
-        // For cloudType, always prefer below unless there's really no space
+        // For user fields, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'cloudType';
+        const forceBelow = type === 'status';
         
         if (forceBelow && spaceBelow >= 100) {
-            // For cloudType, show below if there's at least 100px space
+            // For status fields, show below if there's at least 100px space
             setDropdownPosition('below');
             top = containerRect.bottom + 4;
         } else if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
@@ -2163,39 +2544,49 @@ function AsyncChipSelect({
             
             console.log(`Loading options for type: ${type}`);
             
-            // Use dropdownOptions if available for accountName
-            if (type === 'accountName' && dropdownOptions?.accountNames) {
-                allData = dropdownOptions.accountNames;
+            // Use dropdownOptions if available for firstName
+            if (type === 'firstName' && dropdownOptions?.firstNames) {
+                allData = dropdownOptions.firstNames;
                 console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-            } else if (type === 'address' && dropdownOptions?.addresses) {
-                allData = dropdownOptions.addresses;
+            } else if (type === 'middleName' && dropdownOptions?.middleNames) {
+                allData = dropdownOptions.middleNames;
                 console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-            } else if (type === 'cloudType') {
-                // Always use predefined cloudType options (prioritize dropdownOptions)
-                if (dropdownOptions?.cloudTypes && dropdownOptions.cloudTypes.length > 0) {
-                    allData = dropdownOptions.cloudTypes;
+            } else if (type === 'lastName' && dropdownOptions?.lastNames) {
+                allData = dropdownOptions.lastNames;
+                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'status') {
+                // Always use predefined status options (prioritize dropdownOptions)
+                if (dropdownOptions?.statusTypes && dropdownOptions.statusTypes.length > 0) {
+                    allData = dropdownOptions.statusTypes;
                     console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
                 } else {
-                    console.log('Using fallback predefined cloudType options');
+                    console.log('Using fallback predefined status options');
                     allData = [
-                        { id: 'private-cloud', name: 'Private Cloud' },
-                        { id: 'public-cloud', name: 'Public Cloud' }
+                        { id: 'ACTIVE', name: 'Active' },
+                        { id: 'INACTIVE', name: 'Inactive' }
                     ];
                 }
-            } else if (type === 'masterAccount') {
-                console.log('Calling API: /api/masterAccounts');
+            } else if (type === 'emailAddress') {
+                console.log('Calling API: /api/emails');
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/masterAccounts',
+                    '/api/emails',
                 ) || [];
-            } else if (type === 'address') {
-                console.log('Calling API: /api/addresses');
+            } else if (type === 'password' && dropdownOptions?.passwords) {
+                allData = dropdownOptions.passwords;
+                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'technicalUser') {
+                // Boolean field, no dropdown options needed
+                allData = [];
+            } else if (type === 'assignedUserGroups' && dropdownOptions?.userGroups) {
+                allData = dropdownOptions.userGroups;
+                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'startDate' || type === 'endDate') {
+                console.log('Date fields do not need dropdown options');
+                allData = [];
+            } else if (type === 'assignedUserGroups') {
+                console.log('Calling API: /api/userGroups');
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/addresses',
-                ) || [];
-            } else if (type === 'template') {
-                console.log('Calling API: /api/templates');
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/templates',
+                    '/api/userGroups',
                 ) || [];
             } else {
                 console.log('Calling API: /api/accountNames');
@@ -2257,9 +2648,9 @@ function AsyncChipSelect({
         }
     }, [open, allOptions.length, loadAllOptions]);
 
-    // Load cloudType options immediately on mount since they're predefined
+    // Load status options immediately on mount since they're predefined
     React.useEffect(() => {
-        if (type === 'cloudType' && allOptions.length === 0) {
+        if (type === 'status' && allOptions.length === 0) {
             loadAllOptions();
         }
     }, [type, allOptions.length, loadAllOptions]);
@@ -2303,23 +2694,41 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'masterAccount') {
+            if (type === 'firstName') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/masterAccounts',
+                    '/api/firstNames',
                     {name},
                 );
-            } else if (type === 'cloudType') {
-                // Cloud Type has predefined options, don't create new ones
-                console.log('Cannot create new cloudType options - using predefined values only');
+            } else if (type === 'middleName') {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/middleNames',
+                    {name},
+                );
+            } else if (type === 'lastName') {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/lastNames',
+                    {name},
+                );
+            } else if (type === 'status') {
+                // Status has predefined options, don't create new ones
+                console.log('Cannot create new status options - using predefined values only');
                 return;
-            } else if (type === 'address') {
+            } else if (type === 'emailAddress') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/addresses',
+                    '/api/emails',
                     {name},
                 );
-            } else if (type === 'template') {
+            } else if (type === 'password') {
+                // Passwords are typically not saved as dropdown options for security
+                console.log('Cannot create password options for security reasons');
+                return;
+            } else if (type === 'technicalUser') {
+                // Boolean field, no creation needed
+                console.log('Technical user is a boolean field');
+                return;
+            } else if (type === 'assignedUserGroups') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/templates',
+                    '/api/userGroups',
                     {name},
                 );
             } else {
@@ -2350,14 +2759,20 @@ function AsyncChipSelect({
                     let dropdownType: string;
                     
                     switch (type) {
-                        case 'accountName':
-                            dropdownType = 'accountNames';
+                        case 'firstName':
+                            dropdownType = 'firstNames';
                             break;
-                        case 'masterAccount':
-                            dropdownType = 'masterAccounts';
+                        case 'middleName':
+                            dropdownType = 'middleNames';
                             break;
-                        case 'address':
-                            dropdownType = 'addresses';
+                        case 'lastName':
+                            dropdownType = 'lastNames';
+                            break;
+                        case 'emailAddress':
+                            dropdownType = 'emails';
+                            break;
+                        case 'assignedUserGroups':
+                            dropdownType = 'userGroups';
                             break;
                         default:
                             dropdownType = 'emails'; // fallback
@@ -2365,7 +2780,7 @@ function AsyncChipSelect({
                     }
                     
                     // Only call if this is a supported type for the callback
-                    if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
+                    if (type === 'firstName' || type === 'middleName' || type === 'lastName' || type === 'emailAddress' || type === 'assignedUserGroups') {
                         onNewItemCreated(dropdownType as any, created);
                     }
                 }
@@ -2397,10 +2812,10 @@ function AsyncChipSelect({
         setCurrent(value);
     }, [value]);
 
-    // Debug logging for cloudType
+    // Debug logging for status
     React.useEffect(() => {
-        if (type === 'cloudType') {
-            console.log(`CloudType AsyncChipSelect render - allOptions.length: ${allOptions.length}`, allOptions);
+        if (type === 'status') {
+            console.log(`Status AsyncChipSelect render - allOptions.length: ${allOptions.length}`, allOptions);
         }
     }, [type, allOptions]);
 
@@ -2426,7 +2841,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
+                        className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200 text-red-900' : 'bg-white border-transparent text-black'}`}
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
@@ -2445,8 +2860,8 @@ function AsyncChipSelect({
                             }
                         }}
                         onClick={(e: any) => {
-                            // For cloudType, also allow single click to open dropdown
-                            if (type === 'cloudType' && allOptions.length > 0) {
+                            // For status, also allow single click to open dropdown
+                            if (type === 'status' && allOptions.length > 0) {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
                                     setQuery('');
@@ -2461,8 +2876,8 @@ function AsyncChipSelect({
                         }}
                     >
                         <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
+                        {/* Dropdown arrow for status */}
+                        {type === 'status' && (
                             <ChevronDown 
                                 size={12} 
                                 className="text-slate-400 flex-shrink-0 ml-1" 
@@ -2518,7 +2933,14 @@ function AsyncChipSelect({
                                 }
                                 setOpen(false);
                             }}
-                            onFocus={() => {
+                            onFocus={(e) => {
+                                // Call custom focus handler first (for validation blocking)
+                                if (onFocus) {
+                                    // This will handle the focus validation and potentially show modal
+                                    onFocus();
+                                    // The modal handling will return focus to the appropriate field
+                                }
+                                
                                 // Only open dropdown on focus if there are options to show
                                 if (allOptions.length > 0) {
                                     setOpen(true);
@@ -2555,31 +2977,10 @@ function AsyncChipSelect({
                                     setQuery('');
                                 }
                             }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 placeholder:font-normal focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} font-normal`}
+                            style={{fontWeight: '400', fontFamily: 'inherit', fontStyle: 'normal'}}
                             placeholder=''
                         />
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (allOptions.length > 0) {
-                                        setOpen(!open);
-                                        if (!open && inputRef.current) {
-                                            inputRef.current.focus();
-                                        }
-                                    } else {
-                                        // Force load options
-                                        loadAllOptions();
-                                    }
-                                }}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 z-10"
-                            >
-                                <ChevronDown size={14} />
-                            </button>
-                        )}
                     </div>
                 ) : null}
             </div>
@@ -2630,13 +3031,6 @@ function AsyncChipSelect({
                                         : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
                                     
                                     console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
-                                    
-                                    // Check if query exactly matches an existing option
-                                    const exactMatch = query.trim() ? options.find(opt => 
-                                        opt.name.toLowerCase() === query.toLowerCase().trim()
-                                    ) : null;
-                                    
-                                    const showCreateNew = query.trim() && !exactMatch;
 
                                     return (
                                         <div>
@@ -2660,105 +3054,8 @@ function AsyncChipSelect({
                                                 </div>
                                             )}
                                             
-                                            {/* Show "Create New" option */}
-                                            {showCreateNew && (
-                                                <div className='border-t border-slate-200'>
-                                                    <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                let created: { id: string; name: string; } | null = null;
-                                                                
-                                                                if (type === 'accountName') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/accountNames', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'masterAccount') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/masterAccounts', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'cloudType') {
-                                                                    // Cloud Type has predefined options, don't create new ones
-                                                                    console.log('Cannot create new cloudType options - using predefined values only');
-                                                                    return;
-                                                                } else if (type === 'address') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/addresses', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'template') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/templates', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                }
-                                                                
-                                                                if (created) {
-                                                                    // Update options list
-                                                                    setOptions((prev) => [...prev, created!]);
-                                                                    setAllOptions((prev) => [...prev, created!]);
-                                                                    
-                                                                    // Set the new value
-                                                                    onChange(created.name);
-                                                                    setCurrent(created.name);
-                                                                    setQuery('');
-                                                                    setOpen(false);
-                                                                    
-                                                                    // Notify parent component
-                                                                    if (onNewItemCreated) {
-                                                                        let dropdownType: string;
-                                                                        
-                                                                        switch (type) {
-                                                                            case 'accountName':
-                                                                                dropdownType = 'accountNames';
-                                                                                break;
-                                                                            case 'masterAccount':
-                                                                                dropdownType = 'masterAccounts';
-                                                                                break;
-                                                                            case 'address':
-                                                                                dropdownType = 'addresses';
-                                                                                break;
-                                                                            default:
-                                                                                dropdownType = 'emails'; // fallback
-                                                                                break;
-                                                                        }
-                                                                        
-                                                                        // Only call if this is a supported type for the callback
-                                                                        if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
-                                                                            onNewItemCreated(dropdownType as any, created);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            } catch (error) {
-                                                                console.log(`API creation failed for ${type}, creating local entry`);
-                                                                
-                                                                // Fallback: create a local entry when API fails
-                                                                const newId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                                                                const created = { id: newId, name: query.trim() };
-                                                                
-                                                                // Update options list
-                                                                setOptions((prev) => [...prev, created]);
-                                                                setAllOptions((prev) => [...prev, created]);
-                                                                
-                                                                // Set the new value
-                                                                onChange(created.name);
-                                                                setCurrent(created.name);
-                                                                setQuery('');
-                                                                setOpen(false);
-                                                                
-                                                                // Notify parent component
-                                                                if (onNewItemCreated) {
-                                                                    const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
-                                                                    onNewItemCreated(dropdownType, created);
-                                                                }
-                                                            }
-                                                        }}
-                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
-                                                    >
-                                                        + Create &quot;{query.trim()}&quot;
-                                                    </button>
-                                                </div>
-                                            )}
-                                            
                                             {/* Show "No results" message */}
-                                            {filteredOptions.length === 0 && !showCreateNew && (
+                                            {filteredOptions.length === 0 && (
                                                 <div className='px-3 py-2 text-center text-sm text-slate-500'>
                                                     {query.trim() ? (
                                                         <div>No {type}s found matching &quot;{query}&quot;</div>
@@ -2786,17 +3083,22 @@ interface AccountsTableProps {
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address';
+    groupByExternal?: 'none' | 'firstName' | 'lastName' | 'emailAddress' | 'status';
     onGroupByChange?: (
-        g: 'none' | 'accountName' | 'email' | 'phone',
+        g: 'none' | 'accountName' | 'email' | 'userGroup',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'accountName'
-        | 'masterAccount'
-        | 'cloudType'
-        | 'address'
+        | 'firstName'
+        | 'middleName'
+        | 'lastName'
+        | 'emailAddress'
+        | 'status'
+        | 'startDate'
+        | 'endDate'
+        | 'password'
         | 'technicalUser'
+        | 'assignedUserGroups'
         | 'actions'
     >;
     highlightQuery?: string;
@@ -2806,7 +3108,7 @@ interface AccountsTableProps {
         accountNames?: Array<{id: string; name: string}>;
         cloudTypes?: Array<{id: string; name: string}>;
         emails?: Array<{id: string; name: string}>;
-        phones?: Array<{id: string; name: string}>;
+        userGroups?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -2815,13 +3117,13 @@ interface AccountsTableProps {
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -2840,314 +3142,7 @@ interface AccountsTableProps {
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
     onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
-    onOpenTechnicalUserModal?: (row: AccountRow) => void; // Callback to open technical user modal
-}
-
-// License Sub Row Component
-function LicenseSubRow({
-    license,
-    rowId,
-    onUpdate,
-    onDelete,
-    showValidationErrors,
-    isLicenseFieldMissing,
-    compressingLicenseId,
-    foldingLicenseId,
-    onDeleteClick,
-    onDropdownOptionUpdate,
-    onNewItemCreated,
-    onOpenContactModal,
-    accounts = [],
-}: {
-    license: License;
-    rowId: string;
-    onUpdate: (licenseId: string, field: keyof License, value: string | boolean) => void;
-    onDelete: (licenseId: string) => void;
-    showValidationErrors: boolean;
-    isLicenseFieldMissing: (license: License, field: keyof License) => boolean;
-    compressingLicenseId?: string | null;
-    foldingLicenseId?: string | null;
-    onDeleteClick?: (licenseId: string) => void;
-    onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
-        action: 'update' | 'delete',
-        oldName: string,
-        newName?: string,
-    ) => Promise<void>;
-    onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
-        item: {id: string; name: string},
-    ) => void;
-    onOpenContactModal: (rowId: string, licenseId: string, initialData?: Contact) => void;
-    accounts?: AccountRow[];
-}) {
-    const [isRowHovered, setIsRowHovered] = useState(false);
-
-    // Tab navigation for license fields
-    const createLicenseTabNavigation = (currentCol: string) => {
-        const editableCols = ['enterprise', 'product', 'service', 'licenseStartDate', 'licenseEndDate', 'numberOfUsers', 'noticePeriodDays'];
-        const currentIndex = editableCols.indexOf(currentCol);
-
-        const onTabNext = () => {
-            const nextIndex = currentIndex + 1;
-            if (nextIndex < editableCols.length) {
-                const nextCol = editableCols[nextIndex];
-                setTimeout(() => {
-                    const nextInput = document.querySelector(
-                        `[data-license-id="${license.id}"][data-license-col="${nextCol}"] input`,
-                    ) as HTMLInputElement;
-                    if (nextInput) {
-                        nextInput.focus();
-                        nextInput.select();
-                    }
-                }, 10);
-            }
-        };
-
-        const onTabPrev = () => {
-            const prevIndex = currentIndex - 1;
-            if (prevIndex >= 0) {
-                const prevCol = editableCols[prevIndex];
-                setTimeout(() => {
-                    const prevInput = document.querySelector(
-                        `[data-license-id="${license.id}"][data-license-col="${prevCol}"] input`,
-                    ) as HTMLInputElement;
-                    if (prevInput) {
-                        prevInput.focus();
-                        prevInput.select();
-                    }
-                }, 10);
-            }
-        };
-
-        return {onTabNext, onTabPrev};
-    };
-
-    return (
-        <div 
-            className={`relative flex items-center ml-6 my-1 transition-all duration-200 ${
-                compressingLicenseId === license.id
-                    ? 'transform scale-x-75 transition-all duration-500 ease-out'
-                    : ''
-            } ${
-                foldingLicenseId === license.id
-                    ? 'opacity-0 transform scale-y-50 transition-all duration-300'
-                    : ''
-            }`}
-            onMouseEnter={() => setIsRowHovered(true)}
-            onMouseLeave={() => setIsRowHovered(false)}
-        >
-            {/* Connection line from parent row */}
-            <div className="absolute -left-6 top-0 bottom-0 w-6 flex">
-                {/* Vertical line continuing from parent */}
-                <div className="w-px h-full bg-blue-300 ml-3"></div>
-                {/* Horizontal connector to this row */}
-                <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
-            </div>
-            
-            {/* Delete button */}
-            <div className="flex items-center justify-center w-8 mr-2">
-                {isRowHovered && (
-                    <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e: any) => {
-                            e.stopPropagation();
-                            if (onDelete) {
-                                onDelete(license.id);
-                            }
-                        }}
-                        className="group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md"
-                        title="Delete License"
-                    >
-                        <svg
-                            className="w-2 h-2 transition-transform duration-200"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 12h12"
-                            />
-                        </svg>
-                    </motion.button>
-                )}
-            </div>
-            
-            {/* License row content */}
-            <div 
-                className="flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200"
-                style={{
-                    gridTemplateColumns: license.renewalNotice 
-                        ? "minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
-                        : "minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
-                }}
-            >
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Enterprise</label>
-                    <AsyncChipSelect
-                        type='template'
-                        value={license.enterprise}
-                        onChange={(value) => onUpdate(license.id, 'enterprise', value || '')}
-                        placeholder="Enter enterprise"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'enterprise')}
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        {...createLicenseTabNavigation('enterprise')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Product</label>
-                    <AsyncChipSelect
-                        type='template'
-                        value={license.product}
-                        onChange={(value) => onUpdate(license.id, 'product', value || '')}
-                        placeholder="Enter product"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'product')}
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        {...createLicenseTabNavigation('product')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Service</label>
-                    <AsyncChipSelect
-                        type='template'
-                        value={license.service}
-                        onChange={(value) => onUpdate(license.id, 'service', value || '')}
-                        placeholder="Enter service"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'service')}
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        {...createLicenseTabNavigation('service')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License Start Date</label>
-                    <DateChipSelect
-                        value={license.licenseStartDate}
-                        onChange={(value) => onUpdate(license.id, 'licenseStartDate', value || '')}
-                        placeholder=""
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
-                        compact={true}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License End Date</label>
-                    <DateChipSelect
-                        value={license.licenseEndDate}
-                        onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
-                        placeholder=""
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
-                        compact={true}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
-                    <label className="text-xs font-medium text-blue-700 mb-1">No. of Users</label>
-                    <AsyncChipSelect
-                        type='template'
-                        value={license.numberOfUsers}
-                        onChange={(value) => onUpdate(license.id, 'numberOfUsers', value || '')}
-                        placeholder="Count"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'numberOfUsers')}
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        {...createLicenseTabNavigation('numberOfUsers')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Contact</label>
-                    <div className="flex items-start justify-center h-8 pt-0.5">
-                        <button
-                            onClick={() => onOpenContactModal(rowId, license.id, license.contactDetails)}
-                            className="flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md"
-                            title="Edit contact details"
-                        >
-                            <svg
-                                className="w-4 h-4 text-blue-600 group-hover:text-blue-700"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>
-                    <div className="flex items-start h-8 space-x-1 pt-0.5">
-                        <input
-                            type="checkbox"
-                            checked={license.renewalNotice}
-                            onChange={(e) => onUpdate(license.id, 'renewalNotice', e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-xs text-gray-600">Notify</span>
-                    </div>
-                </div>
-                
-                {license.renewalNotice && (
-                    <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
-                        <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>
-                        <AsyncChipSelect
-                            type='template'
-                            value={license.noticePeriodDays || ''}
-                            onChange={(value) => onUpdate(license.id, 'noticePeriodDays', value || '')}
-                            placeholder="Days"
-                            isError={showValidationErrors && license.renewalNotice && !license.noticePeriodDays}
-                            compact={true}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
-                            accounts={accounts}
-                            currentRowId={license.id}
-                            currentRowEnterprise={license.enterprise}
-                            currentRowProduct={license.product}
-                            {...createLicenseTabNavigation('noticePeriodDays')}
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+    onShowStartDateProtectionModal?: (message: string) => void; // Callback to show start date protection modal
 }
 
 function SortableAccountRow({
@@ -3180,7 +3175,8 @@ function SortableAccountRow({
     allRows = [],
     onDeleteClick,
     onOpenAddressModal,
-    onOpenTechnicalUserModal,
+    onShowStartDateProtectionModal,
+    onShowGlobalValidationModal,
 }: {
     row: AccountRow;
     index: number;
@@ -3204,13 +3200,13 @@ function SortableAccountRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'accountNames' | 'emails' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
@@ -3219,7 +3215,8 @@ function SortableAccountRow({
     allRows?: AccountRow[];
     onDeleteClick?: (rowId: string) => void;
     onOpenAddressModal?: (row: AccountRow) => void;
-    onOpenTechnicalUserModal?: (row: AccountRow) => void;
+    onShowStartDateProtectionModal?: (message: string) => void;
+    onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3228,13 +3225,76 @@ function SortableAccountRow({
         null,
     );
     const [isRowHovered, setIsRowHovered] = useState(false);
+    
+    // Validation state management for each field
+    const [fieldValidationErrors, setFieldValidationErrors] = useState<{
+        firstName?: string;
+        middleName?: string;
+        lastName?: string;
+        emailAddress?: string;
+        password?: string;
+    }>({});
+
+    // Helper functions for validation error management
+    const setFieldError = (field: string, error: string | null) => {
+        setFieldValidationErrors(prev => ({
+            ...prev,
+            [field]: error || undefined
+        }));
+    };
+
+    const clearFieldError = (field: string) => {
+        setFieldValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[field as keyof typeof newErrors];
+            return newErrors;
+        });
+    };
+
+    const showValidationModal = (field: string, message: string) => {
+        onShowGlobalValidationModal?.(row.id, field, message);
+    };
+
+    // Check if the row has any validation errors
+    const hasValidationErrors = () => {
+        return Object.keys(fieldValidationErrors).length > 0;
+    };
+
+    // Check if a specific field has validation errors
+    const hasFieldError = (field: string) => {
+        return !!fieldValidationErrors[field as keyof typeof fieldValidationErrors];
+    };
+
+    // Block focus on fields when there are validation errors in other fields
+    const handleFieldFocus = (targetField: string, originalFocusHandler?: () => void) => {
+        // Find the first field with an error (if any)
+        const errorFields = Object.keys(fieldValidationErrors);
+        if (errorFields.length > 0) {
+            const firstErrorField = errorFields[0];
+            // If the field being focused is not the error field, show validation modal
+            if (firstErrorField !== targetField) {
+                const errorMessage = fieldValidationErrors[firstErrorField as keyof typeof fieldValidationErrors];
+                if (errorMessage) {
+                    showValidationModal(firstErrorField, errorMessage);
+                }
+                return; // Prevent focus - modal will handle returning focus to correct field
+            }
+        }
+        
+        // Allow focus if no errors or focusing the error field itself
+        if (originalFocusHandler) {
+            originalFocusHandler();
+        }
+    };
 
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
         [
-            'accountName',
-            'masterAccount',
-            'cloudType',
+            'firstName',
+            'middleName',
+            'lastName',
+            'emailAddress',
+            'password',
         ].includes(col),
     );
 
@@ -3242,6 +3302,17 @@ function SortableAccountRow({
         const currentIndex = editableCols.indexOf(currentCol);
 
         const onTabNext = () => {
+            // Check if ANY field has validation errors (not just current field)
+            const errorFields = Object.keys(fieldValidationErrors);
+            if (errorFields.length > 0) {
+                const firstErrorField = errorFields[0];
+                const errorMessage = fieldValidationErrors[firstErrorField as keyof typeof fieldValidationErrors];
+                if (errorMessage) {
+                    showValidationModal(firstErrorField, errorMessage);
+                }
+                return; // Prevent navigation
+            }
+
             const nextIndex = currentIndex + 1;
             if (nextIndex < editableCols.length) {
                 const nextCol = editableCols[nextIndex];
@@ -3287,6 +3358,17 @@ function SortableAccountRow({
         };
 
         const onTabPrev = () => {
+            // Check if ANY field has validation errors (not just current field)
+            const errorFields = Object.keys(fieldValidationErrors);
+            if (errorFields.length > 0) {
+                const firstErrorField = errorFields[0];
+                const errorMessage = fieldValidationErrors[firstErrorField as keyof typeof fieldValidationErrors];
+                if (errorMessage) {
+                    showValidationModal(firstErrorField, errorMessage);
+                }
+                return; // Prevent navigation
+            }
+
             const prevIndex = currentIndex - 1;
             if (prevIndex >= 0) {
                 const prevCol = editableCols[prevIndex];
@@ -3384,49 +3466,13 @@ function SortableAccountRow({
         text: string;
         tone: 'slate' | 'blue' | 'sky' | 'indigo' | 'cyan';
     }) => {
-        const toneMap: Record<
-            string,
-            {bg: string; text: string; border: string; dot: string}
-        > = {
-            blue: {
-                bg: 'bg-white',
-                text: 'text-black',
-                border: '',
-                dot: 'bg-blue-400',
-            },
-            sky: {
-                bg: 'bg-sky-50',
-                text: 'text-sky-800',
-                border: 'border-sky-200',
-                dot: 'bg-sky-400',
-            },
-            indigo: {
-                bg: 'bg-indigo-50',
-                text: 'text-indigo-800',
-                border: 'border-indigo-200',
-                dot: 'bg-indigo-400',
-            },
-            cyan: {
-                bg: 'bg-cyan-50',
-                text: 'text-cyan-800',
-                border: 'border-cyan-200',
-                dot: 'bg-cyan-400',
-            },
-            slate: {
-                bg: 'bg-slate-50',
-                text: 'text-slate-800',
-                border: 'border-slate-200',
-                dot: 'bg-slate-400',
-            },
-        };
-        const t = toneMap[tone] || toneMap.slate;
         return (
             <motion.span
                 initial={{scale: 0.95, opacity: 0}}
                 animate={{scale: 1, opacity: 1}}
                 whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
                 transition={{type: 'spring', stiffness: 480, damping: 30}}
-                className={`inline-flex items-center gap-1 px-1.5 py-[2px] text-[10px] leading-[12px] max-w-full min-w-0 overflow-hidden whitespace-nowrap text-ellipsis rounded ${t.bg} ${t.text} ${t.border}`}
+                className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative max-w-full min-w-0 overflow-hidden'
                 title={text}
             >
                 <span className='truncate'>{text}</span>
@@ -3509,9 +3555,9 @@ function SortableAccountRow({
                     </motion.button>
                 )}
             </div>
-            {cols.includes('accountName') && (
+            {cols.includes('firstName') && (
                 <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full ${
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible ${
                         pinFirst && !shouldShowHorizontalScroll
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
@@ -3522,245 +3568,681 @@ function SortableAccountRow({
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
                 >
-                    {!hideRowExpansion && (
-                        <button
-                            className={`h-5 w-5 rounded transition-all duration-200 ${
-                                isExpanded 
-                                    ? 'text-white bg-primary-600 ring-2 ring-primary-500 shadow-md font-bold hover:bg-primary-700' 
-                                    : 'text-primary-600 hover:bg-primary-100 hover:text-primary-700'
-                            }`}
-                            onClick={() => onToggle(row.id)}
-                            title='Toggle subitems'
-                            tabIndex={-1}
-                        >
-                            <motion.span
-                                initial={false}
-                                animate={{rotate: isExpanded ? 90 : 0}}
-                                transition={{
-                                    type: 'spring',
-                                    stiffness: 520,
-                                    damping: 30,
-                                }}
-                                className={`inline-flex ${isExpanded ? 'font-bold' : ''}`}
-                            >
-                                <ChevronRight
-                                    size={16}
-                                    strokeWidth={isExpanded ? 3 : 2}
-                                />
-                            </motion.span>
-                        </button>
-                    )}
                     <div
-                        className='text-slate-700 text-[12px] w-full flex-1'
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='accountName'
+                        data-col='firstName'
                         style={{width: '100%'}}
                     >
                         {enableDropdownChips ? (
                             <AsyncChipSelect
-                                type='accountName'
-                                value={(row as any).accountName || ''}
+                                type='firstName'
+                                value={row.firstName || ''}
                                 onChange={(v) => {
-                                    onUpdateField(
-                                        row.id,
-                                        'accountName' as any,
-                                        v || '',
-                                    );
+                                    console.log('🔥 AsyncChipSelect firstName onChange triggered with:', v);
+                                    
+                                    // Update with original value (no filtering)
+                                    onUpdateField(row.id, 'firstName' as any, v || '');
+                                    
+                                    // Immediate validation to clear errors when content becomes valid
+                                    const immediateValidationError = validateFirstName(v || '');
+                                    if (!immediateValidationError) {
+                                        // Clear error immediately if validation passes
+                                        console.log('🔥 AsyncChipSelect firstName validation passed immediately');
+                                        clearFieldError('firstName');
+                                    }
+                                    
+                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
+                                    setTimeout(() => {
+                                        const validationError = validateFirstName(v || '');
+                                        if (validationError) {
+                                            console.log('🔥 AsyncChipSelect firstName validation failed:', validationError);
+                                            setFieldError('firstName', validationError);
+                                            showValidationModal('firstName', validationError);
+                                        } else {
+                                            console.log('🔥 AsyncChipSelect firstName validation passed (delayed)');
+                                            clearFieldError('firstName'); // Ensure error is cleared
+                                        }
+                                    }, 500); // 500ms delay for debounced validation
                                 }}
-                                placeholder=''
-                                isError={isCellMissing(row.id, 'accountName')}
+                                onFocus={() => handleFieldFocus('firstName')}
+                                placeholder='Enter first name'
+                                isError={isCellMissing(row.id, 'firstName') || !!fieldValidationErrors.firstName}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                 onNewItemCreated={onNewItemCreated as any}
                                 accounts={allRows}
                                 currentRowId={row.id}
                                 currentRowEnterprise={
-                                    row.accountName || ''
+                                    row.firstName || ''
                                 }
                                 currentRowProduct={
-                                    row.masterAccount || ''
+                                    row.firstName || ''
                                 }
-                                {...createTabNavigation('accountName')}
+                                {...createTabNavigation('firstName')}
                             />
                         ) : (
                             <InlineEditableText
-                                value={row.accountName || ''}
-                                onCommit={(v) => {
-                                    onUpdateField(
-                                        row.id,
-                                        'accountName' as any,
-                                        v,
-                                    );
-                                }}
+                                value={row.firstName || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'firstName' as any, v)
+                                }
                                 className='text-[12px]'
-                                placeholder=''
-                                isError={isCellMissing(row.id, 'accountName')}
-                                dataAttr={`${row.id}-accountName`}
-                                {...createTabNavigation('accountName')}
+                                dataAttr={`firstName-${row.id}`}
+                                isError={isCellMissing(row.id, 'firstName')}
+                                placeholder='Enter first name'
+                                validateFn={validateFirstName}
+                                filterFn={filterFirstNameInput}
+                                {...createTabNavigation('firstName')}
                             />
                         )}
                     </div>
                 </div>
             )}
-            {cols.includes('masterAccount') && (
+
+            {/* Middle Name Column */}
+            {cols.includes('middleName') && (
                 <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='masterAccount'
-                    style={{width: '100%'}}
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
                 >
-                    {enableDropdownChips ? (
-                        <AsyncChipSelect
-                            type='masterAccount'
-                            value={(row as any).masterAccount || ''}
-                            onChange={(v) =>
-                                onUpdateField(row.id, 'masterAccount' as any, v || '')
-                            }
-                            placeholder='Enter master account'
-                            isError={isCellMissing(row.id, 'masterAccount')}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
-                            accounts={allRows}
-                            currentRowId={row.id}
-                            currentRowEnterprise={
-                                row.accountName || ''
-                            }
-                            currentRowProduct={
-                                (row as any).masterAccount || ''
-                            }
-                            {...createTabNavigation('masterAccount')}
-                        />
-                    ) : (
-                        <InlineEditableText
-                            value={(row as any).masterAccount || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'masterAccount' as any, v)
-                            }
-                            className='text-[12px]'
-                            dataAttr={`masterAccount-${row.id}`}
-                            isError={isCellMissing(row.id, 'masterAccount')}
-                            placeholder='Enter master account'
-                            {...createTabNavigation('masterAccount')}
-                        />
-                    )}
-                </div>
-            )}
-            {cols.includes('cloudType') && (
-                <div
-                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='cloudType'
-                    style={{width: '100%'}}
-                >
-                    {enableDropdownChips ? (
-                        <SimpleDropdown
-                            value={(row as any).cloudType || ''}
-                            options={[
-                                { value: 'Private Cloud', label: 'Private Cloud' },
-                                { value: 'Public Cloud', label: 'Public Cloud' }
-                            ]}
-                            onChange={(v) => {
-                                console.log('🔥 CRITICAL: CloudType dropdown onChange called:', v, 'for row:', row.id);
-                                console.log('🔥 CRITICAL: Current row.cloudType before update:', (row as any).cloudType);
-                                console.log('🔥 CRITICAL: Calling onUpdateField with:', row.id, 'cloudType', v || '');
-                                onUpdateField(row.id, 'cloudType' as any, v || '');
-                            }}
-                            placeholder='Select...'
-                            className=""
-                            isError={isCellMissing(row.id, 'cloudType')}
-                            {...createTabNavigation('cloudType')}
-                        />
-                    ) : (
-                        <InlineEditableText
-                            value={(row as any).cloudType || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'cloudType' as any, v)
-                            }
-                            className='text-[12px]'
-                            dataAttr={`cloudType-${row.id}`}
-                            isError={isCellMissing(row.id, 'cloudType')}
-                            placeholder='Select cloud type'
-                            {...createTabNavigation('cloudType')}
-                        />
-                    )}
-                </div>
-            )}
-            {cols.includes('address') && (
-                <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='address'
-                    style={{width: '100%'}}
-                >
-                    <button
-                        onClick={() => onOpenAddressModal?.(row)}
-                        className="group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md"
-                        title={`Manage address for ${row.accountName || 'this account'}`}
-                        tabIndex={-1}
+                    <div
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='middleName'
+                        style={{width: '100%'}}
                     >
-                        <MapPin className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
-                        {(row as any).address && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='middleName'
+                                value={row.middleName || ''}
+                                onChange={(v) => {
+                                    console.log('🔥 AsyncChipSelect middleName onChange triggered with:', v);
+                                    
+                                    // Update with original value (no filtering)
+                                    onUpdateField(row.id, 'middleName' as any, v || '');
+                                    
+                                    // Immediate validation to clear errors when content becomes valid
+                                    const immediateValidationError = validateMiddleName(v || '');
+                                    if (!immediateValidationError) {
+                                        // Clear error immediately if validation passes
+                                        console.log('🔥 AsyncChipSelect middleName validation passed immediately');
+                                        clearFieldError('middleName');
+                                    }
+                                    
+                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
+                                    setTimeout(() => {
+                                        const validationError = validateMiddleName(v || '');
+                                        if (validationError) {
+                                            console.log('🔥 AsyncChipSelect middleName validation failed:', validationError);
+                                            setFieldError('middleName', validationError);
+                                            showValidationModal('middleName', validationError);
+                                        } else {
+                                            console.log('🔥 AsyncChipSelect middleName validation passed (delayed)');
+                                            clearFieldError('middleName'); // Ensure error is cleared
+                                        }
+                                    }, 500); // 500ms delay for debounced validation
+                                }}
+                                onFocus={() => handleFieldFocus('middleName')}
+                                placeholder='Enter middle name'
+                                isError={isCellMissing(row.id, 'middleName') || !!fieldValidationErrors.middleName}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                onNewItemCreated={onNewItemCreated as any}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    row.middleName || ''
+                                }
+                                currentRowProduct={
+                                    row.middleName || ''
+                                }
+                                {...createTabNavigation('middleName')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.middleName || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'middleName' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`middleName-${row.id}`}
+                                isError={isCellMissing(row.id, 'middleName')}
+                                placeholder='Enter middle name'
+                                validateFn={validateMiddleName}
+                                filterFn={filterMiddleNameInput}
+                                {...createTabNavigation('middleName')}
+                            />
                         )}
-                    </button>
+                    </div>
                 </div>
             )}
+
+            {/* Last Name Column */}
+            {cols.includes('lastName') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='lastName'
+                        style={{width: '100%'}}
+                    >
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='lastName'
+                                value={row.lastName || ''}
+                                onChange={(v) => {
+                                    console.log('🔥 AsyncChipSelect lastName onChange triggered with:', v);
+                                    
+                                    // Update with original value (no filtering)
+                                    onUpdateField(row.id, 'lastName' as any, v || '');
+                                    
+                                    // Immediate validation to clear errors when content becomes valid
+                                    const immediateValidationError = validateLastName(v || '');
+                                    if (!immediateValidationError) {
+                                        // Clear error immediately if validation passes
+                                        console.log('🔥 AsyncChipSelect lastName validation passed immediately');
+                                        clearFieldError('lastName');
+                                    }
+                                    
+                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
+                                    setTimeout(() => {
+                                        const validationError = validateLastName(v || '');
+                                        if (validationError) {
+                                            console.log('🔥 AsyncChipSelect lastName validation failed:', validationError);
+                                            setFieldError('lastName', validationError);
+                                            showValidationModal('lastName', validationError);
+                                        } else {
+                                            console.log('🔥 AsyncChipSelect lastName validation passed (delayed)');
+                                            clearFieldError('lastName'); // Ensure error is cleared
+                                        }
+                                    }, 500); // 500ms delay for debounced validation
+                                }}
+                                onFocus={() => handleFieldFocus('lastName')}
+                                placeholder='Enter last name'
+                                isError={isCellMissing(row.id, 'lastName') || !!fieldValidationErrors.lastName}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                onNewItemCreated={onNewItemCreated as any}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    row.lastName || ''
+                                }
+                                currentRowProduct={
+                                    row.lastName || ''
+                                }
+                                {...createTabNavigation('lastName')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.lastName || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'lastName' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`lastName-${row.id}`}
+                                isError={isCellMissing(row.id, 'lastName')}
+                                placeholder='Enter last name'
+                                validateFn={validateLastName}
+                                filterFn={filterLastNameInput}
+                                {...createTabNavigation('lastName')}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Email Address Column */}
+            {cols.includes('emailAddress') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='emailAddress'
+                        style={{width: '100%'}}
+                    >
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='emailAddress'
+                                value={row.emailAddress || ''}
+                                onChange={(v) => {
+                                    console.log('🔥 AsyncChipSelect emailAddress onChange triggered with:', v);
+                                    
+                                    // Update with original value
+                                    onUpdateField(row.id, 'emailAddress' as any, v || '');
+                                    
+                                    // Immediate validation to clear errors when content becomes valid
+                                    const immediateValidationError = validateEmail(v || '');
+                                    if (!immediateValidationError) {
+                                        // Clear error immediately if validation passes
+                                        console.log('🔥 AsyncChipSelect emailAddress validation passed immediately');
+                                        clearFieldError('emailAddress');
+                                    }
+                                    
+                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
+                                    setTimeout(() => {
+                                        const validationError = validateEmail(v || '');
+                                        if (validationError) {
+                                            console.log('🔥 AsyncChipSelect emailAddress validation failed:', validationError);
+                                            setFieldError('emailAddress', validationError);
+                                            showValidationModal('emailAddress', validationError);
+                                        } else {
+                                            console.log('🔥 AsyncChipSelect emailAddress validation passed (delayed)');
+                                            clearFieldError('emailAddress'); // Ensure error is cleared
+                                        }
+                                    }, 500); // 500ms delay for debounced validation
+                                }}
+                                onFocus={() => handleFieldFocus('emailAddress')}
+                                placeholder='Enter email address'
+                                isError={isCellMissing(row.id, 'emailAddress') || !!fieldValidationErrors.emailAddress}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                onNewItemCreated={onNewItemCreated as any}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    row.emailAddress || ''
+                                }
+                                currentRowProduct={
+                                    row.emailAddress || ''
+                                }
+                                {...createTabNavigation('emailAddress')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.emailAddress || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'emailAddress' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`emailAddress-${row.id}`}
+                                isError={isCellMissing(row.id, 'emailAddress')}
+                                placeholder='Enter email address'
+                                validateFn={validateEmail}
+                                {...createTabNavigation('emailAddress')}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Status Column */}
+            {cols.includes('status') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='status'
+                        style={{width: '100%'}}
+                    >
+                        <button
+                            className={`status-cell-button ${
+                                row.status === 'ACTIVE'
+                                    ? 'status-cell-active'
+                                    : row.status === 'INACTIVE'
+                                    ? 'status-cell-inactive'
+                                    : 'status-cell-active' // Default to Active for new records
+                            }`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                // Toggle between Active and Inactive
+                                const currentStatus = row.status || 'ACTIVE'; // Default to Active
+                                const isCurrentlyActive = currentStatus === 'ACTIVE';
+                                const newStatus = isCurrentlyActive ? 'INACTIVE' : 'ACTIVE';
+                                
+                                // Update status field
+                                onUpdateField(row.id, 'status' as any, newStatus);
+                                
+                                // Auto-populate dates based on status change
+                                if (newStatus === 'ACTIVE') {
+                                    // Activating user - clear end date and set start date to today
+                                    onUpdateField(row.id, 'endDate' as any, '');
+                                    const today = new Date();
+                                    const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                    onUpdateField(row.id, 'startDate' as any, localToday);
+                                } else if (newStatus === 'INACTIVE') {
+                                    // User becoming inactive - set end date to today
+                                    const today = new Date();
+                                    const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                    onUpdateField(row.id, 'endDate' as any, localToday);
+                                }
+                            }}
+                            title={`Click to ${
+                                row.status === 'ACTIVE' ? 'deactivate' : 'activate'
+                            }`}
+                        >
+                            {row.status || 'ACTIVE'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Start Date Column */}
+            {cols.includes('startDate') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='startDate'
+                        style={{width: '100%'}}
+                    >
+                        <DateChipSelect
+                            value={row.startDate || ''}
+                            onChange={(v) => {
+                                // Check if trying to clear the start date
+                                if (!v || v.trim() === '') {
+                                    // If start date already exists, prevent clearing it
+                                    if (row.startDate && row.startDate.trim() !== '') {
+                                        // Show modal and revert to the existing start date
+                                        if (onShowStartDateProtectionModal) {
+                                            onShowStartDateProtectionModal('Start date cannot be removed once set. You can change it to a different date, but not clear it completely.');
+                                        }
+                                        return; // Don't update the field
+                                    }
+                                }
+                                
+                                // Check if the selected date is in the past
+                                if (v && v.trim() !== '') {
+                                    const selectedDate = new Date(v);
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+                                    
+                                    if (selectedDate < today) {
+                                        // Show modal for past date selection
+                                        if (onShowStartDateProtectionModal) {
+                                            onShowStartDateProtectionModal('Start date cannot be set to a past date. Please select today or a future date.');
+                                        }
+                                        return; // Don't update the field
+                                    }
+                                }
+                                
+                                // Allow the change if it passes all validations
+                                onUpdateField(row.id, 'startDate' as any, v);
+                            }}
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'startDate')}
+                            minDate={(() => {
+                                const today = new Date();
+                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                            })()} // Today's date as minimum (local timezone)
+                            {...createTabNavigation('startDate')}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* End Date Column */}
+            {cols.includes('endDate') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='endDate'
+                        style={{width: '100%'}}
+                    >
+                        <DateChipSelect
+                            value={row.endDate || ''}
+                            onChange={(v) => {
+                                // Check if the selected end date is in the past
+                                if (v && v.trim() !== '') {
+                                    const selectedDate = new Date(v);
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+                                    
+                                    if (selectedDate < today) {
+                                        // Show modal for past date selection
+                                        if (onShowStartDateProtectionModal) {
+                                            onShowStartDateProtectionModal('End date cannot be set to a past date. Please select today or a future date.');
+                                        }
+                                        return; // Don't update the field
+                                    }
+                                }
+                                
+                                // Check if end date is before start date
+                                if (v && v.trim() !== '' && row.startDate && row.startDate.trim() !== '') {
+                                    const endDate = new Date(v);
+                                    const startDate = new Date(row.startDate);
+                                    
+                                    if (endDate < startDate) {
+                                        // Show modal for invalid end date selection
+                                        if (onShowStartDateProtectionModal) {
+                                            onShowStartDateProtectionModal('End date cannot be earlier than the start date. Please select a date equal to or after the start date.');
+                                        }
+                                        return; // Don't update the field
+                                    }
+                                }
+                                
+                                // Update the end date
+                                onUpdateField(row.id, 'endDate' as any, v);
+                                
+                                // If end date is cleared (empty), automatically set status to Active
+                                if (!v || v.trim() === '') {
+                                    onUpdateField(row.id, 'status' as any, 'Active');
+                                }
+                            }}
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'endDate')}
+                            minDate={row.startDate || (() => {
+                                const today = new Date();
+                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                            })()} // Start date or today as minimum (local timezone)
+                            {...createTabNavigation('endDate')}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Password Column */}
+            {cols.includes('password') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='password'
+                        style={{width: '100%'}}
+                    >
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='password'
+                                value={row.password || ''}
+                                onChange={(v) => {
+                                    console.log('🔥 AsyncChipSelect password onChange triggered with:', v);
+                                    
+                                    // Update with original value
+                                    onUpdateField(row.id, 'password' as any, v || '');
+                                    
+                                    // Immediate validation to clear errors when content becomes valid
+                                    const immediateValidationError = validatePassword(v || '');
+                                    if (!immediateValidationError) {
+                                        // Clear error immediately if validation passes
+                                        console.log('🔥 AsyncChipSelect password validation passed immediately');
+                                        clearFieldError('password');
+                                    }
+                                    
+                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
+                                    setTimeout(() => {
+                                        const validationError = validatePassword(v || '');
+                                        if (validationError) {
+                                            console.log('🔥 AsyncChipSelect password validation failed:', validationError);
+                                            setFieldError('password', validationError);
+                                            showValidationModal('password', validationError);
+                                        } else {
+                                            console.log('🔥 AsyncChipSelect password validation passed (delayed)');
+                                            clearFieldError('password'); // Ensure error is cleared
+                                        }
+                                    }, 500); // 500ms delay for debounced validation
+                                }}
+                                onFocus={() => handleFieldFocus('password')}
+                                placeholder='Enter password'
+                                isError={isCellMissing(row.id, 'password') || !!fieldValidationErrors.password}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                onNewItemCreated={onNewItemCreated as any}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={
+                                    row.password || ''
+                                }
+                                currentRowProduct={
+                                    row.password || ''
+                                }
+                                {...createTabNavigation('password')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.password || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'password' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`password-${row.id}`}
+                                isError={isCellMissing(row.id, 'password')}
+                                placeholder='Enter password'
+                                type='password'
+                                validateFn={validatePassword}
+                                {...createTabNavigation('password')}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Technical User Column */}
             {cols.includes('technicalUser') && (
                 <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='technicalUser'
-                    style={{width: '100%'}}
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
                 >
-                    <button
-                        onClick={() => onOpenTechnicalUserModal?.(row)}
-                        className="group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md"
-                        title={`Manage technical users for ${row.accountName || 'this account'}`}
-                        tabIndex={-1}
+                    <div
+                        className='flex items-center justify-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='technicalUser'
+                        style={{width: '100%'}}
                     >
-                        <User className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
-                        {row.technicalUsers && row.technicalUsers.length > 0 && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                                <span className="text-[8px] text-white font-bold">
-                                    {row.technicalUsers.length}
-                                </span>
-                            </div>
-                        )}
-                    </button>
+                        <div className="flex items-center justify-center">
+                            <motion.input
+                                type="checkbox"
+                                checked={row.technicalUser || false}
+                                onChange={(e) =>
+                                    onUpdateField(row.id, 'technicalUser' as any, e.target.checked)
+                                }
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer transition-transform duration-200 hover:scale-110"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                {...createTabNavigation('technicalUser')}
+                            />
+                        </div>
+                    </div>
                 </div>
             )}
+
+            {/* Assigned User Groups Column */}
+            {cols.includes('assignedUserGroups') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='assignedUserGroups'
+                        style={{width: '100%'}}
+                    >
+                        <div className="flex flex-wrap gap-1">
+                            {(row.assignedUserGroups || []).map((group, index) => (
+                                <span
+                                    key={index}
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                >
+                                    {group}
+                                    <button
+                                        onClick={() => {
+                                            const updatedGroups = (row.assignedUserGroups || []).filter((_, i) => i !== index);
+                                            onUpdateField(row.id, 'assignedUserGroups' as any, updatedGroups);
+                                        }}
+                                        className="ml-1 text-blue-600 hover:text-blue-800"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </span>
+                            ))}
+                            <input
+                                type="text"
+                                placeholder="Add group..."
+                                className="min-w-0 flex-1 text-xs border-none outline-none bg-transparent"
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        const currentGroups = row.assignedUserGroups || [];
+                                        const newGroups = [...currentGroups, e.currentTarget.value.trim()];
+                                        onUpdateField(row.id, 'assignedUserGroups' as any, newGroups);
+                                        e.currentTarget.value = '';
+                                    }
+                                }}
+                                {...createTabNavigation('assignedUserGroups')}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* actions column removed */}
             {/* trailing add row removed; fill handle removed */}
-            {!hideRowExpansion && isExpanded && expandedContent && (
-                <motion.div
-                    className='col-span-full'
-                    initial={{opacity: 0, y: -4}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{duration: 0.18, ease: [0.22, 1, 0.36, 1]}}
-                >
-                    {expandedContent}
-                </motion.div>
-            )}
         </div>
     );
 }
 
-const AccountsTable = forwardRef<any, AccountsTableProps>(({
+const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     rows,
     onEdit,
     onDelete,
@@ -3797,28 +4279,192 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     onLicenseDelete,
     onCompleteLicenseDeletion,
     onOpenAddressModal,
-    onOpenTechnicalUserModal,
+    onShowStartDateProtectionModal,
 }, ref) => {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+    const [fieldValidationErrors, setFieldValidationErrors] = useState<{[key: string]: Record<string, string>}>({});
+    
+    // Global validation modal state
+    const [globalValidationModal, setGlobalValidationModal] = useState<{
+        open: boolean;
+        field: string;
+        message: string;
+        rowId: string;
+    }>({ open: false, field: '', message: '', rowId: '' });
+
+    // Global validation modal helper functions
+    const showGlobalValidationModal = useCallback((rowId: string, field: string, message: string) => {
+        setGlobalValidationModal({
+            open: true,
+            field,
+            message,
+            rowId
+        });
+    }, []);
+
+    const hideGlobalValidationModal = useCallback(() => {
+        // Ensure the field error remains set after modal closes
+        if (globalValidationModal.field && globalValidationModal.message) {
+            // Keep the validation error active so field stays red
+            setFieldValidationErrors(prev => ({
+                ...prev,
+                [globalValidationModal.field]: globalValidationModal.message
+            }));
+        }
+
+        // Return focus to the problematic field
+        if (globalValidationModal.rowId && globalValidationModal.field) {
+            setTimeout(() => {
+                const fieldInput = document.querySelector(
+                    `[data-row-id="${globalValidationModal.rowId}"][data-col="${globalValidationModal.field}"] input`
+                ) as HTMLInputElement;
+                
+                if (fieldInput) {
+                    fieldInput.focus();
+                    fieldInput.select(); // Select all text to help user fix the issue
+                }
+            }, 100);
+        }
+        
+        setGlobalValidationModal({ open: false, field: '', message: '', rowId: '' });
+    }, [globalValidationModal.rowId, globalValidationModal.field, globalValidationModal.message]);
+
+    // Enhanced validation functions (same as TechnicalUserModal)
+    const validateName = useCallback((name: string, fieldName: string): { isValid: boolean; error?: string } => {
+        const trimmed = name.trim();
+        
+        if (!trimmed) {
+            return { isValid: false, error: `${fieldName} is required` };
+        }
+        
+        if (trimmed.length < 2) {
+            return { isValid: false, error: `${fieldName} must be at least 2 characters long` };
+        }
+        
+        if (trimmed.length > 50) {
+            return { isValid: false, error: `${fieldName} must not exceed 50 characters` };
+        }
+        
+        // Allow letters, spaces, hyphens, and apostrophes
+        const nameRegex = /^[a-zA-Z\s\-']+$/;
+        if (!nameRegex.test(trimmed)) {
+            return { isValid: false, error: `${fieldName} can only contain letters, spaces, hyphens, and apostrophes` };
+        }
+        
+        // Check for multiple consecutive spaces or special characters
+        if (/\s{2,}|[-']{2,}/.test(trimmed)) {
+            return { isValid: false, error: `${fieldName} cannot contain consecutive spaces or special characters` };
+        }
+        
+        return { isValid: true };
+    }, []);
+
+    const validateEmail = useCallback((email: string): { isValid: boolean; error?: string } => {
+        const trimmed = email.trim();
+        
+        if (!trimmed) {
+            return { isValid: false, error: 'Email address is required' };
+        }
+        
+        // More comprehensive email regex
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        if (!emailRegex.test(trimmed)) {
+            return { isValid: false, error: 'Please enter a valid email address' };
+        }
+        
+        if (trimmed.length > 254) {
+            return { isValid: false, error: 'Email address is too long' };
+        }
+        
+        return { isValid: true };
+    }, []);
+
+    const validatePassword = useCallback((password: string): { isValid: boolean; error?: string } => {
+        if (!password) {
+            return { isValid: false, error: 'Password is required' };
+        }
+        
+        if (password.length < 8) {
+            return { isValid: false, error: 'Password must be at least 8 characters long' };
+        }
+        
+        if (password.length > 128) {
+            return { isValid: false, error: 'Password must not exceed 128 characters' };
+        }
+        
+        // Check for at least one uppercase letter
+        if (!/[A-Z]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one uppercase letter' };
+        }
+        
+        // Check for at least one lowercase letter
+        if (!/[a-z]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one lowercase letter' };
+        }
+        
+        // Check for at least one number
+        if (!/\d/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one number' };
+        }
+        
+        // Check for at least one special character
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one special character (!@#$%^&*...)' };
+        }
+        
+        // Check for common weak patterns
+        const commonPatterns = [
+            /(.)\1{2,}/, // Three or more consecutive identical characters
+            /123|234|345|456|567|678|789|890/, // Sequential numbers
+            /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i, // Sequential letters
+        ];
+        
+        for (const pattern of commonPatterns) {
+            if (pattern.test(password)) {
+                return { isValid: false, error: 'Password contains common patterns and is not secure enough' };
+            }
+        }
+        
+        return { isValid: true };
+    }, []);
+
+    // Field validation handlers
+    const handleFieldValidation = useCallback((rowId: string, fieldName: string, value: string, validationFn: (val: string, fieldName?: string) => { isValid: boolean; error?: string }) => {
+        const validation = fieldName.includes('Name') ? validationFn(value, fieldName) : validationFn(value);
+        
+        setFieldValidationErrors(prev => {
+            const newErrors = { ...prev };
+            if (!newErrors[rowId]) {
+                newErrors[rowId] = {};
+            }
+            
+            if (!validation.isValid) {
+                newErrors[rowId][fieldName] = validation.error || `${fieldName} is invalid`;
+            } else {
+                delete newErrors[rowId][fieldName];
+                if (Object.keys(newErrors[rowId]).length === 0) {
+                    delete newErrors[rowId];
+                }
+            }
+            
+            return newErrors;
+        });
+        
+        return validation.isValid;
+    }, []);
     
     // State for license deletion
     const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<string | null>(null);
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
     
-    // State for expanded rows and licenses
-    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
-    const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
-    const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
-
-    // ContactModal state for license contact details
-    const [contactModalData, setContactModalData] = useState<Contact[]>([]);
-    const [showContactModal, setShowContactModal] = useState(false);
-    const [contactModalRowId, setContactModalRowId] = useState<string | null>(null);
-    const [contactModalLicenseId, setContactModalLicenseId] = useState<string | null>(null);
-    const [contactModalAccountName, setContactModalAccountName] = useState<string>('');
-    const [contactModalMasterAccount, setContactModalMasterAccount] = useState<string>('');
+    // Temporary empty rowLicenses to prevent errors during cleanup
+    const rowLicenses: Record<string, any[]> = {};
+    const setRowLicenses = () => {}; // Placeholder
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set<string>());
+    
+    // Validation state
 
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
@@ -3865,39 +4511,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         });
     }, [baseLocalRows, localEdits]);
     
-    // Initialize rowLicenses from rows prop only once
-    const [hasInitializedLicenses, setHasInitializedLicenses] = useState(false);
-
-    // Expose methods to parent component via ref
-    useImperativeHandle(ref, () => ({
-        completeLicenseDeletion: () => {
-            if (pendingDeleteLicenseId && pendingDeleteRowId) {
-                console.log('🗑️ Completing license deletion via ref:', pendingDeleteLicenseId);
-                setRowLicenses(prev => ({
-                    ...prev,
-                    [pendingDeleteRowId]: (prev[pendingDeleteRowId] || []).filter(license => license.id !== pendingDeleteLicenseId)
-                }));
-                setPendingDeleteLicenseId(null);
-                setPendingDeleteRowId(null);
-                console.log('✅ License removed from rowLicenses state via ref');
-            }
-        },
-        getCurrentLicenseState: () => {
-            return rowLicenses;
-        }
-    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses]);
-
     // Helper function to check if a field is missing/invalid
     const isFieldMissing = (row: AccountRow, field: string): boolean => {
         switch (field) {
-            case 'accountName':
-                return !row.accountName || row.accountName.trim() === '';
-            case 'masterAccount':
-                return !row.masterAccount || row.masterAccount.trim() === '';
-            case 'cloudType':
-                return !row.cloudType || row.cloudType.trim() === '';
-            case 'address':
-                return !row.address || row.address.trim() === '';
+            case 'firstName':
+                return !row.firstName || row.firstName.trim() === '';
+            case 'lastName':
+                return !row.lastName || row.lastName.trim() === '';
+            case 'emailAddress':
+                return !row.emailAddress || row.emailAddress.trim() === '';
+            case 'status':
+                return !row.status || row.status.trim() === '';
             default:
                 return false;
         }
@@ -3941,24 +4565,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         return errorRowIds;
     };
     
-    useEffect(() => {
-        if (!hasInitializedLicenses) {
-            const initialLicenses: Record<string, License[]> = {};
-            rows.forEach(row => {
-                if (row.licenses && row.licenses.length > 0) {
-                    initialLicenses[row.id] = row.licenses;
-                }
-            });
-            
-            if (Object.keys(initialLicenses).length > 0) {
-                setRowLicenses(initialLicenses);
-            }
-            setHasInitializedLicenses(true);
-        }
-    }, [rows, hasInitializedLicenses]);
-    
-    // No useEffect needed - using useMemo for derived state above
-
     // Effect to trigger validation when requested
     useEffect(() => {
         if (triggerValidation) {
@@ -4028,31 +4634,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         };
     }, []);
 
-    // Only show license validation during explicit save attempts with incomplete licenses
-    const prevShowValidationErrors = useRef(false);
-    useEffect(() => {
-        // Only trigger license validation when showValidationErrors changes from false to true (save attempt)
-        if (showValidationErrors && !prevShowValidationErrors.current) {
-            const rowsWithIncompleteLicenses = new Set<string>();
-            Object.keys(rowLicenses).forEach(rowId => {
-                const licenses = rowLicenses[rowId] || [];
-                const hasIncompleteLicense = licenses.some(license => 
-                    !license.enterprise?.trim() || !license.product?.trim() || !license.service?.trim() ||
-                    !license.licenseStartDate?.trim() || !license.licenseEndDate?.trim() || !license.numberOfUsers?.trim() ||
-                    (license.renewalNotice && !license.noticePeriodDays?.trim())
-                );
-                // Include any row that has licenses with incomplete data
-                if (hasIncompleteLicense) {
-                    rowsWithIncompleteLicenses.add(rowId);
-                }
-            });
-            console.log('🔍 License validation triggered for rows:', Array.from(rowsWithIncompleteLicenses));
-            setLicenseValidationTriggered(rowsWithIncompleteLicenses);
-        } else if (!showValidationErrors) {
-            setLicenseValidationTriggered(new Set());
-        }
-        prevShowValidationErrors.current = showValidationErrors;
-    }, [showValidationErrors, rowLicenses]);
     async function persistAccountRow(row: AccountRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
@@ -4064,42 +4645,42 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 return;
             }
             const core = {
-                // Core fields for account configuration
-                accountName: row.accountName,
-                masterAccount: row.masterAccount,
-                cloudType: row.cloudType,
-                address: row.address,
+                // Core fields for user management
+                firstName: row.firstName,
+                lastName: row.lastName,
+                emailAddress: row.emailAddress,
+                status: row.status,
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
-                // Account configuration specific fields
-                accountName: row.accountName || '',
-                masterAccount: row.masterAccount || '',
-                cloudType: row.cloudType || '',
-                address: row.address || '',
+                // User management specific fields
+                firstName: row.firstName || '',
+                lastName: row.lastName || '',
+                emailAddress: row.emailAddress || '',
+                status: row.status || '',
             } as any;
             // Handle existing (non-temporary) rows
-            // Check if we're on account management page
+            // Check if we're on user management page
             if (
                 typeof window !== 'undefined' &&
-                window.location.pathname.includes('/manage-accounts')
+                window.location.pathname.includes('/manage-users')
             ) {
                 console.log(
-                    '🔄 Updating account linkage instead of enterprise:',
+                    '🔄 Updating user data instead of enterprise:',
                     row.id,
                 );
 
-                // For account management, update the linkage via the parent's onUpdateField
-                // The parent component will handle the account linkage updates
+                // For user management, update the data via the parent's onUpdateField
+                // The parent component will handle the user data updates
                 console.log(
-                    '⏭️ Skipping direct API call for account management page',
+                    '⏭️ Skipping direct API call for user management page',
                 );
                 return;
             }
 
-            // For account management, all persistence is handled by parent component
+            // For user management, all persistence is handled by parent component
             console.log(
-                '⏭️ Skipping API call - account management handled by parent',
+                '⏭️ Skipping API call - user management handled by parent',
             );
             return;
         } catch (_e) {
@@ -4144,381 +4725,42 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         }
     }
 
-    // License management functions
-    const toggleRowExpansion = (rowId: string) => {
-        setExpandedRows(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(rowId)) {
-                newSet.delete(rowId);
-            } else {
-                newSet.add(rowId);
-                // Initialize licenses if not exist
-                if (!rowLicenses[rowId]) {
-                    setRowLicenses(prevLicenses => ({
-                        ...prevLicenses,
-                        [rowId]: []
-                    }));
-                }
-            }
-            return newSet;
-        });
-    };
-
-    // Expand all rows function
-    const expandAllRows = () => {
-        const allRowIds = orderedItems.map(row => row.id);
-        setExpandedRows(new Set(allRowIds));
-        
-        // Initialize licenses for all rows that don't have them
-        setRowLicenses(prevLicenses => {
-            const newLicenses = { ...prevLicenses };
-            allRowIds.forEach(rowId => {
-                if (!newLicenses[rowId]) {
-                    newLicenses[rowId] = [];
-                }
-            });
-            return newLicenses;
-        });
-    };
-
-    // Collapse all rows function
-    const collapseAllRows = () => {
-        setExpandedRows(new Set());
-    };
-
     // Helper function to check if main row fields are complete
     const isMainRowComplete = (row: AccountRow): boolean => {
-        return !!(row.accountName && row.accountName.trim() && 
-                 row.masterAccount && row.masterAccount.trim() && 
-                 row.cloudType && row.cloudType.trim());
+        return !!(row.firstName && row.firstName.trim() && 
+                 row.lastName && row.lastName.trim() && 
+                 row.emailAddress && row.emailAddress.trim());
     };
 
-    const addNewLicense = (rowId: string) => {
-        const newLicenseId = `license-${rowId}-${Date.now()}`;
-        const newLicense: License = {
-            id: newLicenseId,
-            enterprise: '',
-            product: '',
-            service: '',
-            licenseStartDate: '',
-            licenseEndDate: '',
-            numberOfUsers: '',
-            contactDetails: {
-                id: generateId(),
-                name: '',
-                email: '',
-                phone: '',
-                department: '',
-                designation: '',
-                company: ''
-            },
-            renewalNotice: false,
-            noticePeriodDays: ''
-        };
-
-        // Ensure the row is expanded when adding a license
-        setExpandedRows(prev => {
-            const newSet = new Set(prev);
-            newSet.add(rowId);
-            return newSet;
-        });
-
-        setRowLicenses(prev => ({
-            ...prev,
-            [rowId]: [...(prev[rowId] || []), newLicense]
-        }));
-
-        // Clear license validation for this row when adding new license
-        setLicenseValidationTriggered(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(rowId);
-            return newSet;
-        });
-
-        // Mark this row as having pending licenses for validation
-        setPendingLicenseRows(prev => {
-            const newSet = new Set(prev);
-            newSet.add(rowId);
-            return newSet;
-        });
-
-        // Don't trigger auto-save for adding empty license - only when fields are filled
-        // But still update parent state so validation can see the empty license
-        if (onUpdateField) {
-            const currentLicenses = rowLicenses[rowId] || [];
-            const updatedLicenses = [...currentLicenses, newLicense];
-            onUpdateField(rowId, 'licenses', updatedLicenses);
-        }
-        
-        // Don't clear validation errors when adding new license - let existing validation state persist
-        // This allows multiple accounts to maintain their validation highlighting
-        
-        console.log('➕ Added new empty license, updated parent state but preserved validation state:', {
-            rowId,
-            licenseId: newLicenseId
-        });
-    };
-
-    const updateLicense = (rowId: string, licenseId: string, field: keyof License, value: string | boolean) => {
-        setRowLicenses(prev => {
-            const updatedLicenses = {
-                ...prev,
-                [rowId]: (prev[rowId] || []).map(license => 
-                    license.id === licenseId 
-                        ? {...license, [field]: value}
-                        : license
-                )
-            };
-
-            // Check if the license is now complete using the updated state
-            const updatedLicense = updatedLicenses[rowId]?.find(l => l.id === licenseId);
-            if (updatedLicense && updatedLicense.enterprise && updatedLicense.product && updatedLicense.service && 
-                updatedLicense.licenseStartDate && updatedLicense.licenseEndDate && updatedLicense.numberOfUsers &&
-                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays)) {
-                // License is complete, check if all licenses in row are complete
-                const allLicenses = updatedLicenses[rowId] || [];
-                const allComplete = allLicenses.every(l => 
-                    l.enterprise && l.product && l.service && l.licenseStartDate && l.licenseEndDate && l.numberOfUsers &&
-                    (!l.renewalNotice || l.noticePeriodDays)
-                );
-                if (allComplete) {
-                    // Use setTimeout to avoid state update during render
-                    setTimeout(() => {
-                        setPendingLicenseRows(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(rowId);
-                            return newSet;
-                        });
-                    }, 0);
-                }
-            } else if (updatedLicense) {
-                // License is incomplete, ensure it's marked as pending
-                setTimeout(() => {
-                    setPendingLicenseRows(prev => {
-                        const newSet = new Set(prev);
-                        newSet.add(rowId);
-                        return newSet;
-                    });
-                }, 0);
-            }
-
-            return updatedLicenses;
-        });
-
-        // Only trigger auto-save for license updates if ALL mandatory fields are complete
-        // This prevents auto-save from triggering on partial license completion
-        const isValueEmpty = typeof value === 'boolean' ? false : (!value || value.trim() === '');
-        
-        if (!isValueEmpty && onUpdateField) {
-            // Get the updated licenses for this row
-            const updatedRowLicenses = rowLicenses[rowId]?.map(license => 
-                license.id === licenseId 
-                    ? {...license, [field]: value}
-                    : license
-            ) || [];
-            
-            // Check if this specific license now has all mandatory fields completed
-            const updatedLicense = updatedRowLicenses.find(license => license.id === licenseId);
-            const hasAllFields = updatedLicense && 
-                updatedLicense.enterprise?.trim() && 
-                updatedLicense.product?.trim() && 
-                updatedLicense.service?.trim() &&
-                updatedLicense.licenseStartDate?.trim() &&
-                updatedLicense.licenseEndDate?.trim() &&
-                updatedLicense.numberOfUsers?.trim() &&
-                (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays?.trim());
-            
-            if (hasAllFields) {
-                console.log('🔄 Triggering auto-save for complete license:', {
-                    rowId,
-                    licenseId,
-                    field,
-                    value,
-                    hasAllFields,
-                    licenseData: updatedLicense
-                });
-                onUpdateField(rowId, 'licenses', updatedRowLicenses);
-            } else {
-                console.log('⏳ License incomplete, not triggering auto-save yet:', {
-                    rowId,
-                    licenseId,
-                    field,
-                    value,
-                    hasAllFields,
-                    licenseData: updatedLicense,
-                    missing: {
-                        enterprise: !updatedLicense?.enterprise?.trim(),
-                        product: !updatedLicense?.product?.trim(),
-                        service: !updatedLicense?.service?.trim(),
-                        licenseStartDate: !updatedLicense?.licenseStartDate?.trim(),
-                        licenseEndDate: !updatedLicense?.licenseEndDate?.trim(),
-                        numberOfUsers: !updatedLicense?.numberOfUsers?.trim(),
-                        noticePeriodDays: updatedLicense?.renewalNotice && !updatedLicense?.noticePeriodDays?.trim()
-                    }
-                });
-            }
-        } else if (isValueEmpty) {
-            console.log('❌ Not triggering auto-save for empty license field:', {
-                rowId,
-                licenseId,
-                field,
-                value,
-                isValueEmpty
-            });
-        }
-    };
-
-    const deleteLicense = async (rowId: string, licenseId: string) => {
-        // Store the deletion context for completion after confirmation
-        setPendingDeleteLicenseId(licenseId);
-        setPendingDeleteRowId(rowId);
-        
-        if (onLicenseDelete) {
-            // Use the parent's animation callback
-            await onLicenseDelete(licenseId);
-        } else {
-            // Direct deletion if no animation callback
-            setRowLicenses(prev => ({
-                ...prev,
-                [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
-            }));
-            
-            // Trigger auto-save for license deletion
-            if (onUpdateField) {
-                const updatedLicenses = (rowLicenses[rowId] || []).filter(license => license.id !== licenseId);
-                onUpdateField(rowId, 'licenses', updatedLicenses);
-            }
-        }
-    };
-
-    // Complete the license deletion when animation and confirmation are done
-    const completeLicenseDeletion = () => {
-        if (pendingDeleteLicenseId && pendingDeleteRowId) {
-            const rowId = pendingDeleteRowId;
-            const licenseId = pendingDeleteLicenseId;
-            
-            setRowLicenses(prev => {
-                const updatedLicenses = {
-                    ...prev,
-                    [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
-                };
-                
-                // Trigger auto-save for license deletion after animation
-                if (onUpdateField) {
-                    onUpdateField(rowId, 'licenses', updatedLicenses[rowId] || []);
-                }
-                
-                return updatedLicenses;
-            });
-            
-            setPendingDeleteLicenseId(null);
-            setPendingDeleteRowId(null);
-        }
-    };
-
-    // Complete license deletion when animations and confirmation are done
-    useEffect(() => {
-        if (onCompleteLicenseDeletion) {
-            onCompleteLicenseDeletion();
-        }
-    }, [onCompleteLicenseDeletion]);
-
-    // Expose the completion function to parent via callback
-    useEffect(() => {
-        if (pendingDeleteLicenseId && pendingDeleteRowId) {
-            // Register the completion function
-            window.completeLicenseDeletion = () => {
-                console.log('🗑️ Completing license deletion in AccountsTable:', pendingDeleteLicenseId);
-                setRowLicenses(prev => ({
-                    ...prev,
-                    [pendingDeleteRowId]: (prev[pendingDeleteRowId] || []).filter(license => license.id !== pendingDeleteLicenseId)
-                }));
-                setPendingDeleteLicenseId(null);
-                setPendingDeleteRowId(null);
-                console.log('✅ License removed from rowLicenses state');
-            };
-        }
-    }, [pendingDeleteLicenseId, pendingDeleteRowId]);
-
-    const isLicenseFieldMissing = (license: License, field: keyof License): boolean => {
-        let isMissing = false;
-        switch (field) {
-            case 'enterprise':
-            case 'product':
-            case 'service':
-            case 'licenseStartDate':
-            case 'licenseEndDate':
-            case 'numberOfUsers':
-                isMissing = !license[field] || license[field].trim() === '';
-                break;
-            case 'noticePeriodDays':
-                // Only required if renewalNotice is enabled
-                isMissing = license.renewalNotice && (!license.noticePeriodDays || license.noticePeriodDays.trim() === '');
-                break;
-            default:
-                isMissing = false;
-        }
-        
-        // Debug logging for missing fields
-        if (isMissing && showValidationErrors) {
-            console.log(`🔴 License field missing - License ID: ${license.id}, Field: ${field}, Value: "${license[field] || ''}", showValidationErrors: ${showValidationErrors}`);
-        }
-        
-        return isMissing;
-    };
-
-    // License validation effect - notify parent when license validation state changes
-    React.useEffect(() => {
-        if (onLicenseValidationChange) {
-            const incompleteLicenseRows: string[] = [];
-            let hasIncompleteLicenses = false;
-
-            Object.entries(rowLicenses).forEach(([rowId, licenses]) => {
-                const hasIncomplete = licenses.some(license => 
-                    !license.enterprise || !license.product || !license.service || 
-                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                    (license.renewalNotice && !license.noticePeriodDays)
-                );
-                if (hasIncomplete) {
-                    incompleteLicenseRows.push(rowId);
-                    hasIncompleteLicenses = true;
-                }
-            });
-
-            onLicenseValidationChange(hasIncompleteLicenses, incompleteLicenseRows);
-        }
-    }, [rowLicenses, onLicenseValidationChange]);
-
-    // Function to check if there are any incomplete licenses
-    const hasIncompleteLicenses = () => {
-        return Object.entries(rowLicenses).some(([rowId, licenses]) => 
-            licenses.some(license => 
-                !license.enterprise || !license.product || !license.service || 
-                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                (license.renewalNotice && !license.noticePeriodDays)
-            )
-        );
-    };
-
+    // State for grouping
     const [groupBy, setGroupBy] = useState<
-        'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
+        'none' | 'firstName' | 'lastName' | 'emailAddress' | 'status'
     >('none');
+    
     // sync external groupBy
     React.useEffect(() => {
         if (groupByExternal) setGroupBy(groupByExternal);
     }, [groupByExternal]);
 
+    // Clean break - license management removed
     const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
         () => [
-            // Only the required columns
-            'accountName',
-            'masterAccount',
-            'cloudType',
-            'address',
+            // User management columns
+            'firstName',
+            'middleName',
+            'lastName',
+            'emailAddress',
+            'status',
+            'startDate',
+            'endDate',
+            'password',
             'technicalUser',
+            'assignedUserGroups',
         ],
         [],
     );
+    
+    // Continue with component structure
     const cols = useMemo(() => {
         const base = (columnOrder || []) as string[];
         if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
@@ -4530,13 +4772,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
-        accountName: '200px', // Account name column - increased for label + arrows + resize handle
-        masterAccount: '200px', // Master Account column
-        cloudType: '160px', // Cloud Type column
-        address: '120px', // Address column - increased width for icon + text alignment
-        technicalUser: '140px', // Technical User column - increased width for icon + text alignment
-        email: '220px', // Email column - increased for label + arrows + resize handle
-        phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
+        firstName: '150px', // First Name column
+        middleName: '150px', // Middle Name column
+        lastName: '150px', // Last Name column
+        emailAddress: '220px', // Email Address column - wider for email addresses
+        status: '70px', // Status column - compact width for full-cell button
+        startDate: '140px', // Start Date column
+        endDate: '140px', // End Date column
+        password: '120px', // Password column
+        technicalUser: '120px', // Technical User column
+        assignedUserGroups: '200px', // Assigned User Groups column
     } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -4558,7 +4803,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 masterAccount: { min: 190, max: 310 }, // Master Account column constraints
                 cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
                 address: { min: 120, max: 200 }, // Address column constraints - increased for icon + text
-                technicalUser: { min: 140, max: 220 }, // Technical User column constraints - increased for icon + text
+                firstName: { min: 140, max: 220 }, // First Name column constraints - increased for icon + text
             };
             
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
@@ -4612,61 +4857,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         if (onDelete) {
             onDelete(rowId);
         }
-    };
-
-    // ContactModal handlers for license contact details
-    const handleOpenContactModal = (rowId: string, licenseId: string, initialData?: Contact) => {
-        const row = localRows.find(r => r.id === rowId);
-        setContactModalRowId(rowId);
-        setContactModalLicenseId(licenseId);
-        setContactModalAccountName(row?.accountName || '');
-        setContactModalMasterAccount(row?.masterAccount || '');
-        setContactModalData(initialData ? [initialData] : []);
-        setShowContactModal(true);
-    };
-
-    const handleCloseContactModal = () => {
-        setShowContactModal(false);
-        setContactModalData([]);
-        setContactModalRowId(null);
-        setContactModalLicenseId(null);
-        setContactModalAccountName('');
-        setContactModalMasterAccount('');
-    };
-
-    const handleContactModalSave = (contacts: Contact[]) => {
-        if (!contactModalRowId || !contactModalLicenseId) return;
-
-        // Update the license's contact details with the first contact
-        const contactData = contacts.length > 0 ? contacts[0] : {
-            id: generateId(),
-            name: '',
-            email: '',
-            phone: '',
-            department: '',
-            designation: '',
-            company: ''
-        };
-
-        setRowLicenses(prev => {
-            const rowLicenses = prev[contactModalRowId] || [];
-            const updatedLicenses = rowLicenses.map(license => {
-                if (license.id === contactModalLicenseId) {
-                    return {
-                        ...license,
-                        contactDetails: contactData
-                    };
-                }
-                return license;
-            });
-            
-            return {
-                ...prev,
-                [contactModalRowId]: updatedLicenses
-            };
-        });
-
-        handleCloseContactModal();
     };
 
     // removed fill down state
@@ -4825,6 +5015,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         });
     };
 
+    // For compatibility with the component usage
+    const toggleRowExpansion = toggleExpanded;
+
     const highlightText = (text: string) => {
         const q = (highlightQuery || '').trim();
         if (!q) return <>{text}</>;
@@ -4968,17 +5161,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             let groupKey = '';
             
             switch (groupBy) {
-                case 'accountName':
-                    groupKey = item.accountName || '(No Account Name)';
+                case 'firstName':
+                    groupKey = item.firstName || '(No First Name)';
                     break;
-                case 'masterAccount':
-                    groupKey = item.masterAccount || '(No Master Account)';
+                case 'lastName':
+                    groupKey = item.lastName || '(No Last Name)';
                     break;
-                case 'cloudType':
-                    groupKey = item.cloudType || '(No Cloud Type)';
+                case 'emailAddress':
+                    groupKey = item.emailAddress || '(No Email Address)';
                     break;
-                case 'address':
-                    groupKey = item.address || '(No Address)';
+                case 'status':
+                    groupKey = item.status || '(No Status)';
                     break;
                 default:
                     groupKey = 'All Records';
@@ -5014,6 +5207,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     useEffect(() => {
         const checkScrollNeed = () => {
             if (!tableContainerRef.current) return;
+            
+            // With 10+ columns, we likely always need horizontal scrolling
+            // Simplified logic: if we have more than 6 columns, enable scrolling
+            const totalColumns = 10; // firstName, middleName, lastName, emailAddress, status, startDate, endDate, password, technicalUser, assignedUserGroups
+            const shouldAlwaysScroll = totalColumns > 6;
+            
+            if (shouldAlwaysScroll) {
+                setShouldShowHorizontalScroll(true);
+                return;
+            }
             
             // Get current zoom level
             const currentZoom = window.devicePixelRatio || 1;
@@ -5052,7 +5255,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     // Only trigger if Services column is actually cut off or too narrow to display content properly
                     if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
                         // Additional check: see if there's actually content being cut off
-                        const servicesChips = serviceElement.querySelectorAll('.inline-flex');
+                        const servicesChips = serviceElement.querySelectorAll('.bg-white, .bg-gray-100, .bg-blue-50');
                         if (servicesChips.length > 0) {
                             servicesChips.forEach(chip => {
                                 const chipRect = chip.getBoundingClientRect();
@@ -5076,7 +5279,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 hoverBuffer,
                 isContentOverflowing,
                 servicesContentHidden,
-                needsScrollbar
+                needsScrollbar,
+                shouldAlwaysScroll
             });
             
             setShouldShowHorizontalScroll(needsScrollbar);
@@ -5150,6 +5354,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         window.addEventListener('keydown', handleKeyZoom);
         window.addEventListener('wheel', handleWheelZoom, { passive: true });
         
+        // Call checkScrollNeed initially
+        checkScrollNeed();
+        
         return () => {
             resizeObserver.disconnect();
             mutationObserver.disconnect();
@@ -5161,15 +5368,66 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
     
     return (
-        <div className='w-full compact-table safari-tight'>
-            {/* Using browser default scrollbars only */}
+        <div className='compact-table safari-tight manage-users-table' style={{ width: 'max(100%, 1400px)', minWidth: 'max-content' }}>
+            {/* Using browser default scrollbars only - remove internal scroll containers */}
             <style dangerouslySetInnerHTML={{
                 __html: `
+                    /* Use browser's natural scrolling - no internal scroll containers */
+                    .manage-users-table div[role="table"] {
+                        overflow: visible !important;
+                        position: relative;
+                    }
+                    
+                    /* Ensure all field value containers span full width */
+                    .manage-users-table [data-col] .bg-white {
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        display: flex !important;
+                    }
+                    
+                    /* Ensure AsyncChipSelect containers span full width */
+                    .manage-users-table .relative.min-w-0 {
+                        width: 100% !important;
+                    }
+                    
+                    /* Ensure all motion spans with white background span full width */
+                    .manage-users-table motion-span[style*="background"] {
+                        width: 100% !important;
+                        min-width: 100% !important;
+                    }
+                    
+                    /* Force all motion spans in data cells to be full width */
+                    .manage-users-table [data-col] motion-span {
+                        width: 100% !important;
+                        display: flex !important;
+                    }
+                    
                     /* Table container with proper scrolling */
                     div[role="table"] {
                         position: relative;
-                        overflow-y: visible;
-                        overflow-x: ${shouldShowHorizontalScroll ? 'auto' : 'hidden'};
+                        overflow-y: visible !important;
+                        overflow-x: ${shouldShowHorizontalScroll ? 'auto !important' : 'hidden !important'};
+                    }
+                    
+                    /* Ensure the header row respects the container's rounded corners */
+                    .manage-users-table .rounded-xl > .bg-slate-50 {
+                        border-top-left-radius: 0.75rem !important;  /* Match rounded-xl */
+                        border-top-right-radius: 0.75rem !important; /* Match rounded-xl */
+                        margin: 0 !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-top: none !important;
+                    }
+                    
+                    /* Ensure the header container clips content properly */
+                    .manage-users-table .rounded-xl {
+                        overflow: hidden !important;
+                        border-radius: 0.75rem !important;
+                    }
+                    
+                    /* Override any border-radius interference */
+                    .manage-users-table .bg-slate-50 > div.rounded-sm {
+                        border-radius: 0.125rem !important;
                     }
                     
                     /* Prevent horizontal scrollbars on table cells and headers (except services) */
@@ -5272,72 +5530,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             }} />
             <div className='flex items-center justify-between mb-2'>
                 <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'Account Management Details'}
+                    {title ?? 'User Management Details'}
                 </h3>
-                <div className='flex items-center space-x-3'>
-                    <motion.button
-                        onClick={expandAllRows}
-                        className="group relative px-4 py-2 text-xs font-semibold text-emerald-700 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 rounded-lg border border-emerald-200 hover:border-emerald-300 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-sm hover:shadow-md"
-                        title="Expand All Accounts"
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        style={{ overflow: 'hidden', contain: 'layout' }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-100 to-green-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <motion.div
-                            animate={{ 
-                                scale: [1, 1.1, 1],
-                                rotate: [0, 180, 360]
-                            }}
-                            transition={{ 
-                                duration: 2.5, 
-                                repeat: Infinity, 
-                                ease: "easeInOut",
-                                repeatDelay: 1
-                            }}
-                            className="relative z-10 flex items-center justify-center"
-                            style={{ transformOrigin: 'center center' }}
-                        >
-                            <UnfoldVertical className="w-4 h-4" />
-                        </motion.div>
-                        <span className="relative z-10">Expand All</span>
-                    </motion.button>
-                    
-                    <motion.button
-                        onClick={collapseAllRows}
-                        className="group relative px-4 py-2 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md"
-                        title="Collapse All Accounts"
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.99 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        style={{ 
-                            overflow: 'hidden', 
-                            contain: 'layout style paint',
-                            willChange: 'transform'
-                        }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <motion.div
-                            animate={{ 
-                                rotate: [0, 360]
-                            }}
-                            transition={{ 
-                                duration: 4, 
-                                repeat: Infinity, 
-                                ease: "linear"
-                            }}
-                            className="relative z-10 w-4 h-4 flex items-center justify-center flex-shrink-0"
-                            style={{ 
-                                transformOrigin: 'center center',
-                                backfaceVisibility: 'hidden'
-                            }}
-                        >
-                            <FoldVertical className="w-4 h-4" />
-                        </motion.div>
-                        <span className="relative z-10 flex-shrink-0">Collapse All</span>
-                    </motion.button>
-                </div>
             </div>
             {cols.length === 0 ? (
                 <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
@@ -5398,23 +5592,27 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     role='table' 
                     className='p-0 w-full'
                     style={{
-                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
-                        overflowY: 'visible',
                         maxWidth: '100%',
+                        minHeight: '400px', // Ensure minimum height for proper modal display
                         boxSizing: 'border-box'
-                    }}
+                    } as React.CSSProperties}
                 >
                 <div className='w-full relative' style={{ 
-                    minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
-                    width: '100%' 
+                    minWidth: 'max-content', // Let content determine the minimum width
+                    width: 'max(100%, 1400px)' // Ensure wide enough to trigger browser horizontal scroll
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
-                            accountName: 'Account Name',
-                            masterAccount: 'Master Account',
-                            cloudType: 'Cloud Type',
-                            address: 'Address',
+                            firstName: 'First Name',
+                            middleName: 'Middle Name',
+                            lastName: 'Last Name',
+                            emailAddress: 'Email Address',
+                            status: 'Status',
+                            startDate: 'Start Date',
+                            endDate: 'End Date',
+                            password: 'Password',
                             technicalUser: 'Technical User',
+                            assignedUserGroups: 'Assigned User Groups',
                         };
 
                         // Merge custom labels with defaults
@@ -5424,20 +5622,35 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         };
 
                         const iconFor: Record<string, React.ReactNode> = {
-                            accountName: (
+                            firstName: (
                                 <User size={14} />
                             ),
-                            masterAccount: (
-                                <Building2 size={14} />
+                            middleName: (
+                                <User size={14} />
                             ),
-                            cloudType: (
-                                <FileText size={14} />
+                            lastName: (
+                                <User size={14} />
                             ),
-                            address: (
-                                <MapPin size={14} />
+                            emailAddress: (
+                                <AtSign size={14} />
+                            ),
+                            status: (
+                                <CheckCircle size={14} />
+                            ),
+                            startDate: (
+                                <Calendar size={14} />
+                            ),
+                            endDate: (
+                                <Calendar size={14} />
+                            ),
+                            password: (
+                                <Lock size={14} />
                             ),
                             technicalUser: (
-                                <User size={14} />
+                                <Key size={14} />
+                            ),
+                            assignedUserGroups: (
+                                <Users size={14} />
                             ),
                         };
                         return (
@@ -5473,22 +5686,22 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
                                             } ${
-                                                c === 'phone' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for Phone column
+                                                c === 'assignedUserGroups' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'phone' ? { minWidth: '400px' } : undefined} // Match Phone column minimum width
+                                            style={c === 'assignedUserGroups' ? { minWidth: '400px' } : undefined} // Match last column minimum width
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
                                                 <span>{labelFor[c] || c}</span>
                                             </div>
                                             {[
-                                                'accountName',
-                                                'masterAccount',
-                                                'cloudType',
-                                                'email',
-                                                'phone',
+                                                'firstName',
+                                                'middleName',
+                                                'lastName',
+                                                'emailAddress',
+                                                'status',
                                             ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'phone' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                <div className={`inline-flex items-center ml-4 ${c === 'assignedUserGroups' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
                                                     <button
                                                         onClick={() => toggleSort(c as any, 'asc')}
                                                         className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
@@ -5507,8 +5720,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     </button>
                                                 </div>
                                             )}
-                                            {/* Show resize handle for resizable columns but not for Phone (last column) */}
-                                            {['accountName', 'masterAccount', 'cloudType', 'address', 'email'].includes(c) && (
+                                            {/* Show resize handle for resizable columns but not for last column */}
+                                            {['firstName', 'middleName', 'lastName', 'emailAddress', 'status', 'startDate', 'endDate', 'password', 'technicalUser'].includes(c) && (
                                                 <div
                                                     onMouseDown={(e: any) =>
                                                         startResize(c, e)
@@ -5519,7 +5732,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
-                                            {c === 'accountName' && (
+                                            {c === 'firstName' && (
                                                 <span
                                                     aria-hidden
                                                     className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
@@ -5578,86 +5791,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         onDeleteClick={handleDeleteClick}
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
-                                        onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                        onShowStartDateProtectionModal={onShowStartDateProtectionModal}
+                                        onShowGlobalValidationModal={showGlobalValidationModal}
                                     />
-                                    {expandedRows.has(r.id) && (
-                                        <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
-                                            {/* Vertical connection line from chevron */}
-                                            <div className="absolute -left-2 top-0 bottom-0 w-px bg-blue-400"></div>
-                                            
-                                            {/* License section header */}
-                                            <div className="p-3 pb-2">
-                                                <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                                                    <FileText className="w-4 h-4" />
-                                                    Licenses for {r.accountName || 'Account'}
-                                                </h4>
-                                                
-                                                {/* Render existing licenses */}
-                                                <div className="space-y-2">
-                                                    {(rowLicenses[r.id] || []).map((license) => (
-                                                        <LicenseSubRow
-                                                            key={license.id}
-                                                            license={license}
-                                                            rowId={r.id}
-                                                            onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
-                                                            onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
-                                                            showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
-                                                            isLicenseFieldMissing={isLicenseFieldMissing}
-                                                            compressingLicenseId={compressingLicenseId}
-                                                            foldingLicenseId={foldingLicenseId}
-                                                            onDeleteClick={onLicenseDelete}
-                                                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                                            onNewItemCreated={onNewItemCreated as any}
-                                                            onOpenContactModal={handleOpenContactModal}
-                                                            accounts={rows}
-                                                        />
-                                                    ))}
-                                                </div>
-                                                
-                                                {/* Add New License Button */}
-                                                <div className="mt-4 ml-6">
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.02, y: -1 }}
-                                                        whileTap={{ scale: 0.98 }}
-                                                        onClick={() => addNewLicense(r.id)}
-                                                        disabled={
-                                                            // Check if main row fields are incomplete
-                                                            !isMainRowComplete(r) ||
-                                                            // Check if there are any incomplete licenses in this row
-                                                            (rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            )
-                                                        }
-                                                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
-                                                            (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            ))
-                                                            ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                                                            : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm hover:shadow-md'
-                                                        }`}
-                                                        title={
-                                                            !isMainRowComplete(r)
-                                                            ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
-                                                            : (rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            )
-                                                            ? 'Complete existing licenses before adding new ones'
-                                                            : 'Add New License'
-                                                        }
-                                                    >
-                                                        <Plus className="w-4 h-4" />
-                                                        Add New License
-                                                    </motion.button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             ))}
                             
@@ -5740,7 +5876,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     onDeleteClick={handleDeleteClick}
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
-                                                    onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                                    onShowStartDateProtectionModal={onShowStartDateProtectionModal}
+                                                    onShowGlobalValidationModal={showGlobalValidationModal}
                                                 />
                                             </div>
                                         ))}
@@ -5781,21 +5918,62 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     </div>
                 </div>
             )}
-            
-            {/* ContactModal for license contact details */}
-            <ContactModal
-                isOpen={showContactModal}
-                onClose={handleCloseContactModal}
-                onSave={handleContactModalSave}
-                accountName={contactModalAccountName}
-                masterAccount={contactModalMasterAccount}
-                initialContacts={contactModalData}
-            />
+
+            {/* Global Validation Modal */}
+            {globalValidationModal.open && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={hideGlobalValidationModal}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-500'
+                                        fill='currentColor'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <path fillRule='evenodd' d='M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z' clipRule='evenodd' />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-base font-semibold leading-6 text-gray-900'>
+                                        Information
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            {globalValidationModal.message}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto'
+                                    onClick={hideGlobalValidationModal}
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });
 
 // Set the display name for debugging
-AccountsTable.displayName = 'AccountsTable';
+ManageUsersTable.displayName = 'ManageUsersTable';
 
-export default AccountsTable;
+export default ManageUsersTable;

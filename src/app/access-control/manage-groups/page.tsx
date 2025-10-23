@@ -104,7 +104,7 @@ export default function ManageGroups() {
 
     useEffect(() => {
         loadGroups();
-    }, [search]);
+    }, [search, loadGroups]);
 
     const handleCreateGroup = async () => {
         try {
