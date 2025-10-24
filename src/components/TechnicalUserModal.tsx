@@ -608,12 +608,13 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Left Panel - Pipeline Canvas Style (Narrow) */}
+                {/* Left Panel - Sidebar Image */}
                 <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
-                    {/* Panel Content - Empty (no icons) */}
-                    <div className="flex-1 relative z-10">
-                        {/* Empty space - no content */}
-                    </div>
+                    <img 
+                        src="/images/logos/sidebar.png" 
+                        alt="Sidebar" 
+                        className="w-full h-full object-cover"
+                    />
                     
                     {/* Middle Text - Rotated and Bold */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
@@ -621,15 +622,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                             <Users className="h-4 w-4" />
                             <span>Manage Tech User</span>
                         </div>
-                    </div>
-                    
-                    {/* Logo Watermark - Bottom of Panel */}
-                    <div className="absolute bottom-2 left-1 right-1 h-16">
-                        <img 
-                            src="/images/logos/logo.svg" 
-                            alt="Logo" 
-                            className="w-full h-full object-contain opacity-20"
-                        />
                     </div>
                 </div>
 

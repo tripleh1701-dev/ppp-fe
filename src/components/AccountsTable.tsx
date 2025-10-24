@@ -214,6 +214,12 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                         e.preventDefault();
                         setIsOpen(false);
                         setHighlightedIndex(-1);
+                    } else if (e.key === 'P' || e.key === 'p') {
+                        e.preventDefault();
+                        if (!isOpen) {
+                            setIsOpen(true);
+                            setHighlightedIndex(-1);
+                        }
                     }
                 }}
                 className={`w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} hover:bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} flex items-center justify-between min-h-[24px]`}
@@ -2858,6 +2864,8 @@ function LicenseSubRow({
     onNewItemCreated,
     onOpenContactModal,
     accounts = [],
+    isTableRow = false,
+    isLastRow = false,
 }: {
     license: License;
     rowId: string;
@@ -2880,6 +2888,8 @@ function LicenseSubRow({
     ) => void;
     onOpenContactModal: (rowId: string, licenseId: string, initialData?: Contact) => void;
     accounts?: AccountRow[];
+    isTableRow?: boolean;
+    isLastRow?: boolean;
 }) {
     const [isRowHovered, setIsRowHovered] = useState(false);
 
@@ -2925,7 +2935,9 @@ function LicenseSubRow({
 
     return (
         <div 
-            className={`relative flex items-center ml-6 my-1 transition-all duration-200 ${
+            className={`relative transition-all duration-200 ${
+                isTableRow ? '' : 'ml-6 my-1'
+            } ${
                 compressingLicenseId === license.id
                     ? 'transform scale-x-75 transition-all duration-500 ease-out'
                     : ''
@@ -2937,60 +2949,67 @@ function LicenseSubRow({
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
         >
-            {/* Connection line from parent row */}
-            <div className="absolute -left-6 top-0 bottom-0 w-6 flex">
-                {/* Vertical line continuing from parent */}
-                <div className="w-px h-full bg-blue-300 ml-3"></div>
-                {/* Horizontal connector to this row */}
-                <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
-            </div>
+            {/* Connection line from parent row - only show for non-table rows */}
+            {!isTableRow && (
+                <div className="absolute -left-6 top-0 bottom-0 w-6 flex">
+                    {/* Vertical line continuing from parent */}
+                    <div className="w-px h-full bg-blue-300 ml-3"></div>
+                    {/* Horizontal connector to this row */}
+                    <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
+                </div>
+            )}
             
-            {/* Delete button */}
-            <div className="flex items-center justify-center w-8 mr-2">
-                {isRowHovered && (
-                    <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e: any) => {
-                            e.stopPropagation();
-                            if (onDelete) {
-                                onDelete(license.id);
-                            }
-                        }}
-                        className="group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md"
-                        title="Delete License"
-                    >
-                        <svg
-                            className="w-2 h-2 transition-transform duration-200"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 12h12"
-                            />
-                        </svg>
-                    </motion.button>
-                )}
-            </div>
-            
-            {/* License row content */}
+            {/* License row content with grid structure */}
             <div 
-                className="flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200"
+                className={`grid gap-3 p-3 transition-all duration-200 ${
+                    isTableRow 
+                        ? `border-l border-r border-blue-200 hover:bg-blue-50/50 ${
+                            isLastRow ? 'rounded-b-lg border-b' : 'border-b'
+                        }`
+                        : 'bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md'
+                }`}
                 style={{
                     gridTemplateColumns: license.renewalNotice 
-                        ? "minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
-                        : "minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
+                        ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
+                        : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
                 }}
             >
+                {/* Delete Button Column - First in grid */}
+                <div className="flex items-center justify-center">
+                    {isRowHovered && (
+                        <motion.button
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                if (onDelete) {
+                                    onDelete(license.id);
+                                }
+                            }}
+                            className="group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md"
+                            title="Delete License"
+                        >
+                            <svg
+                                className="w-2 h-2 transition-transform duration-200"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M6 12h12"
+                                />
+                            </svg>
+                        </motion.button>
+                    )}
+                </div>
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Enterprise</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Enterprise</label>}
                     <AsyncChipSelect
                         type='template'
                         value={license.enterprise}
@@ -3009,7 +3028,7 @@ function LicenseSubRow({
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Product</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Product</label>}
                     <AsyncChipSelect
                         type='template'
                         value={license.product}
@@ -3028,7 +3047,7 @@ function LicenseSubRow({
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Service</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Service</label>}
                     <AsyncChipSelect
                         type='template'
                         value={license.service}
@@ -3047,29 +3066,38 @@ function LicenseSubRow({
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License Start Date</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">License Start Date</label>}
                     <DateChipSelect
                         value={license.licenseStartDate}
-                        onChange={(value) => onUpdate(license.id, 'licenseStartDate', value || '')}
+                        onChange={(value) => {
+                            onUpdate(license.id, 'licenseStartDate', value || '');
+                            // If end date is earlier than new start date, clear it
+                            if (value && license.licenseEndDate && new Date(license.licenseEndDate) < new Date(value)) {
+                                onUpdate(license.id, 'licenseEndDate', '');
+                            }
+                        }}
                         placeholder=""
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
                         compact={true}
+                        className="text-xs min-h-[20px] py-0.5"
                     />
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
-                    <label className="text-xs font-medium text-blue-700 mb-1">License End Date</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">License End Date</label>}
                     <DateChipSelect
                         value={license.licenseEndDate}
                         onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
                         placeholder=""
                         isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
                         compact={true}
+                        className="text-xs min-h-[20px] py-0.5"
+                        minDate={license.licenseStartDate || undefined}
                     />
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
-                    <label className="text-xs font-medium text-blue-700 mb-1">No. of Users</label>
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">No. of Users</label>}
                     <AsyncChipSelect
                         type='template'
                         value={license.numberOfUsers}
@@ -3088,8 +3116,8 @@ function LicenseSubRow({
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Contact</label>
-                    <div className="flex items-start justify-center h-8 pt-0.5">
+                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Contact</label>}
+                    <div className={`flex items-start justify-center pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
                         <button
                             onClick={() => onOpenContactModal(rowId, license.id, license.contactDetails)}
                             className="flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md"
@@ -3113,8 +3141,8 @@ function LicenseSubRow({
                 </div>
                 
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
-                    <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>
-                    <div className="flex items-start h-8 space-x-1 pt-0.5">
+                    {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>}
+                    <div className={`flex items-start space-x-1 pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
                         <input
                             type="checkbox"
                             checked={license.renewalNotice}
@@ -3127,7 +3155,7 @@ function LicenseSubRow({
                 
                 {license.renewalNotice && (
                     <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
-                        <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>
+                        {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>}
                         <AsyncChipSelect
                             type='template'
                             value={license.noticePeriodDays || ''}
@@ -3884,8 +3912,26 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         },
         getCurrentLicenseState: () => {
             return rowLicenses;
+        },
+        expandAllRows: () => {
+            const allRowIds = rows.map(row => row.id);
+            setExpandedRows(new Set(allRowIds));
+            
+            // Initialize licenses for all rows that don't have them
+            setRowLicenses(prevLicenses => {
+                const newLicenses = { ...prevLicenses };
+                allRowIds.forEach(rowId => {
+                    if (!newLicenses[rowId]) {
+                        newLicenses[rowId] = [];
+                    }
+                });
+                return newLicenses;
+            });
+        },
+        collapseAllRows: () => {
+            setExpandedRows(new Set());
         }
-    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses]);
+    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses, rows]);
 
     // Helper function to check if a field is missing/invalid
     const isFieldMissing = (row: AccountRow, field: string): boolean => {
@@ -5270,75 +5316,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     }
                 `
             }} />
-            <div className='flex items-center justify-between mb-2'>
-                <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'Account Management Details'}
-                </h3>
-                <div className='flex items-center space-x-3'>
-                    <motion.button
-                        onClick={expandAllRows}
-                        className="group relative px-4 py-2 text-xs font-semibold text-emerald-700 bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 rounded-lg border border-emerald-200 hover:border-emerald-300 transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-sm hover:shadow-md"
-                        title="Expand All Accounts"
-                        whileHover={{ scale: 1.02, y: -1 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        style={{ overflow: 'hidden', contain: 'layout' }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-100 to-green-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <motion.div
-                            animate={{ 
-                                scale: [1, 1.1, 1],
-                                rotate: [0, 180, 360]
-                            }}
-                            transition={{ 
-                                duration: 2.5, 
-                                repeat: Infinity, 
-                                ease: "easeInOut",
-                                repeatDelay: 1
-                            }}
-                            className="relative z-10 flex items-center justify-center"
-                            style={{ transformOrigin: 'center center' }}
-                        >
-                            <UnfoldVertical className="w-4 h-4" />
-                        </motion.div>
-                        <span className="relative z-10">Expand All</span>
-                    </motion.button>
-                    
-                    <motion.button
-                        onClick={collapseAllRows}
-                        className="group relative px-4 py-2 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md"
-                        title="Collapse All Accounts"
-                        whileHover={{ y: -1 }}
-                        whileTap={{ scale: 0.99 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        style={{ 
-                            overflow: 'hidden', 
-                            contain: 'layout style paint',
-                            willChange: 'transform'
-                        }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <motion.div
-                            animate={{ 
-                                rotate: [0, 360]
-                            }}
-                            transition={{ 
-                                duration: 4, 
-                                repeat: Infinity, 
-                                ease: "linear"
-                            }}
-                            className="relative z-10 w-4 h-4 flex items-center justify-center flex-shrink-0"
-                            style={{ 
-                                transformOrigin: 'center center',
-                                backfaceVisibility: 'hidden'
-                            }}
-                        >
-                            <FoldVertical className="w-4 h-4" />
-                        </motion.div>
-                        <span className="relative z-10 flex-shrink-0">Collapse All</span>
-                    </motion.button>
-                </div>
-            </div>
+
             {cols.length === 0 ? (
                 <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
                     <div className='flex flex-col items-center space-y-4'>
@@ -5494,7 +5472,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
                                                     >
                                                         <ArrowUp
-                                                            size={sortCol === c && sortDir === 'asc' ? 20 : 16}
+                                                            size={sortCol === c && sortDir === 'asc' ? 14 : 12}
                                                         />
                                                     </button>
                                                     <button
@@ -5502,7 +5480,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
                                                     >
                                                         <ArrowDown
-                                                            size={sortCol === c && sortDir === 'desc' ? 20 : 16}
+                                                            size={sortCol === c && sortDir === 'desc' ? 14 : 12}
                                                         />
                                                     </button>
                                                 </div>
@@ -5587,73 +5565,117 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                             
                                             {/* License section header */}
                                             <div className="p-3 pb-2">
-                                                <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                                <h4 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
                                                     <FileText className="w-4 h-4" />
                                                     Licenses for {r.accountName || 'Account'}
                                                 </h4>
                                                 
-                                                {/* Render existing licenses */}
-                                                <div className="space-y-2">
-                                                    {(rowLicenses[r.id] || []).map((license) => (
-                                                        <LicenseSubRow
-                                                            key={license.id}
-                                                            license={license}
-                                                            rowId={r.id}
-                                                            onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
-                                                            onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
-                                                            showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
-                                                            isLicenseFieldMissing={isLicenseFieldMissing}
-                                                            compressingLicenseId={compressingLicenseId}
-                                                            foldingLicenseId={foldingLicenseId}
-                                                            onDeleteClick={onLicenseDelete}
-                                                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                                            onNewItemCreated={onNewItemCreated as any}
-                                                            onOpenContactModal={handleOpenContactModal}
-                                                            accounts={rows}
-                                                        />
+                                                {/* License Table Container */}
+                                                <div className="ml-6">
+                                                    {/* Table Header */}
+                                                    <div 
+                                                        className="grid gap-3 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black"
+                                                        style={{
+                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
+                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
+                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
+                                                        }}
+                                                    >
+                                                        <div></div>
+                                                        <div>Enterprise</div>
+                                                        <div>Product</div>
+                                                        <div>Service</div>
+                                                        <div>Start Date</div>
+                                                        <div>End Date</div>
+                                                        <div>Users</div>
+                                                        <div>Contact</div>
+                                                        <div>Renewal</div>
+                                                        {(rowLicenses[r.id] || []).some(license => license.renewalNotice) && (
+                                                            <div>Notice (days)</div>
+                                                        )}
+                                                    </div>
+                                                    
+
+                                                    
+                                                    {/* Existing License Rows */}
+                                                    {(rowLicenses[r.id] || []).map((license, index) => (
+                                                        <div key={license.id} className={`${index === (rowLicenses[r.id] || []).length - 1 ? 'rounded-b-lg' : ''}`}>
+                                                            <LicenseSubRow
+                                                                license={license}
+                                                                rowId={r.id}
+                                                                onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
+                                                                onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
+                                                                showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
+                                                                isLicenseFieldMissing={isLicenseFieldMissing}
+                                                                compressingLicenseId={compressingLicenseId}
+                                                                foldingLicenseId={foldingLicenseId}
+                                                                onDeleteClick={onLicenseDelete}
+                                                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                                                onNewItemCreated={onNewItemCreated as any}
+                                                                onOpenContactModal={handleOpenContactModal}
+                                                                accounts={rows}
+                                                                isTableRow={true}
+                                                                isLastRow={index === (rowLicenses[r.id] || []).length - 1}
+                                                            />
+                                                        </div>
                                                     ))}
-                                                </div>
-                                                
-                                                {/* Add New License Button */}
-                                                <div className="mt-4 ml-6">
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.02, y: -1 }}
-                                                        whileTap={{ scale: 0.98 }}
-                                                        onClick={() => addNewLicense(r.id)}
-                                                        disabled={
-                                                            // Check if main row fields are incomplete
-                                                            !isMainRowComplete(r) ||
-                                                            // Check if there are any incomplete licenses in this row
-                                                            (rowLicenses[r.id] || []).some(license => 
+                                                    
+                                                    {/* Add New License Button */}
+                                                    <div 
+                                                        className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
+                                                        style={{
+                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
+                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
+                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px",
+                                                            minWidth: 'max-content',
+                                                            width: '100%'
+                                                        }}
+                                                        onClick={() => {
+                                                            // Check if main row is complete and all existing licenses are complete
+                                                            if (isMainRowComplete(r) && !(rowLicenses[r.id] || []).some(license => 
                                                                 !license.enterprise || !license.product || !license.service ||
                                                                 !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                                                                 (license.renewalNotice && !license.noticePeriodDays)
-                                                            )
-                                                        }
-                                                        className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
-                                                            (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            ))
-                                                            ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                                                            : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm hover:shadow-md'
-                                                        }`}
+                                                            )) {
+                                                                addNewLicense(r.id);
+                                                            }
+                                                        }}
                                                         title={
                                                             !isMainRowComplete(r)
-                                                            ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
-                                                            : (rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            )
-                                                            ? 'Complete existing licenses before adding new ones'
-                                                            : 'Add New License'
+                                                                ? 'Complete main row fields first'
+                                                                : (rowLicenses[r.id] || []).some(license => 
+                                                                    !license.enterprise || !license.product || !license.service ||
+                                                                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                    (license.renewalNotice && !license.noticePeriodDays)
+                                                                )
+                                                                ? 'Complete existing licenses first'
+                                                                : 'Add new license'
                                                         }
                                                     >
-                                                        <Plus className="w-4 h-4" />
-                                                        Add New License
-                                                    </motion.button>
+                                                        {/* Empty delete button space */}
+                                                        <div className='flex items-center justify-center px-2 py-1'>
+                                                            {/* No delete icon for add license row */}
+                                                        </div>
+                                                        
+                                                        {/* Add new license content spanning all columns */}
+                                                        <div 
+                                                            className={`flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 ${
+                                                                (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
+                                                                    !license.enterprise || !license.product || !license.service ||
+                                                                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                                                                    (license.renewalNotice && !license.noticePeriodDays)
+                                                                ))
+                                                                ? 'text-slate-400 cursor-not-allowed'
+                                                                : 'text-slate-500 group-hover:text-blue-600'
+                                                            }`} 
+                                                            style={{gridColumn: `span ${(rowLicenses[r.id] || []).some(license => license.renewalNotice) ? '9' : '8'}`}}
+                                                        >
+                                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                                            </svg>
+                                                            <span className='italic'>Add New License</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
