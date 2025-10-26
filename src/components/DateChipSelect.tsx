@@ -171,7 +171,7 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
             {isOpen && position && createPortal(
                 <div
                     ref={calendarRef}
-                    className="z-[9999] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
+                    className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
                     style={{
                         position: 'fixed',
                         top: `${position.top}px`,

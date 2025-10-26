@@ -380,14 +380,14 @@ const ChipDropdown = ({
             </div>
 
             {isOpen && (
-                <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
-                    <div className='p-2 border-b'>
+                <div className='absolute w-full mt-1 bg-gray-50 border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto before:content-[""] before:absolute before:-top-2 before:left-4 before:w-0 before:h-0 before:border-l-[8px] before:border-l-transparent before:border-r-[8px] before:border-r-transparent before:border-b-[8px] before:border-b-gray-50 after:content-[""] after:absolute after:-top-[10px] after:left-[14px] after:w-0 after:h-0 after:border-l-[10px] after:border-l-transparent after:border-r-[10px] after:border-r-transparent after:border-b-[10px] after:border-b-gray-200'>
+                    <div className='p-3 border-b border-gray-200 bg-gray-50'>
                         <input
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                            className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
+                            className='w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white'
                             autoFocus
                         />
                     </div>
@@ -408,10 +408,10 @@ const ChipDropdown = ({
                                             }
                                         }
                                     }}
-                                    className={`p-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
+                                    className={`p-3 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between transition-colors duration-150 ${
                                         isSelected
-                                            ? 'bg-blue-50 text-blue-600'
-                                            : ''
+                                            ? 'bg-blue-100 text-blue-700 font-medium'
+                                            : 'text-gray-700'
                                     }`}
                                 >
                                     <span>{option.name}</span>
@@ -423,7 +423,7 @@ const ChipDropdown = ({
                         })}
 
                         {filteredOptions.length === 0 && searchTerm && (
-                            <div className='p-2 text-sm text-gray-500'>
+                            <div className='p-3 text-sm text-gray-500 text-center italic'>
                                 No options found
                             </div>
                         )}
@@ -599,7 +599,7 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template';
+type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template' | 'enterprise' | 'product' | 'service';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -1273,7 +1273,7 @@ function PhoneMultiSelect({
                         {showMoreServices && moreServicesPos && 
                             createPortal(
                                 <div
-                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
                                     onMouseDown={(e: any) => e.stopPropagation()}
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
@@ -1480,7 +1480,7 @@ function PhoneMultiSelect({
                 createPortal(
                     <div
                         ref={dropdownRef}
-                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
                         onMouseDown={(e: any) => e.stopPropagation()}
                         onClick={(e: any) => e.stopPropagation()}
                         style={{
@@ -2008,6 +2008,7 @@ function AsyncChipSelect({
     dropdownOptions,
     onTabNext,
     onTabPrev,
+    selectedEnterpriseName = '',
 }: {
     type: CatalogType;
     value?: string;
@@ -2036,6 +2037,7 @@ function AsyncChipSelect({
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
+    selectedEnterpriseName?: string;
 }) {
     const [open, setOpen] = React.useState(false);
     const [current, setCurrent] = React.useState<string | undefined>(value);
@@ -2050,6 +2052,12 @@ function AsyncChipSelect({
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement>(null);
+
+    // Check if this is a static enterprise field (should use the selected enterprise from top-right)
+    const isStaticEnterprise = type === 'enterprise' && selectedEnterpriseName;
+    const displayValue = isStaticEnterprise ? selectedEnterpriseName : (current || value);
+    
+    console.log(`🏢 AsyncChipSelect: type=${type}, selectedEnterpriseName=${selectedEnterpriseName}, isStaticEnterprise=${isStaticEnterprise}`);
 
     // Helper function to check if an option is in use (with composite key constraint)
     const isOptionInUse = React.useCallback(
@@ -2090,60 +2098,24 @@ function AsyncChipSelect({
         if (!containerRef.current) return;
         
         const containerRect = containerRef.current.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
-        const dropdownHeight = 300; // Max height of dropdown
-        const spaceBelow = viewportHeight - containerRect.bottom;
-        const spaceAbove = containerRect.top;
         
-        // Find the table container to ensure dropdown stays within table bounds
-        const tableContainer = containerRef.current.closest('.compact-table') ||
-                              containerRef.current.closest('[role="table"]') || 
-                              containerRef.current.closest('.rounded-xl') ||
-                              containerRef.current.closest('.overflow-auto') ||
-                              containerRef.current.closest('.w-full.compact-table') ||
-                              document.querySelector('.compact-table') ||
-                              document.body;
-        const tableRect = tableContainer.getBoundingClientRect();
+        // Always position below the field
+        setDropdownPosition('below');
         
-        // Calculate portal position with table container constraints
-        const maxWidth = Math.min(120, tableRect.width - 64, viewportWidth - 64); // Reduced to match dropdown width
-        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+        // Calculate width to match container
+        const width = Math.max(140, Math.min(200, containerRect.width));
         
-        // Ensure dropdown stays within table container horizontally with more padding
-        const idealLeft = containerRect.left;
-        const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32); // More padding
-        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
-        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+        // Position directly below the field
+        let top = containerRect.bottom + 2;
+        const left = containerRect.left;
         
-        // Prefer below if there's enough space, otherwise use above if there's more space above
-        // For cloudType, always prefer below unless there's really no space
-        let top;
-        const forceBelow = type === 'cloudType';
-        
-        if (forceBelow && spaceBelow >= 100) {
-            // For cloudType, show below if there's at least 100px space
-            setDropdownPosition('below');
-            top = containerRect.bottom + 4;
-        } else if (spaceBelow >= dropdownHeight || (spaceBelow >= spaceAbove && spaceBelow >= 150)) {
-            setDropdownPosition('below');
-            top = containerRect.bottom + 4;
-            // Ensure it doesn't go below table bounds
-            if (top + dropdownHeight > tableRect.bottom) {
-                top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
-                setDropdownPosition('above');
-            }
-        } else {
-            setDropdownPosition('above');
-            top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
-        }
-        
-        // Final constraint to ensure dropdown is within table bounds
-        top = Math.max(top, tableRect.top + 10);
-        top = Math.min(top, tableRect.bottom - 100);
+        // Ensure dropdown stays within viewport
+        const viewportHeight = window.innerHeight;
+        top = Math.min(top, viewportHeight - 200); // Leave space for dropdown
         
         setDropdownPortalPos({ top, left, width });
-        console.log('📍 Dropdown position calculated:', { top, left, width, position: spaceBelow >= dropdownHeight ? 'below' : 'above', tableRect });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: 'below' });
     }, [type]);
 
     // Calculate position when dropdown opens
@@ -2176,6 +2148,10 @@ function AsyncChipSelect({
             } else if (type === 'address' && dropdownOptions?.addresses) {
                 allData = dropdownOptions.addresses;
                 console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
+            } else if (type === 'template' && dropdownOptions?.accountNames) {
+                // For template type, use the provided accountNames dropdown options (which contain enterprises, products, or services)
+                allData = dropdownOptions.accountNames;
+                console.log(`Using dropdownOptions for template type, got ${allData.length} items:`, allData);
             } else if (type === 'cloudType') {
                 // Always use predefined cloudType options (prioritize dropdownOptions)
                 if (dropdownOptions?.cloudTypes && dropdownOptions.cloudTypes.length > 0) {
@@ -2203,6 +2179,24 @@ function AsyncChipSelect({
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/templates',
                 ) || [];
+            } else if (type === 'enterprise') {
+                console.log('🏢 Calling API: /api/enterprises');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/enterprises',
+                ) || [];
+                console.log('🏢 Enterprise API response:', allData);
+            } else if (type === 'product') {
+                console.log('📦 Calling API: /api/products');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/products',
+                ) || [];
+                console.log('📦 Product API response:', allData);
+            } else if (type === 'service') {
+                console.log('⚙️ Calling API: /api/services');
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/services',
+                ) || [];
+                console.log('⚙️ Service API response:', allData);
             } else {
                 console.log('Calling API: /api/accountNames');
                 allData = await api.get<Array<{id: string; name: string}>>(
@@ -2258,7 +2252,9 @@ function AsyncChipSelect({
 
     // Load options when dropdown opens
     React.useEffect(() => {
+        console.log(`🔍 AsyncChipSelect useEffect: type=${type}, open=${open}, allOptions.length=${allOptions.length}`);
         if (open && allOptions.length === 0) {
+            console.log(`📞 Triggering loadAllOptions for type: ${type}`);
             loadAllOptions();
         }
     }, [open, allOptions.length, loadAllOptions]);
@@ -2400,8 +2396,16 @@ function AsyncChipSelect({
     };
 
     React.useEffect(() => {
-        setCurrent(value);
-    }, [value]);
+        if (isStaticEnterprise) {
+            // For static enterprise fields, use the selected enterprise and update parent
+            setCurrent(selectedEnterpriseName);
+            if (selectedEnterpriseName && selectedEnterpriseName !== value) {
+                onChange(selectedEnterpriseName);
+            }
+        } else {
+            setCurrent(value);
+        }
+    }, [value, isStaticEnterprise, selectedEnterpriseName, onChange]);
 
     // Debug logging for cloudType
     React.useEffect(() => {
@@ -2411,6 +2415,31 @@ function AsyncChipSelect({
     }, [type, allOptions]);
 
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
+    
+    // For static enterprise fields, show a read-only display
+    if (isStaticEnterprise) {
+        return (
+            <div
+                ref={containerRef}
+                className='relative min-w-0 flex items-center gap-1 group/item'
+                style={{maxWidth: '100%'}}
+            >
+                <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
+                    <div 
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-gray-100 text-gray-600 rounded-sm border border-gray-300 cursor-not-allowed opacity-75'
+                        style={{width: '100%', minWidth: '100%'}}
+                        title={`Enterprise: ${selectedEnterpriseName} (Selected from top-right dropdown - read only)`}
+                    >
+                        <span className='flex-1 truncate'>{selectedEnterpriseName}</span>
+                        <svg className='w-3 h-3 text-gray-400 flex-shrink-0' fill='currentColor' viewBox='0 0 20 20'>
+                            <path fillRule='evenodd' d='M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z' clipRule='evenodd' />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
     return (
         <div
             ref={containerRef}
@@ -2436,6 +2465,7 @@ function AsyncChipSelect({
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
+                            console.log(`🖱️🖱️ Double-click on field: type=${type}, value=${current || value}`);
                             const target = e.target as HTMLElement;
                             if (!target.closest('button')) {
                                 // Always allow editing by setting the query and opening input
@@ -2451,10 +2481,13 @@ function AsyncChipSelect({
                             }
                         }}
                         onClick={(e: any) => {
-                            // For cloudType, also allow single click to open dropdown
-                            if (type === 'cloudType' && allOptions.length > 0) {
+                            console.log(`🖱️ License field clicked: type=${type}`);
+                            // For cloudType and license fields (product, service), allow single click to open dropdown
+                            // Skip enterprise if it's static (selected from top-right)
+                            if ((type === 'cloudType' || type === 'product' || type === 'service') && (allOptions.length > 0 || ['product', 'service'].includes(type))) {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
+                                    console.log(`🎯 Opening dropdown for type: ${type}`);
                                     setQuery('');
                                     setOpen(true);
                                     setTimeout(() => {
@@ -2525,14 +2558,13 @@ function AsyncChipSelect({
                                 setOpen(false);
                             }}
                             onFocus={() => {
-                                // Only open dropdown on focus if there are options to show
-                                if (allOptions.length > 0) {
+                                console.log(`🎯 Field focused: type=${type}, allOptions.length=${allOptions.length}`);
+                                // For license fields (product, service), open dropdown to trigger API loading
+                                // Skip enterprise if it's static (selected from top-right)
+                                // For other fields, only open if there are already options to show
+                                if (allOptions.length > 0 || (['product', 'service'].includes(type))) {
+                                    console.log(`🔓 Opening dropdown on focus for type: ${type}`);
                                     setOpen(true);
-                                }
-                                
-                                // Don't load options if dropdown is disabled (empty options array)
-                                if (false) {
-                                    loadAllOptions();
                                 }
                             }}
                             onKeyDown={async (e: any) => {
@@ -2561,7 +2593,7 @@ function AsyncChipSelect({
                                     setQuery('');
                                 }
                             }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
                             placeholder=''
                         />
                         {/* Dropdown arrow for cloudType */}
@@ -2594,20 +2626,20 @@ function AsyncChipSelect({
             {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
                 <div 
                     ref={dropdownRef}
-                    className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                    className='bg-white border border-blue-200 rounded-md shadow-lg'
                     onMouseDown={(e: any) => e.stopPropagation()}
                     onClick={(e: any) => e.stopPropagation()}
                     style={{
                         position: 'fixed',
                         top: `${dropdownPortalPos.top}px`,
                         left: `${dropdownPortalPos.left}px`,
-                        width: `${Math.min(dropdownPortalPos.width, 180)}px`,
-                        maxWidth: '180px',
-                        minWidth: '140px'
+                        width: `${dropdownPortalPos.width}px`,
+                        minWidth: '140px',
+                        maxHeight: '200px'
                     }}
                 >
                         <div className='py-1'>
-                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
+                            <div className='max-h-44 overflow-y-auto overflow-x-hidden'>
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
@@ -2658,7 +2690,7 @@ function AsyncChipSelect({
                                                                 setQuery('');
                                                                 setOpen(false);
                                                             }}
-                                                            className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
+                                                            className='w-full px-3 py-2 text-left text-sm cursor-pointer text-blue-700 hover:bg-blue-50 border-b border-blue-100 last:border-b-0 transition-colors duration-150'
                                                         >
                                                             {opt.name}
                                                         </div>
@@ -2866,6 +2898,7 @@ function LicenseSubRow({
     accounts = [],
     isTableRow = false,
     isLastRow = false,
+    selectedEnterpriseName = '',
 }: {
     license: License;
     rowId: string;
@@ -2890,6 +2923,7 @@ function LicenseSubRow({
     accounts?: AccountRow[];
     isTableRow?: boolean;
     isLastRow?: boolean;
+    selectedEnterpriseName?: string;
 }) {
     const [isRowHovered, setIsRowHovered] = useState(false);
 
@@ -3011,7 +3045,7 @@ function LicenseSubRow({
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Enterprise</label>}
                     <AsyncChipSelect
-                        type='template'
+                        type='enterprise'
                         value={license.enterprise}
                         onChange={(value) => onUpdate(license.id, 'enterprise', value || '')}
                         placeholder="Enter enterprise"
@@ -3023,6 +3057,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        selectedEnterpriseName={selectedEnterpriseName}
                         {...createLicenseTabNavigation('enterprise')}
                     />
                 </div>
@@ -3030,7 +3065,7 @@ function LicenseSubRow({
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Product</label>}
                     <AsyncChipSelect
-                        type='template'
+                        type='product'
                         value={license.product}
                         onChange={(value) => onUpdate(license.id, 'product', value || '')}
                         placeholder="Enter product"
@@ -3042,6 +3077,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        selectedEnterpriseName={selectedEnterpriseName}
                         {...createLicenseTabNavigation('product')}
                     />
                 </div>
@@ -3049,7 +3085,7 @@ function LicenseSubRow({
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Service</label>}
                     <AsyncChipSelect
-                        type='template'
+                        type='service'
                         value={license.service}
                         onChange={(value) => onUpdate(license.id, 'service', value || '')}
                         placeholder="Enter service"
@@ -3061,6 +3097,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        selectedEnterpriseName={selectedEnterpriseName}
                         {...createLicenseTabNavigation('service')}
                     />
                 </div>
@@ -3111,6 +3148,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        selectedEnterpriseName={selectedEnterpriseName}
                         {...createLicenseTabNavigation('numberOfUsers')}
                     />
                 </div>
@@ -3169,6 +3207,7 @@ function LicenseSubRow({
                             currentRowId={license.id}
                             currentRowEnterprise={license.enterprise}
                             currentRowProduct={license.product}
+                            selectedEnterpriseName={selectedEnterpriseName}
                             {...createLicenseTabNavigation('noticePeriodDays')}
                         />
                     </div>
@@ -3209,6 +3248,7 @@ function SortableAccountRow({
     onDeleteClick,
     onOpenAddressModal,
     onOpenTechnicalUserModal,
+    selectedEnterpriseName = '',
 }: {
     row: AccountRow;
     index: number;
@@ -3248,6 +3288,7 @@ function SortableAccountRow({
     onDeleteClick?: (rowId: string) => void;
     onOpenAddressModal?: (row: AccountRow) => void;
     onOpenTechnicalUserModal?: (row: AccountRow) => void;
+    selectedEnterpriseName?: string;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3607,6 +3648,7 @@ function SortableAccountRow({
                                 currentRowProduct={
                                     row.masterAccount || ''
                                 }
+                                selectedEnterpriseName={selectedEnterpriseName}
                                 {...createTabNavigation('accountName')}
                             />
                         ) : (
@@ -3659,6 +3701,7 @@ function SortableAccountRow({
                             currentRowProduct={
                                 (row as any).masterAccount || ''
                             }
+                            selectedEnterpriseName={selectedEnterpriseName}
                             {...createTabNavigation('masterAccount')}
                         />
                     ) : (
@@ -3839,6 +3882,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
     const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
     const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
+    
+    // State for selected enterprise (from top-right breadcrumb)
+    const [selectedEnterpriseName, setSelectedEnterpriseName] = useState<string>('');
 
     // ContactModal state for license contact details
     const [contactModalData, setContactModalData] = useState<Contact[]>([]);
@@ -4002,6 +4048,37 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             setHasInitializedLicenses(true);
         }
     }, [rows, hasInitializedLicenses]);
+    
+    // Load selected enterprise from localStorage and listen for changes
+    useEffect(() => {
+        const loadSelectedEnterprise = () => {
+            try {
+                const savedName = window.localStorage.getItem('selectedEnterpriseName');
+                if (savedName) {
+                    setSelectedEnterpriseName(savedName);
+                    console.log(`🏢 Loaded selected enterprise: ${savedName}`);
+                }
+            } catch (error) {
+                console.warn('Failed to load selected enterprise:', error);
+            }
+        };
+
+        // Load on mount
+        loadSelectedEnterprise();
+
+        // Listen for enterprise changes
+        const handleEnterpriseChange = () => {
+            loadSelectedEnterprise();
+        };
+
+        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
+        window.addEventListener('storage', handleEnterpriseChange);
+
+        return () => {
+            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
+            window.removeEventListener('storage', handleEnterpriseChange);
+        };
+    }, []);
     
     // No useEffect needed - using useMemo for derived state above
 
@@ -5557,6 +5634,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
                                         onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                        selectedEnterpriseName={selectedEnterpriseName}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
@@ -5616,6 +5694,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                                 accounts={rows}
                                                                 isTableRow={true}
                                                                 isLastRow={index === (rowLicenses[r.id] || []).length - 1}
+                                                                selectedEnterpriseName={selectedEnterpriseName}
                                                             />
                                                         </div>
                                                     ))}
@@ -5763,6 +5842,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
                                                     onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                                    selectedEnterpriseName={selectedEnterpriseName}
                                                 />
                                             </div>
                                         ))}

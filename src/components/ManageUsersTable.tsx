@@ -1759,7 +1759,7 @@ function UserGroupMultiSelect({
                         {showMoreServices && moreServicesPos && 
                             createPortal(
                                 <div
-                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
                                     onMouseDown={(e: any) => e.stopPropagation()}
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
@@ -1967,7 +1967,7 @@ function UserGroupMultiSelect({
                 createPortal(
                     <div
                         ref={dropdownRef}
-                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
                         onMouseDown={(e: any) => e.stopPropagation()}
                         onClick={(e: any) => e.stopPropagation()}
                         style={{
@@ -2989,7 +2989,7 @@ function AsyncChipSelect({
             {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
                 <div 
                     ref={dropdownRef}
-                    className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                    className='bg-white border border-gray-200 rounded-md shadow-md'
                     onMouseDown={(e: any) => e.stopPropagation()}
                     onClick={(e: any) => e.stopPropagation()}
                     style={{
@@ -4305,12 +4305,16 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     const hideGlobalValidationModal = useCallback(() => {
         // Ensure the field error remains set after modal closes
-        if (globalValidationModal.field && globalValidationModal.message) {
+        if (globalValidationModal.field && globalValidationModal.message && globalValidationModal.rowId) {
             // Keep the validation error active so field stays red
-            setFieldValidationErrors(prev => ({
-                ...prev,
-                [globalValidationModal.field]: globalValidationModal.message
-            }));
+            setFieldValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (!newErrors[globalValidationModal.rowId]) {
+                    newErrors[globalValidationModal.rowId] = {};
+                }
+                newErrors[globalValidationModal.rowId][globalValidationModal.field] = globalValidationModal.message;
+                return newErrors;
+            });
         }
 
         // Return focus to the problematic field
