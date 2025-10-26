@@ -177,6 +177,7 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
                         top: `${position.top}px`,
                         left: `${position.left}px`,
                         width: `${position.width}px`,
+                        zIndex: 10001, // Higher than modal z-index
                         animation: 'slideInFromTop 0.3s ease-out forwards'
                     }}
                 >

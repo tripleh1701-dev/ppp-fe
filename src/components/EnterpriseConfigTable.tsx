@@ -42,7 +42,7 @@ const getServiceColor = (serviceName: string) => {
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
-
+    
     // Blueish service color palette - consistent across all components
     const serviceColors = [
         {
@@ -76,7 +76,7 @@ const getServiceColor = (serviceName: string) => {
             tone: 'slate' as const,
         },
     ];
-
+    
     return serviceColors[hash % serviceColors.length];
 };
 
@@ -286,9 +286,7 @@ function InlineEditableText({
             <input
                 ref={inputRef}
                 value={draft}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDraft(e.target.value)
-                }
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
                 onBlur={commit}
                 onKeyDown={(e: any) => {
                     if (e.key === 'Enter') commit();
@@ -303,15 +301,9 @@ function InlineEditableText({
                     }
                 }}
                 placeholder={placeholder}
-                className={`min-w-0 w-full rounded-sm border ${
-                    isError
-                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
-                        : 'border-blue-300 bg-white'
-                } px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${
-                    isError
-                        ? 'focus:ring-red-200 focus:border-red-500'
-                        : 'focus:ring-blue-200 focus:border-blue-500'
-                } ${className || ''}`}
+                className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-0.5 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                    className || ''
+                }`}
                 data-inline={dataAttr || undefined}
             />
         );
@@ -336,7 +328,11 @@ function InlineEditableText({
                 }
             }}
         >
-            {renderDisplay ? renderDisplay(value || '') : value || ''}
+            {renderDisplay ? (
+                renderDisplay(value || '')
+            ) : (
+                value || ''
+            )}
         </span>
     );
 }
@@ -462,9 +458,7 @@ function DropdownOption({
                 className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-hidden`}
                 style={{wordBreak: 'break-word', overflowWrap: 'break-word'}}
             >
-                <span className='relative z-10 block truncate pr-16'>
-                    {option.name}
-                </span>
+                <span className='relative z-10 block truncate pr-16'>{option.name}</span>
                 <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
             </button>
 
@@ -723,69 +717,64 @@ function ServicesMultiSelect({
     React.useEffect(() => {
         if (!open) return;
         loadOptions();
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (rect && typeof window !== 'undefined') {
-            // Find table container for better positioning
-            const tableContainer =
-                containerRef.current?.closest('[role="table"]') ||
-                containerRef.current?.closest('.overflow-auto') ||
-                document.body;
-            const tableRect = tableContainer.getBoundingClientRect();
-
-            const width = 256;
-            // Constrain within table bounds
-            const tableRightBound = tableRect.right - width - 16;
-            const maxLeft = Math.min(
-                tableRightBound,
-                window.innerWidth - width - 16,
-            );
-            const minLeft = Math.max(tableRect.left + 16, 16);
-            const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
-
-            const tableBottomBound = Math.min(
-                tableRect.bottom - 50,
-                window.innerHeight - 200,
-            );
-            const top = Math.min(tableBottomBound, rect.bottom + 8);
-            setDropdownPos({top, left, width});
-        }
+        
+        // Use a slight delay to ensure the input field is rendered and focused
+        const calculatePosition = () => {
+            // Use the input field reference for positioning, fallback to container
+            const positioningElement = inputRef.current || containerRef.current;
+            const rect = positioningElement?.getBoundingClientRect();
+            
+            if (rect && typeof window !== 'undefined') {
+                // Find table container for better positioning
+                const tableContainer = positioningElement?.closest('[role="table"]') || 
+                                      positioningElement?.closest('.overflow-auto') ||
+                                      document.body;
+                const tableRect = tableContainer.getBoundingClientRect();
+                
+                const width = 256;
+                // Constrain within table bounds
+                const tableRightBound = tableRect.right - width - 16;
+                const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
+                const minLeft = Math.max(tableRect.left + 16, 16);
+                const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
+                
+                const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
+                const top = Math.min(tableBottomBound, rect.bottom + 8);
+                setDropdownPos({top, left, width});
+            }
+        };
+        
+        // Calculate position immediately and after a short delay to handle input field focus
+        calculatePosition();
+        const timeoutId = setTimeout(calculatePosition, 50);
+        
+        return () => clearTimeout(timeoutId);
     }, [open, loadOptions]);
 
     // Position the more services dropdown
     React.useEffect(() => {
         if (showMoreServices && moreServicesRef.current) {
             const rect = moreServicesRef.current.getBoundingClientRect();
-
+            
             // Find the table container to ensure dropdown stays within table bounds
-            const tableContainer =
-                moreServicesRef.current.closest('[role="table"]') ||
-                moreServicesRef.current.closest('.overflow-auto') ||
-                document.body;
+            const tableContainer = moreServicesRef.current.closest('[role="table"]') || 
+                                  moreServicesRef.current.closest('.overflow-auto') ||
+                                  document.body;
             const tableRect = tableContainer.getBoundingClientRect();
-
+            
             // Calculate width with stricter table container constraints
-            const maxWidth = Math.min(
-                280,
-                tableRect.width * 0.4,
-                window.innerWidth * 0.3,
-            );
+            const maxWidth = Math.min(280, tableRect.width * 0.4, window.innerWidth * 0.3);
             const width = Math.max(180, Math.min(maxWidth, rect.width));
-
+            
             // Ensure dropdown stays strictly within table container horizontally
             const idealLeft = rect.left;
             const tableRightBound = tableRect.right - width - 16; // More margin from table edge
-            const maxLeft = Math.min(
-                tableRightBound,
-                window.innerWidth - width - 16,
-            );
+            const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
             const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
             const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
-
+            
             // Ensure dropdown stays within both table and viewport vertically
-            const tableBottomBound = Math.min(
-                tableRect.bottom - 50,
-                window.innerHeight - 200,
-            );
+            const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
             const top = Math.min(tableBottomBound, rect.bottom + 8);
             setMoreServicesPos({top, left, width});
         }
@@ -822,27 +811,23 @@ function ServicesMultiSelect({
             setShowAdder(false);
             setAdding('');
             setQuery('');
-
+            
             // Focus next row's first field (Enterprise) after selecting existing service
             const currentElement = inputRef?.current;
             if (currentElement) {
                 // Find the closest div with data-row-id attribute
                 const currentRowDiv = currentElement.closest('[data-row-id]');
                 const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-
+                
                 if (currentRowId) {
                     // Find the next row (increment the row number)
                     const currentRowNum = parseInt(currentRowId);
                     const nextRowId = (currentRowNum + 1).toString();
-
+                    
                     // Find the enterprise column in the next row
-                    const nextRowDiv = document.querySelector(
-                        `[data-row-id="${nextRowId}"][data-col="enterprise"]`,
-                    );
-                    const nextInput = nextRowDiv?.querySelector(
-                        'input',
-                    ) as HTMLInputElement;
-
+                    const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                    const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                    
                     if (nextInput) {
                         // Use requestAnimationFrame to ensure DOM is updated
                         requestAnimationFrame(() => {
@@ -875,24 +860,18 @@ function ServicesMultiSelect({
                 const currentElement = inputRef?.current;
                 if (currentElement) {
                     // Find the closest div with data-row-id attribute
-                    const currentRowDiv =
-                        currentElement.closest('[data-row-id]');
-                    const currentRowId =
-                        currentRowDiv?.getAttribute('data-row-id');
-
+                    const currentRowDiv = currentElement.closest('[data-row-id]');
+                    const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+                    
                     if (currentRowId) {
                         // Find the next row (increment the row number)
                         const currentRowNum = parseInt(currentRowId);
                         const nextRowId = (currentRowNum + 1).toString();
-
+                        
                         // Find the enterprise column in the next row
-                        const nextRowDiv = document.querySelector(
-                            `[data-row-id="${nextRowId}"][data-col="enterprise"]`,
-                        );
-                        const nextInput = nextRowDiv?.querySelector(
-                            'input',
-                        ) as HTMLInputElement;
-
+                        const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                        const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                        
                         if (nextInput) {
                             // Use requestAnimationFrame to ensure DOM is updated
                             requestAnimationFrame(() => {
@@ -920,29 +899,23 @@ function ServicesMultiSelect({
                 );
                 if (existingItem) {
                     toggleService(existingItem.name);
-
+                    
                     // Focus next row's first field (Enterprise) after selecting existing service
                     const currentElement = inputRef?.current;
                     if (currentElement) {
                         // Find the closest div with data-row-id attribute
-                        const currentRowDiv =
-                            currentElement.closest('[data-row-id]');
-                        const currentRowId =
-                            currentRowDiv?.getAttribute('data-row-id');
-
+                        const currentRowDiv = currentElement.closest('[data-row-id]');
+                        const currentRowId = currentRowDiv?.getAttribute('data-row-id');
+                        
                         if (currentRowId) {
                             // Find the next row (increment the row number)
                             const currentRowNum = parseInt(currentRowId);
                             const nextRowId = (currentRowNum + 1).toString();
-
+                            
                             // Find the enterprise column in the next row
-                            const nextRowDiv = document.querySelector(
-                                `[data-row-id="${nextRowId}"][data-col="enterprise"]`,
-                            );
-                            const nextInput = nextRowDiv?.querySelector(
-                                'input',
-                            ) as HTMLInputElement;
-
+                            const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
+                            const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
+                            
                             if (nextInput) {
                                 // Use requestAnimationFrame to ensure DOM is updated
                                 requestAnimationFrame(() => {
@@ -987,7 +960,7 @@ function ServicesMultiSelect({
                     .map((service, index) => {
                         // Use consistent color function
                         const colorTheme = getServiceColor(service);
-
+                        
                         return (
                             <motion.span
                                 key={service}
@@ -1010,10 +983,7 @@ function ServicesMultiSelect({
                                     onClick={() => removeService(service)}
                                     className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0 p-0.5 rounded-sm'
                                     aria-label='Remove'
-                                    style={{
-                                        minWidth: '20px',
-                                        minHeight: '20px',
-                                    }}
+                                    style={{minWidth: '20px', minHeight: '20px'}}
                                 >
                                     <X size={12} />
                                 </button>
@@ -1032,10 +1002,9 @@ function ServicesMultiSelect({
                         >
                             +{selectedServices.length - visibleCount}
                         </button>
-
+                        
                         {/* Dropdown for additional services */}
-                        {showMoreServices &&
-                            moreServicesPos &&
+                        {showMoreServices && moreServicesPos && 
                             createPortal(
                                 <div
                                     className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
@@ -1043,78 +1012,52 @@ function ServicesMultiSelect({
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
                                         position: 'fixed',
-                                        top: Math.min(
-                                            moreServicesPos.top,
-                                            window.innerHeight - 200,
-                                        ),
-                                        left: Math.min(
-                                            moreServicesPos.left,
-                                            window.innerWidth - 250,
-                                        ),
-                                        width: Math.min(
-                                            moreServicesPos.width,
-                                            240,
-                                        ),
-                                        maxWidth: '240px',
+                                        top: Math.min(moreServicesPos.top, window.innerHeight - 200),
+                                        left: Math.min(moreServicesPos.left, window.innerWidth - 250),
+                                        width: Math.min(moreServicesPos.width, 240),
+                                        maxWidth: '240px'
                                     }}
                                 >
                                     <div className='p-3'>
                                         <div className='text-xs font-medium text-slate-700 mb-2'>
-                                            Additional Services (
-                                            {selectedServices.length -
-                                                visibleCount}
-                                            )
+                                            Additional Services ({selectedServices.length - visibleCount})
                                         </div>
                                         <div className='space-y-1 max-h-32 overflow-y-auto'>
-                                            {selectedServices
-                                                .slice(visibleCount)
-                                                .map((service, idx) => {
-                                                    const colorTheme =
-                                                        getServiceColor(
-                                                            service,
-                                                        );
-                                                    return (
-                                                        <div
-                                                            key={`additional-${idx}`}
-                                                            className='flex items-center justify-between group/additional'
+                                            {selectedServices.slice(visibleCount).map((service, idx) => {
+                                                const colorTheme = getServiceColor(service);
+                                                return (
+                                                    <div 
+                                                        key={`additional-${idx}`}
+                                                        className='flex items-center justify-between group/additional'
+                                                    >
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}>
+                                                            {service}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                removeService(service);
+                                                                // Close dropdown if no more additional services
+                                                                if (selectedServices.length - 1 <= visibleCount) {
+                                                                    setShowMoreServices(false);
+                                                                }
+                                                            }}
+                                                            className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                            aria-label='Remove'
                                                         >
-                                                            <span
-                                                                className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] leading-[12px] border rounded whitespace-nowrap ${colorTheme.bg} ${colorTheme.text} ${colorTheme.border}`}
-                                                            >
-                                                                {service}
-                                                            </span>
-                                                            <button
-                                                                onClick={() => {
-                                                                    removeService(
-                                                                        service,
-                                                                    );
-                                                                    // Close dropdown if no more additional services
-                                                                    if (
-                                                                        selectedServices.length -
-                                                                            1 <=
-                                                                        visibleCount
-                                                                    ) {
-                                                                        setShowMoreServices(
-                                                                            false,
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
-                                                                aria-label='Remove'
-                                                            >
-                                                                <X size={12} />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>,
-                                document.body,
-                            )}
+                                document.body
+                            )
+                        }
                     </div>
                 )}
-
+                
                 {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
                 {selectedServices.length === 0 || open || isError ? (
                     <input
@@ -1130,45 +1073,26 @@ function ServicesMultiSelect({
                         }}
                         onKeyDown={async (e: any) => {
                             // Helper function to navigate to next row's enterprise field
-                            const navigateToNextRow = (
-                                currentElement: HTMLInputElement,
-                            ) => {
+                            const navigateToNextRow = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
-                                const currentColDiv =
-                                    currentElement.closest('[data-col]');
-                                const currentRowId =
-                                    currentColDiv?.getAttribute('data-row-id');
-
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
                                 if (currentRowId) {
                                     // For services column, move to next row's first column (enterprise)
                                     // Find next row by looking for the next row ID
-                                    const allRows =
-                                        document.querySelectorAll(
-                                            '[data-row-id]',
-                                        );
-                                    const currentRowIndex = Array.from(
-                                        allRows,
-                                    ).findIndex(
-                                        (row) =>
-                                            row.getAttribute('data-row-id') ===
-                                            currentRowId,
+                                    const allRows = document.querySelectorAll('[data-row-id]');
+                                    const currentRowIndex = Array.from(allRows).findIndex(row => 
+                                        row.getAttribute('data-row-id') === currentRowId
                                     );
-
+                                    
                                     // Find next row's enterprise column
-                                    const nextRowElements = Array.from(
-                                        allRows,
-                                    ).slice(currentRowIndex + 1);
-                                    const nextEnterpriseCol =
-                                        nextRowElements.find(
-                                            (row) =>
-                                                row.getAttribute('data-col') ===
-                                                'enterprise',
-                                        );
-                                    const nextInput =
-                                        nextEnterpriseCol?.querySelector(
-                                            'input',
-                                        ) as HTMLInputElement;
-
+                                    const nextRowElements = Array.from(allRows).slice(currentRowIndex + 1);
+                                    const nextEnterpriseCol = nextRowElements.find(row => 
+                                        row.getAttribute('data-col') === 'enterprise'
+                                    );
+                                    const nextInput = nextEnterpriseCol?.querySelector('input') as HTMLInputElement;
+                                    
                                     if (nextInput) {
                                         // Use requestAnimationFrame to ensure DOM is updated
                                         requestAnimationFrame(() => {
@@ -1182,120 +1106,82 @@ function ServicesMultiSelect({
                             if (e.key === 'Enter' && query.trim()) {
                                 e.preventDefault(); // Prevent form submission
                                 e.stopPropagation(); // Stop event bubbling
-
+                                
                                 // Check for exact match first
-                                const exactMatch = options.find(
-                                    (opt) =>
-                                        opt.name.toLowerCase() ===
-                                        query.toLowerCase().trim(),
+                                const exactMatch = options.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
-
+                                
                                 if (exactMatch) {
                                     // Add existing service and navigate
                                     toggleService(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
-                                    navigateToNextRow(
-                                        e.target as HTMLInputElement,
-                                    );
+                                    navigateToNextRow(e.target as HTMLInputElement);
                                 } else {
                                     // Create new service (same logic as addNew function)
                                     try {
-                                        const created = await api.post<{
-                                            id: string;
-                                            name: string;
-                                        }>('/api/services', {
+                                        const created = await api.post<{ id: string; name: string; }>('/api/services', {
                                             name: query.trim(),
                                         });
-
+                                        
                                         if (created) {
                                             setOptions((prev) => {
-                                                const exists = prev.some(
-                                                    (o) => o.id === created!.id,
-                                                );
-                                                return exists
-                                                    ? prev
-                                                    : [...prev, created!];
+                                                const exists = prev.some((o) => o.id === created!.id);
+                                                return exists ? prev : [...prev, created!];
                                             });
                                             // Add the new service to selection
                                             toggleService(created.name);
                                             setQuery('');
                                             setOpen(false);
-
+                                            
                                             // Navigate to next row
-                                            navigateToNextRow(
-                                                e.target as HTMLInputElement,
-                                            );
+                                            navigateToNextRow(e.target as HTMLInputElement);
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
-                                                onNewItemCreated(
-                                                    'services',
-                                                    created,
-                                                );
+                                                onNewItemCreated('services', created);
                                             }
                                         }
                                     } catch (error: any) {
                                         // Handle duplicate error from backend
-                                        if (
-                                            error?.message?.includes(
-                                                'already exists',
-                                            ) ||
-                                            error?.message?.includes(
-                                                'duplicate',
-                                            )
-                                        ) {
+                                        if (error?.message?.includes('already exists') || error?.message?.includes('duplicate')) {
                                             // Try to find the existing item and add it to selection
                                             const existingItem = options.find(
-                                                (opt) =>
-                                                    opt.name.toLowerCase() ===
-                                                    query.toLowerCase(),
+                                                (opt) => opt.name.toLowerCase() === query.toLowerCase(),
                                             );
                                             if (existingItem) {
-                                                toggleService(
-                                                    existingItem.name,
-                                                );
+                                                toggleService(existingItem.name);
                                                 setQuery('');
                                                 setOpen(false);
-                                                navigateToNextRow(
-                                                    e.target as HTMLInputElement,
-                                                );
+                                                navigateToNextRow(e.target as HTMLInputElement);
                                             }
                                         } else {
-                                            console.error(
-                                                'Failed to create service:',
-                                                error,
-                                            );
+                                            console.error('Failed to create service:', error);
                                         }
                                     }
                                 }
                             } else if (e.key === 'Tab' && query.trim()) {
                                 // Check for exact match in all options when Tab is pressed
-                                const exactMatch = options.find(
-                                    (opt) =>
-                                        opt.name.toLowerCase() ===
-                                        query.toLowerCase().trim(),
+                                const exactMatch = options.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
                                 if (exactMatch) {
                                     e.preventDefault(); // Prevent default Tab behavior
                                     e.stopPropagation(); // Stop event bubbling
-
+                                    
                                     // Add the service first
                                     toggleService(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
-
+                                    
                                     // Navigate to next row
-                                    navigateToNextRow(
-                                        e.target as HTMLInputElement,
-                                    );
+                                    navigateToNextRow(e.target as HTMLInputElement);
                                 } else {
                                     // No exact match found - prevent Tab and show message to use Enter or Add button
                                     e.preventDefault(); // Prevent default Tab behavior
                                     e.stopPropagation(); // Stop event bubbling
-                                    console.log(
-                                        'Tab blocked: Please press Enter or click Add button to create new service, or change the value',
-                                    );
+                                    console.log('Tab blocked: Please press Enter or click Add button to create new service, or change the value');
                                     // Keep focus on current field
                                 }
                             } else if (e.key === 'Escape') {
@@ -1303,15 +1189,7 @@ function ServicesMultiSelect({
                                 setQuery('');
                             }
                         }}
-                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${
-                            isError
-                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
-                                : 'border-blue-300 bg-white hover:bg-slate-50'
-                        } focus:outline-none focus:ring-2 ${
-                            isError
-                                ? 'focus:ring-red-200 focus:border-red-500'
-                                : 'focus:ring-blue-200 focus:border-blue-500'
-                        } text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
+                        className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
                         placeholder=''
                     />
                 ) : (
@@ -1319,22 +1197,14 @@ function ServicesMultiSelect({
                     <button
                         onClick={() => {
                             setOpen(true);
-                            setQuery('');
+                            setQuery(''); // Clear query to show input field
                             setShowMoreServices(false); // Close the more services dropdown
                             // Focus the input field when "Add more" is clicked
                             setTimeout(() => {
                                 inputRef.current?.focus();
                             }, 10);
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${
-                            isError
-                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
-                                : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'
-                        } transition-colors ${
-                            isError
-                                ? 'text-red-700 hover:bg-red-100'
-                                : 'text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100'} transition-colors ${isError ? 'text-red-700 hover:bg-red-100' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         + Add more
                     </button>
@@ -1353,12 +1223,15 @@ function ServicesMultiSelect({
                             position: 'fixed',
                             top: dropdownPos.top,
                             left: dropdownPos.left,
-                            width: dropdownPos.width,
-                            maxWidth: '300px',
+                            width: 'max-content',
+                            minWidth: `${dropdownPos.width}px`,
+                            maxWidth: '500px'
                         }}
                     >
-                        <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                        <div className='py-1 text-[12px] px-3 space-y-2'>
+                        {/* Integrated pointer as part of the panel - positioned to align with input field */}
+                        <div className="absolute -top-2 left-2 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                        <div className='relative z-10'>
+                            <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto max-h-44'>
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
@@ -1389,54 +1262,59 @@ function ServicesMultiSelect({
                                         );
 
                                     const showAddNew =
-                                        query.trim() && !hasExactMatch;
+                                        query.trim() &&
+                                        !hasExactMatch;
 
                                     if (showAddNew) {
                                         return (
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const created =
-                                                            await api.post<{
-                                                                id: string;
-                                                                name: string;
-                                                            }>(
-                                                                '/api/services',
-                                                                {
-                                                                    name: query.trim(),
-                                                                },
-                                                            );
-                                                        if (created) {
-                                                            setOptions(
-                                                                (prev) => [
-                                                                    ...prev,
-                                                                    created,
-                                                                ],
-                                                            );
-                                                            toggleService(
-                                                                created.name,
-                                                            );
-                                                            setQuery('');
-                                                            setOpen(false);
-                                                        }
-                                                    } catch (error) {
-                                                        console.error(
-                                                            'Failed to create service:',
-                                                            error,
-                                                        );
-                                                    }
-                                                }}
-                                                className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
+                                            <motion.div
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                className='mt-2 border-t border-slate-200 pt-2'
                                             >
-                                                <div className='flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'>
-                                                    <Plus size={12} />
-                                                </div>
-                                                <div className='flex-1'>
-                                                    <span className='text-sm text-blue-600 font-medium'>
-                                                        Add &quot;{query}&quot;
-                                                    </span>
-                                                </div>
-                                            </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const created =
+                                                                await api.post<{
+                                                                    id: string;
+                                                                    name: string;
+                                                                }>(
+                                                                    '/api/services',
+                                                                    {
+                                                                        name: query.trim(),
+                                                                    },
+                                                                );
+                                                            if (created) {
+                                                                setOptions(
+                                                                    (prev) => [
+                                                                        ...prev,
+                                                                        created,
+                                                                    ],
+                                                                );
+                                                                toggleService(
+                                                                    created.name,
+                                                                );
+                                                                setQuery('');
+                                                                // Don't close dropdown for services to allow multiple selections
+                                                                
+                                                                // Notify parent component about the new item
+                                                                if (onNewItemCreated) {
+                                                                    onNewItemCreated('services', created);
+                                                                }
+                                                            }
+                                                        } catch (error) {
+                                                            console.error(
+                                                                'Failed to create service:',
+                                                                error,
+                                                            );
+                                                        }
+                                                    }}
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                >
+                                                    + Add &quot;{query.trim()}&quot;
+                                                </button>
+                                            </motion.div>
                                         );
                                     }
 
@@ -1477,266 +1355,74 @@ function ServicesMultiSelect({
                                             palette[idx % palette.length];
 
                                         return (
-                                            <DropdownOption
+                                            <motion.div
                                                 key={opt.id}
-                                                option={opt}
-                                                tone={tone}
-                                                type='service'
-                                                isInUse={isServiceInUse(
-                                                    opt.name,
-                                                )}
-                                                onSelect={() =>
-                                                    toggleService(opt.name)
-                                                }
-                                                onEdit={async (newName) => {
-                                                    try {
-                                                        // Update via API
-                                                        await api.put(
-                                                            `/api/services/${opt.id}`,
-                                                            {
-                                                                name: newName,
-                                                            },
-                                                        );
-
-                                                        // Update local options
-                                                        setOptions((prev) =>
-                                                            prev.map((o) =>
-                                                                o.id === opt.id
-                                                                    ? {
-                                                                          ...o,
-                                                                          name: newName,
-                                                                      }
-                                                                    : o,
-                                                            ),
-                                                        );
-
-                                                        // Update selected services if this one was selected
-                                                        if (
-                                                            selectedServices.includes(
-                                                                opt.name,
-                                                            )
-                                                        ) {
-                                                            const updatedServices =
-                                                                selectedServices.map(
-                                                                    (s) =>
-                                                                        s ===
-                                                                        opt.name
-                                                                            ? newName
-                                                                            : s,
-                                                                );
-                                                            onChange(
-                                                                updatedServices.join(
-                                                                    ', ',
-                                                                ),
-                                                            );
-                                                        }
-
-                                                        // Notify parent component to update all rows
-                                                        if (
-                                                            onDropdownOptionUpdate
-                                                        ) {
-                                                            await onDropdownOptionUpdate(
-                                                                'services',
-                                                                'update',
-                                                                opt.name,
-                                                                newName,
-                                                            );
-                                                        }
-                                                    } catch (error) {
-                                                        console.error(
-                                                            'Failed to update service:',
-                                                            error,
-                                                        );
-                                                    }
-                                                }}
-                                                onDelete={async () => {
-                                                    try {
-                                                        // Delete via API
-                                                        await api.del(
-                                                            `/api/services/${opt.id}`,
-                                                        );
-
-                                                        // Remove from local options
-                                                        setOptions((prev) =>
-                                                            prev.filter(
-                                                                (o) =>
-                                                                    o.id !==
-                                                                    opt.id,
-                                                            ),
-                                                        );
-
-                                                        // Remove from selected services if it was selected
-                                                        if (
-                                                            selectedServices.includes(
-                                                                opt.name,
-                                                            )
-                                                        ) {
-                                                            const updatedServices =
-                                                                selectedServices.filter(
-                                                                    (s) =>
-                                                                        s !==
-                                                                        opt.name,
-                                                                );
-                                                            onChange(
-                                                                updatedServices.join(
-                                                                    ', ',
-                                                                ),
-                                                            );
-                                                        }
-
-                                                        // Notify parent component to update all rows
-                                                        if (
-                                                            onDropdownOptionUpdate
-                                                        ) {
-                                                            await onDropdownOptionUpdate(
-                                                                'services',
-                                                                'delete',
-                                                                opt.name,
-                                                            );
-                                                        }
-                                                    } catch (error) {
-                                                        console.error(
-                                                            'Failed to delete service:',
-                                                            error,
-                                                        );
-                                                    }
-                                                }}
-                                            />
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                whileHover={{scale: 1.02, y: -1}}
+                                                transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                className='relative group'
+                                            >
+                                                <button
+                                                    onClick={() => toggleService(opt.name)}
+                                                    className={`w-full rounded-lg px-3 py-2.5 ${
+                                                        isSelected
+                                                            ? 'bg-blue-500 text-white border-2 border-blue-600'
+                                                            : `${tone.bg} ${tone.hover} ${tone.text}`
+                                                    } transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between`}
+                                                    style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                >
+                                                    <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                    {/* Show trash icon for services */}
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            
+                                                            if (confirm(`Are you sure you want to delete "${opt.name}"? This action cannot be undone.`)) {
+                                                                try {
+                                                                    await api.del(`/api/services/${opt.id}`);
+                                                                    
+                                                                    // Remove from local options
+                                                                    setOptions((prev) => prev.filter(o => o.id !== opt.id));
+                                                                    
+                                                                    // Remove from selected services if it was selected
+                                                                    if (selectedServices.includes(opt.name)) {
+                                                                        const newServices = selectedServices.filter(s => s !== opt.name);
+                                                                        const newValue = newServices.join(', ');
+                                                                        onChange(newValue);
+                                                                    }
+                                                                    
+                                                                    // Notify parent component
+                                                                    if (onDropdownOptionUpdate) {
+                                                                        await onDropdownOptionUpdate('services', 'delete', opt.name);
+                                                                    }
+                                                                    
+                                                                    console.log(`🗑️ Deleted service: ${opt.name}`);
+                                                                } catch (error) {
+                                                                    console.error(`Failed to delete service:`, error);
+                                                                    alert(`Failed to delete ${opt.name}. Please try again.`);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className='opacity-50 group-hover:opacity-100 bg-white border border-gray-300 hover:bg-red-500 hover:border-red-500 rounded-full transition-all duration-150 flex-shrink-0 w-5 h-5 flex items-center justify-center z-20 group/btn'
+                                                        title={`Delete ${opt.name}`}
+                                                    >
+                                                        <Trash2 size={12} className="text-gray-600 group-hover/btn:text-white" />
+                                                    </button>
+                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                </button>
+                                            </motion.div>
                                         );
                                     });
                                 })()
                             )}
                         </div>
-                        {/* Only show bottom Add button when dropdown is open but no query is typed */}
-                        {!query.trim() && (
-                            <div className='border-t border-slate-200 px-3 py-2'>
-                                <button
-                                    onClick={() => {
-                                        setAdding('');
-                                        setShowAdder(true);
-                                    }}
-                                    className='group w-full text-left text-[12px] text-slate-700 hover:text-slate-900 flex items-center gap-2'
-                                >
-                                    <Plus size={14} />
-                                    <span className='inline-block max-w-0 overflow-hidden whitespace-nowrap -translate-x-1 opacity-0 group-hover:max-w-xs group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-200'>
-                                        Add new service
-                                    </span>
-                                </button>
-                                {showAdder && (
-                                    <div className='mt-2 overflow-hidden'>
-                                        {(() => {
-                                            const similarMatch = adding.trim()
-                                                ? options.find(
-                                                      (opt) =>
-                                                          opt.name.toLowerCase() ===
-                                                          adding
-                                                              .trim()
-                                                              .toLowerCase(),
-                                                  )
-                                                : null;
-
-                                            return (
-                                                <>
-                                                    <div className='flex items-center gap-2'>
-                                                        <motion.input
-                                                            initial={{
-                                                                x: -12,
-                                                                opacity: 0,
-                                                            }}
-                                                            animate={{
-                                                                x: 0,
-                                                                opacity: 1,
-                                                            }}
-                                                            transition={{
-                                                                type: 'spring',
-                                                                stiffness: 420,
-                                                                damping: 28,
-                                                            }}
-                                                            value={adding}
-                                                            onChange={(
-                                                                e: any,
-                                                            ) =>
-                                                                setAdding(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            onKeyDown={(
-                                                                e: any,
-                                                            ) => {
-                                                                if (
-                                                                    e.key ===
-                                                                    'Enter'
-                                                                )
-                                                                    addNew();
-                                                                if (
-                                                                    e.key ===
-                                                                    'Escape'
-                                                                )
-                                                                    setShowAdder(
-                                                                        false,
-                                                                    );
-                                                            }}
-                                                            placeholder=''
-                                                            className={`flex-1 rounded border px-2 py-1 text-[12px] ${
-                                                                similarMatch
-                                                                    ? 'border-amber-400 bg-amber-50'
-                                                                    : 'border-slate-300'
-                                                            }`}
-                                                        />
-                                                        <button
-                                                            onClick={addNew}
-                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] ${
-                                                                similarMatch
-                                                                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                                                    : 'bg-violet-600 hover:bg-violet-700 text-white'
-                                                            }`}
-                                                        >
-                                                            {similarMatch
-                                                                ? 'Add Existing'
-                                                                : 'Add'}
-                                                        </button>
-                                                    </div>
-                                                    {similarMatch && (
-                                                        <motion.div
-                                                            initial={{
-                                                                opacity: 0,
-                                                                height: 0,
-                                                            }}
-                                                            animate={{
-                                                                opacity: 1,
-                                                                height: 'auto',
-                                                            }}
-                                                            className='mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800'
-                                                        >
-                                                            <span className='font-medium'>
-                                                                ⚠️ Similar
-                                                                service exists:
-                                                            </span>{' '}
-                                                            &quot;
-                                                            {similarMatch.name}
-                                                            &quot;
-                                                            <br />
-                                                            <span className='text-amber-600'>
-                                                                Click &quot;Add
-                                                                Existing&quot;
-                                                                to select it
-                                                                instead of
-                                                                creating a
-                                                                duplicate.
-                                                            </span>
-                                                        </motion.div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>,
-                    document.body,
-                )}
+                    </div>
+                </div>,
+                document.body,
+            )
+        }
         </div>
     );
 }
@@ -1782,9 +1468,9 @@ function AsyncChipSelect({
     const [options, setOptions] = React.useState<{id: string; name: string}[]>(
         [],
     );
-    const [allOptions, setAllOptions] = React.useState<
-        {id: string; name: string}[]
-    >([]);
+    const [allOptions, setAllOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
     const [loading, setLoading] = React.useState(false);
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
@@ -1811,8 +1497,8 @@ function AsyncChipSelect({
                     if (currentEnterprise) {
                         // Check if this product is already used with the selected enterprise
                         const isUsedWithCurrentEnterprise =
-                            account.enterprise === currentEnterprise &&
-                            account.product === optionName;
+                            (account.enterprise === currentEnterprise &&
+                                account.product === optionName);
 
                         return isUsedWithCurrentEnterprise;
                     }
@@ -1820,7 +1506,8 @@ function AsyncChipSelect({
                     return false;
                 } else if (type === 'service') {
                     const services =
-                        account.services?.split(', ').filter(Boolean) || [];
+                        account.services?.split(', ').filter(Boolean) ||
+                        [];
                     return services.includes(optionName);
                 }
                 return false;
@@ -1831,9 +1518,7 @@ function AsyncChipSelect({
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
-    const [dropdownPosition, setDropdownPosition] = React.useState<
-        'below' | 'above'
-    >('below');
+    const [dropdownPosition, setDropdownPosition] = React.useState<'below' | 'above'>('below');
     const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
         top: number;
         left: number;
@@ -1844,7 +1529,7 @@ function AsyncChipSelect({
     // Function to calculate optimal dropdown position - always prefer below
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
-
+        
         const containerRect = containerRef.current.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         
@@ -1882,39 +1567,32 @@ function AsyncChipSelect({
         setLoading(true);
         try {
             let allData: Array<{id: string; name: string}> = [];
-
+            
             console.log(`Loading options for type: ${type}`);
-
+            
             if (type === 'product') {
                 console.log('Calling API: /api/products');
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
-                        '/api/products',
-                    )) || [];
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/products',
+                ) || [];
             } else if (type === 'service') {
                 console.log('Calling API: /api/services');
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
-                        '/api/services',
-                    )) || [];
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/services',
+                ) || [];
             } else if (type === 'template') {
                 console.log('Calling API: /api/products (for template)');
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
-                        '/api/products',
-                    )) || [];
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/products',
+                ) || [];
             } else {
                 console.log('Calling API: /api/enterprises');
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
-                        '/api/enterprises',
-                    )) || [];
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/enterprises',
+                ) || [];
             }
-
-            console.log(
-                `API call successful for ${type}, got ${allData.length} items:`,
-                allData,
-            );
+            
+            console.log(`API call successful for ${type}, got ${allData.length} items:`, allData);
             setAllOptions(allData);
         } catch (error) {
             console.error(`API call failed for ${type}:`, error);
@@ -1933,29 +1611,27 @@ function AsyncChipSelect({
         // Apply search filter
         if (query) {
             const queryLower = query.toLowerCase();
-            filtered = filtered.filter((opt) =>
-                opt.name.toLowerCase().startsWith(queryLower),
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
             );
-
+            
             // Sort filtered results: exact matches first, then alphabetical
             filtered = filtered.sort((a, b) => {
                 const aLower = a.name.toLowerCase();
                 const bLower = b.name.toLowerCase();
-
+                
                 // Exact match comes first
                 if (aLower === queryLower && bLower !== queryLower) return -1;
                 if (bLower === queryLower && aLower !== queryLower) return 1;
-
+                
                 // Otherwise alphabetical order
                 return aLower.localeCompare(bLower);
             });
         }
 
-        // Apply usage filter for products
+        // Apply usage filter for products (but not for services, which need to show selected items)
         if (type === 'product') {
-            filtered = filtered.filter(
-                (product) => !isOptionInUse(product.name),
-            );
+            filtered = filtered.filter(product => !isOptionInUse(product.name));
         }
 
         setOptions(filtered);
@@ -2100,10 +1776,7 @@ function AsyncChipSelect({
             className='relative min-w-0 flex items-center gap-1 group/item'
             style={{maxWidth: '100%'}}
         >
-            <div
-                className='relative w-full flex items-center gap-1'
-                style={{width: '100%'}}
-            >
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
                 {/* Show selected value as chip when there's a value and not actively typing */}
                 {(current || value) && !open && (
                     <motion.span
@@ -2129,9 +1802,7 @@ function AsyncChipSelect({
                             }
                         }}
                     >
-                        <span className='flex-1 truncate pointer-events-none'>
-                            {current || value}
-                        </span>
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
                         <button
                             onClick={(e: any) => {
                                 e.stopPropagation();
@@ -2148,7 +1819,7 @@ function AsyncChipSelect({
                         </button>
                     </motion.span>
                 )}
-
+                
                 {/* Show input when no value selected or actively typing */}
                 {(!current && !value) || open ? (
                     <input
@@ -2157,15 +1828,15 @@ function AsyncChipSelect({
                         onChange={(e: any) => {
                             const newValue = e.target.value;
                             setQuery(newValue);
-
+                            
                             // Always open dropdown when typing
                             setOpen(true);
-
+                            
                             // Load options if not already loaded
                             if (allOptions.length === 0) {
                                 loadAllOptions();
                             }
-
+                            
                             // Clear current selection if user clears the input completely
                             if (newValue === '') {
                                 onChange('');
@@ -2175,7 +1846,7 @@ function AsyncChipSelect({
                         onFocus={() => {
                             // Open dropdown on focus to show available options immediately
                             setOpen(true);
-
+                            
                             // Load options if not already loaded
                             if (allOptions.length === 0) {
                                 loadAllOptions();
@@ -2183,104 +1854,67 @@ function AsyncChipSelect({
                         }}
                         onKeyDown={async (e: any) => {
                             // Helper function to navigate to next field
-                            const navigateToNextField = (
-                                currentElement: HTMLInputElement,
-                            ) => {
+                            const navigateToNextField = (currentElement: HTMLInputElement) => {
                                 // Find the closest div with data-col attribute (current column)
-                                const currentColDiv =
-                                    currentElement.closest('[data-col]');
-                                const currentRowId =
-                                    currentColDiv?.getAttribute('data-row-id');
-
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
                                 if (currentRowId && currentColDiv) {
-                                    const currentCol =
-                                        currentColDiv.getAttribute('data-col');
+                                    const currentCol = currentColDiv.getAttribute('data-col');
                                     let nextCol = '';
-
+                                    
                                     // Determine next column based on current column
                                     if (currentCol === 'enterprise') {
                                         nextCol = 'product';
                                     } else if (currentCol === 'product') {
                                         nextCol = 'services';
                                     }
-
+                                    
                                     if (nextCol) {
                                         // Find the next column in the same row
-                                        const nextColDiv =
-                                            document.querySelector(
-                                                `[data-row-id="${currentRowId}"][data-col="${nextCol}"]`,
-                                            );
-
+                                        const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="${nextCol}"]`);
+                                        
                                         if (nextCol === 'services') {
                                             // For Services column, we need to handle both input and button cases
-                                            let nextInput =
-                                                nextColDiv?.querySelector(
-                                                    'input',
-                                                ) as HTMLInputElement;
-                                            const addMoreButton =
-                                                nextColDiv?.querySelector(
-                                                    'button',
-                                                ) as HTMLButtonElement;
-
-                                            console.log(
-                                                'Navigating to Services field:',
-                                                {
-                                                    nextColDiv: !!nextColDiv,
-                                                    nextInput: !!nextInput,
-                                                    addMoreButton:
-                                                        !!addMoreButton,
-                                                    rowId: currentRowId,
-                                                },
-                                            );
-
+                                            let nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            const addMoreButton = nextColDiv?.querySelector('button') as HTMLButtonElement;
+                                            
+                                            console.log('Navigating to Services field:', {
+                                                nextColDiv: !!nextColDiv,
+                                                nextInput: !!nextInput,
+                                                addMoreButton: !!addMoreButton,
+                                                rowId: currentRowId
+                                            });
+                                            
                                             if (!nextInput && addMoreButton) {
                                                 // If no input visible, click the "Add more" button to show input
-                                                console.log(
-                                                    'Clicking Add more button to show Services input',
-                                                );
+                                                console.log('Clicking Add more button to show Services input');
                                                 addMoreButton.click();
                                                 // Wait for the input to appear and then focus it
                                                 setTimeout(() => {
-                                                    nextInput =
-                                                        nextColDiv?.querySelector(
-                                                            'input',
-                                                        ) as HTMLInputElement;
-                                                    console.log(
-                                                        'After clicking button, input found:',
-                                                        !!nextInput,
-                                                    );
+                                                    nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                                    console.log('After clicking button, input found:', !!nextInput);
                                                     if (nextInput) {
                                                         nextInput.focus();
                                                         nextInput.click();
-                                                        console.log(
-                                                            'Services input focused successfully',
-                                                        );
+                                                        console.log('Services input focused successfully');
                                                     }
                                                 }, 100); // Increased timeout for better reliability
                                             } else if (nextInput) {
                                                 // Input is already visible, focus it
-                                                console.log(
-                                                    'Services input already visible, focusing',
-                                                );
+                                                console.log('Services input already visible, focusing');
                                                 requestAnimationFrame(() => {
                                                     nextInput.focus();
                                                     nextInput.click();
-                                                    console.log(
-                                                        'Services input focused directly',
-                                                    );
+                                                    console.log('Services input focused directly');
                                                 });
                                             } else {
-                                                console.log(
-                                                    'Could not find Services input or button',
-                                                );
+                                                console.log('Could not find Services input or button');
                                             }
                                         } else {
                                             // For other columns, just find the input
-                                            const nextInput =
-                                                nextColDiv?.querySelector(
-                                                    'input',
-                                                ) as HTMLInputElement;
-
+                                            const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            
                                             if (nextInput) {
                                                 // Use requestAnimationFrame to ensure DOM is updated
                                                 requestAnimationFrame(() => {
@@ -2296,141 +1930,95 @@ function AsyncChipSelect({
                             if (e.key === 'Enter' && query.trim()) {
                                 e.preventDefault(); // Prevent form submission
                                 e.stopPropagation(); // Stop event bubbling
-
+                                
                                 // Check for exact match first
-                                const exactMatch = allOptions.find(
-                                    (opt) =>
-                                        opt.name.toLowerCase() ===
-                                        query.toLowerCase().trim(),
+                                const exactMatch = allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
-
+                                
                                 if (exactMatch) {
                                     // Select existing value and navigate
                                     onChange(exactMatch.name);
                                     setCurrent(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
-                                    navigateToNextField(
-                                        e.target as HTMLInputElement,
-                                    );
+                                    navigateToNextField(e.target as HTMLInputElement);
                                 } else {
                                     // Create new entry (same logic as Add button)
                                     try {
-                                        let created: {
-                                            id: string;
-                                            name: string;
-                                        } | null = null;
-
+                                        let created: { id: string; name: string; } | null = null;
+                                        
                                         if (type === 'enterprise') {
-                                            created = await api.post<{
-                                                id: string;
-                                                name: string;
-                                            }>('/api/enterprises', {
+                                            created = await api.post<{ id: string; name: string; }>('/api/enterprises', {
                                                 name: query.trim(),
                                             });
                                         } else if (type === 'product') {
-                                            created = await api.post<{
-                                                id: string;
-                                                name: string;
-                                            }>('/api/products', {
+                                            created = await api.post<{ id: string; name: string; }>('/api/products', {
                                                 name: query.trim(),
                                             });
                                         } else if (type === 'service') {
-                                            created = await api.post<{
-                                                id: string;
-                                                name: string;
-                                            }>('/api/services', {
+                                            created = await api.post<{ id: string; name: string; }>('/api/services', {
                                                 name: query.trim(),
                                             });
                                         }
-
+                                        
                                         if (created) {
-                                            setOptions((prev) => [
-                                                ...prev,
-                                                created!,
-                                            ]);
-                                            setAllOptions((prev) => [
-                                                ...prev,
-                                                created!,
-                                            ]);
+                                            setOptions((prev) => [...prev, created!]);
+                                            setAllOptions((prev) => [...prev, created!]);
                                             onChange(created.name);
                                             setCurrent(created.name);
                                             setQuery('');
                                             setOpen(false);
-
+                                            
                                             // Navigate to next field
-                                            navigateToNextField(
-                                                e.target as HTMLInputElement,
-                                            );
-
+                                            navigateToNextField(e.target as HTMLInputElement);
+                                            
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
-                                                const dropdownType =
-                                                    type === 'enterprise'
-                                                        ? 'enterprises'
-                                                        : type === 'product'
-                                                        ? 'products'
-                                                        : 'services';
-                                                onNewItemCreated(
-                                                    dropdownType,
-                                                    created,
-                                                );
+                                                const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
+                                                onNewItemCreated(dropdownType, created);
                                             }
                                         }
                                     } catch (error) {
-                                        console.error(
-                                            `Failed to create ${type}:`,
-                                            error,
-                                        );
+                                        console.error(`Failed to create ${type}:`, error);
                                     }
                                 }
                             } else if (e.key === 'Tab') {
                                 // Always handle Tab with our custom navigation
                                 e.preventDefault(); // Always prevent default Tab behavior
                                 e.stopPropagation(); // Stop event bubbling
-
+                                
                                 if (query.trim()) {
                                     // Check for exact match in all options when Tab is pressed
-                                    const exactMatch = allOptions.find(
-                                        (opt) =>
-                                            opt.name.toLowerCase() ===
-                                            query.toLowerCase().trim(),
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
                                     );
-
+                                    
                                     if (exactMatch) {
                                         // Set the value first
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
                                         setQuery('');
                                         setOpen(false);
-
+                                        
                                         // Navigate to next field
-                                        navigateToNextField(
-                                            e.target as HTMLInputElement,
-                                        );
+                                        navigateToNextField(e.target as HTMLInputElement);
                                     } else {
                                         // No exact match found - commit the current query value and move to next field
-                                        console.log(
-                                            'Tab: Moving to next field and committing current query value:',
-                                            query.trim(),
-                                        );
-
+                                        console.log('Tab: Moving to next field and committing current query value:', query.trim());
+                                        
                                         // Commit the current query value (even if it doesn't match existing options)
                                         onChange(query.trim());
                                         setCurrent(query.trim());
                                         setQuery('');
                                         setOpen(false);
-
-                                        navigateToNextField(
-                                            e.target as HTMLInputElement,
-                                        );
+                                        
+                                        navigateToNextField(e.target as HTMLInputElement);
                                     }
                                 } else {
                                     // Empty field - just navigate to next field
                                     setOpen(false);
-                                    navigateToNextField(
-                                        e.target as HTMLInputElement,
-                                    );
+                                    navigateToNextField(e.target as HTMLInputElement);
                                 }
                             } else if (e.key === 'Escape') {
                                 setOpen(false);
@@ -2440,18 +2028,13 @@ function AsyncChipSelect({
                         onBlur={() => {
                             setTimeout(() => {
                                 if (!open) {
-                                    const exactMatch = allOptions.find(
-                                        (opt) =>
-                                            opt.name.toLowerCase() ===
-                                            (query || '').toLowerCase().trim(),
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === (query || '').toLowerCase().trim()
                                     );
                                     if (exactMatch) {
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
-                                    } else if (
-                                        query &&
-                                        query !== (current || value)
-                                    ) {
+                                    } else if (query && query !== (current || value)) {
                                         // Keep the typed value for potential creation
                                     } else if (!query) {
                                         setQuery('');
@@ -2465,7 +2048,7 @@ function AsyncChipSelect({
                     />
                 ) : null}
             </div>
-
+            
             {/* Full Autocomplete Dropdown - Portal Based */}
             {open && dropdownPortalPos && createPortal(
                 <div 
@@ -2520,7 +2103,9 @@ function AsyncChipSelect({
                                         opt.name.toLowerCase() === query.toLowerCase().trim()
                                     ) : null;
                                     
-                                    if (filteredOptions.length === 0) {
+                                    const showCreateNew = query.trim() && !exactMatch && (type === 'enterprise' || type === 'product' || type === 'service');
+                                    
+                                    if (filteredOptions.length === 0 && !showCreateNew) {
                                         return (
                                             <div className='px-3 py-2 text-slate-500 text-center'>
                                                 No matches
@@ -2528,7 +2113,9 @@ function AsyncChipSelect({
                                         );
                                     }
 
-                                    return filteredOptions.map((opt, idx) => {
+                                    return (
+                                        <>
+                                            {filteredOptions.map((opt, idx) => {
                                         const palette = [
                                             { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
                                             { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
@@ -2553,21 +2140,113 @@ function AsyncChipSelect({
                                                         setQuery('');
                                                         setOpen(false);
                                                     }}
-                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible`}
+                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between`}
                                                     style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
                                                 >
-                                                    <span className='relative z-10 block'>{opt.name}</span>
+                                                    <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                    {/* Show minus icon for enterprise and product types */}
+                                                    {(type === 'enterprise' || type === 'product' || type === 'service') && (
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                
+                                                                if (confirm(`Are you sure you want to delete "${opt.name}"? This action cannot be undone.`)) {
+                                                                    try {
+                                                                        const endpoint = type === 'enterprise' ? '/api/enterprises' : type === 'product' ? '/api/products' : '/api/services';
+                                                                        await api.del(`${endpoint}/${opt.id}`);
+                                                                        
+                                                                        // Remove from local options
+                                                                        setOptions((prev) => prev.filter(o => o.id !== opt.id));
+                                                                        setAllOptions((prev) => prev.filter(o => o.id !== opt.id));
+                                                                        
+                                                                        console.log(`🗑️ Deleted ${type}: ${opt.name}`);
+                                                                    } catch (error) {
+                                                                        console.error(`Failed to delete ${type}:`, error);
+                                                                        alert(`Failed to delete ${opt.name}. Please try again.`);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className='opacity-50 group-hover:opacity-100 bg-white border border-gray-300 hover:bg-red-500 hover:border-red-500 rounded-full transition-all duration-150 flex-shrink-0 w-5 h-5 flex items-center justify-center z-20 group/btn'
+                                                            title={`Delete ${opt.name}`}
+                                                        >
+                                                            <Trash2 size={12} className="text-gray-600 group-hover/btn:text-white" />
+                                                        </button>
+                                                    )}
                                                     <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
                                                 </button>
                                             </motion.div>
                                         );
-                                    });
+                                    })}
+                                    
+                                    {/* Show "Add" button for enterprise and product when no exact match */}
+                                    {showCreateNew && (
+                                        <motion.div
+                                            initial={{scale: 0.98, opacity: 0}}
+                                            animate={{scale: 1, opacity: 1}}
+                                            className='mt-2 border-t border-slate-200 pt-2'
+                                        >
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        let created: { id: string; name: string; } | null = null;
+                                                        
+                                                        if (type === 'enterprise') {
+                                                            created = await api.post<{ id: string; name: string; }>('/api/enterprises', {
+                                                                name: query.trim(),
+                                                            });
+                                                        } else if (type === 'product') {
+                                                            created = await api.post<{ id: string; name: string; }>('/api/products', {
+                                                                name: query.trim(),
+                                                            });
+                                                        } else if (type === 'service') {
+                                                            created = await api.post<{ id: string; name: string; }>('/api/services', {
+                                                                name: query.trim(),
+                                                            });
+                                                        } else if (type === 'service') {
+                                                            created = await api.post<{ id: string; name: string; }>('/api/services', {
+                                                                name: query.trim(),
+                                                            });
+                                                        }
+                                                        
+                                                        if (created) {
+                                                            // Update options list
+                                                            setOptions((prev) => [...prev, created!]);
+                                                            setAllOptions((prev) => [...prev, created!]);
+                                                            
+                                                            // Set the new value
+                                                            onChange(created.name);
+                                                            setCurrent(created.name);
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                            
+                                                            // Notify parent component
+                                                            if (onNewItemCreated) {
+                                                                const dropdownType = type === 'enterprise' ? 'enterprises' : type === 'product' ? 'products' : 'services';
+                                                                onNewItemCreated(dropdownType as any, created);
+                                                            }
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(`Failed to create ${type}:`, error);
+                                                        alert(`Failed to create ${query.trim()}. Please try again.`);
+                                                    }
+                                                }}
+                                                className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                            >
+                                                + Add &quot;{query.trim()}&quot;
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                        </>
+                                    );
                                 })()
                             )}
                         </div>
-                    </div>,
-                    document.body,
-                )}
+                    </div>
+                </div>,
+                document.body
+            )
+        }
         </div>
     );
 }
@@ -2582,7 +2261,12 @@ interface EnterpriseConfigTableProps {
         g: 'none' | 'enterpriseName' | 'productName' | 'serviceName',
     ) => void;
     hideControls?: boolean;
-    visibleColumns?: Array<'enterprise' | 'product' | 'services' | 'actions'>;
+    visibleColumns?: Array<
+        | 'enterprise'
+        | 'product'
+        | 'services'
+        | 'actions'
+    >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
@@ -2660,18 +2344,10 @@ function SortableEnterpriseConfigRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (
-        rowId: string,
-        key: keyof EnterpriseConfigRow,
-        value: any,
-    ) => void;
+    onUpdateField: (rowId: string, key: keyof EnterpriseConfigRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onStartFill: (
-        rowId: string,
-        col: keyof EnterpriseConfigRow,
-        value: string,
-    ) => void;
+    onStartFill: (rowId: string, col: keyof EnterpriseConfigRow, value: string) => void;
     inFillRange: boolean;
     pinFirst?: boolean;
     firstColWidth?: string;
@@ -2704,7 +2380,11 @@ function SortableEnterpriseConfigRow({
 
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
-        ['enterprise', 'product', 'services'].includes(col),
+        [
+            'enterprise',
+            'product',
+            'services',
+        ].includes(col),
     );
 
     const createTabNavigation = (currentCol: string) => {
@@ -2892,20 +2572,16 @@ function SortableEnterpriseConfigRow({
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
             className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
-                isSelected
-                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200'
+                isSelected 
+                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
                     : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
+            } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
+                isSelected ? 'border-blue-300' : 'border-slate-200'
+            } ${inFillRange ? 'bg-primary-50/40' : ''} ${
+                isExpanded
+                    ? 'bg-primary-50'
+                    : ''
             } ${
-                index % 2 === 0
-                    ? isSelected
-                        ? ''
-                        : 'bg-white'
-                    : isSelected
-                    ? ''
-                    : 'bg-slate-50/70'
-            } ${isSelected ? 'border-blue-300' : 'border-slate-200'} ${
-                inFillRange ? 'bg-primary-50/40' : ''
-            } ${isExpanded ? 'bg-primary-50' : ''} ${
                 compressingRowId === row.id
                     ? 'transform scale-x-75 transition-all duration-500 ease-out'
                     : ''
@@ -2932,11 +2608,11 @@ function SortableEnterpriseConfigRow({
             <div className='flex items-center justify-center px-1'>
                 {isRowHovered && (
                     <motion.button
-                        initial={{opacity: 0, scale: 0.8}}
-                        animate={{opacity: 1, scale: 1}}
-                        exit={{opacity: 0, scale: 0.8}}
-                        whileHover={{scale: 1.1}}
-                        whileTap={{scale: 0.95}}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={(e: any) => {
                             e.stopPropagation();
                             if (onDeleteClick) {
@@ -2970,11 +2646,9 @@ function SortableEnterpriseConfigRow({
                             ? 'sticky left-0 z-10 shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                             : ''
                     } ${
-                        isSelected
-                            ? 'bg-blue-50'
-                            : index % 2 === 0
-                            ? 'bg-white'
-                            : 'bg-slate-50/70'
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                 >
                     {!hideRowExpansion && (
@@ -2995,7 +2669,9 @@ function SortableEnterpriseConfigRow({
                                 }}
                                 className='inline-flex'
                             >
-                                <ChevronRight size={16} />
+                                <ChevronRight
+                                    size={16}
+                                />
                             </motion.span>
                         </button>
                     )}
@@ -3022,8 +2698,13 @@ function SortableEnterpriseConfigRow({
                                 onNewItemCreated={onNewItemCreated}
                                 accounts={allRows}
                                 currentRowId={row.id}
-                                currentRowEnterprise={row.enterprise || ''}
-                                currentRowProduct={row.product || ''}
+                                currentRowEnterprise={
+                                    row.enterprise ||
+                                    ''
+                                }
+                                currentRowProduct={
+                                    row.product || ''
+                                }
                             />
                         ) : (
                             <InlineEditableText
@@ -3047,11 +2728,9 @@ function SortableEnterpriseConfigRow({
             {cols.includes('product') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected
-                            ? 'bg-blue-50'
-                            : index % 2 === 0
-                            ? 'bg-white'
-                            : 'bg-slate-50/70'
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='product'
@@ -3089,19 +2768,17 @@ function SortableEnterpriseConfigRow({
             {cols.includes('services') && (
                 <div
                     className={`text-slate-700 text-[12px] px-2 py-1 w-full ${
-                        isSelected
-                            ? 'bg-blue-50'
-                            : index % 2 === 0
-                            ? 'bg-white'
-                            : 'bg-slate-50/70'
+                        isSelected 
+                            ? 'bg-blue-50' 
+                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
                     data-col='services'
-                    style={{
-                        borderRight: 'none',
-                        width: '100%',
+                    style={{ 
+                        borderRight: 'none', 
+                        width: '100%', 
                         minWidth: '500px', // Increased minimum width to ensure content visibility when scrolled
-                        maxWidth: 'none', // Ensure no max width constraint
+                        maxWidth: 'none' // Ensure no max width constraint
                     }}
                 >
                     <ServicesMultiSelect
@@ -3166,15 +2843,10 @@ export default function EnterpriseConfigTable({
     isAIInsightsPanelOpen = false,
 }: EnterpriseConfigTableProps) {
     // Local validation state to track rows with errors
-    const [validationErrors, setValidationErrors] = useState<Set<string>>(
-        new Set(),
-    );
+    const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
     // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (
-        row: EnterpriseConfigRow,
-        field: string,
-    ): boolean => {
+    const isFieldMissing = (row: EnterpriseConfigRow, field: string): boolean => {
         switch (field) {
             case 'enterprise':
                 return !row.enterprise || row.enterprise.trim() === '';
@@ -3199,10 +2871,8 @@ export default function EnterpriseConfigTable({
         }
 
         // Check if this row has validation errors (either from parent or local validation)
-        const hasValidationError =
-            showValidationErrors &&
-            (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
-
+        const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
+        
         if (!hasValidationError) return false;
 
         // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
@@ -3217,18 +2887,16 @@ export default function EnterpriseConfigTable({
     // Function to validate all rows and highlight missing fields
     const validateAndHighlightErrors = useCallback(() => {
         const errorRowIds = new Set<string>();
-
-        localRows.forEach((row) => {
+        
+        localRows.forEach(row => {
             // Check if any required field is missing
-            if (
-                isFieldMissing(row, 'enterprise') ||
-                isFieldMissing(row, 'product') ||
-                isFieldMissing(row, 'services')
-            ) {
+            if (isFieldMissing(row, 'enterprise') || 
+                isFieldMissing(row, 'product') || 
+                isFieldMissing(row, 'services')) {
                 errorRowIds.add(row.id);
             }
         });
-
+        
         setValidationErrors(errorRowIds);
         return errorRowIds;
     }, [localRows]);
@@ -3265,8 +2933,7 @@ export default function EnterpriseConfigTable({
             validateAndHighlightErrors();
         } else {
             // Clear validation errors when not showing validation or no incomplete rows from parent
-            // Only update if there are errors to clear (prevents unnecessary re-renders)
-            setValidationErrors((prev) => (prev.size > 0 ? new Set() : prev));
+            setValidationErrors(new Set());
         }
     }, [incompleteRowIds, showValidationErrors, validateAndHighlightErrors]);
 
@@ -3353,11 +3020,7 @@ export default function EnterpriseConfigTable({
         }
     }
 
-    function updateRowField(
-        rowId: string,
-        key: keyof EnterpriseConfigRow,
-        value: any,
-    ) {
+    function updateRowField(rowId: string, key: keyof EnterpriseConfigRow, value: any) {
         let changed: EnterpriseConfigRow | null = null;
         setLocalRows((prev) =>
             prev.map((r) => {
@@ -3421,38 +3084,33 @@ export default function EnterpriseConfigTable({
     const gridTemplate = useMemo(() => {
         // Always include delete button column first with fixed width
         const deleteCol = '32px'; // Fixed width for delete button
-
+        
         const base = cols.map((c, index) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
-
+            
             // Define minimum and maximum widths per column
             const constraints = {
-                enterprise: {min: 140, max: 250}, // Increased min width to prevent arrow overlap
-                product: {min: 140, max: 280}, // Reduced max width to prevent overflow
-                services: {min: 400, max: Infinity}, // Increased minimum to ensure content visibility
+                enterprise: { min: 140, max: 250 }, // Increased min width to prevent arrow overlap
+                product: { min: 140, max: 280 }, // Reduced max width to prevent overflow
+                services: { min: 400, max: Infinity } // Increased minimum to ensure content visibility
             };
-
-            const columnConstraints = constraints[
-                c as keyof typeof constraints
-            ] || {min: 100, max: 250};
-
+            
+            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 100, max: 250 };
+            
             if (dynamicWidth && dynamicWidth > 0) {
                 // For Services column, use minmax to fill remaining space
                 if (c === 'services') {
-                    return `minmax(${Math.max(
-                        columnConstraints.min,
-                        dynamicWidth,
-                    )}px, 1fr)`;
+                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
                 }
                 // Clamp the dynamic width within constraints for other columns
                 const clampedWidth = Math.max(
-                    columnConstraints.min,
-                    Math.min(columnConstraints.max, dynamicWidth),
+                    columnConstraints.min, 
+                    Math.min(columnConstraints.max, dynamicWidth)
                 );
                 return `${clampedWidth}px`;
             }
-
+            
             // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
@@ -3464,20 +3122,20 @@ export default function EnterpriseConfigTable({
                 if (!isNaN(numericSize)) {
                     const clampedSize = Math.max(
                         columnConstraints.min,
-                        Math.min(columnConstraints.max, numericSize),
+                        Math.min(columnConstraints.max, numericSize)
                     );
                     return `${clampedSize}px`;
                 }
                 return defaultSize;
             }
-
+            
             // Final fallback - Services gets remaining space
             if (c === 'services') {
                 return `minmax(${columnConstraints.min}px, 1fr)`;
             }
             return `${columnConstraints.min}px`;
         });
-
+        
         const custom = customColumns.map(() => '110px');
         const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
@@ -3493,30 +3151,28 @@ export default function EnterpriseConfigTable({
 
     // removed fill down state
 
-    const startResize = (colKey: string, e: any) => {
+    const startResize = (
+        colKey: string,
+        e: any,
+    ) => {
         e.preventDefault();
         e.stopPropagation();
-
+        
         const tableContainer = e.currentTarget.closest('.grid');
         if (!tableContainer) return;
-
+        
         const startX = e.clientX;
-        const startWidth =
-            colWidths[colKey] ||
-            parseInt(colSizes[colKey]?.replace('px', '') || '140') ||
-            140;
-
+        const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
+        
         // Define column-specific constraints
         const constraints = {
-            enterprise: {min: 140, max: 250}, // Increased min to prevent arrow overlap
-            product: {min: 140, max: 280}, // Reduced max to prevent over-expansion
-            services: {min: 500, max: 2000}, // Increased minimum to ensure Services content visibility when scrolled
+            enterprise: { min: 140, max: 250 }, // Increased min to prevent arrow overlap
+            product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
+            services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
         };
-
-        const columnConstraints = constraints[
-            colKey as keyof typeof constraints
-        ] || {min: 100, max: 250};
-
+        
+        const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
+        
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
@@ -3525,51 +3181,42 @@ export default function EnterpriseConfigTable({
             ev.preventDefault();
             const delta = ev.clientX - startX;
             const newWidth = Math.max(
-                columnConstraints.min,
-                Math.min(columnConstraints.max, startWidth + delta),
+                columnConstraints.min, 
+                Math.min(columnConstraints.max, startWidth + delta)
             );
-
+            
             setColWidths((prev) => ({
                 ...prev,
-                [colKey]: newWidth,
+                [colKey]: newWidth
             }));
-
+            
             // Trigger scroll check during resize to detect Services column visibility
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
-                    const containerWidth =
-                        tableContainerRef.current.clientWidth;
-
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
                     // Check if Services content is getting hidden
-                    const servicesColumns =
-                        tableContainerRef.current.querySelectorAll(
-                            '[data-col="services"]',
-                        );
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-
-                    servicesColumns.forEach((serviceCol) => {
+                    
+                    servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
-                        const serviceRect =
-                            serviceElement.getBoundingClientRect();
-                        const containerRect =
-                            tableContainerRef.current!.getBoundingClientRect();
-
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-
-                        if (
-                            serviceRect.right > containerRect.right ||
-                            serviceRect.width < widthThreshold
-                        ) {
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-
+                    
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -3577,19 +3224,18 @@ export default function EnterpriseConfigTable({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-
-                    const needsScrollbar =
-                        contentWidth * zoomAdjustedThreshold > containerWidth ||
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
-                        (isAIInsightsPanelOpen &&
-                            contentWidth > availableWidth * 0.9);
-
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 10);
         };
-
+        
         const onUp = () => {
             // Remove visual feedback
             document.body.style.cursor = '';
@@ -3599,38 +3245,29 @@ export default function EnterpriseConfigTable({
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
-                    const containerWidth =
-                        tableContainerRef.current.clientWidth;
-
+                    const containerWidth = tableContainerRef.current.clientWidth;
+                    
                     // Check if Services content is hidden
-                    const servicesColumns =
-                        tableContainerRef.current.querySelectorAll(
-                            '[data-col="services"]',
-                        );
+                    const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-
-                    servicesColumns.forEach((serviceCol) => {
+                    
+                    servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
-                        const serviceRect =
-                            serviceElement.getBoundingClientRect();
-                        const containerRect =
-                            tableContainerRef.current!.getBoundingClientRect();
-
+                        const serviceRect = serviceElement.getBoundingClientRect();
+                        const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                        
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-
-                        if (
-                            serviceRect.right > containerRect.right ||
-                            serviceRect.width < widthThreshold
-                        ) {
+                        
+                        if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-
+                    
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -3638,22 +3275,21 @@ export default function EnterpriseConfigTable({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-
-                    const needsScrollbar =
-                        contentWidth * zoomAdjustedThreshold > containerWidth ||
+                    
+                    const needsScrollbar = 
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
-                        (isAIInsightsPanelOpen &&
-                            contentWidth > availableWidth * 0.9);
-
+                        (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
+                    
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 50);
-
+            
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-
+        
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };
@@ -3696,9 +3332,9 @@ export default function EnterpriseConfigTable({
             return <>{text}</>;
         }
     };
-
+    
     // Handle delete click - directly call parent's onDelete function
-
+    
     // Use external sort state if provided, otherwise fall back to internal state
     const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
@@ -3712,9 +3348,7 @@ export default function EnterpriseConfigTable({
         | 'services'
         | null
     >(null);
-    const [internalSortDir, setInternalSortDir] = useState<
-        'asc' | 'desc' | null
-    >(null);
+    const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc' | null>(null);
 
     // Listen for clear sorting events from parent component
     useEffect(() => {
@@ -3722,9 +3356,9 @@ export default function EnterpriseConfigTable({
             setInternalSortCol(null);
             setInternalSortDir(null);
         };
-
+        
         window.addEventListener('clearTableSorting', handleClearSorting);
-
+        
         return () => {
             window.removeEventListener('clearTableSorting', handleClearSorting);
         };
@@ -3745,59 +3379,52 @@ export default function EnterpriseConfigTable({
             | 'enterprise'
             | 'product'
             | 'services',
-        direction?: 'asc' | 'desc',
+        direction?: 'asc' | 'desc'
     ) => {
         let nextDir: 'asc' | 'desc';
-
+        
         // Check if external sorting is actively being used (both props provided and not empty)
         const isExternalSorting = externalSortColumn && externalSortDirection;
-
+        
         if (isExternalSorting) {
             // When external sort is actively controlled, use external state for calculation
-            nextDir =
-                direction ||
+            nextDir = direction || 
                 (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
-
+            
             // Notify parent to update external sort state
             if (onSortChange) {
                 onSortChange(col, nextDir);
             }
         } else {
             // When using internal sort (including first time with no sorting)
-            nextDir =
-                direction ||
-                (internalSortCol === col && internalSortDir === 'asc'
-                    ? 'desc'
-                    : 'asc');
-
+            nextDir = direction ||
+                (internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc');
+            
             // Update internal state first (this actually sorts the table)
             setInternalSortCol(col);
             setInternalSortDir(nextDir);
-
+            
             // Then notify parent to update Sort panel (for toolbar sync)
             if (onSortChange) {
                 onSortChange(col, nextDir);
             }
         }
-
+        
         // Always dispatch custom event for parent component to listen to
         notifyParentSortChange(col, nextDir);
     };
 
     // Function to notify parent component about sort changes via custom event
-    const notifyParentSortChange = (
-        column: string,
-        direction: 'asc' | 'desc',
-    ) => {
+    const notifyParentSortChange = (column: string, direction: 'asc' | 'desc') => {
         // Dispatch a custom event that the parent can listen to
         const event = new CustomEvent('enterpriseTableSortChange', {
             detail: {
                 column,
-                direction,
+                direction
             },
-            bubbles: true,
+            bubbles: true
         });
-
+        
         // Dispatch the event from the document to ensure it reaches the parent
         document.dispatchEvent(event);
     };
@@ -3820,14 +3447,14 @@ export default function EnterpriseConfigTable({
     // Group data based on groupBy setting
     const groupedItems = useMemo(() => {
         if (groupBy === 'none') {
-            return {'All Records': displayItems};
+            return { 'All Records': displayItems };
         }
 
         const groups: Record<string, EnterpriseConfigRow[]> = {};
-
+        
         displayItems.forEach((item) => {
             let groupKey = '';
-
+            
             switch (groupBy) {
                 case 'enterpriseName':
                     groupKey = item.enterprise || '(No Enterprise)';
@@ -3838,12 +3465,9 @@ export default function EnterpriseConfigTable({
                 case 'serviceName':
                     // For services, we need to handle multiple services per row
                     if (item.services) {
-                        const services = item.services
-                            .split(',')
-                            .map((s) => s.trim())
-                            .filter(Boolean);
+                        const services = item.services.split(',').map(s => s.trim()).filter(Boolean);
                         if (services.length > 0) {
-                            services.forEach((service) => {
+                            services.forEach(service => {
                                 const serviceKey = service || '(No Service)';
                                 if (!groups[serviceKey]) {
                                     groups[serviceKey] = [];
@@ -3858,7 +3482,7 @@ export default function EnterpriseConfigTable({
                 default:
                     groupKey = 'All Records';
             }
-
+            
             if (!groups[groupKey]) {
                 groups[groupKey] = [];
             }
@@ -3875,7 +3499,7 @@ export default function EnterpriseConfigTable({
             return a.localeCompare(b);
         });
 
-        sortedKeys.forEach((key) => {
+        sortedKeys.forEach(key => {
             sortedGroups[key] = groups[key];
         });
 
@@ -3883,68 +3507,56 @@ export default function EnterpriseConfigTable({
     }, [displayItems, groupBy]);
 
     // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
-    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] =
-        useState(false);
+    const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
-
+    
     useEffect(() => {
         const checkScrollNeed = () => {
             if (!tableContainerRef.current) return;
-
+            
             // Get current zoom level
             const currentZoom = window.devicePixelRatio || 1;
             const baseZoom = 1;
             const zoomFactor = currentZoom / baseZoom;
-
+            
             // Get viewport dimensions accounting for AI insights panel
             const viewportWidth = window.innerWidth;
             const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
             const availableWidth = viewportWidth - aiPanelWidth;
-
+            
             // Check if content width exceeds container width with a larger buffer for hover effects
             const contentWidth = tableContainerRef.current.scrollWidth;
             const containerWidth = tableContainerRef.current.clientWidth;
-
+            
             // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
             const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
-
+            
             // Only show scrollbar when content genuinely exceeds container accounting for hover effects
-            const isContentOverflowing =
-                contentWidth > containerWidth + hoverBuffer;
-
+            const isContentOverflowing = contentWidth > containerWidth + hoverBuffer;
+            
             // Check if Services column content is actually being cut off
-            const servicesColumns = tableContainerRef.current.querySelectorAll(
-                '[data-col="services"]',
-            );
+            const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
             let servicesContentHidden = false;
-
+            
             if (servicesColumns.length > 0) {
-                servicesColumns.forEach((serviceCol) => {
+                servicesColumns.forEach(serviceCol => {
                     const serviceElement = serviceCol as HTMLElement;
                     const serviceRect = serviceElement.getBoundingClientRect();
-                    const containerRect =
-                        tableContainerRef.current!.getBoundingClientRect();
-
+                    const containerRect = tableContainerRef.current!.getBoundingClientRect();
+                    
                     // More reasonable threshold - minimum 300px for services content
                     const minServicesWidth = 300;
                     const bufferZone = 15; // Additional buffer for hover effects
-
+                    
                     // Only trigger if Services column is actually cut off or too narrow to display content properly
-                    if (
-                        serviceRect.right > containerRect.right - bufferZone ||
-                        serviceRect.width < minServicesWidth
-                    ) {
+                    if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
                         // Additional check: see if there's actually content being cut off
-                        const servicesChips =
-                            serviceElement.querySelectorAll('.inline-flex');
+                        const servicesChips = serviceElement.querySelectorAll('.inline-flex');
                         if (servicesChips.length > 0) {
-                            servicesChips.forEach((chip) => {
+                            servicesChips.forEach(chip => {
                                 const chipRect = chip.getBoundingClientRect();
                                 // Account for hover effects in chip positioning
-                                if (
-                                    chipRect.right >
-                                    serviceRect.right - bufferZone
-                                ) {
+                                if (chipRect.right > serviceRect.right - bufferZone) {
                                     servicesContentHidden = true;
                                 }
                             });
@@ -3952,40 +3564,44 @@ export default function EnterpriseConfigTable({
                     }
                 });
             }
-
+            
             // Show scrollbar only when there's genuine overflow or content is being cut off
-            const needsScrollbar =
-                isContentOverflowing || servicesContentHidden;
-
-            // Only update state if the value has changed (prevents infinite re-renders)
-            setShouldShowHorizontalScroll((prev) =>
-                prev !== needsScrollbar ? needsScrollbar : prev,
-            );
+            const needsScrollbar = isContentOverflowing || servicesContentHidden;
+            
+            // Debug logging (remove in production)
+            console.log('Scroll Check:', {
+                contentWidth,
+                containerWidth,
+                hoverBuffer,
+                isContentOverflowing,
+                servicesContentHidden,
+                needsScrollbar
+            });
+            
+            setShouldShowHorizontalScroll(needsScrollbar);
         };
-
+        
         // Check on mount and when table structure changes
         let scrollCheckTimeout: NodeJS.Timeout;
         const debouncedScrollCheck = () => {
             clearTimeout(scrollCheckTimeout);
             scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
         };
-
+        
         checkScrollNeed();
-
+        
         // Use ResizeObserver for better performance
         const resizeObserver = new ResizeObserver(() => {
             debouncedScrollCheck(); // Use debounced version
         });
-
+        
         // Use MutationObserver to detect when Services content changes
         const mutationObserver = new MutationObserver((mutations) => {
             let shouldCheck = false;
             mutations.forEach((mutation) => {
                 // Check if Services column content changed
                 if (mutation.target instanceof Element) {
-                    const servicesCol = mutation.target.closest(
-                        '[data-col="services"]',
-                    );
+                    const servicesCol = mutation.target.closest('[data-col="services"]');
                     if (servicesCol) {
                         shouldCheck = true;
                     }
@@ -3995,48 +3611,44 @@ export default function EnterpriseConfigTable({
                 debouncedScrollCheck(); // Use debounced version
             }
         });
-
+        
         if (tableContainerRef.current) {
             resizeObserver.observe(tableContainerRef.current);
             mutationObserver.observe(tableContainerRef.current, {
                 childList: true,
                 subtree: true,
                 attributes: true,
-                attributeFilter: ['style', 'class'],
+                attributeFilter: ['style', 'class']
             });
-
+            
             // Also observe all column cells for resize changes
-            const columnCells =
-                tableContainerRef.current.querySelectorAll('[data-col]');
-            columnCells.forEach((cell) => {
+            const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
+            columnCells.forEach(cell => {
                 if (cell instanceof Element) {
                     resizeObserver.observe(cell);
                 }
             });
         }
-
+        
         // Also listen for window resize (zoom changes)
         window.addEventListener('resize', debouncedScrollCheck);
-
+        
         // Listen for zoom via keyboard shortcuts and mouse wheel
         const handleKeyZoom = (e: KeyboardEvent) => {
-            if (
-                (e.ctrlKey || e.metaKey) &&
-                (e.key === '+' || e.key === '-' || e.key === '0')
-            ) {
+            if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
                 debouncedScrollCheck();
             }
         };
-
+        
         const handleWheelZoom = (e: WheelEvent) => {
             if (e.ctrlKey || e.metaKey) {
                 debouncedScrollCheck();
             }
         };
-
+        
         window.addEventListener('keydown', handleKeyZoom);
-        window.addEventListener('wheel', handleWheelZoom, {passive: true});
-
+        window.addEventListener('wheel', handleWheelZoom, { passive: true });
+        
         return () => {
             resizeObserver.disconnect();
             mutationObserver.disconnect();
@@ -4045,54 +3657,50 @@ export default function EnterpriseConfigTable({
             window.removeEventListener('wheel', handleWheelZoom);
             clearTimeout(scrollCheckTimeout);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAIInsightsPanelOpen]); // colWidths removed - ResizeObserver handles column width changes automatically
-
+    }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
+    
     return (
         <div className='w-full compact-table safari-tight'>
             {/* Using browser default scrollbars only */}
-            <style
-                dangerouslySetInnerHTML={{
-                    __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                     /* Table container with proper scrolling */
                     div[role="table"] {
                         position: relative;
                         overflow-y: visible;
-                        overflow-x: ${
-                            shouldShowHorizontalScroll ? 'auto' : 'hidden'
-                        };
+                        overflow-x: ${shouldShowHorizontalScroll ? 'auto' : 'hidden'};
                     }
-
+                    
                     /* Prevent horizontal scrollbars on table cells and headers (except services) */
                     [data-col]:not([data-col="services"]) {
                         overflow-x: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
                     }
-
+                    
                     /* Specifically prevent scrollbars in column headers */
                     .bg-slate-50[data-col] {
                         overflow: hidden;
                         text-overflow: ellipsis;
                     }
-
+                    
                     /* Header row should not have scrollbars */
                     .bg-slate-50 > div {
                         overflow: hidden !important;
                         text-overflow: ellipsis;
                     }
-
+                    
                     /* Ensure header content fits properly */
                     .bg-slate-50 .relative {
                         overflow: hidden;
                         min-width: 0;
                     }
-
+                    
                     /* Ensure proper grid layout */
                     .grid {
                         display: grid;
                     }
-
+                    
                     /* Services column should allow content display within bounds */
                     [data-col="services"] {
                         overflow: visible;
@@ -4101,7 +3709,7 @@ export default function EnterpriseConfigTable({
                         position: relative;
                         max-width: 600px;
                     }
-
+                    
                     /* Services column chips should display full text */
                     [data-col="services"] .inline-flex {
                         white-space: nowrap;
@@ -4110,14 +3718,14 @@ export default function EnterpriseConfigTable({
                         min-width: max-content;
                         flex-shrink: 0;
                     }
-
+                    
                     /* Services column chip text should not be truncated */
                     [data-col="services"] .inline-flex span {
                         white-space: nowrap;
                         overflow: visible;
                         text-overflow: unset;
                     }
-
+                    
                     /* Services column container should wrap content */
                     [data-col="services"] > div {
                         white-space: normal;
@@ -4128,7 +3736,7 @@ export default function EnterpriseConfigTable({
                         position: relative;
                         max-width: 100%;
                     }
-
+                    
                     /* Ensure dropdowns within Services column stay within bounds */
                     [data-col="services"] .absolute {
                         max-width: 100%;
@@ -4141,32 +3749,26 @@ export default function EnterpriseConfigTable({
                         max-width: 100%;
                         box-sizing: border-box;
                     }
-
+                    
                     /* Ensure dropdowns don't extend beyond table container */
                     .z-\\[9999\\] {
                         max-width: calc(100vw - 32px) !important;
                         max-height: calc(100vh - 100px) !important;
                         overflow: auto !important;
                     }
-
+                    
                     /* Table container should contain overflow */
                     [role="table"] {
                         position: relative;
                         contain: layout style;
                     }
-
+                    
                     /* Hide any scrollbars that might appear in header elements */
                     .bg-slate-50 {
                         overflow: hidden;
                     }
-                `,
-                }}
-            />
-            <div className='flex items-center justify-between mb-2'>
-                <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'Enterprise Configuration Details'}
-                </h3>
-            </div>
+                `
+            }} />
             {cols.length === 0 ? (
                 <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
                     <div className='flex flex-col items-center space-y-4'>
@@ -4188,10 +3790,7 @@ export default function EnterpriseConfigTable({
                                 No columns are visible
                             </h3>
                             <p className='text-sm text-slate-500 max-w-sm'>
-                                All columns have been hidden. Use the Show/Hide
-                                button in the toolbar to select which columns to
-                                display, or click the button below to show all
-                                columns.
+                                All columns have been hidden. Use the Show/Hide button in the toolbar to select which columns to display, or click the button below to show all columns.
                             </p>
                         </div>
                         {onShowAllColumns && (
@@ -4224,269 +3823,296 @@ export default function EnterpriseConfigTable({
                     </div>
                 </div>
             ) : (
-                <div
+                <div 
                     ref={tableContainerRef}
-                    role='table'
+                    role='table' 
                     className='p-0 w-full'
                     style={{
-                        overflowX: shouldShowHorizontalScroll
-                            ? 'auto'
-                            : 'visible',
+                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
                         overflowY: 'visible',
                         maxWidth: '100%',
-                        boxSizing: 'border-box',
+                        boxSizing: 'border-box'
                     }}
                 >
-                    <div
-                        className='w-full relative'
-                        style={{
-                            minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
-                            width: '100%',
-                        }}
-                    >
-                        {(() => {
-                            const defaultLabels: Record<string, string> = {
-                                enterprise: 'Enterprise',
-                                product: 'Product',
-                                services: 'Services',
-                            };
+                <div className='w-full relative' style={{ 
+                    minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
+                    width: '100%' 
+                }}>
+                    {(() => {
+                        const defaultLabels: Record<string, string> = {
+                            enterprise: 'Enterprise',
+                            product: 'Product', 
+                            services: 'Services',
+                        };
 
-                            // Merge custom labels with defaults
-                            const labelFor: Record<string, string> = {
-                                ...defaultLabels,
-                                ...customColumnLabels,
-                            };
+                        // Merge custom labels with defaults
+                        const labelFor: Record<string, string> = {
+                            ...defaultLabels,
+                            ...customColumnLabels,
+                        };
 
-                            const iconFor: Record<string, React.ReactNode> = {
-                                enterprise: <Building2 size={14} />,
-                                product: <Package size={14} />,
-                                services: <Globe size={14} />,
-                            };
-                            return (
+                        const iconFor: Record<string, React.ReactNode> = {
+                            enterprise: (
+                                <Building2 size={14} />
+                            ),
+                            product: (
+                                <Package size={14} />
+                            ),
+                            services: (
+                                <Globe size={14} />
+                            ),
+                        };
+                        return (
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
+                                minWidth: 'fit-content', 
+                                width: '100%',
+                                maxWidth: '100%',
+                                overflow: 'hidden' // Ensure content doesn't escape the container
+                            }}>
                                 <div
-                                    className='rounded-xl border border-slate-300 shadow-sm bg-white'
+                                    className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
                                     style={{
-                                        minWidth: 'fit-content',
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
                                         width: '100%',
-                                        maxWidth: '100%',
-                                        overflow: 'hidden', // Ensure content doesn't escape the container
+                                        display: 'grid'
                                     }}
                                 >
-                                    <div
-                                        className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
-                                        style={{
-                                            gridTemplateColumns: gridTemplate,
-                                            minWidth: 'max-content',
-                                            width: '100%',
-                                            display: 'grid',
-                                        }}
-                                    >
-                                        {/* Delete Button Column Header */}
-                                        <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
-                                            {/* Empty header for delete column */}
-                                        </div>
-
-                                        {cols.map((c, idx) => (
-                                            <div
-                                                key={c}
-                                                className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
-                                                    idx === 0
-                                                        ? 'border-l-0'
-                                                        : ''
-                                                } ${
-                                                    idx === 0 &&
-                                                    pinFirst &&
-                                                    !shouldShowHorizontalScroll
-                                                        ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
-                                                        : ''
-                                                } ${
-                                                    c === 'services'
-                                                        ? 'border-r-0'
-                                                        : 'border-r border-slate-200' // Remove right border for Services column
-                                                }`}
-                                                style={
-                                                    c === 'services'
-                                                        ? {minWidth: '600px'}
-                                                        : undefined
-                                                } // Match Services column minimum width
-                                            >
-                                                <div className='flex items-center gap-2'>
-                                                    {iconFor[c] && iconFor[c]}
-                                                    <span>
-                                                        {labelFor[c] || c}
-                                                    </span>
+                                    {/* Delete Button Column Header */}
+                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                        {/* Empty header for delete column */}
+                                    </div>
+                                    
+                                    {cols.map((c, idx) => (
+                                        <div
+                                            key={c}
+                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
+                                                idx === 0 
+                                                    ? 'border-l-0' 
+                                                    : ''
+                                            } ${
+                                                idx === 0 && pinFirst && !shouldShowHorizontalScroll
+                                                    ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                    : ''
+                                            } ${
+                                                c === 'services' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for Services column
+                                            }`}
+                                            style={c === 'services' ? { minWidth: '600px' } : undefined} // Match Services column minimum width
+                                        >
+                                            <div className='flex items-center gap-2'>
+                                                {iconFor[c] && iconFor[c]}
+                                                <span>{labelFor[c] || c}</span>
+                                            </div>
+                                            {[
+                                                'accountName',
+                                                'email',
+                                                'enterpriseName',
+                                                'enterprise',
+                                                'product',
+                                                'services',
+                                            ].includes(c) && (
+                                                <div className={`inline-flex items-center ml-4 ${c === 'services' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                    <button
+                                                        onClick={() => toggleSort(c as any, 'asc')}
+                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                    >
+                                                        <ArrowUp
+                                                            size={sortCol === c && sortDir === 'asc' ? 20 : 16}
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleSort(c as any, 'desc')}
+                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                    >
+                                                        <ArrowDown
+                                                            size={sortCol === c && sortDir === 'desc' ? 20 : 16}
+                                                        />
+                                                    </button>
                                                 </div>
-                                                {[
-                                                    'accountName',
-                                                    'email',
-                                                    'enterpriseName',
-                                                    'enterprise',
-                                                    'product',
-                                                    'services',
-                                                ].includes(c) && (
-                                                    <div
-                                                        className={`inline-flex items-center ml-4 ${
-                                                            c === 'services'
-                                                                ? ''
-                                                                : 'absolute right-8 top-1/2 -translate-y-1/2'
-                                                        }`}
-                                                    >
-                                                        <button
-                                                            onClick={() =>
-                                                                toggleSort(
-                                                                    c as any,
-                                                                    'asc',
-                                                                )
-                                                            }
-                                                            className={`${
-                                                                sortCol === c &&
-                                                                sortDir ===
-                                                                    'asc'
-                                                                    ? 'text-blue-600 font-bold'
-                                                                    : 'text-slate-400'
-                                                            } transition-all duration-200 hover:text-slate-600`}
-                                                        >
-                                                            <ArrowUp
-                                                                size={
-                                                                    sortCol ===
-                                                                        c &&
-                                                                    sortDir ===
-                                                                        'asc'
-                                                                        ? 20
-                                                                        : 16
-                                                                }
-                                                            />
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                toggleSort(
-                                                                    c as any,
-                                                                    'desc',
-                                                                )
-                                                            }
-                                                            className={`${
-                                                                sortCol === c &&
-                                                                sortDir ===
-                                                                    'desc'
-                                                                    ? 'text-blue-600 font-bold'
-                                                                    : 'text-slate-400'
-                                                            } transition-all duration-200 hover:text-slate-600`}
-                                                        >
-                                                            <ArrowDown
-                                                                size={
-                                                                    sortCol ===
-                                                                        c &&
-                                                                    sortDir ===
-                                                                        'desc'
-                                                                        ? 20
-                                                                        : 16
-                                                                }
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {/* Show resize handle for resizable columns but not for Services (last column) */}
-                                                {[
-                                                    'enterprise',
-                                                    'product',
-                                                ].includes(c) && (
-                                                    <div
-                                                        onMouseDown={(e: any) =>
-                                                            startResize(c, e)
-                                                        }
-                                                        className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
-                                                        title={`Resize ${
-                                                            labelFor[c] || c
-                                                        } column`}
-                                                    >
-                                                        <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
-                                                    </div>
-                                                )}
-                                                {c === 'accountName' && (
-                                                    <span
-                                                        aria-hidden
-                                                        className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
-                                                    />
-                                                )}
+                                            )}
+                                            {/* Show resize handle for resizable columns but not for Services (last column) */}
+                                            {['enterprise', 'product'].includes(c) && (
+                                                <div
+                                                    onMouseDown={(e: any) =>
+                                                        startResize(c, e)
+                                                    }
+                                                    className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                    title={`Resize ${labelFor[c] || c} column`}
+                                                >
+                                                    <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
+                                                </div>
+                                            )}
+                                            {c === 'accountName' && (
+                                                <span
+                                                    aria-hidden
+                                                    className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
+                                                />
+                                            )}
+                                        </div>
+                                    ))}
+                                    {customColumns.map((name, idx) => (
+                                        <div
+                                            key={`custom-${idx}`}
+                                            className='min-w-0'
+                                        >
+                                            {name}
+                                        </div>
+                                    ))}
+                                    {/* trailing add column removed */}
+                                </div>
+                            </div>
+                        );
+                    })()}
+                    {groupBy === 'none' ? (
+                        <div className='mt-2'>
+                            {displayItems.map((r, idx) => (
+                                <div key={r.id}>
+                                    <SortableEnterpriseConfigRow
+                                        row={r}
+                                        index={idx}
+                                        cols={cols}
+                                        gridTemplate={gridTemplate}
+                                        highlightQuery={highlightQuery}
+                                        onEdit={onEdit}
+                                        onDelete={onDelete}
+                                        customColumns={customColumns}
+                                        pinFirst={pinFirst}
+                                        firstColWidth={firstColWidth}
+                                        isExpanded={expandedRows.has(r.id)}
+                                        onToggle={toggleExpanded}
+                                        hideRowExpansion={hideRowExpansion}
+                                        enableDropdownChips={
+                                            enableDropdownChips
+                                        }
+                                        onDropdownOptionUpdate={
+                                            onDropdownOptionUpdate
+                                        }
+                                        onNewItemCreated={onNewItemCreated}
+                                        isCellMissing={isCellMissing}
+                                        compressingRowId={compressingRowId}
+                                        foldingRowId={foldingRowId}
+                                        allRows={rows}
+                                        expandedContent={null}
+                                        onUpdateField={updateRowField}
+                                        isSelected={selectedRowId === r.id}
+                                        onSelect={(id) => setSelectedRowId(id)}
+                                        onStartFill={() => {}}
+                                        inFillRange={false}
+                                        onDeleteClick={handleDeleteClick}
+                                        shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                    />
+                                    {expandedRows.has(r.id) && (
+                                        <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
+                                            <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
+                                            <div className='text-sm text-slate-600'>
+                                                Expanded content has been simplified for the 3-field enterprise configuration model.
                                             </div>
-                                        ))}
-                                        {customColumns.map((name, idx) => (
-                                            <div
-                                                key={`custom-${idx}`}
-                                                className='min-w-0'
-                                            >
-                                                {name}
-                                            </div>
-                                        ))}
-                                        {/* trailing add column removed */}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            
+                            {/* Add New Row Button */}
+                            {onAddNewRow && (
+                                <div 
+                                    className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    style={{
+                                        gridTemplateColumns: gridTemplate, 
+                                        minWidth: 'max-content',
+                                        width: '100%'
+                                    }}
+                                    onClick={onAddNewRow}
+                                >
+                                    {/* Empty delete button space */}
+                                    <div className='flex items-center justify-center px-2 py-1'>
+                                        {/* No delete icon for add row */}
+                                    </div>
+                                    
+                                    {/* Add new row content spanning all columns */}
+                                    <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                        <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                                        </svg>
+                                        <span className='italic'>Add New Row</span>
                                     </div>
                                 </div>
-                            );
-                        })()}
-                        {groupBy === 'none' ? (
-                            <div className='mt-2'>
-                                {displayItems.map((r, idx) => (
-                                    <div key={r.id}>
-                                        <SortableEnterpriseConfigRow
-                                            row={r}
-                                            index={idx}
-                                            cols={cols}
-                                            gridTemplate={gridTemplate}
-                                            highlightQuery={highlightQuery}
-                                            onEdit={onEdit}
-                                            onDelete={onDelete}
-                                            customColumns={customColumns}
-                                            pinFirst={pinFirst}
-                                            firstColWidth={firstColWidth}
-                                            isExpanded={expandedRows.has(r.id)}
-                                            onToggle={toggleExpanded}
-                                            hideRowExpansion={hideRowExpansion}
-                                            enableDropdownChips={
-                                                enableDropdownChips
-                                            }
-                                            onDropdownOptionUpdate={
-                                                onDropdownOptionUpdate
-                                            }
-                                            onNewItemCreated={onNewItemCreated}
-                                            isCellMissing={isCellMissing}
-                                            compressingRowId={compressingRowId}
-                                            foldingRowId={foldingRowId}
-                                            allRows={rows}
-                                            expandedContent={null}
-                                            onUpdateField={updateRowField}
-                                            isSelected={selectedRowId === r.id}
-                                            onSelect={(id) =>
-                                                setSelectedRowId(id)
-                                            }
-                                            onStartFill={() => {}}
-                                            inFillRange={false}
-                                            onDeleteClick={handleDeleteClick}
-                                            shouldShowHorizontalScroll={
-                                                shouldShowHorizontalScroll
-                                            }
-                                        />
-                                        {expandedRows.has(r.id) && (
-                                            <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
-                                                <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
-                                                <div className='text-sm text-slate-600'>
-                                                    Expanded content has been
-                                                    simplified for the 3-field
-                                                    enterprise configuration
-                                                    model.
-                                                </div>
-                                            </div>
-                                        )}
+                            )}
+                        </div>
+                    ) : (
+                        <div className='space-y-4 mt-2'>
+                            {Object.entries(groupedItems).map(([groupName, groupRows]) => (
+                                <div key={groupName} className='border border-slate-200 rounded-lg'>
+                                    {/* Group Header */}
+                                    <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
+                                        <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
+                                            <span>{groupName}</span>
+                                            <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
+                                                {groupRows.length} record{groupRows.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </h4>
                                     </div>
-                                ))}
-
-                                {/* Add New Row Button */}
-                                {onAddNewRow && (
-                                    <div
-                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 border-t border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
+                                    
+                                    {/* Group Rows */}
+                                    <div className='border-b border-slate-200 overflow-hidden'>
+                                        {groupRows.map((r, idx) => (
+                                            <div key={r.id}>
+                                                <SortableEnterpriseConfigRow
+                                                    row={r}
+                                                    index={idx}
+                                                    cols={cols}
+                                                    gridTemplate={gridTemplate}
+                                                    highlightQuery={highlightQuery}
+                                                    onEdit={onEdit}
+                                                    onDelete={onDelete}
+                                                    customColumns={customColumns}
+                                                    pinFirst={pinFirst}
+                                                    firstColWidth={firstColWidth}
+                                                    isExpanded={expandedRows.has(r.id)}
+                                                    onToggle={toggleExpanded}
+                                                    hideRowExpansion={hideRowExpansion}
+                                                    enableDropdownChips={
+                                                        enableDropdownChips
+                                                    }
+                                                    onDropdownOptionUpdate={
+                                                        onDropdownOptionUpdate
+                                                    }
+                                                    onNewItemCreated={onNewItemCreated}
+                                                    isCellMissing={isCellMissing}
+                                                    compressingRowId={compressingRowId}
+                                                    foldingRowId={foldingRowId}
+                                                    allRows={rows}
+                                                    expandedContent={null}
+                                                    onUpdateField={updateRowField}
+                                                    isSelected={selectedRowId === r.id}
+                                                    onSelect={(id) => setSelectedRowId(id)}
+                                                    onStartFill={() => {}}
+                                                    inFillRange={false}
+                                                    onDeleteClick={handleDeleteClick}
+                                                    shouldShowHorizontalScroll={shouldShowHorizontalScroll}
+                                                />
+                                                {expandedRows.has(r.id) && (
+                                                    <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
+                                                        <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
+                                                        <div className='text-sm text-slate-600'>
+                                                            Expanded content has been simplified for the 3-field enterprise configuration model.
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            {/* Add New Row Button for grouped view */}
+                            {onAddNewRow && (
+                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                    <div 
+                                        className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
                                         style={{
-                                            gridTemplateColumns: gridTemplate,
+                                            gridTemplateColumns: gridTemplate, 
                                             minWidth: 'max-content',
-                                            width: '100%',
+                                            width: '100%'
                                         }}
                                         onClick={onAddNewRow}
                                     >
@@ -4494,203 +4120,19 @@ export default function EnterpriseConfigTable({
                                         <div className='flex items-center justify-center px-2 py-1'>
                                             {/* No delete icon for add row */}
                                         </div>
-
+                                        
                                         {/* Add new row content spanning all columns */}
-                                        <div
-                                            className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium'
-                                            style={{
-                                                gridColumn: `span ${cols.length}`,
-                                            }}
-                                        >
-                                            <svg
-                                                className='w-4 h-4'
-                                                fill='none'
-                                                viewBox='0 0 24 24'
-                                                stroke='currentColor'
-                                            >
-                                                <path
-                                                    strokeLinecap='round'
-                                                    strokeLinejoin='round'
-                                                    strokeWidth={2}
-                                                    d='M12 4v16m8-8H4'
-                                                />
+                                        <div className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium' style={{gridColumn: `span ${cols.length}`}}>
+                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
                                             </svg>
-                                            <span className='italic'>
-                                                Add New Row
-                                            </span>
+                                            <span className='italic'>Add New Row</span>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className='space-y-4 mt-2'>
-                                {Object.entries(groupedItems).map(
-                                    ([groupName, groupRows]) => (
-                                        <div
-                                            key={groupName}
-                                            className='border border-slate-200 rounded-lg'
-                                        >
-                                            {/* Group Header */}
-                                            <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
-                                                <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
-                                                    <span>{groupName}</span>
-                                                    <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
-                                                        {groupRows.length}{' '}
-                                                        record
-                                                        {groupRows.length !== 1
-                                                            ? 's'
-                                                            : ''}
-                                                    </span>
-                                                </h4>
-                                            </div>
-
-                                            {/* Group Rows */}
-                                            <div className='border-b border-slate-200 overflow-hidden'>
-                                                {groupRows.map((r, idx) => (
-                                                    <div key={r.id}>
-                                                        <SortableEnterpriseConfigRow
-                                                            row={r}
-                                                            index={idx}
-                                                            cols={cols}
-                                                            gridTemplate={
-                                                                gridTemplate
-                                                            }
-                                                            highlightQuery={
-                                                                highlightQuery
-                                                            }
-                                                            onEdit={onEdit}
-                                                            onDelete={onDelete}
-                                                            customColumns={
-                                                                customColumns
-                                                            }
-                                                            pinFirst={pinFirst}
-                                                            firstColWidth={
-                                                                firstColWidth
-                                                            }
-                                                            isExpanded={expandedRows.has(
-                                                                r.id,
-                                                            )}
-                                                            onToggle={
-                                                                toggleExpanded
-                                                            }
-                                                            hideRowExpansion={
-                                                                hideRowExpansion
-                                                            }
-                                                            enableDropdownChips={
-                                                                enableDropdownChips
-                                                            }
-                                                            onDropdownOptionUpdate={
-                                                                onDropdownOptionUpdate
-                                                            }
-                                                            onNewItemCreated={
-                                                                onNewItemCreated
-                                                            }
-                                                            isCellMissing={
-                                                                isCellMissing
-                                                            }
-                                                            compressingRowId={
-                                                                compressingRowId
-                                                            }
-                                                            foldingRowId={
-                                                                foldingRowId
-                                                            }
-                                                            allRows={rows}
-                                                            expandedContent={
-                                                                null
-                                                            }
-                                                            onUpdateField={
-                                                                updateRowField
-                                                            }
-                                                            isSelected={
-                                                                selectedRowId ===
-                                                                r.id
-                                                            }
-                                                            onSelect={(id) =>
-                                                                setSelectedRowId(
-                                                                    id,
-                                                                )
-                                                            }
-                                                            onStartFill={() => {}}
-                                                            inFillRange={false}
-                                                            onDeleteClick={
-                                                                handleDeleteClick
-                                                            }
-                                                            shouldShowHorizontalScroll={
-                                                                shouldShowHorizontalScroll
-                                                            }
-                                                        />
-                                                        {expandedRows.has(
-                                                            r.id,
-                                                        ) && (
-                                                            <div className='group relative bg-white border-t border-slate-200 px-2 py-3 pl-6'>
-                                                                <div className='absolute left-3 top-0 bottom-0 w-px bg-slate-500 transition-colors duration-300 group-hover:bg-sky-500'></div>
-                                                                <div className='text-sm text-slate-600'>
-                                                                    Expanded
-                                                                    content has
-                                                                    been
-                                                                    simplified
-                                                                    for the
-                                                                    3-field
-                                                                    enterprise
-                                                                    configuration
-                                                                    model.
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ),
-                                )}
-
-                                {/* Add New Row Button for grouped view */}
-                                {onAddNewRow && (
-                                    <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
-                                        <div
-                                            className='grid w-full gap-0 px-0 py-1 text-sm bg-slate-50/80 hover:bg-blue-50 transition-colors duration-150 cursor-pointer group h-10'
-                                            style={{
-                                                gridTemplateColumns:
-                                                    gridTemplate,
-                                                minWidth: 'max-content',
-                                                width: '100%',
-                                            }}
-                                            onClick={onAddNewRow}
-                                        >
-                                            {/* Empty delete button space */}
-                                            <div className='flex items-center justify-center px-2 py-1'>
-                                                {/* No delete icon for add row */}
-                                            </div>
-
-                                            {/* Add new row content spanning all columns */}
-                                            <div
-                                                className='flex items-center justify-start gap-2 px-2 py-1 text-slate-500 group-hover:text-blue-600 transition-colors duration-150 font-medium'
-                                                style={{
-                                                    gridColumn: `span ${cols.length}`,
-                                                }}
-                                            >
-                                                <svg
-                                                    className='w-4 h-4'
-                                                    fill='none'
-                                                    viewBox='0 0 24 24'
-                                                    stroke='currentColor'
-                                                >
-                                                    <path
-                                                        strokeLinecap='round'
-                                                        strokeLinejoin='round'
-                                                        strokeWidth={2}
-                                                        d='M12 4v16m8-8H4'
-                                                    />
-                                                </svg>
-                                                <span className='italic'>
-                                                    Add New Row
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     </div>
                 </div>
             )}
