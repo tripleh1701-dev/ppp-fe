@@ -26,14 +26,156 @@ const pathMapping: {
     '': {label: 'Overview', icon: 'grid'},
     inbox: {label: 'My Inbox', icon: 'mail'},
     dashboard: {label: 'Dashboard', icon: 'chart'},
-    pipelines: {label: 'Pipelines', icon: 'bolt'},
-    canvas: {label: 'Canvas', icon: 'template'},
+    pipelines: {
+        label: 'Pipelines',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+            >
+                {/* Connected boxes representing pipeline stages */}
+                <rect
+                    x='3'
+                    y='9'
+                    width='5'
+                    height='6'
+                    rx='1'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    fill='none'
+                />
+                <rect
+                    x='16'
+                    y='9'
+                    width='5'
+                    height='6'
+                    rx='1'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    fill='none'
+                />
+                {/* Connecting line with arrow */}
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    d='M8 12h8'
+                />
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    d='M14 10l2 2-2 2'
+                />
+                {/* Small download/connection node at bottom */}
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    d='M12 15v3'
+                />
+                <rect
+                    x='10.5'
+                    y='18'
+                    width='3'
+                    height='3'
+                    rx='0.5'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={1.8}
+                    fill='none'
+                />
+            </svg>
+        ),
+    },
+    canvas: {
+        label: 'Canvas',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                viewBox='0 0 24 24'
+            >
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z'
+                />
+            </svg>
+        ),
+    },
+    summary: {
+        label: 'Pipeline Canvas',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                viewBox='0 0 24 24'
+            >
+                {/* Canvas/Artboard frame */}
+                <rect
+                    x='3'
+                    y='3'
+                    width='18'
+                    height='18'
+                    rx='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                />
+                {/* Connected nodes representing workflow */}
+                <circle cx='8' cy='8' r='1.5' fill='currentColor' />
+                <circle cx='16' cy='8' r='1.5' fill='currentColor' />
+                <circle cx='12' cy='16' r='1.5' fill='currentColor' />
+                {/* Connection lines */}
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='1.5'
+                    d='M9.5 8.5L11 15'
+                    opacity='0.6'
+                />
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth='1.5'
+                    d='M14.5 8.5L13 15'
+                    opacity='0.6'
+                />
+            </svg>
+        ),
+    },
     builds: {label: 'Builds', icon: 'flask'},
     'access-control': {label: 'Access Control', icon: 'lock'},
     'account-settings': {label: 'Account Settings', icon: 'gear'},
     'enterprise-configuration': {
         label: 'Enterprise Configuration',
-        icon: 'template',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                viewBox='0 0 24 24'
+            >
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
+                />
+            </svg>
+        ),
     },
     'manage-accounts': {label: 'Manage Accounts', icon: 'users'},
     'manage-users': {label: 'Manage Users', icon: 'users'},
@@ -157,6 +299,44 @@ const pathMapping: {
     },
     monitoring: {label: 'Monitoring', icon: 'chart'},
     templates: {label: 'Pipeline Templates', icon: 'template'},
+    profile: {
+        label: 'Profile',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                viewBox='0 0 24 24'
+            >
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+                />
+            </svg>
+        ),
+    },
+    'privacy-policy': {
+        label: 'Privacy Policy',
+        icon: 'custom',
+        customIcon: (
+            <svg
+                className='w-4 h-4'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                viewBox='0 0 24 24'
+            >
+                <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                />
+            </svg>
+        ),
+    },
 };
 
 export default function Breadcrumbs({
@@ -201,18 +381,19 @@ export default function Breadcrumbs({
         const segments = pathValue.split('/').filter(Boolean);
 
         // For account-settings paths, start from Account Settings instead of Overview
-        // For pipelines/canvas paths, start from Pipelines instead of Overview
+        // For pipelines/canvas or pipelines/summary paths, start from Pipelines instead of Overview
         // For security-governance paths, start from Security & Governance instead of Overview
         // For access-control paths, start from Access Control instead of Overview
         const isAccountSettingsPath = segments[0] === 'account-settings';
-        const isPipelineCanvasPath =
-            segments[0] === 'pipelines' && segments[1] === 'canvas';
+        const isPipelineSubPath =
+            segments[0] === 'pipelines' &&
+            (segments[1] === 'canvas' || segments[1] === 'summary');
         const isSecurityGovernancePath = segments[0] === 'security-governance';
         const isAccessControlPath = segments[0] === 'access-control';
 
         if (
             !isAccountSettingsPath &&
-            !isPipelineCanvasPath &&
+            !isPipelineSubPath &&
             !isSecurityGovernancePath &&
             !isAccessControlPath
         ) {

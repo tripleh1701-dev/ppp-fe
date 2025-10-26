@@ -1,5 +1,5 @@
 // Ensure the API base doesn't end with /api to avoid double /api/ prefixes
-const rawApiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+const rawApiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 export const API_BASE = rawApiBase.endsWith('/api')
     ? rawApiBase.slice(0, -4)
     : rawApiBase;

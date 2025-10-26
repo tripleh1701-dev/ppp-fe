@@ -16,10 +16,9 @@ const pipelineCards: PipelineCard[] = [
     {
         id: 'pipeline-canvas',
         title: 'Pipeline Canvas',
-        description:
-            'Build and design your CI/CD pipelines with our visual drag-and-drop editor',
+        description: 'Manage your CI/CD workflows',
         icon: 'canvas',
-        href: '/pipelines/canvas',
+        href: '/pipelines/summary',
         features: [
             'Visual pipeline builder',
             'Drag & drop components',

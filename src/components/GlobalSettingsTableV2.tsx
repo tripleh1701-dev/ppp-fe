@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
@@ -33,6 +33,7 @@ import {
     Clock,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
+import {ConfigurationTooltip} from './ConfigurationTooltip';
 import {api} from '../utils/api';
 
 // Utility function to generate consistent colors for services across the application
@@ -178,14 +179,16 @@ const ChipDropdown = ({
             </div>
 
             {isOpen && (
-                <div className='absolute w-full mt-1 bg-gray-50 border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto before:content-[""] before:absolute before:-top-2 before:left-4 before:w-0 before:h-0 before:border-l-[8px] before:border-l-transparent before:border-r-[8px] before:border-r-transparent before:border-b-[8px] before:border-b-gray-50 after:content-[""] after:absolute after:-top-[10px] after:left-[14px] after:w-0 after:h-0 after:border-l-[10px] after:border-l-transparent after:border-r-[10px] after:border-r-transparent after:border-b-[10px] after:border-b-gray-200'>
-                    <div className='p-3 border-b border-gray-200 bg-gray-50'>
+                <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
+                    <div className='p-2 border-b'>
                         <input
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                            className='w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white'
+                            onChange={(
+                                e: React.ChangeEvent<HTMLInputElement>,
+                            ) => setSearchTerm(e.target.value)}
+                            className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
                             autoFocus
                         />
                     </div>
@@ -206,10 +209,10 @@ const ChipDropdown = ({
                                             }
                                         }
                                     }}
-                                    className={`p-3 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between transition-colors duration-150 ${
+                                    className={`p-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
                                         isSelected
-                                            ? 'bg-blue-100 text-blue-700 font-medium'
-                                            : 'text-gray-700'
+                                            ? 'bg-blue-50 text-blue-600'
+                                            : ''
                                     }`}
                                 >
                                     <span>{option.name}</span>
@@ -221,7 +224,7 @@ const ChipDropdown = ({
                         })}
 
                         {filteredOptions.length === 0 && searchTerm && (
-                            <div className='p-3 text-sm text-gray-500 text-center italic'>
+                            <div className='p-2 text-sm text-gray-500'>
                                 No options found
                             </div>
                         )}
@@ -232,12 +235,15 @@ const ChipDropdown = ({
     );
 };
 
-export interface EnterpriseConfigRow {
+export interface GlobalSettingsRow {
     id: string;
-    // New simplified fields - primary data model
+    // Global Settings fields
+    account: string;
     enterprise: string;
-    product: string;
-    services: string;
+    entity: string;
+    configuration: string;
+    configurationDetails?: Record<string, string[]>; // Category -> tools mapping for tooltip
+    isConfigured?: boolean; // Track if entity has been configured
 }
 
 function InlineEditableText({
@@ -341,7 +347,7 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'enterprise' | 'product' | 'service' | 'template';
+type CatalogType = 'account' | 'enterprise' | 'entity' | 'service' | 'template';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -621,16 +627,16 @@ function ServicesMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         item: {id: string; name: string},
     ) => void;
-    accounts?: EnterpriseConfigRow[];
+    accounts?: GlobalSettingsRow[];
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -649,14 +655,19 @@ function ServicesMultiSelect({
     const moreServicesRef = React.useRef<HTMLButtonElement>(null);
 
     // Helper function to check if a service is in use
+    // Note: Not used in Global Settings context, kept for compatibility
     const isServiceInUse = React.useCallback(
         (serviceName: string): boolean => {
             if (!accounts || accounts.length === 0) return false;
 
-            return accounts.some((account) => {
-                const services =
-                    account.services?.split(', ').filter(Boolean) || [];
-                return services.includes(serviceName);
+            return accounts.some((account: any) => {
+                // For legacy enterprise config rows that have services property
+                if (account.services) {
+                    const services =
+                        account.services?.split(', ').filter(Boolean) || [];
+                    return services.includes(serviceName);
+                }
+                return false;
             });
         },
         [accounts],
@@ -905,7 +916,8 @@ function ServicesMultiSelect({
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
-                    onNewItemCreated('services', created);
+                    // In Global Settings context, configuration items are entities
+                    onNewItemCreated('entities', created);
                 }
             }
         } catch (error: any) {
@@ -1038,8 +1050,10 @@ function ServicesMultiSelect({
                             moreServicesPos &&
                             createPortal(
                                 <div
-                                    className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
-                                    onMouseDown={(e: any) => e.stopPropagation()}
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) =>
+                                        e.stopPropagation()
+                                    }
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
                                         position: 'fixed',
@@ -1229,8 +1243,9 @@ function ServicesMultiSelect({
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
+                                                // In Global Settings context, configuration items are entities
                                                 onNewItemCreated(
-                                                    'services',
+                                                    'entities',
                                                     created,
                                                 );
                                             }
@@ -1346,7 +1361,7 @@ function ServicesMultiSelect({
                 createPortal(
                     <div
                         ref={dropdownRef}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
                         onMouseDown={(e: any) => e.stopPropagation()}
                         onClick={(e: any) => e.stopPropagation()}
                         style={{
@@ -1535,8 +1550,9 @@ function ServicesMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
+                                                            // In Global Settings context, configuration items are entities
                                                             await onDropdownOptionUpdate(
-                                                                'services',
+                                                                'entities',
                                                                 'update',
                                                                 opt.name,
                                                                 newName,
@@ -1588,8 +1604,9 @@ function ServicesMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
+                                                            // In Global Settings context, configuration items are entities
                                                             await onDropdownOptionUpdate(
-                                                                'services',
+                                                                'entities',
                                                                 'delete',
                                                                 opt.name,
                                                             );
@@ -1762,16 +1779,16 @@ function AsyncChipSelect({
     isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         item: {id: string; name: string},
     ) => void;
-    accounts?: EnterpriseConfigRow[];
+    accounts?: GlobalSettingsRow[];
     currentRowId?: string;
     currentRowEnterprise?: string;
     currentRowProduct?: string;
@@ -1804,23 +1821,25 @@ function AsyncChipSelect({
                 if (type === 'enterprise') {
                     // Never filter enterprises - show all options
                     return false;
-                } else if (type === 'product') {
+                } else if (type === 'entity') {
                     // For products, check if this product is already paired with the current enterprise
                     const currentEnterprise = currentRowEnterprise || '';
 
                     if (currentEnterprise) {
                         // Check if this product is already used with the selected enterprise
+                        const accountAny = account as any;
                         const isUsedWithCurrentEnterprise =
                             account.enterprise === currentEnterprise &&
-                            account.product === optionName;
+                            accountAny.product === optionName;
 
                         return isUsedWithCurrentEnterprise;
                     }
                     // If no enterprise is selected yet, don't filter anything
                     return false;
                 } else if (type === 'service') {
+                    const accountAny = account as any;
                     const services =
-                        account.services?.split(', ').filter(Boolean) || [];
+                        accountAny.services?.split(', ').filter(Boolean) || [];
                     return services.includes(optionName);
                 }
                 return false;
@@ -1841,25 +1860,81 @@ function AsyncChipSelect({
     } | null>(null);
     // Portal-based dropdown to avoid table clipping
 
-    // Function to calculate optimal dropdown position - always prefer below
+    // Function to calculate optimal dropdown position
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
 
         const containerRect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
-        
-        // Always position below the field
-        setDropdownPosition('below');
-        
-        // Calculate width to match container
-        const width = Math.max(140, Math.min(200, containerRect.width));
-        
-        // Position directly below the field
-        const top = containerRect.bottom + 2;
-        const left = containerRect.left;
-        
-        setDropdownPortalPos({ top, left, width });
-        console.log('📍 Dropdown position calculated:', { top, left, width, position: 'below' });
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer =
+            containerRef.current.closest('.compact-table') ||
+            containerRef.current.closest('[role="table"]') ||
+            containerRef.current.closest('.rounded-xl') ||
+            containerRef.current.closest('.overflow-auto') ||
+            containerRef.current.closest('.w-full.compact-table') ||
+            document.querySelector('.compact-table') ||
+            document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(
+            120,
+            tableRect.width - 64,
+            viewportWidth - 64,
+        ); // Reduced to match dropdown width
+        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+
+        // Ensure dropdown stays within table container horizontally with more padding
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(
+            tableRect.right - width - 32,
+            viewportWidth - width - 32,
+        ); // More padding
+        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        let top;
+        if (
+            spaceBelow >= dropdownHeight ||
+            (spaceBelow >= spaceAbove && spaceBelow >= 150)
+        ) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+            // Ensure it doesn't go below table bounds
+            if (top + dropdownHeight > tableRect.bottom) {
+                top = Math.max(
+                    tableRect.top + 10,
+                    containerRect.top - dropdownHeight - 4,
+                );
+                setDropdownPosition('above');
+            }
+        } else {
+            setDropdownPosition('above');
+            top = Math.max(
+                tableRect.top + 10,
+                containerRect.top - dropdownHeight - 4,
+            );
+        }
+
+        // Final constraint to ensure dropdown is within table bounds
+        top = Math.max(top, tableRect.top + 10);
+        top = Math.min(top, tableRect.bottom - 100);
+
+        setDropdownPortalPos({top, left, width});
+        console.log('📍 Dropdown position calculated:', {
+            top,
+            left,
+            width,
+            position: spaceBelow >= dropdownHeight ? 'below' : 'above',
+            tableRect,
+        });
     }, []);
 
     // Calculate position when dropdown opens
@@ -1885,7 +1960,7 @@ function AsyncChipSelect({
 
             console.log(`Loading options for type: ${type}`);
 
-            if (type === 'product') {
+            if (type === 'entity') {
                 console.log('Calling API: /api/products');
                 allData =
                     (await api.get<Array<{id: string; name: string}>>(
@@ -1952,7 +2027,7 @@ function AsyncChipSelect({
         }
 
         // Apply usage filter for products
-        if (type === 'product') {
+        if (type === 'entity') {
             filtered = filtered.filter(
                 (product) => !isOptionInUse(product.name),
             );
@@ -1975,7 +2050,7 @@ function AsyncChipSelect({
 
     // Reload options when currentRowEnterprise changes (for product filtering)
     React.useEffect(() => {
-        if (type === 'product' && currentRowEnterprise) {
+        if (type === 'entity' && currentRowEnterprise) {
             // Reset allOptions to force reload with new enterprise context
             setAllOptions([]);
         }
@@ -2017,7 +2092,7 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'product') {
+            if (type === 'entity') {
                 created = await api.post<{id: string; name: string}>(
                     '/api/products',
                     {name},
@@ -2060,9 +2135,9 @@ function AsyncChipSelect({
                     const dropdownType =
                         type === 'enterprise'
                             ? 'enterprises'
-                            : type === 'product'
-                            ? 'products'
-                            : 'services';
+                            : type === 'entity'
+                            ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                            : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                     onNewItemCreated(dropdownType, created);
                 }
             }
@@ -2199,9 +2274,9 @@ function AsyncChipSelect({
 
                                     // Determine next column based on current column
                                     if (currentCol === 'enterprise') {
-                                        nextCol = 'product';
-                                    } else if (currentCol === 'product') {
-                                        nextCol = 'services';
+                                        nextCol = 'entity';
+                                    } else if (currentCol === 'entity') {
+                                        nextCol = 'configuration';
                                     }
 
                                     if (nextCol) {
@@ -2211,7 +2286,7 @@ function AsyncChipSelect({
                                                 `[data-row-id="${currentRowId}"][data-col="${nextCol}"]`,
                                             );
 
-                                        if (nextCol === 'services') {
+                                        if (nextCol === 'configuration') {
                                             // For Services column, we need to handle both input and button cases
                                             let nextInput =
                                                 nextColDiv?.querySelector(
@@ -2328,7 +2403,7 @@ function AsyncChipSelect({
                                             }>('/api/enterprises', {
                                                 name: query.trim(),
                                             });
-                                        } else if (type === 'product') {
+                                        } else if (type === 'entity') {
                                             created = await api.post<{
                                                 id: string;
                                                 name: string;
@@ -2368,9 +2443,9 @@ function AsyncChipSelect({
                                                 const dropdownType =
                                                     type === 'enterprise'
                                                         ? 'enterprises'
-                                                        : type === 'product'
-                                                        ? 'products'
-                                                        : 'services';
+                                                        : type === 'entity'
+                                                        ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                        : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
                                                 onNewItemCreated(
                                                     dropdownType,
                                                     created,
@@ -2460,110 +2535,365 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${
+                            isError
+                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                : 'border-blue-300 bg-white hover:bg-slate-50'
+                        } text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${
+                            isError
+                                ? 'focus:ring-red-200 focus:border-red-500'
+                                : 'focus:ring-blue-200 focus:border-blue-500'
+                        }`}
                         placeholder=''
                     />
                 ) : null}
             </div>
 
             {/* Full Autocomplete Dropdown - Portal Based */}
-            {open && dropdownPortalPos && createPortal(
-                <div 
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px'
-                    }}
-                >
-                    {/* Integrated pointer as part of the panel - positioned to align with input field */}
-                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
-                        <div className='relative z-10'>
-                            <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto max-h-44'>
-                            {loading ? (
-                                <div className='px-3 py-2 text-slate-500'>
-                                    Loading…
-                                </div>
-                            ) : (
-                                (() => {
-                                    // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim() 
-                                        ? options.filter(opt => 
-                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
-                                            opt.name.toLowerCase().includes(query.toLowerCase())
-                                        ).sort((a, b) => {
-                                            const aLower = a.name.toLowerCase();
-                                            const bLower = b.name.toLowerCase();
-                                            const queryLower = query.toLowerCase();
-                                            
-                                            // Prioritize starts with matches
-                                            const aStartsWith = aLower.startsWith(queryLower);
-                                            const bStartsWith = bLower.startsWith(queryLower);
-                                            
-                                            if (aStartsWith && !bStartsWith) return -1;
-                                            if (bStartsWith && !aStartsWith) return 1;
-                                            
-                                            return aLower.localeCompare(bLower);
-                                        })
-                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-                                    
-                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
-                                    
-                                    // Check if query exactly matches an existing option
-                                    const exactMatch = query.trim() ? options.find(opt => 
-                                        opt.name.toLowerCase() === query.toLowerCase().trim()
-                                    ) : null;
-                                    
-                                    if (filteredOptions.length === 0) {
+            {open &&
+                dropdownPortalPos &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: `${Math.min(
+                                dropdownPortalPos.width,
+                                180,
+                            )}px`,
+                            maxWidth: '180px',
+                            minWidth: '140px',
+                        }}
+                    >
+                        <div className='py-1'>
+                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
+                                {loading ? (
+                                    <div className='px-3 py-2 text-slate-500'>
+                                        Loading…
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        // Filter options that match the query (show all if no query)
+                                        const filteredOptions = query.trim()
+                                            ? options
+                                                  .filter(
+                                                      (opt) =>
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .startsWith(
+                                                                  query.toLowerCase(),
+                                                              ) ||
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .includes(
+                                                                  query.toLowerCase(),
+                                                              ),
+                                                  )
+                                                  .sort((a, b) => {
+                                                      const aLower =
+                                                          a.name.toLowerCase();
+                                                      const bLower =
+                                                          b.name.toLowerCase();
+                                                      const queryLower =
+                                                          query.toLowerCase();
+
+                                                      // Prioritize starts with matches
+                                                      const aStartsWith =
+                                                          aLower.startsWith(
+                                                              queryLower,
+                                                          );
+                                                      const bStartsWith =
+                                                          bLower.startsWith(
+                                                              queryLower,
+                                                          );
+
+                                                      if (
+                                                          aStartsWith &&
+                                                          !bStartsWith
+                                                      )
+                                                          return -1;
+                                                      if (
+                                                          bStartsWith &&
+                                                          !aStartsWith
+                                                      )
+                                                          return 1;
+
+                                                      return aLower.localeCompare(
+                                                          bLower,
+                                                      );
+                                                  })
+                                            : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+
+                                        console.log(
+                                            `Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`,
+                                            filteredOptions,
+                                        );
+
+                                        // Check if query exactly matches an existing option
+                                        const exactMatch = query.trim()
+                                            ? options.find(
+                                                  (opt) =>
+                                                      opt.name.toLowerCase() ===
+                                                      query
+                                                          .toLowerCase()
+                                                          .trim(),
+                                              )
+                                            : null;
+
+                                        const showCreateNew =
+                                            query.trim() && !exactMatch;
+
                                         return (
-                                            <div className='px-3 py-2 text-slate-500 text-center'>
-                                                No matches
+                                            <div>
+                                                {/* Show existing matching options */}
+                                                {filteredOptions.length > 0 && (
+                                                    <div>
+                                                        {filteredOptions.map(
+                                                            (opt, idx) => (
+                                                                <div
+                                                                    key={opt.id}
+                                                                    onClick={() => {
+                                                                        onChange(
+                                                                            opt.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            opt.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+                                                                    }}
+                                                                    className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
+                                                                >
+                                                                    {opt.name}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Show "Create New" option */}
+                                                {showCreateNew && (
+                                                    <div className='border-t border-slate-200'>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    let created: {
+                                                                        id: string;
+                                                                        name: string;
+                                                                    } | null =
+                                                                        null;
+
+                                                                    if (
+                                                                        type ===
+                                                                        'enterprise'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/enterprises',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'entity'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/products',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'service'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/services',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    }
+
+                                                                    if (
+                                                                        created
+                                                                    ) {
+                                                                        // Update options list
+                                                                        setOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+                                                                        setAllOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+
+                                                                        // Set the new value
+                                                                        onChange(
+                                                                            created.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            created.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+
+                                                                        // Notify parent component
+                                                                        if (
+                                                                            onNewItemCreated
+                                                                        ) {
+                                                                            const dropdownType =
+                                                                                type ===
+                                                                                'enterprise'
+                                                                                    ? 'enterprises'
+                                                                                    : type ===
+                                                                                      'entity'
+                                                                                    ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                                                    : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
+                                                                            onNewItemCreated(
+                                                                                dropdownType,
+                                                                                created,
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.log(
+                                                                        `API creation failed for ${type}, creating local entry`,
+                                                                    );
+
+                                                                    // Fallback: create a local entry when API fails
+                                                                    const newId = `local-${Date.now()}-${Math.random()
+                                                                        .toString(
+                                                                            36,
+                                                                        )
+                                                                        .substr(
+                                                                            2,
+                                                                            9,
+                                                                        )}`;
+                                                                    const created =
+                                                                        {
+                                                                            id: newId,
+                                                                            name: query.trim(),
+                                                                        };
+
+                                                                    // Update options list
+                                                                    setOptions(
+                                                                        (
+                                                                            prev,
+                                                                        ) => [
+                                                                            ...prev,
+                                                                            created,
+                                                                        ],
+                                                                    );
+                                                                    setAllOptions(
+                                                                        (
+                                                                            prev,
+                                                                        ) => [
+                                                                            ...prev,
+                                                                            created,
+                                                                        ],
+                                                                    );
+
+                                                                    // Set the new value
+                                                                    onChange(
+                                                                        created.name,
+                                                                    );
+                                                                    setCurrent(
+                                                                        created.name,
+                                                                    );
+                                                                    setQuery(
+                                                                        '',
+                                                                    );
+                                                                    setOpen(
+                                                                        false,
+                                                                    );
+
+                                                                    // Notify parent component
+                                                                    if (
+                                                                        onNewItemCreated
+                                                                    ) {
+                                                                        const dropdownType =
+                                                                            type ===
+                                                                            'enterprise'
+                                                                                ? 'enterprises'
+                                                                                : type ===
+                                                                                  'entity'
+                                                                                ? 'entities' // Fixed: was 'products', now 'entities' for Global Settings
+                                                                                : 'entities'; // Fixed: was 'configuration', now 'entities' for Global Settings
+                                                                        onNewItemCreated(
+                                                                            dropdownType,
+                                                                            created,
+                                                                        );
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
+                                                        >
+                                                            + Create &quot;
+                                                            {query.trim()}&quot;
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Show "No results" message */}
+                                                {filteredOptions.length === 0 &&
+                                                    !showCreateNew && (
+                                                        <div className='px-3 py-2 text-center text-sm text-slate-500'>
+                                                            {query.trim() ? (
+                                                                <div>
+                                                                    No {type}s
+                                                                    found
+                                                                    matching
+                                                                    &quot;
+                                                                    {query}
+                                                                    &quot;
+                                                                </div>
+                                                            ) : (
+                                                                <div>
+                                                                    No {type}s
+                                                                    available
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                             </div>
                                         );
-                                    }
-
-                                    return filteredOptions.map((opt, idx) => {
-                                        const palette = [
-                                            { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
-                                            { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
-                                            { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
-                                            { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
-                                        ];
-                                        const tone = palette[idx % palette.length];
-                                        
-                                        return (
-                                            <motion.div
-                                                key={opt.id}
-                                                initial={{scale: 0.98, opacity: 0}}
-                                                animate={{scale: 1, opacity: 1}}
-                                                whileHover={{scale: 1.02, y: -1}}
-                                                transition={{type: 'spring', stiffness: 400, damping: 25}}
-                                                className='relative group'
-                                            >
-                                                <button
-                                                    onClick={() => {
-                                                        onChange(opt.name);
-                                                        setCurrent(opt.name);
-                                                        setQuery('');
-                                                        setOpen(false);
-                                                    }}
-                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible`}
-                                                    style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
-                                                >
-                                                    <span className='relative z-10 block'>{opt.name}</span>
-                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                </button>
-                                            </motion.div>
-                                        );
-                                    });
-                                })()
-                            )}
+                                    })()
+                                )}
+                            </div>
                         </div>
                     </div>,
                     document.body,
@@ -2572,24 +2902,26 @@ function AsyncChipSelect({
     );
 }
 
-interface EnterpriseConfigTableProps {
-    rows: EnterpriseConfigRow[];
+interface GlobalSettingsTableV2Props {
+    rows: GlobalSettingsRow[];
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'enterpriseName' | 'productName' | 'serviceName';
+    groupByExternal?: 'none' | 'accountName' | 'enterpriseName' | 'entityName';
     onGroupByChange?: (
-        g: 'none' | 'enterpriseName' | 'productName' | 'serviceName',
+        g: 'none' | 'accountName' | 'enterpriseName' | 'entityName',
     ) => void;
     hideControls?: boolean;
-    visibleColumns?: Array<'enterprise' | 'product' | 'services' | 'actions'>;
+    visibleColumns?: Array<
+        'account' | 'enterprise' | 'entity' | 'configuration' | 'actions'
+    >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
+        accounts?: Array<{id: string; name: string}>;
         enterprises?: Array<{id: string; name: string}>;
-        products?: Array<{id: string; name: string}>;
-        services?: Array<{id: string; name: string}>;
+        entities?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -2598,13 +2930,13 @@ interface EnterpriseConfigTableProps {
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -2619,7 +2951,7 @@ interface EnterpriseConfigTableProps {
     isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
 }
 
-function SortableEnterpriseConfigRow({
+function SortableGlobalSettingsRow({
     row,
     index,
     onEdit,
@@ -2640,6 +2972,7 @@ function SortableEnterpriseConfigRow({
     firstColWidth,
     hideRowExpansion = false,
     enableDropdownChips = false,
+    enableInlineEditing = true,
     shouldShowHorizontalScroll = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
@@ -2649,10 +2982,10 @@ function SortableEnterpriseConfigRow({
     allRows = [],
     onDeleteClick,
 }: {
-    row: EnterpriseConfigRow;
+    row: GlobalSettingsRow;
     index: number;
-    onEdit: (id: string) => void;
-    onDelete: (id: string) => void;
+    onEdit?: (id: string) => void;
+    onDelete?: (id: string) => void;
     cols: string[];
     gridTemplate: string;
     highlightQuery?: string;
@@ -2662,14 +2995,14 @@ function SortableEnterpriseConfigRow({
     expandedContent?: React.ReactNode;
     onUpdateField: (
         rowId: string,
-        key: keyof EnterpriseConfigRow,
+        key: keyof GlobalSettingsRow,
         value: any,
     ) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
     onStartFill: (
         rowId: string,
-        col: keyof EnterpriseConfigRow,
+        col: keyof GlobalSettingsRow,
         value: string,
     ) => void;
     inFillRange: boolean;
@@ -2677,21 +3010,22 @@ function SortableEnterpriseConfigRow({
     firstColWidth?: string;
     hideRowExpansion?: boolean;
     enableDropdownChips?: boolean;
+    enableInlineEditing?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'enterprises' | 'products' | 'services',
+        type: 'accounts' | 'enterprises' | 'entities',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    allRows?: EnterpriseConfigRow[];
+    allRows?: GlobalSettingsRow[];
     onDeleteClick?: (rowId: string) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -2704,7 +3038,7 @@ function SortableEnterpriseConfigRow({
 
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
-        ['enterprise', 'product', 'services'].includes(col),
+        ['enterprise', 'entity', 'configuration'].includes(col),
     );
 
     const createTabNavigation = (currentCol: string) => {
@@ -2891,7 +3225,7 @@ function SortableEnterpriseConfigRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+            className={`group w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected
                     ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200'
                     : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
@@ -2963,6 +3297,57 @@ function SortableEnterpriseConfigRow({
                     </motion.button>
                 )}
             </div>
+            {cols.includes('account') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                >
+                    <div
+                        className='text-slate-700 text-[12px] w-full'
+                        data-row-id={row.id}
+                        data-col='account'
+                        style={{width: '100%'}}
+                    >
+                        {enableDropdownChips ? (
+                            <AsyncChipSelect
+                                type='account'
+                                value={(row as any).account || ''}
+                                onChange={(v) => {
+                                    onUpdateField(
+                                        row.id,
+                                        'account' as any,
+                                        v || '',
+                                    );
+                                }}
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'account')}
+                                onDropdownOptionUpdate={onDropdownOptionUpdate}
+                                onNewItemCreated={onNewItemCreated}
+                                accounts={allRows}
+                                currentRowId={row.id}
+                                currentRowEnterprise={row.enterprise || ''}
+                                currentRowProduct={row.entity || ''}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.account || ''}
+                                onCommit={(v) => {
+                                    onUpdateField(row.id, 'account' as any, v);
+                                }}
+                                className='text-[12px]'
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'account')}
+                                dataAttr={`${row.id}-account`}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
             {cols.includes('enterprise') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 pl-1 pr-2 py-1 w-full ${
@@ -3023,7 +3408,7 @@ function SortableEnterpriseConfigRow({
                                 accounts={allRows}
                                 currentRowId={row.id}
                                 currentRowEnterprise={row.enterprise || ''}
-                                currentRowProduct={row.product || ''}
+                                currentRowProduct={row.entity || ''}
                             />
                         ) : (
                             <InlineEditableText
@@ -3044,7 +3429,7 @@ function SortableEnterpriseConfigRow({
                     </div>
                 </div>
             )}
-            {cols.includes('product') && (
+            {cols.includes('entity') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
@@ -3054,18 +3439,18 @@ function SortableEnterpriseConfigRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='product'
+                    data-col='entity'
                     style={{width: '100%'}}
                 >
                     {enableDropdownChips ? (
                         <AsyncChipSelect
-                            type='product'
-                            value={row.product}
+                            type='entity'
+                            value={row.entity}
                             onChange={(v) =>
-                                onUpdateField(row.id, 'product', v || '')
+                                onUpdateField(row.id, 'entity', v || '')
                             }
                             placeholder=''
-                            isError={isCellMissing(row.id, 'product')}
+                            isError={isCellMissing(row.id, 'entity')}
                             onDropdownOptionUpdate={onDropdownOptionUpdate}
                             onNewItemCreated={onNewItemCreated}
                             accounts={allRows}
@@ -3074,21 +3459,19 @@ function SortableEnterpriseConfigRow({
                         />
                     ) : (
                         <InlineEditableText
-                            value={row.product || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'product', v)
-                            }
+                            value={row.entity || ''}
+                            onCommit={(v) => onUpdateField(row.id, 'entity', v)}
                             className='text-[12px]'
                             dataAttr={`product-${row.id}`}
-                            isError={isCellMissing(row.id, 'product')}
+                            isError={isCellMissing(row.id, 'entity')}
                             placeholder=''
                         />
                     )}
                 </div>
             )}
-            {cols.includes('services') && (
+            {cols.includes('configuration') && (
                 <div
-                    className={`text-slate-700 text-[12px] px-2 py-1 w-full ${
+                    className={`relative text-slate-700 text-[12px] px-2 py-1 w-full border-r border-slate-200 ${
                         isSelected
                             ? 'bg-blue-50'
                             : index % 2 === 0
@@ -3096,28 +3479,35 @@ function SortableEnterpriseConfigRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='services'
+                    data-col='configuration'
                     style={{
-                        borderRight: 'none',
                         width: '100%',
-                        minWidth: '500px', // Increased minimum width to ensure content visibility when scrolled
-                        maxWidth: 'none', // Ensure no max width constraint
                     }}
                 >
-                    <ServicesMultiSelect
-                        value={row.services || ''}
-                        onChange={(v) =>
-                            onUpdateField(row.id, 'services', v || '')
-                        }
-                        placeholder=''
-                        isError={isCellMissing(row.id, 'services')}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate}
-                        onNewItemCreated={onNewItemCreated}
-                        accounts={allRows}
-                    />
+                    {enableInlineEditing ? (
+                        <ServicesMultiSelect
+                            value={row.configuration || ''}
+                            onChange={(v) =>
+                                onUpdateField(row.id, 'configuration', v || '')
+                            }
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'configuration')}
+                            onDropdownOptionUpdate={onDropdownOptionUpdate}
+                            onNewItemCreated={onNewItemCreated}
+                            accounts={allRows}
+                        />
+                    ) : (
+                        <ConfigurationTooltip
+                            configuration={
+                                row.configuration || 'Not configured'
+                            }
+                            configurationDetails={row.configurationDetails}
+                            onIconClick={() => onEdit?.(row.id)}
+                            isConfigured={row.isConfigured}
+                        />
+                    )}
                 </div>
             )}
-            {/* actions column removed */}
             {/* trailing add row removed; fill handle removed */}
             {!hideRowExpansion && isExpanded && expandedContent && (
                 <motion.div
@@ -3133,7 +3523,7 @@ function SortableEnterpriseConfigRow({
     );
 }
 
-export default function EnterpriseConfigTable({
+export default function GlobalSettingsTableV2({
     rows,
     onEdit,
     onDelete,
@@ -3164,24 +3554,64 @@ export default function EnterpriseConfigTable({
     externalSortDirection,
     onSortChange,
     isAIInsightsPanelOpen = false,
-}: EnterpriseConfigTableProps) {
+}: {
+    rows: GlobalSettingsRow[];
+    onEdit?: (rowId: string) => void;
+    onDelete?: (rowId: string) => void;
+    title?: string;
+    groupByExternal?: 'accountName' | 'enterpriseName' | 'entityName';
+    onGroupByChange?: (
+        groupBy: 'accountName' | 'enterpriseName' | 'entityName' | '',
+    ) => void;
+    hideControls?: boolean;
+    visibleColumns?: Array<
+        'account' | 'enterprise' | 'entity' | 'configuration'
+    >;
+    highlightQuery?: string;
+    customColumnLabels?: Record<string, string>;
+    enableDropdownChips?: boolean;
+    dropdownOptions?: Record<string, any>;
+    onUpdateField?: (rowId: string, field: string, value: any) => void;
+    hideRowExpansion?: boolean;
+    enableInlineEditing?: boolean;
+    incompleteRowIds?: string[];
+    showValidationErrors?: boolean;
+    hasBlankRow?: boolean;
+    onDropdownOptionUpdate?: (
+        type: 'accounts' | 'enterprises' | 'entities',
+        action: 'update' | 'delete',
+        oldName: string,
+        newName?: string,
+    ) => Promise<void>;
+    onNewItemCreated?: (
+        type: 'accounts' | 'enterprises' | 'entities',
+        item: {id: string; name: string},
+    ) => void;
+    onShowAllColumns?: () => void;
+    compressingRowId?: string | null;
+    foldingRowId?: string | null;
+    triggerValidation?: boolean;
+    onValidationComplete?: (hasErrors: boolean) => void;
+    onAddNewRow?: () => void;
+    externalSortColumn?: string;
+    externalSortDirection?: 'asc' | 'desc' | '';
+    onSortChange?: (column: string, direction: 'asc' | 'desc' | '') => void;
+    isAIInsightsPanelOpen?: boolean;
+}) {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(
         new Set(),
     );
 
     // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (
-        row: EnterpriseConfigRow,
-        field: string,
-    ): boolean => {
+    const isFieldMissing = (row: GlobalSettingsRow, field: string): boolean => {
         switch (field) {
             case 'enterprise':
                 return !row.enterprise || row.enterprise.trim() === '';
-            case 'product':
-                return !row.product || row.product.trim() === '';
-            case 'services':
-                return !row.services || row.services.trim() === '';
+            case 'entity':
+                return !row.entity || row.entity.trim() === '';
+            case 'configuration':
+                return !row.configuration || row.configuration.trim() === '';
             default:
                 return false;
         }
@@ -3210,20 +3640,16 @@ export default function EnterpriseConfigTable({
         return isFieldMissing(row, field);
     };
 
-    // Keep a local order for row management. Sync when rows change
-    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
-    const [localRows, setLocalRows] = useState<EnterpriseConfigRow[]>(rows);
-
     // Function to validate all rows and highlight missing fields
-    const validateAndHighlightErrors = useCallback(() => {
+    const validateAndHighlightErrors = () => {
         const errorRowIds = new Set<string>();
 
         localRows.forEach((row) => {
             // Check if any required field is missing
             if (
                 isFieldMissing(row, 'enterprise') ||
-                isFieldMissing(row, 'product') ||
-                isFieldMissing(row, 'services')
+                isFieldMissing(row, 'entity') ||
+                isFieldMissing(row, 'configuration')
             ) {
                 errorRowIds.add(row.id);
             }
@@ -3231,32 +3657,43 @@ export default function EnterpriseConfigTable({
 
         setValidationErrors(errorRowIds);
         return errorRowIds;
-    }, [localRows]);
+    };
+
+    // Keep a local order for row management. Sync when rows change
+    const [order, setOrder] = useState<string[]>(() =>
+        rows.map((r: GlobalSettingsRow) => r.id),
+    );
+    const [localRows, setLocalRows] = useState<GlobalSettingsRow[]>(rows);
     useEffect(() => {
         // Preserve existing order; append any new ids
         const existing = new Set(order);
         const merged = [
-            ...order.filter((id) => rows.some((r) => r.id === id)),
-            ...rows.filter((r) => !existing.has(r.id)).map((r) => r.id),
+            ...order.filter((id) =>
+                rows.some((r: GlobalSettingsRow) => r.id === id),
+            ),
+            ...rows
+                .filter((r: GlobalSettingsRow) => !existing.has(r.id))
+                .map((r: GlobalSettingsRow) => r.id),
         ];
         setOrder(merged);
         // Deep copy rows to create new references for React updates
         const cloned = rows.map((r) => ({
             ...r,
-        })) as EnterpriseConfigRow[];
+        })) as GlobalSettingsRow[];
         setLocalRows(cloned);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rows.map((r) => r.id).join(',')]);
+    }, [rows]);
 
     // Effect to trigger validation when requested
     useEffect(() => {
         if (triggerValidation) {
             const errorRowIds = validateAndHighlightErrors();
             if (onValidationComplete) {
-                onValidationComplete(Array.from(errorRowIds));
+                onValidationComplete(errorRowIds.size > 0);
             }
         }
-    }, [triggerValidation, validateAndHighlightErrors, onValidationComplete]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [triggerValidation]);
 
     // Effect to highlight errors when incompleteRowIds changes from parent
     useEffect(() => {
@@ -3268,40 +3705,40 @@ export default function EnterpriseConfigTable({
             // Only update if there are errors to clear (prevents unnecessary re-renders)
             setValidationErrors((prev) => (prev.size > 0 ? new Set() : prev));
         }
-    }, [incompleteRowIds, showValidationErrors, validateAndHighlightErrors]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [incompleteRowIds, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
             order
                 .map((id) => localRows.find((r) => r.id === id))
-                .filter(Boolean) as EnterpriseConfigRow[],
+                .filter(Boolean) as GlobalSettingsRow[],
         [order, localRows],
     );
 
     // Persist helpers
     // Debounced autosave per-row to avoid excessive API traffic
     const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, EnterpriseConfigRow>>({});
-    function schedulePersist(row: EnterpriseConfigRow, delay = 600) {
+    const latestRowRef = useRef<Record<string, GlobalSettingsRow>>({});
+    function schedulePersist(row: GlobalSettingsRow, delay = 600) {
         const rowId = String(row.id);
         latestRowRef.current[rowId] = row;
         if (saveTimersRef.current[rowId])
             clearTimeout(saveTimersRef.current[rowId]);
         saveTimersRef.current[rowId] = setTimeout(() => {
             const latest = latestRowRef.current[rowId];
-            if (latest) void persistEnterpriseConfigRow(latest);
+            if (latest) void persistGlobalSettingsRow(latest);
         }, delay);
     }
     useEffect(() => {
         return () => {
             // cleanup pending timers on unmount without forcing save
-            const currentTimers = saveTimersRef.current;
-            Object.values(currentTimers).forEach((t) =>
+            Object.values(saveTimersRef.current).forEach((t) =>
                 clearTimeout(t),
             );
         };
     }, []);
-    async function persistEnterpriseConfigRow(row: EnterpriseConfigRow) {
+    async function persistGlobalSettingsRow(row: GlobalSettingsRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle enterprise linkage auto-save
             if (String(row.id || '').startsWith('tmp-')) {
@@ -3314,15 +3751,15 @@ export default function EnterpriseConfigTable({
             const core = {
                 // Core fields for enterprise configuration
                 enterprise: row.enterprise,
-                product: row.product,
-                services: row.services,
+                product: row.entity,
+                services: row.configuration,
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
                 // Enterprise configuration specific fields
                 enterprise: row.enterprise || '',
-                product: row.product || '',
-                services: row.services || '',
+                product: row.entity || '',
+                services: row.configuration || '',
             } as any;
             // Handle existing (non-temporary) rows
             // Check if we're on enterprise configuration page
@@ -3355,14 +3792,14 @@ export default function EnterpriseConfigTable({
 
     function updateRowField(
         rowId: string,
-        key: keyof EnterpriseConfigRow,
+        key: keyof GlobalSettingsRow,
         value: any,
     ) {
-        let changed: EnterpriseConfigRow | null = null;
+        let changed: GlobalSettingsRow | null = null;
         setLocalRows((prev) =>
             prev.map((r) => {
                 if (r.id !== rowId) return r;
-                const next = {...r, [key]: value} as EnterpriseConfigRow;
+                const next = {...r, [key]: value} as GlobalSettingsRow;
                 changed = next;
                 return next;
             }),
@@ -3380,19 +3817,20 @@ export default function EnterpriseConfigTable({
         }
     }
     const [groupBy, setGroupBy] = useState<
-        'none' | 'enterpriseName' | 'productName' | 'serviceName'
+        'none' | 'accountName' | 'enterpriseName' | 'entityName'
     >('none');
     // sync external groupBy
     React.useEffect(() => {
         if (groupByExternal) setGroupBy(groupByExternal);
     }, [groupByExternal]);
 
-    const columnOrder: EnterpriseConfigTableProps['visibleColumns'] = useMemo(
+    const columnOrder: GlobalSettingsTableV2Props['visibleColumns'] = useMemo(
         () => [
-            // Only the three required columns
+            // Global Settings columns
+            'account',
             'enterprise',
-            'product',
-            'services',
+            'entity',
+            'configuration',
         ],
         [],
     );
@@ -3405,12 +3843,15 @@ export default function EnterpriseConfigTable({
         return base.filter((c) => allowed.has(c));
     }, [visibleColumns, columnOrder]);
 
-    const colSizes = useMemo(() => ({
+    const colSizes: Record<string, string> = {
         deleteButton: '8px', // Space for delete button with proper padding
-        enterprise: '180px', // Reduced width to give more space for Services column
-        product: '200px', // Further reduced width for product names
-        services: 'minmax(600px, 1fr)', // Increased minimum width to 600px for more space
-    } as Record<string, string>), []);
+        account: '200px', // Width for account column
+        enterprise: '200px', // Width for enterprise column
+        entity: '180px', // Width for entity column
+        configuration: 'minmax(300px, 1fr)', // Configuration column gets remaining space
+        product: '200px', // Further reduced width for product names (legacy)
+        services: 'minmax(600px, 1fr)', // Increased minimum width to 600px for more space (legacy)
+    };
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -3428,9 +3869,12 @@ export default function EnterpriseConfigTable({
 
             // Define minimum and maximum widths per column
             const constraints = {
-                enterprise: {min: 140, max: 250}, // Increased min width to prevent arrow overlap
-                product: {min: 140, max: 280}, // Reduced max width to prevent overflow
-                services: {min: 400, max: Infinity}, // Increased minimum to ensure content visibility
+                account: {min: 150, max: 250},
+                enterprise: {min: 150, max: 250},
+                entity: {min: 140, max: 220},
+                configuration: {min: 300, max: Infinity}, // Gets remaining space
+                product: {min: 140, max: 280}, // Legacy
+                services: {min: 400, max: Infinity}, // Legacy
             };
 
             const columnConstraints = constraints[
@@ -3439,7 +3883,7 @@ export default function EnterpriseConfigTable({
 
             if (dynamicWidth && dynamicWidth > 0) {
                 // For Services column, use minmax to fill remaining space
-                if (c === 'services') {
+                if (c === 'configuration') {
                     return `minmax(${Math.max(
                         columnConstraints.min,
                         dynamicWidth,
@@ -3457,7 +3901,7 @@ export default function EnterpriseConfigTable({
             const defaultSize = colSizes[c];
             if (defaultSize) {
                 // For Services column, use flexible sizing to fill remaining space
-                if (c === 'services' && defaultSize === '1fr') {
+                if (c === 'configuration' && defaultSize === '1fr') {
                     return `minmax(${columnConstraints.min}px, 1fr)`;
                 }
                 const numericSize = parseInt(defaultSize.replace('px', ''));
@@ -3472,13 +3916,14 @@ export default function EnterpriseConfigTable({
             }
 
             // Final fallback - Services gets remaining space
-            if (c === 'services') {
+            if (c === 'configuration') {
                 return `minmax(${columnConstraints.min}px, 1fr)`;
             }
             return `${columnConstraints.min}px`;
         });
 
         const custom = customColumns.map(() => '110px');
+        // Actions column removed - configure icon is now in the configuration column
         const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
     }, [cols, customColumns, colWidths, colSizes]);
@@ -3708,8 +4153,8 @@ export default function EnterpriseConfigTable({
         | 'enterpriseName'
         | 'servicesSummary'
         | 'enterprise'
-        | 'product'
-        | 'services'
+        | 'entity'
+        | 'configuration'
         | null
     >(null);
     const [internalSortDir, setInternalSortDir] = useState<
@@ -3743,8 +4188,8 @@ export default function EnterpriseConfigTable({
             | 'enterpriseName'
             | 'servicesSummary'
             | 'enterprise'
-            | 'product'
-            | 'services',
+            | 'entity'
+            | 'configuration',
         direction?: 'asc' | 'desc',
     ) => {
         let nextDir: 'asc' | 'desc';
@@ -3823,27 +4268,38 @@ export default function EnterpriseConfigTable({
             return {'All Records': displayItems};
         }
 
-        const groups: Record<string, EnterpriseConfigRow[]> = {};
+        const groups: Record<string, GlobalSettingsRow[]> = {};
 
         displayItems.forEach((item) => {
             let groupKey = '';
 
-            switch (groupBy) {
+            // Cast to string to handle legacy group by values
+            const groupByValue = groupBy as string;
+
+            switch (groupByValue) {
+                case 'accountName':
+                    groupKey = item.account || '(No Account)';
+                    break;
                 case 'enterpriseName':
                     groupKey = item.enterprise || '(No Enterprise)';
                     break;
+                case 'entityName':
+                    groupKey = item.entity || '(No Entity)';
+                    break;
                 case 'productName':
-                    groupKey = item.product || '(No Product)';
+                    // Legacy support for enterprise config
+                    groupKey = (item as any).product || '(No Product)';
                     break;
                 case 'serviceName':
-                    // For services, we need to handle multiple services per row
-                    if (item.services) {
-                        const services = item.services
+                    // Legacy support for enterprise config - For services, we need to handle multiple services per row
+                    const itemAny = item as any;
+                    if (itemAny.services) {
+                        const services = itemAny.services
                             .split(',')
-                            .map((s) => s.trim())
+                            .map((s: any) => s.trim())
                             .filter(Boolean);
                         if (services.length > 0) {
-                            services.forEach((service) => {
+                            services.forEach((service: any) => {
                                 const serviceKey = service || '(No Service)';
                                 if (!groups[serviceKey]) {
                                     groups[serviceKey] = [];
@@ -3866,7 +4322,7 @@ export default function EnterpriseConfigTable({
         });
 
         // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-        const sortedGroups: Record<string, EnterpriseConfigRow[]> = {};
+        const sortedGroups: Record<string, GlobalSettingsRow[]> = {};
         const sortedKeys = Object.keys(groups).sort((a, b) => {
             const aIsEmpty = a.startsWith('(No ');
             const bIsEmpty = b.startsWith('(No ');
@@ -4159,14 +4615,28 @@ export default function EnterpriseConfigTable({
                     .bg-slate-50 {
                         overflow: hidden;
                     }
+
+                    /* Configure button hover behavior - show on desktop hover, always visible on mobile */
+                    @media (min-width: 768px) {
+                        .actions-cell button {
+                            opacity: 0;
+                            transition: opacity 0.15s ease-in-out;
+                        }
+
+                        .group:hover .actions-cell button {
+                            opacity: 1;
+                        }
+                    }
+
+                    /* On mobile, always show the configure button */
+                    @media (max-width: 767px) {
+                        .actions-cell button {
+                            opacity: 1;
+                        }
+                    }
                 `,
                 }}
             />
-            <div className='flex items-center justify-between mb-2'>
-                <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'Enterprise Configuration Details'}
-                </h3>
-            </div>
             {cols.length === 0 ? (
                 <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
                     <div className='flex flex-col items-center space-y-4'>
@@ -4246,9 +4716,10 @@ export default function EnterpriseConfigTable({
                     >
                         {(() => {
                             const defaultLabels: Record<string, string> = {
+                                account: 'Account',
                                 enterprise: 'Enterprise',
-                                product: 'Product',
-                                services: 'Services',
+                                entity: 'Entity',
+                                configuration: 'Configuration',
                             };
 
                             // Merge custom labels with defaults
@@ -4258,9 +4729,10 @@ export default function EnterpriseConfigTable({
                             };
 
                             const iconFor: Record<string, React.ReactNode> = {
+                                account: <User size={14} />,
                                 enterprise: <Building2 size={14} />,
-                                product: <Package size={14} />,
-                                services: <Globe size={14} />,
+                                entity: <Package size={14} />,
+                                configuration: <Settings size={14} />,
                             };
                             return (
                                 <div
@@ -4300,15 +4772,15 @@ export default function EnterpriseConfigTable({
                                                         ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                         : ''
                                                 } ${
-                                                    c === 'services'
+                                                    c === 'configuration'
                                                         ? 'border-r-0'
-                                                        : 'border-r border-slate-200' // Remove right border for Services column
+                                                        : 'border-r border-slate-200' // Remove right border for Configuration column
                                                 }`}
                                                 style={
-                                                    c === 'services'
-                                                        ? {minWidth: '600px'}
+                                                    c === 'configuration'
+                                                        ? {minWidth: '300px'}
                                                         : undefined
-                                                } // Match Services column minimum width
+                                                } // Match Configuration column minimum width
                                             >
                                                 <div className='flex items-center gap-2'>
                                                     {iconFor[c] && iconFor[c]}
@@ -4321,12 +4793,13 @@ export default function EnterpriseConfigTable({
                                                     'email',
                                                     'enterpriseName',
                                                     'enterprise',
-                                                    'product',
-                                                    'services',
+                                                    'entity',
+                                                    'configuration',
                                                 ].includes(c) && (
                                                     <div
                                                         className={`inline-flex items-center ml-4 ${
-                                                            c === 'services'
+                                                            c ===
+                                                            'configuration'
                                                                 ? ''
                                                                 : 'absolute right-8 top-1/2 -translate-y-1/2'
                                                         }`}
@@ -4385,10 +4858,11 @@ export default function EnterpriseConfigTable({
                                                         </button>
                                                     </div>
                                                 )}
-                                                {/* Show resize handle for resizable columns but not for Services (last column) */}
+                                                {/* Show resize handle for resizable columns but not for Configuration (last column) */}
                                                 {[
+                                                    'account',
                                                     'enterprise',
-                                                    'product',
+                                                    'entity',
                                                 ].includes(c) && (
                                                     <div
                                                         onMouseDown={(e: any) =>
@@ -4427,7 +4901,7 @@ export default function EnterpriseConfigTable({
                             <div className='mt-2'>
                                 {displayItems.map((r, idx) => (
                                     <div key={r.id}>
-                                        <SortableEnterpriseConfigRow
+                                        <SortableGlobalSettingsRow
                                             row={r}
                                             index={idx}
                                             cols={cols}
@@ -4443,6 +4917,9 @@ export default function EnterpriseConfigTable({
                                             hideRowExpansion={hideRowExpansion}
                                             enableDropdownChips={
                                                 enableDropdownChips
+                                            }
+                                            enableInlineEditing={
+                                                enableInlineEditing
                                             }
                                             onDropdownOptionUpdate={
                                                 onDropdownOptionUpdate
@@ -4548,7 +5025,7 @@ export default function EnterpriseConfigTable({
                                             <div className='border-b border-slate-200 overflow-hidden'>
                                                 {groupRows.map((r, idx) => (
                                                     <div key={r.id}>
-                                                        <SortableEnterpriseConfigRow
+                                                        <SortableGlobalSettingsRow
                                                             row={r}
                                                             index={idx}
                                                             cols={cols}
@@ -4578,6 +5055,9 @@ export default function EnterpriseConfigTable({
                                                             }
                                                             enableDropdownChips={
                                                                 enableDropdownChips
+                                                            }
+                                                            enableInlineEditing={
+                                                                enableInlineEditing
                                                             }
                                                             onDropdownOptionUpdate={
                                                                 onDropdownOptionUpdate

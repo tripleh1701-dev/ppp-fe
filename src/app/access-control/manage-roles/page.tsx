@@ -223,6 +223,19 @@ export default function ManageRoles() {
     const loadRolesRequestId = useRef(0);
 
     // Load initial data
+    // Debug: Log whenever tableData changes
+    useEffect(() => {
+        console.log('🔄 tableData STATE CHANGED:', {
+            count: tableData.length,
+            data: tableData,
+            hasData: tableData.length > 0,
+        });
+    }, [tableData]);
+
+    // Note: We don't load on initial mount anymore
+    // Instead, we rely on the account-change useEffect below
+    // This ensures selectedAccount is properly loaded before calling the API
+
     // Load roles data from API
     const loadRoles = useCallback(async () => {
         setLoading(true);
@@ -242,18 +255,48 @@ export default function ManageRoles() {
 
             // Build URL with account parameters
             const params = new URLSearchParams();
-            if (selectedAccount.isSystiva) {
-                // For Systiva, pass null/empty to fetch from Systiva table
-                params.append('accountId', '');
-                params.append('accountName', '');
-            } else {
-                // For specific accounts, pass the account ID and name
-                params.append('accountId', selectedAccount.id || '');
-                params.append('accountName', selectedAccount.name || '');
-            }
 
-            const url = `${apiBase}/api/roles?${params.toString()}`;
+            console.log('🔍 DEBUG - Account context check:', {
+                isSystiva: selectedAccount.isSystiva,
+                hasId: !!selectedAccount.id,
+                hasName: !!selectedAccount.name,
+                id: selectedAccount.id,
+                name: selectedAccount.name,
+                willAddParams:
+                    !selectedAccount.isSystiva &&
+                    selectedAccount.id &&
+                    selectedAccount.name,
+            });
+
+            if (
+                !selectedAccount.isSystiva &&
+                selectedAccount.id &&
+                selectedAccount.name
+            ) {
+                // For specific accounts, pass the account ID and name
+                params.append('accountId', selectedAccount.id);
+                params.append('accountName', selectedAccount.name);
+                console.log('✅ Added account params to URL:', {
+                    accountId: selectedAccount.id,
+                    accountName: selectedAccount.name,
+                });
+            } else {
+                console.log('⚠️  NOT adding account params because:', {
+                    isSystiva: selectedAccount.isSystiva,
+                    hasId: !!selectedAccount.id,
+                    hasName: !!selectedAccount.name,
+                });
+            }
+            // For Systiva, don't add any params - backend will default to Systiva
+
+            const url = `${apiBase}/api/user-management/roles${
+                params.toString() ? `?${params.toString()}` : ''
+            }`;
             console.log('🌐 Fetching roles from:', url);
+            console.log(
+                '🌐 Query params string:',
+                params.toString() || '(empty)',
+            );
 
             // Fetch roles from the backend API
             const response = await fetch(url);
@@ -262,6 +305,14 @@ export default function ManageRoles() {
             }
 
             const rolesData = await response.json();
+
+            console.log('📦 RAW API Response:', {
+                requestId: currentRequestId,
+                type: typeof rolesData,
+                isArray: Array.isArray(rolesData),
+                length: rolesData?.length,
+                data: rolesData,
+            });
 
             // Check if this is still the latest request
             if (currentRequestId !== loadRolesRequestId.current) {
@@ -281,9 +332,13 @@ export default function ManageRoles() {
             console.log('🚀 Fetching groups to determine role assignments...');
             let allGroups: any[] = [];
             try {
-                const groupsResponse = await fetch(
-                    `${apiBase}/api/user-management/groups`,
-                );
+                // Build groups URL with same account context
+                const groupsUrl = `${apiBase}/api/user-management/groups${
+                    params.toString() ? `?${params.toString()}` : ''
+                }`;
+                console.log('🌐 Fetching groups from:', groupsUrl);
+
+                const groupsResponse = await fetch(groupsUrl);
                 if (groupsResponse.ok) {
                     allGroups = await groupsResponse.json();
                     console.log('📊 Groups fetched:', allGroups);
@@ -339,10 +394,17 @@ export default function ManageRoles() {
                 };
             });
 
-            console.log('✅ Transformed roles data:', transformedRoles);
+            console.log('✅ Transformed roles data:', {
+                count: transformedRoles.length,
+                roles: transformedRoles,
+            });
+
+            console.log('⚡ About to setTableData with:', transformedRoles);
 
             // Set only the API data
             setTableData(transformedRoles);
+
+            console.log('✅ setTableData called successfully');
         } catch (error) {
             console.error('❌ Error loading roles:', error);
             // Set empty array if API fails
@@ -458,9 +520,17 @@ export default function ManageRoles() {
                 name: role.roleName,
                 description: role.description,
                 permissions: role.permissions || [],
+                // Include account context so backend knows which account to save to
+                selectedAccountId: selectedAccount.id,
+                selectedAccountName: selectedAccount.name,
             };
 
             console.log('📤 Sending request body:', requestBody);
+            console.log('📤 With account context:', {
+                selectedAccountId: selectedAccount.id,
+                selectedAccountName: selectedAccount.name,
+                isSystiva: selectedAccount.isSystiva,
+            });
 
             const apiBase =
                 process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
@@ -501,13 +571,17 @@ export default function ManageRoles() {
                 console.warn(
                     '⚠️ Role not found in database, creating it instead...',
                 );
+                console.log('📤 Creating with account context:', {
+                    selectedAccountId: selectedAccount.id,
+                    selectedAccountName: selectedAccount.name,
+                });
 
                 const createResponse = await fetch(
                     `${apiBase}/api/user-management/roles`,
                     {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(requestBody),
+                        body: JSON.stringify(requestBody), // requestBody already has account context
                     },
                 );
 

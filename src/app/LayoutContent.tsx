@@ -64,6 +64,39 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
         }
     }, [isMobile, sidebarCollapsed]);
 
+    // Listen for custom events to control sidebar state
+    useEffect(() => {
+        const handleCollapseSidebar = () => {
+            setSidebarCollapsed(true);
+        };
+
+        const handleExpandSidebar = () => {
+            // Only expand if not on mobile
+            if (!isMobile) {
+                setSidebarCollapsed(false);
+            }
+        };
+
+        window.addEventListener('collapseSidebar', handleCollapseSidebar);
+        window.addEventListener('expandSidebar', handleExpandSidebar);
+
+        return () => {
+            window.removeEventListener(
+                'collapseSidebar',
+                handleCollapseSidebar,
+            );
+            window.removeEventListener('expandSidebar', handleExpandSidebar);
+        };
+    }, [isMobile]);
+
+    // Check if we're on a standalone page (like login) that shouldn't have the layout
+    const isStandalonePage = pathname === '/login';
+
+    // If it's a standalone page, just render the children without any layout
+    if (isStandalonePage) {
+        return <>{children}</>;
+    }
+
     return (
         <div className='h-screen flex bg-secondary relative'>
             {/* Navigation Sidebar - Flush with left edge */}

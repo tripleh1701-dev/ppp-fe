@@ -3264,4 +3264,139 @@ html body .manage-users-table textarea:focus {
 .manage-users-table .task-row,
 .manage-users-table .table-header {
     overflow: visible !important;
+/* ===== PIPELINE DROPDOWN BLUE THEME ===== */
+/* Subtle blue theme styling for pipeline dropdown selector */
+
+/* Ensure dropdowns appear above table content with proper z-index */
+.entity-dropdown,
+.pipeline-dropdown-blue {
+    position: relative;
+    z-index: 10;
+}
+
+/* Make dropdown chips clickable with pointer cursor */
+.entity-dropdown > div > span,
+.pipeline-dropdown-blue > div > span {
+    cursor: pointer !important;
+}
+
+/* Style the selected value chip to indicate it's interactive */
+.entity-dropdown span[title*='Double-click'],
+.pipeline-dropdown-blue span[title*='Double-click'] {
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.entity-dropdown span[title*='Double-click']:hover,
+.pipeline-dropdown-blue span[title*='Double-click']:hover {
+    background-color: #f8fafc !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1) !important;
+}
+
+/* Pipeline dropdown button with subtle blue */
+.pipeline-dropdown-blue button,
+.pipeline-dropdown-blue > button {
+    background-color: #eff6ff !important; /* Very light blue background */
+    border: 1px solid #bfdbfe !important; /* Soft blue border */
+    color: #1e40af !important; /* Deep blue text */
+    transition: all 0.2s ease !important;
+}
+
+.pipeline-dropdown-blue button:hover,
+.pipeline-dropdown-blue > button:hover {
+    background-color: #dbeafe !important; /* Slightly deeper blue on hover */
+    border-color: #93c5fd !important; /* Brighter blue border */
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+}
+
+.pipeline-dropdown-blue button:focus,
+.pipeline-dropdown-blue > button:focus {
+    background-color: #dbeafe !important;
+    border-color: #60a5fa !important; /* Even brighter focus border */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    outline: none !important;
+}
+
+/* Pipeline dropdown menu */
+.pipeline-dropdown-blue [role='menu'],
+.pipeline-dropdown-blue .dropdown-menu {
+    background-color: #ffffff !important;
+    border: 1px solid #bfdbfe !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12) !important;
+    border-radius: 6px !important;
+}
+
+/* Pipeline dropdown menu items */
+.pipeline-dropdown-blue [role='menuitem'],
+.pipeline-dropdown-blue .dropdown-item {
+    color: #1e3a8a !important;
+    transition: all 0.15s ease !important;
+}
+
+.pipeline-dropdown-blue [role='menuitem']:hover,
+.pipeline-dropdown-blue .dropdown-item:hover {
+    background-color: #eff6ff !important; /* Light blue hover */
+    color: #1e40af !important;
+}
+
+.pipeline-dropdown-blue [role='menuitem']:focus,
+.pipeline-dropdown-blue .dropdown-item:focus {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    outline: none !important;
+}
+
+/* Selected pipeline item styling */
+.pipeline-dropdown-blue .selected,
+.pipeline-dropdown-blue [aria-selected='true'] {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    font-weight: 600 !important;
+}
+
+/* Pipeline chip/tag styling with blue theme */
+.pipeline-dropdown-blue .chip,
+.pipeline-dropdown-blue .tag {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    border: 1px solid #93c5fd !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+}
+
+/* Pipeline dropdown icon color */
+.pipeline-dropdown-blue svg,
+.pipeline-dropdown-blue .icon {
+    color: #3b82f6 !important; /* Blue icon */
+}
+
+/* Pipeline dropdown placeholder */
+.pipeline-dropdown-blue input::placeholder,
+.pipeline-dropdown-blue [placeholder] {
+    color: #60a5fa !important;
+    font-style: italic !important;
+}
+
+/* Loading state for pipeline dropdown */
+.pipeline-dropdown-blue .loading {
+    color: #3b82f6 !important;
+}
+
+/* Empty state */
+.pipeline-dropdown-blue .empty-state {
+    color: #60a5fa !important;
+    font-style: italic !important;
+}
+
+/* ===== STATUS TOGGLE ANIMATIONS ===== */
+/* Shimmer animation for status toggle hover effect */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
 }

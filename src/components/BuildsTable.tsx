@@ -55,18 +55,17 @@ import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
 import DateChipSelect from './DateChipSelect';
-import ContactModal from './ContactModal';
 
-// Utility function to generate consistent colors for account data across the application
-const getAccountColor = (accountName: string) => {
-    const key = accountName.toLowerCase();
+// Utility function to generate consistent colors for build data across the application
+const getBuildColor = (buildName: string) => {
+    const key = buildName.toLowerCase();
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
 
-    // Blueish account color palette - consistent across all components
-    const accountColors = [
+    // Blueish build color palette - consistent across all components
+    const buildColors = [
         {
             bg: 'bg-blue-50',
             text: 'text-blue-800',
@@ -99,7 +98,7 @@ const getAccountColor = (accountName: string) => {
         },
     ];
 
-    return accountColors[hash % accountColors.length];
+    return buildColors[hash % buildColors.length];
 };
 
 // Simple dropdown component for predefined values (like cloudType)
@@ -235,12 +234,6 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                         e.preventDefault();
                         setIsOpen(false);
                         setHighlightedIndex(-1);
-                    } else if (e.key === 'P' || e.key === 'p') {
-                        e.preventDefault();
-                        if (!isOpen) {
-                            setIsOpen(true);
-                            setHighlightedIndex(-1);
-                        }
                     }
                 }}
                 className={`w-full text-left px-2 py-1 text-[11px] leading-[14px] rounded border ${
@@ -430,14 +423,16 @@ const ChipDropdown = ({
             </div>
 
             {isOpen && (
-                <div className='absolute w-full mt-1 bg-gray-50 border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto before:content-[""] before:absolute before:-top-2 before:left-4 before:w-0 before:h-0 before:border-l-[8px] before:border-l-transparent before:border-r-[8px] before:border-r-transparent before:border-b-[8px] before:border-b-gray-50 after:content-[""] after:absolute after:-top-[10px] after:left-[14px] after:w-0 after:h-0 after:border-l-[10px] after:border-l-transparent after:border-r-[10px] after:border-r-transparent after:border-b-[10px] after:border-b-gray-200'>
-                    <div className='p-3 border-b border-gray-200 bg-gray-50'>
+                <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
+                    <div className='p-2 border-b'>
                         <input
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                            className='w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white'
+                            onChange={(
+                                e: React.ChangeEvent<HTMLInputElement>,
+                            ) => setSearchTerm(e.target.value)}
+                            className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
                             autoFocus
                         />
                     </div>
@@ -458,10 +453,10 @@ const ChipDropdown = ({
                                             }
                                         }
                                     }}
-                                    className={`p-3 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between transition-colors duration-150 ${
+                                    className={`p-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
                                         isSelected
-                                            ? 'bg-blue-100 text-blue-700 font-medium'
-                                            : 'text-gray-700'
+                                            ? 'bg-blue-50 text-blue-600'
+                                            : ''
                                     }`}
                                 >
                                     <span>{option.name}</span>
@@ -473,7 +468,7 @@ const ChipDropdown = ({
                         })}
 
                         {filteredOptions.length === 0 && searchTerm && (
-                            <div className='p-3 text-sm text-gray-500 text-center italic'>
+                            <div className='p-2 text-sm text-gray-500'>
                                 No options found
                             </div>
                         )}
@@ -484,44 +479,27 @@ const ChipDropdown = ({
     );
 };
 
-export interface AccountRow {
+export interface BuildRow {
     id: string;
-    // New simplified fields - primary data model
-    accountName: string;
-    masterAccount: string;
-    cloudType: string;
-    address: string;
-    email?: string;
-    phone?: string;
-    addresses?: any[]; // Array of address objects from DynamoDB
-    addressData?: any; // Structured address data for modal
-    technicalUsers?: any[]; // Add technical users field
-    // Add licenses array for expandable sub-rows
-    licenses?: License[];
+    // Build-specific fields
+    buildName: string;
+    description: string;
+    entity: string;
+    pipeline: string;
+    status: string;
+    artifact: string;
+    build: string;
+    // Add stages array for expandable sub-rows
+    stages?: BuildStage[];
+    isTemporary?: boolean;
 }
 
-// License interface for sub-rows
-interface Contact {
+// BuildStage interface for sub-rows (deployment stages)
+export interface BuildStage {
     id: string;
     name: string;
-    email: string;
-    phone: string;
-    department: string;
-    designation: string;
-    company: string;
-}
-
-export interface License {
-    id: string;
-    enterprise: string;
-    product: string;
-    service: string;
-    licenseStartDate: string;
-    licenseEndDate: string;
-    numberOfUsers: string;
-    contactDetails: Contact;
-    renewalNotice: boolean;
-    noticePeriodDays?: string;
+    status: string;
+    deployedAt: string;
 }
 
 function InlineEditableText({
@@ -669,7 +647,12 @@ function InlineEditableText({
     );
 }
 
-type CatalogType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'template' | 'enterprise' | 'product' | 'service';
+type CatalogType =
+    | 'buildName'
+    | 'description'
+    | 'entity'
+    | 'pipeline'
+    | 'template';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -942,23 +925,23 @@ function PhoneMultiSelect({
     isError = false,
     onDropdownOptionUpdate,
     onNewItemCreated,
-    accounts = [],
+    builds = [],
 }: {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         item: {id: string; name: string},
     ) => void;
-    accounts?: AccountRow[];
+    builds?: BuildRow[];
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -979,14 +962,14 @@ function PhoneMultiSelect({
     // Helper function to check if a phone number is in use
     const isPhoneInUse = React.useCallback(
         (phoneNumber: string): boolean => {
-            if (!accounts || accounts.length === 0) return false;
+            if (!builds || builds.length === 0) return false;
 
-            return accounts.some((account) => {
+            return builds.some((build) => {
                 // Since phone is no longer used, always return false
                 return false;
             });
         },
-        [accounts],
+        [builds],
     );
 
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -1259,9 +1242,10 @@ function PhoneMultiSelect({
                 }
 
                 // Notify parent component about the new item
-                if (onNewItemCreated) {
-                    onNewItemCreated('phones', created);
-                }
+                // Note: PhoneMultiSelect not used in builds - keeping for reference
+                // if (onNewItemCreated) {
+                //     onNewItemCreated('phones', created);
+                // }
             }
         } catch (error: any) {
             // Handle duplicate error from backend
@@ -1345,7 +1329,7 @@ function PhoneMultiSelect({
                     .slice(0, visibleCount)
                     .map((service: string, index: number) => {
                         // Use consistent color function
-                        const colorTheme = getAccountColor(service);
+                        const colorTheme = getBuildColor(service);
 
                         return (
                             <motion.span
@@ -1397,8 +1381,10 @@ function PhoneMultiSelect({
                             moreServicesPos &&
                             createPortal(
                                 <div
-                                    className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
-                                    onMouseDown={(e: any) => e.stopPropagation()}
+                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) =>
+                                        e.stopPropagation()
+                                    }
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
                                         position: 'fixed',
@@ -1429,7 +1415,7 @@ function PhoneMultiSelect({
                                                 .slice(visibleCount)
                                                 .map((phone, idx) => {
                                                     const colorTheme =
-                                                        getAccountColor(phone);
+                                                        getBuildColor(phone);
                                                     return (
                                                         <div
                                                             key={`additional-${idx}`}
@@ -1585,10 +1571,10 @@ function PhoneMultiSelect({
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
-                                                onNewItemCreated(
-                                                    'phones',
-                                                    created,
-                                                );
+                                                // onNewItemCreated(
+                                                // 'phones',
+                                                // created,
+                                                // );
                                             }
                                         }
                                     } catch (error: any) {
@@ -1700,7 +1686,7 @@ function PhoneMultiSelect({
                 createPortal(
                     <div
                         ref={dropdownRef}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
                         onMouseDown={(e: any) => e.stopPropagation()}
                         onClick={(e: any) => e.stopPropagation()}
                         style={{
@@ -1889,12 +1875,12 @@ function PhoneMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
-                                                            await onDropdownOptionUpdate(
-                                                                'phones',
-                                                                'update',
-                                                                opt.name,
-                                                                newName,
-                                                            );
+                                                            // await onDropdownOptionUpdate(
+                                                            //     'phones',
+                                                            //     'update',
+                                                            //     opt.name,
+                                                            //     newName,
+                                                            // );
                                                         }
                                                     } catch (error) {
                                                         console.error(
@@ -1944,11 +1930,11 @@ function PhoneMultiSelect({
                                                         if (
                                                             onDropdownOptionUpdate
                                                         ) {
-                                                            await onDropdownOptionUpdate(
-                                                                'phones',
-                                                                'delete',
-                                                                opt.name,
-                                                            );
+                                                            // await onDropdownOptionUpdate(
+                                                            //     'phones',
+                                                            //     'delete',
+                                                            //     opt.name,
+                                                            // );
                                                         }
                                                     } catch (error) {
                                                         console.error(
@@ -2228,14 +2214,13 @@ function AsyncChipSelect({
     compact,
     onDropdownOptionUpdate,
     onNewItemCreated,
-    accounts = [],
+    builds = [],
     currentRowId,
     currentRowEnterprise,
     currentRowProduct,
     dropdownOptions,
     onTabNext,
     onTabPrev,
-    selectedEnterpriseName = '',
 }: {
     type: CatalogType;
     value?: string;
@@ -2244,39 +2229,26 @@ function AsyncChipSelect({
     isError?: boolean;
     compact?: boolean;
     onDropdownOptionUpdate?: (
-        type:
-            | 'accountNames'
-            | 'masterAccounts'
-            | 'cloudTypes'
-            | 'addresses'
-            | 'emails'
-            | 'phones',
+        type: 'buildNames' | 'descriptions' | 'entities' | 'pipelines',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type:
-            | 'accountNames'
-            | 'masterAccounts'
-            | 'cloudTypes'
-            | 'addresses'
-            | 'emails'
-            | 'phones',
+        type: 'buildNames' | 'descriptions' | 'entities' | 'pipelines',
         item: {id: string; name: string},
     ) => void;
-    accounts?: AccountRow[];
+    builds?: BuildRow[];
     currentRowId?: string;
     currentRowEnterprise?: string;
     currentRowProduct?: string;
     dropdownOptions?: {
-        accountNames: Array<{id: string; name: string}>;
-        cloudTypes: Array<{id: string; name: string}>;
-        addresses: Array<{id: string; name: string}>;
+        buildNames: Array<{id: string; name: string}>;
+        entities: Array<{id: string; name: string}>;
+        pipelines: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
-    selectedEnterpriseName?: string;
 }) {
     const [open, setOpen] = React.useState(false);
     const [current, setCurrent] = React.useState<string | undefined>(value);
@@ -2292,34 +2264,28 @@ function AsyncChipSelect({
     const [showAdder, setShowAdder] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement>(null);
 
-    // Check if this is a static enterprise field (should use the selected enterprise from top-right)
-    const isStaticEnterprise = type === 'enterprise' && selectedEnterpriseName;
-    const displayValue = isStaticEnterprise ? selectedEnterpriseName : (current || value);
-    
-    console.log(`🏢 AsyncChipSelect: type=${type}, selectedEnterpriseName=${selectedEnterpriseName}, isStaticEnterprise=${isStaticEnterprise}`);
-
     // Helper function to check if an option is in use (with composite key constraint)
     const isOptionInUse = React.useCallback(
         (optionName: string): boolean => {
-            if (!accounts || accounts.length === 0) return false;
+            if (!builds || builds.length === 0) return false;
 
-            return accounts.some((account) => {
+            return builds.some((build) => {
                 // Skip the current row being edited
-                if (currentRowId && account.id === currentRowId) {
+                if (currentRowId && build.id === currentRowId) {
                     return false;
                 }
 
-                if (type === 'accountName') {
-                    // Never filter account names - show all options
+                if (type === 'buildName') {
+                    // Never filter build names - show all options
                     return false;
-                } else if (type === 'address') {
-                    // For addresses, show all options (no filtering needed)
+                } else if (type === 'pipeline') {
+                    // For pipelines, show all options (no filtering needed)
                     return false;
                 }
                 return false;
             });
         },
-        [accounts, type, currentRowId],
+        [builds, type, currentRowId, currentRowEnterprise],
     );
 
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -2339,24 +2305,92 @@ function AsyncChipSelect({
         if (!containerRef.current) return;
 
         const containerRect = containerRef.current.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        
-        // Always position below the field
-        setDropdownPosition('below');
-        
-        // Calculate width to match container
-        const width = Math.max(140, Math.min(200, containerRect.width));
-        
-        // Position directly below the field
-        let top = containerRect.bottom + 2;
-        const left = containerRect.left;
-        
-        // Ensure dropdown stays within viewport
         const viewportHeight = window.innerHeight;
-        top = Math.min(top, viewportHeight - 200); // Leave space for dropdown
-        
-        setDropdownPortalPos({ top, left, width });
-        console.log('📍 Dropdown position calculated:', { top, left, width, position: 'below' });
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer =
+            containerRef.current.closest('.compact-table') ||
+            containerRef.current.closest('[role="table"]') ||
+            containerRef.current.closest('.rounded-xl') ||
+            containerRef.current.closest('.overflow-auto') ||
+            containerRef.current.closest('.w-full.compact-table') ||
+            document.querySelector('.compact-table') ||
+            document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(
+            120,
+            tableRect.width - 64,
+            viewportWidth - 64,
+        ); // Reduced to match dropdown width
+        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
+
+        // Ensure dropdown stays within table container horizontally with more padding
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(
+            tableRect.right - width - 32,
+            viewportWidth - width - 32,
+        ); // More padding
+        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+
+        // Prefer below if there's enough space, otherwise use above if there's more space above
+        // For entity and pipeline, always prefer below unless there's really no space
+        let top;
+        const forceBelow = type === 'entity' || type === 'pipeline';
+
+        if (forceBelow && spaceBelow >= 100) {
+            // For entity and pipeline, show below if there's at least 100px space
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+        } else if (
+            spaceBelow >= dropdownHeight ||
+            (spaceBelow >= spaceAbove && spaceBelow >= 150)
+        ) {
+            setDropdownPosition('below');
+            top = containerRect.bottom + 4;
+            // For entity/pipeline, don't reposition above even if it goes below table bounds
+            if (!forceBelow && top + dropdownHeight > tableRect.bottom) {
+                top = Math.max(
+                    tableRect.top + 10,
+                    containerRect.top - dropdownHeight - 4,
+                );
+                setDropdownPosition('above');
+            }
+        } else {
+            // Only use above positioning if not entity/pipeline
+            if (forceBelow) {
+                setDropdownPosition('below');
+                top = containerRect.bottom + 4;
+            } else {
+                setDropdownPosition('above');
+                top = Math.max(
+                    tableRect.top + 10,
+                    containerRect.top - dropdownHeight - 4,
+                );
+            }
+        }
+
+        // Final constraint to ensure dropdown is within viewport
+        // For entity/pipeline, prioritize below positioning
+        if (!forceBelow) {
+            top = Math.max(top, tableRect.top + 10);
+            top = Math.min(top, tableRect.bottom - 100);
+        }
+
+        setDropdownPortalPos({top, left, width});
+        console.log('📍 Dropdown position calculated:', {
+            top,
+            left,
+            width,
+            position: spaceBelow >= dropdownHeight ? 'below' : 'above',
+            tableRect,
+        });
     }, [type]);
 
     // Calculate position when dropdown opens
@@ -2380,80 +2414,66 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
 
-            console.log(`Loading options for type: ${type}`);
+            console.log(`🔄 Loading options for type: ${type}`);
+            console.log('📦 Available dropdownOptions:', dropdownOptions);
 
             // Use dropdownOptions if available for accountName
-            if (type === 'accountName' && dropdownOptions?.accountNames) {
-                allData = dropdownOptions.accountNames;
+            if (type === 'buildName' && dropdownOptions?.buildNames) {
+                allData = dropdownOptions.buildNames;
                 console.log(
-                    `Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                    `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
                     allData,
                 );
-            } else if (type === 'address' && dropdownOptions?.addresses) {
-                allData = dropdownOptions.addresses;
-                console.log(`Using dropdownOptions for ${type}, got ${allData.length} items:`, allData);
-            } else if (type === 'template' && dropdownOptions?.accountNames) {
-                // For template type, use the provided accountNames dropdown options (which contain enterprises, products, or services)
-                allData = dropdownOptions.accountNames;
-                console.log(`Using dropdownOptions for template type, got ${allData.length} items:`, allData);
-            } else if (type === 'cloudType') {
+            } else if (type === 'pipeline' && dropdownOptions?.pipelines) {
+                allData = dropdownOptions.pipelines;
+                console.log(
+                    `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                    allData,
+                );
+            } else if (type === 'entity') {
                 // Always use predefined cloudType options (prioritize dropdownOptions)
                 if (
-                    dropdownOptions?.cloudTypes &&
-                    dropdownOptions.cloudTypes.length > 0
+                    dropdownOptions?.entities &&
+                    dropdownOptions.entities.length > 0
                 ) {
-                    allData = dropdownOptions.cloudTypes;
+                    allData = dropdownOptions.entities;
                     console.log(
-                        `Using dropdownOptions for ${type}, got ${allData.length} items:`,
+                        `✅ Using dropdownOptions for ${type}, got ${allData.length} items:`,
                         allData,
                     );
                 } else {
-                    console.log('Using fallback predefined cloudType options');
+                    console.warn(
+                        `⚠️ No entities in dropdownOptions, using fallback. dropdownOptions?.entities:`,
+                        dropdownOptions?.entities,
+                    );
                     allData = [
                         {id: 'private-cloud', name: 'Private Cloud'},
                         {id: 'public-cloud', name: 'Public Cloud'},
                     ];
                 }
-            } else if (type === 'masterAccount') {
-                console.log('Calling API: /api/masterAccounts');
+            } else if (type === 'description') {
+                console.log('Calling API: /api/descriptions');
                 allData =
                     (await api.get<Array<{id: string; name: string}>>(
-                        '/api/masterAccounts',
+                        '/api/descriptions',
                     )) || [];
-            } else if (type === 'address') {
-                console.log('Calling API: /api/addresses');
+            } else if (type === 'pipeline') {
+                console.log('Calling API: /api/pipelines');
                 allData =
                     (await api.get<Array<{id: string; name: string}>>(
-                        '/api/addresses',
+                        '/api/pipelines',
                     )) || [];
             } else if (type === 'template') {
                 console.log('Calling API: /api/templates');
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/templates',
-                ) || [];
-            } else if (type === 'enterprise') {
-                console.log('🏢 Calling API: /api/enterprises');
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/enterprises',
-                ) || [];
-                console.log('🏢 Enterprise API response:', allData);
-            } else if (type === 'product') {
-                console.log('📦 Calling API: /api/products');
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/products',
-                ) || [];
-                console.log('📦 Product API response:', allData);
-            } else if (type === 'service') {
-                console.log('⚙️ Calling API: /api/services');
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/services',
-                ) || [];
-                console.log('⚙️ Service API response:', allData);
-            } else {
-                console.log('Calling API: /api/accountNames');
                 allData =
                     (await api.get<Array<{id: string; name: string}>>(
-                        '/api/accountNames',
+                        '/api/templates',
+                    )) || [];
+            } else {
+                console.log('Calling API: /api/buildNames');
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
+                        '/api/buildNames',
                     )) || [];
             }
 
@@ -2499,7 +2519,7 @@ function AsyncChipSelect({
 
         // Apply usage filter - no filtering needed for accountName or address
         setOptions(filtered);
-    }, [allOptions, query]);
+    }, [allOptions, query, type, isOptionInUse]);
 
     // Filter options when query or allOptions change
     React.useEffect(() => {
@@ -2508,22 +2528,20 @@ function AsyncChipSelect({
 
     // Load options when dropdown opens
     React.useEffect(() => {
-        console.log(`🔍 AsyncChipSelect useEffect: type=${type}, open=${open}, allOptions.length=${allOptions.length}`);
         if (open && allOptions.length === 0) {
-            console.log(`📞 Triggering loadAllOptions for type: ${type}`);
             loadAllOptions();
         }
     }, [open, allOptions.length, loadAllOptions]);
 
-    // Load cloudType options immediately on mount since they're predefined
+    // Load entity/pipeline options immediately on mount and reload when dropdownOptions change
     React.useEffect(() => {
-        if (type === 'cloudType' && allOptions.length === 0) {
+        if (type === 'entity' || type === 'pipeline') {
             loadAllOptions();
         }
-    }, [type, allOptions.length, loadAllOptions]);
+    }, [type, loadAllOptions, dropdownOptions]);
 
     // Remove unused effect for email filtering
-    // React.useEffect was here for email/account filtering - no longer needed
+    // React.useEffect was here for email/build filtering - no longer needed
 
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
@@ -2561,20 +2579,20 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'masterAccount') {
+            if (type === 'description') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/masterAccounts',
+                    '/api/descriptions',
                     {name},
                 );
-            } else if (type === 'cloudType') {
-                // Cloud Type has predefined options, don't create new ones
+            } else if (type === 'entity') {
+                // Entity has predefined options, don't create new ones
                 console.log(
                     'Cannot create new cloudType options - using predefined values only',
                 );
                 return;
-            } else if (type === 'address') {
+            } else if (type === 'pipeline') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/addresses',
+                    '/api/pipelines',
                     {name},
                 );
             } else if (type === 'template') {
@@ -2584,7 +2602,7 @@ function AsyncChipSelect({
                 );
             } else {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/accountNames',
+                    '/api/buildNames',
                     {name},
                 );
             }
@@ -2610,14 +2628,14 @@ function AsyncChipSelect({
                     let dropdownType: string;
 
                     switch (type) {
-                        case 'accountName':
-                            dropdownType = 'accountNames';
+                        case 'buildName':
+                            dropdownType = 'buildNames';
                             break;
-                        case 'masterAccount':
-                            dropdownType = 'masterAccounts';
+                        case 'description':
+                            dropdownType = 'descriptions';
                             break;
-                        case 'address':
-                            dropdownType = 'addresses';
+                        case 'pipeline':
+                            dropdownType = 'pipelines';
                             break;
                         default:
                             dropdownType = 'emails'; // fallback
@@ -2626,9 +2644,9 @@ function AsyncChipSelect({
 
                     // Only call if this is a supported type for the callback
                     if (
-                        type === 'accountName' ||
-                        type === 'masterAccount' ||
-                        type === 'address'
+                        type === 'buildName' ||
+                        type === 'description' ||
+                        type === 'pipeline'
                     ) {
                         onNewItemCreated(dropdownType as any, created);
                     }
@@ -2658,20 +2676,12 @@ function AsyncChipSelect({
     };
 
     React.useEffect(() => {
-        if (isStaticEnterprise) {
-            // For static enterprise fields, use the selected enterprise and update parent
-            setCurrent(selectedEnterpriseName);
-            if (selectedEnterpriseName && selectedEnterpriseName !== value) {
-                onChange(selectedEnterpriseName);
-            }
-        } else {
-            setCurrent(value);
-        }
-    }, [value, isStaticEnterprise, selectedEnterpriseName, onChange]);
+        setCurrent(value);
+    }, [value]);
 
     // Debug logging for cloudType
     React.useEffect(() => {
-        if (type === 'cloudType') {
+        if (type === 'entity') {
             console.log(
                 `CloudType AsyncChipSelect render - allOptions.length: ${allOptions.length}`,
                 allOptions,
@@ -2680,31 +2690,6 @@ function AsyncChipSelect({
     }, [type, allOptions]);
 
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
-    
-    // For static enterprise fields, show a read-only display
-    if (isStaticEnterprise) {
-        return (
-            <div
-                ref={containerRef}
-                className='relative min-w-0 flex items-center gap-1 group/item'
-                style={{maxWidth: '100%'}}
-            >
-                <div className='relative w-full flex items-center gap-1' style={{width: '100%'}}>
-                    <div 
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-gray-100 text-gray-600 rounded-sm border border-gray-300 cursor-not-allowed opacity-75'
-                        style={{width: '100%', minWidth: '100%'}}
-                        title={`Enterprise: ${selectedEnterpriseName} (Selected from top-right dropdown - read only)`}
-                    >
-                        <span className='flex-1 truncate'>{selectedEnterpriseName}</span>
-                        <svg className='w-3 h-3 text-gray-400 flex-shrink-0' fill='currentColor' viewBox='0 0 20 20'>
-                            <path fillRule='evenodd' d='M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z' clipRule='evenodd' />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-    
     return (
         <div
             ref={containerRef}
@@ -2733,7 +2718,6 @@ function AsyncChipSelect({
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
-                            console.log(`🖱️🖱️ Double-click on field: type=${type}, value=${current || value}`);
                             const target = e.target as HTMLElement;
                             if (!target.closest('button')) {
                                 // Always allow editing by setting the query and opening input
@@ -2749,13 +2733,13 @@ function AsyncChipSelect({
                             }
                         }}
                         onClick={(e: any) => {
-                            console.log(`🖱️ License field clicked: type=${type}`);
-                            // For cloudType and license fields (product, service), allow single click to open dropdown
-                            // Skip enterprise if it's static (selected from top-right)
-                            if ((type === 'cloudType' || type === 'product' || type === 'service') && (allOptions.length > 0 || ['product', 'service'].includes(type))) {
+                            // For entity and pipeline, also allow single click to open dropdown
+                            if (
+                                (type === 'entity' || type === 'pipeline') &&
+                                allOptions.length > 0
+                            ) {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
-                                    console.log(`🎯 Opening dropdown for type: ${type}`);
                                     setQuery('');
                                     setOpen(true);
                                     setTimeout(() => {
@@ -2770,8 +2754,8 @@ function AsyncChipSelect({
                         <span className='flex-1 truncate pointer-events-none'>
                             {current || value}
                         </span>
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
+                        {/* Dropdown arrow for entity and pipeline */}
+                        {(type === 'entity' || type === 'pipeline') && (
                             <ChevronDown
                                 size={12}
                                 className='text-slate-400 flex-shrink-0 ml-1'
@@ -2818,23 +2802,35 @@ function AsyncChipSelect({
                                 }
                             }}
                             onBlur={(e: any) => {
-                                // Create chip from entered text when focus is lost
-                                const newValue = query.trim();
-                                if (newValue) {
-                                    onChange(newValue);
-                                    setCurrent(newValue);
-                                    setQuery('');
-                                }
-                                setOpen(false);
+                                // Delay closing to allow click events on dropdown items to fire
+                                setTimeout(() => {
+                                    // Create chip from entered text when focus is lost
+                                    // Only if the dropdown is still open (not closed by selection)
+                                    if (open) {
+                                        const newValue = query.trim();
+                                        if (
+                                            newValue &&
+                                            type !== 'entity' &&
+                                            type !== 'pipeline'
+                                        ) {
+                                            // Don't auto-create for entity/pipeline
+                                            onChange(newValue);
+                                            setCurrent(newValue);
+                                            setQuery('');
+                                        }
+                                        setOpen(false);
+                                    }
+                                }, 200);
                             }}
                             onFocus={() => {
-                                console.log(`🎯 Field focused: type=${type}, allOptions.length=${allOptions.length}`);
-                                // For license fields (product, service), open dropdown to trigger API loading
-                                // Skip enterprise if it's static (selected from top-right)
-                                // For other fields, only open if there are already options to show
-                                if (allOptions.length > 0 || (['product', 'service'].includes(type))) {
-                                    console.log(`🔓 Opening dropdown on focus for type: ${type}`);
+                                // Only open dropdown on focus if there are options to show
+                                if (allOptions.length > 0) {
                                     setOpen(true);
+                                }
+
+                                // Don't load options if dropdown is disabled (empty options array)
+                                if (false) {
+                                    loadAllOptions();
                                 }
                             }}
                             onKeyDown={async (e: any) => {
@@ -2867,11 +2863,25 @@ function AsyncChipSelect({
                                     setQuery('');
                                 }
                             }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
-                            placeholder=''
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${
+                                isError
+                                    ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                    : 'border-blue-300 bg-white hover:bg-slate-50'
+                            } text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${
+                                isError
+                                    ? 'focus:ring-red-200 focus:border-red-500'
+                                    : 'focus:ring-blue-200 focus:border-blue-500'
+                            }`}
+                            placeholder={
+                                type === 'entity'
+                                    ? placeholder || 'Select entity...'
+                                    : type === 'pipeline'
+                                    ? placeholder || 'Select pipeline...'
+                                    : placeholder || ''
+                            }
                         />
-                        {/* Dropdown arrow for cloudType */}
-                        {type === 'cloudType' && (
+                        {/* Dropdown arrow for entity and pipeline */}
+                        {(type === 'entity' || type === 'pipeline') && (
                             <button
                                 type='button'
                                 onClick={(e) => {
@@ -2897,112 +2907,324 @@ function AsyncChipSelect({
             </div>
 
             {/* Full Autocomplete Dropdown - Portal Based */}
-            {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
-                <div 
-                    ref={dropdownRef}
-                    className='bg-white border border-blue-200 rounded-md shadow-lg'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: `${dropdownPortalPos.width}px`,
-                        minWidth: '140px',
-                        maxHeight: '200px'
-                    }}
-                >
+            {open &&
+                dropdownPortalPos &&
+                allOptions.length > 0 &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: `${Math.min(
+                                dropdownPortalPos.width,
+                                180,
+                            )}px`,
+                            maxWidth: '180px',
+                            minWidth: '140px',
+                        }}
+                    >
                         <div className='py-1'>
-                            <div className='max-h-44 overflow-y-auto overflow-x-hidden'>
-                            {loading ? (
-                                <div className='px-3 py-2 text-slate-500'>
-                                    Loading…
-                                </div>
-                            ) : (
-                                (() => {
-                                    // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim() 
-                                        ? options.filter(opt => 
-                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
-                                            opt.name.toLowerCase().includes(query.toLowerCase())
-                                        ).sort((a, b) => {
-                                            const aLower = a.name.toLowerCase();
-                                            const bLower = b.name.toLowerCase();
-                                            const queryLower = query.toLowerCase();
-                                            
-                                            // Prioritize starts with matches
-                                            const aStartsWith = aLower.startsWith(queryLower);
-                                            const bStartsWith = bLower.startsWith(queryLower);
-                                            
-                                            if (aStartsWith && !bStartsWith) return -1;
-                                            if (bStartsWith && !aStartsWith) return 1;
-                                            
-                                            return aLower.localeCompare(bLower);
-                                        })
-                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-                                    
-                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
-                                    
-                                    // Check if query exactly matches an existing option
-                                    const exactMatch = query.trim() ? options.find(opt => 
-                                        opt.name.toLowerCase() === query.toLowerCase().trim()
-                                    ) : null;
-                                    
-                                    const showCreateNew = query.trim() && !exactMatch;
+                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
+                                {loading ? (
+                                    <div className='px-3 py-2 text-slate-500'>
+                                        Loading…
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        // Filter options that match the query (show all if no query)
+                                        const filteredOptions = query.trim()
+                                            ? options
+                                                  .filter(
+                                                      (opt) =>
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .startsWith(
+                                                                  query.toLowerCase(),
+                                                              ) ||
+                                                          opt.name
+                                                              .toLowerCase()
+                                                              .includes(
+                                                                  query.toLowerCase(),
+                                                              ),
+                                                  )
+                                                  .sort((a, b) => {
+                                                      const aLower =
+                                                          a.name.toLowerCase();
+                                                      const bLower =
+                                                          b.name.toLowerCase();
+                                                      const queryLower =
+                                                          query.toLowerCase();
 
-                                    return (
-                                        <div>
-                                            {/* Show existing matching options */}
-                                            {filteredOptions.length > 0 && (
-                                                <div>
-                                                    {filteredOptions.map((opt, idx) => (
-                                                        <div
-                                                            key={opt.id}
-                                                            onClick={() => {
-                                                                onChange(opt.name);
-                                                                setCurrent(opt.name);
-                                                                setQuery('');
-                                                                setOpen(false);
-                                                            }}
-                                                            className='w-full px-3 py-2 text-left text-sm cursor-pointer text-blue-700 hover:bg-blue-50 border-b border-blue-100 last:border-b-0 transition-colors duration-150'
-                                                        >
-                                                            {opt.name}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            
-                                            {/* Show "Create New" option */}
-                                            {showCreateNew && (
-                                                <div className='border-t border-slate-200'>
-                                                    <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                let created: { id: string; name: string; } | null = null;
-                                                                
-                                                                if (type === 'accountName') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/accountNames', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'masterAccount') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/masterAccounts', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'cloudType') {
-                                                                    // Cloud Type has predefined options, don't create new ones
-                                                                    console.log('Cannot create new cloudType options - using predefined values only');
-                                                                    return;
-                                                                } else if (type === 'address') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/addresses', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                } else if (type === 'template') {
-                                                                    created = await api.post<{ id: string; name: string; }>('/api/templates', {
-                                                                        name: query.trim(),
-                                                                    });
-                                                                }
-                                                                
-                                                                if (created) {
+                                                      // Prioritize starts with matches
+                                                      const aStartsWith =
+                                                          aLower.startsWith(
+                                                              queryLower,
+                                                          );
+                                                      const bStartsWith =
+                                                          bLower.startsWith(
+                                                              queryLower,
+                                                          );
+
+                                                      if (
+                                                          aStartsWith &&
+                                                          !bStartsWith
+                                                      )
+                                                          return -1;
+                                                      if (
+                                                          bStartsWith &&
+                                                          !aStartsWith
+                                                      )
+                                                          return 1;
+
+                                                      return aLower.localeCompare(
+                                                          bLower,
+                                                      );
+                                                  })
+                                            : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+
+                                        console.log(
+                                            `Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`,
+                                            filteredOptions,
+                                        );
+
+                                        // Check if query exactly matches an existing option
+                                        const exactMatch = query.trim()
+                                            ? options.find(
+                                                  (opt) =>
+                                                      opt.name.toLowerCase() ===
+                                                      query
+                                                          .toLowerCase()
+                                                          .trim(),
+                                              )
+                                            : null;
+
+                                        const showCreateNew =
+                                            query.trim() && !exactMatch;
+
+                                        return (
+                                            <div>
+                                                {/* Show existing matching options */}
+                                                {filteredOptions.length > 0 && (
+                                                    <div>
+                                                        {filteredOptions.map(
+                                                            (opt, idx) => (
+                                                                <div
+                                                                    key={opt.id}
+                                                                    onClick={() => {
+                                                                        console.log(
+                                                                            `✅ ${type} selected:`,
+                                                                            opt.name,
+                                                                        );
+                                                                        onChange(
+                                                                            opt.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            opt.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+                                                                    }}
+                                                                    onMouseDown={(
+                                                                        e,
+                                                                    ) => {
+                                                                        // Prevent blur event on input
+                                                                        e.preventDefault();
+                                                                    }}
+                                                                    className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
+                                                                >
+                                                                    {opt.name}
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Show "Create New" option */}
+                                                {showCreateNew && (
+                                                    <div className='border-t border-slate-200'>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    let created: {
+                                                                        id: string;
+                                                                        name: string;
+                                                                    } | null =
+                                                                        null;
+
+                                                                    if (
+                                                                        type ===
+                                                                        'buildName'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/buildNames',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'description'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/descriptions',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'entity'
+                                                                    ) {
+                                                                        // Entity has predefined options, don't create new ones
+                                                                        console.log(
+                                                                            'Cannot create new cloudType options - using predefined values only',
+                                                                        );
+                                                                        return;
+                                                                    } else if (
+                                                                        type ===
+                                                                        'pipeline'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/pipelines',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    } else if (
+                                                                        type ===
+                                                                        'template'
+                                                                    ) {
+                                                                        created =
+                                                                            await api.post<{
+                                                                                id: string;
+                                                                                name: string;
+                                                                            }>(
+                                                                                '/api/templates',
+                                                                                {
+                                                                                    name: query.trim(),
+                                                                                },
+                                                                            );
+                                                                    }
+
+                                                                    if (
+                                                                        created
+                                                                    ) {
+                                                                        // Update options list
+                                                                        setOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+                                                                        setAllOptions(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                created!,
+                                                                            ],
+                                                                        );
+
+                                                                        // Set the new value
+                                                                        onChange(
+                                                                            created.name,
+                                                                        );
+                                                                        setCurrent(
+                                                                            created.name,
+                                                                        );
+                                                                        setQuery(
+                                                                            '',
+                                                                        );
+                                                                        setOpen(
+                                                                            false,
+                                                                        );
+
+                                                                        // Notify parent component
+                                                                        if (
+                                                                            onNewItemCreated
+                                                                        ) {
+                                                                            let dropdownType: string;
+
+                                                                            switch (
+                                                                                type
+                                                                            ) {
+                                                                                case 'buildName':
+                                                                                    dropdownType =
+                                                                                        'buildNames';
+                                                                                    break;
+                                                                                case 'description':
+                                                                                    dropdownType =
+                                                                                        'descriptions';
+                                                                                    break;
+                                                                                case 'pipeline':
+                                                                                    dropdownType =
+                                                                                        'pipelines';
+                                                                                    break;
+                                                                                default:
+                                                                                    dropdownType =
+                                                                                        'emails'; // fallback
+                                                                                    break;
+                                                                            }
+
+                                                                            // Only call if this is a supported type for the callback
+                                                                            if (
+                                                                                type ===
+                                                                                    'buildName' ||
+                                                                                type ===
+                                                                                    'description' ||
+                                                                                type ===
+                                                                                    'pipeline'
+                                                                            ) {
+                                                                                onNewItemCreated(
+                                                                                    dropdownType as any,
+                                                                                    created,
+                                                                                );
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.log(
+                                                                        `API creation failed for ${type}, creating local entry`,
+                                                                    );
+
+                                                                    // Fallback: create a local entry when API fails
+                                                                    const newId = `local-${Date.now()}-${Math.random()
+                                                                        .toString(
+                                                                            36,
+                                                                        )
+                                                                        .substr(
+                                                                            2,
+                                                                            9,
+                                                                        )}`;
+                                                                    const created =
+                                                                        {
+                                                                            id: newId,
+                                                                            name: query.trim(),
+                                                                        };
+
                                                                     // Update options list
                                                                     setOptions(
                                                                         (
@@ -3041,18 +3263,18 @@ function AsyncChipSelect({
                                                                     ) {
                                                                         const dropdownType =
                                                                             type ===
-                                                                            'accountName'
-                                                                                ? 'accountNames'
+                                                                            'buildName'
+                                                                                ? 'buildNames'
                                                                                 : type ===
-                                                                                  'masterAccount'
-                                                                                ? 'masterAccounts'
+                                                                                  'description'
+                                                                                ? 'descriptions'
                                                                                 : type ===
-                                                                                  'cloudType'
-                                                                                ? 'cloudTypes'
+                                                                                  'entity'
+                                                                                ? 'entities'
                                                                                 : type ===
-                                                                                  'address'
-                                                                                ? 'addresses'
-                                                                                : 'emails';
+                                                                                  'pipeline'
+                                                                                ? 'pipelines'
+                                                                                : 'buildNames';
                                                                         onNewItemCreated(
                                                                             dropdownType,
                                                                             created,
@@ -3102,35 +3324,46 @@ function AsyncChipSelect({
     );
 }
 
-interface AccountsTableProps {
-    rows: AccountRow[];
+interface BuildsTableProps {
+    rows: BuildRow[];
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
     groupByExternal?:
         | 'none'
-        | 'accountName'
-        | 'masterAccount'
-        | 'cloudType'
-        | 'address';
-    onGroupByChange?: (g: 'none' | 'accountName' | 'email' | 'phone') => void;
+        | 'buildName'
+        | 'description'
+        | 'entity'
+        | 'pipeline'
+        | 'status';
+    onGroupByChange?: (
+        g:
+            | 'none'
+            | 'buildName'
+            | 'description'
+            | 'entity'
+            | 'pipeline'
+            | 'status',
+    ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'accountName'
-        | 'masterAccount'
-        | 'cloudType'
-        | 'address'
-        | 'technicalUser'
+        | 'buildName'
+        | 'description'
+        | 'entity'
+        | 'pipeline'
+        | 'status'
+        | 'artifact'
+        | 'build'
         | 'actions'
     >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
-        accountNames?: Array<{id: string; name: string}>;
-        cloudTypes?: Array<{id: string; name: string}>;
-        emails?: Array<{id: string; name: string}>;
-        phones?: Array<{id: string; name: string}>;
+        buildNames?: Array<{id: string; name: string}>;
+        entities?: Array<{id: string; name: string}>;
+        pipelines?: Array<{id: string; name: string}>;
+        statuses?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -3139,439 +3372,163 @@ interface AccountsTableProps {
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    compressingLicenseId?: string | null;
-    foldingLicenseId?: string | null;
+    compressingStageId?: string | null;
+    foldingStageId?: string | null;
     triggerValidation?: boolean; // Trigger validation highlighting
     onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
-    onAddNewRow?: () => void; // Callback to add a new row
+    onAddNewRow?: () => void;
+    onBuildDetailClick?: (rowId: string) => void;
+    getBuildCount?: (rowId: string) => number; // Callback to add a new row
     externalSortColumn?: string; // External sort column from parent
     externalSortDirection?: 'asc' | 'desc' | ''; // External sort direction from parent
     onSortChange?: (column: string, direction: 'asc' | 'desc') => void; // Callback when sort changes from column headers
     isAIInsightsPanelOpen?: boolean; // Whether the AI insights panel is expanded
-    onLicenseValidationChange?: (
-        hasIncompleteLicenses: boolean,
-        incompleteLicenseRows: string[],
-    ) => void; // Callback for license validation state
-    onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
-    onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
-    onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
-    onOpenTechnicalUserModal?: (row: AccountRow) => void; // Callback to open technical user modal
+    onOpenAddressModal?: (row: BuildRow) => void; // Callback to open address modal
+    onOpenTechnicalUserModal?: (row: BuildRow) => void; // Callback to open technical user modal
 }
 
-// License Sub Row Component
-function LicenseSubRow({
-    license,
+// Build Stage Sub Row Component
+function StageSubRow({
+    stage,
     rowId,
     onUpdate,
     onDelete,
-    showValidationErrors,
-    isLicenseFieldMissing,
-    compressingLicenseId,
-    foldingLicenseId,
-    onDeleteClick,
-    onDropdownOptionUpdate,
-    onNewItemCreated,
-    onOpenContactModal,
-    accounts = [],
-    isTableRow = false,
-    isLastRow = false,
-    selectedEnterpriseName = '',
+    compressingStageId,
+    foldingStageId,
 }: {
-    license: License;
+    stage: BuildStage;
     rowId: string;
-    onUpdate: (
-        licenseId: string,
-        field: keyof License,
-        value: string | boolean,
-    ) => void;
-    onDelete: (licenseId: string) => void;
-    showValidationErrors: boolean;
-    isLicenseFieldMissing: (license: License, field: keyof License) => boolean;
-    compressingLicenseId?: string | null;
-    foldingLicenseId?: string | null;
-    onDeleteClick?: (licenseId: string) => void;
-    onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
-        action: 'update' | 'delete',
-        oldName: string,
-        newName?: string,
-    ) => Promise<void>;
-    onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
-        item: {id: string; name: string},
-    ) => void;
-    onOpenContactModal: (
-        rowId: string,
-        licenseId: string,
-        initialData?: Contact,
-    ) => void;
-    accounts?: AccountRow[];
-    isTableRow?: boolean;
-    isLastRow?: boolean;
-    selectedEnterpriseName?: string;
+    onUpdate: (stageId: string, field: keyof BuildStage, value: string) => void;
+    onDelete: (stageId: string) => void;
+    compressingStageId?: string | null;
+    foldingStageId?: string | null;
 }) {
     const [isRowHovered, setIsRowHovered] = useState(false);
 
-    // Tab navigation for license fields
-    const createLicenseTabNavigation = (currentCol: string) => {
-        const editableCols = [
-            'enterprise',
-            'product',
-            'service',
-            'licenseStartDate',
-            'licenseEndDate',
-            'numberOfUsers',
-            'noticePeriodDays',
-        ];
-        const currentIndex = editableCols.indexOf(currentCol);
-
-        const onTabNext = () => {
-            const nextIndex = currentIndex + 1;
-            if (nextIndex < editableCols.length) {
-                const nextCol = editableCols[nextIndex];
-                setTimeout(() => {
-                    const nextInput = document.querySelector(
-                        `[data-license-id="${license.id}"][data-license-col="${nextCol}"] input`,
-                    ) as HTMLInputElement;
-                    if (nextInput) {
-                        nextInput.focus();
-                        nextInput.select();
-                    }
-                }, 10);
-            }
-        };
-
-        const onTabPrev = () => {
-            const prevIndex = currentIndex - 1;
-            if (prevIndex >= 0) {
-                const prevCol = editableCols[prevIndex];
-                setTimeout(() => {
-                    const prevInput = document.querySelector(
-                        `[data-license-id="${license.id}"][data-license-col="${prevCol}"] input`,
-                    ) as HTMLInputElement;
-                    if (prevInput) {
-                        prevInput.focus();
-                        prevInput.select();
-                    }
-                }, 10);
-            }
-        };
-
-        return {onTabNext, onTabPrev};
-    };
-
     return (
-        <div 
-            className={`relative transition-all duration-200 ${
-                isTableRow ? '' : 'ml-6 my-1'
-            } ${
-                compressingLicenseId === license.id
+        <div
+            className={`relative flex items-center ml-6 my-1 transition-all duration-200 ${
+                compressingStageId === stage.id
                     ? 'transform scale-x-75 transition-all duration-500 ease-out'
                     : ''
             } ${
-                foldingLicenseId === license.id
+                foldingStageId === stage.id
                     ? 'opacity-0 transform scale-y-50 transition-all duration-300'
                     : ''
             }`}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
         >
-            {/* Connection line from parent row - only show for non-table rows */}
-            {!isTableRow && (
-                <div className="absolute -left-6 top-0 bottom-0 w-6 flex">
-                    {/* Vertical line continuing from parent */}
-                    <div className="w-px h-full bg-blue-300 ml-3"></div>
-                    {/* Horizontal connector to this row */}
-                    <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
-                </div>
-            )}
-            
-            {/* License row content with grid structure */}
-            <div 
-                className={`grid gap-3 p-3 transition-all duration-200 ${
-                    isTableRow 
-                        ? `border-l border-r border-blue-200 hover:bg-blue-50/50 ${
-                            isLastRow ? 'rounded-b-lg border-b' : 'border-b'
-                        }`
-                        : 'bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md'
-                }`}
-                style={{
-                    gridTemplateColumns: license.renewalNotice 
-                        ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
-                        : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
-                }}
-            >
-                {/* Delete Button Column - First in grid */}
-                <div className="flex items-center justify-center">
-                    {isRowHovered && (
-                        <motion.button
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e: any) => {
-                                e.stopPropagation();
-                                if (onDelete) {
-                                    onDelete(license.id);
-                                }
-                            }}
-                            className="group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md"
-                            title="Delete License"
-                        >
-                            <svg
-                                className="w-2 h-2 transition-transform duration-200"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 12h12"
-                                />
-                            </svg>
-                        </motion.button>
-                    )}
-                </div>
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Enterprise</label>}
-                    <AsyncChipSelect
-                        type='enterprise'
-                        value={license.enterprise}
-                        onChange={(value) =>
-                            onUpdate(license.id, 'enterprise', value || '')
-                        }
-                        placeholder='Enter enterprise'
-                        isError={
-                            showValidationErrors &&
-                            isLicenseFieldMissing(license, 'enterprise')
-                        }
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        selectedEnterpriseName={selectedEnterpriseName}
-                        {...createLicenseTabNavigation('enterprise')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Product</label>}
-                    <AsyncChipSelect
-                        type='product'
-                        value={license.product}
-                        onChange={(value) =>
-                            onUpdate(license.id, 'product', value || '')
-                        }
-                        placeholder='Enter product'
-                        isError={
-                            showValidationErrors &&
-                            isLicenseFieldMissing(license, 'product')
-                        }
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        selectedEnterpriseName={selectedEnterpriseName}
-                        {...createLicenseTabNavigation('product')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Service</label>}
-                    <AsyncChipSelect
-                        type='service'
-                        value={license.service}
-                        onChange={(value) =>
-                            onUpdate(license.id, 'service', value || '')
-                        }
-                        placeholder='Enter service'
-                        isError={
-                            showValidationErrors &&
-                            isLicenseFieldMissing(license, 'service')
-                        }
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        selectedEnterpriseName={selectedEnterpriseName}
-                        {...createLicenseTabNavigation('service')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">License Start Date</label>}
-                    <DateChipSelect
-                        value={license.licenseStartDate}
-                        onChange={(value) => {
-                            onUpdate(license.id, 'licenseStartDate', value || '');
-                            // If end date is earlier than new start date, clear it
-                            if (value && license.licenseEndDate && new Date(license.licenseEndDate) < new Date(value)) {
-                                onUpdate(license.id, 'licenseEndDate', '');
+            {/* Connection line from parent row */}
+            <div className='absolute -left-6 top-0 bottom-0 w-6 flex'>
+                {/* Vertical line continuing from parent */}
+                <div className='w-px h-full bg-blue-300 ml-3'></div>
+                {/* Horizontal connector to this row */}
+                <div className='absolute top-1/2 left-3 w-3 h-px bg-blue-300'></div>
+            </div>
+
+            {/* Delete button */}
+            <div className='flex items-center justify-center w-8 mr-2'>
+                {isRowHovered && (
+                    <motion.button
+                        initial={{opacity: 0, scale: 0.8}}
+                        animate={{opacity: 1, scale: 1}}
+                        exit={{opacity: 0, scale: 0.8}}
+                        whileHover={{scale: 1.1}}
+                        whileTap={{scale: 0.95}}
+                        onClick={(e: any) => {
+                            e.stopPropagation();
+                            if (onDelete) {
+                                onDelete(stage.id);
                             }
                         }}
-                        placeholder=""
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
-                        compact={true}
-                        className="text-xs min-h-[20px] py-0.5"
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">License End Date</label>}
-                    <DateChipSelect
-                        value={license.licenseEndDate}
-                        onChange={(value) =>
-                            onUpdate(license.id, 'licenseEndDate', value || '')
-                        }
-                        placeholder=''
-                        isError={
-                            showValidationErrors &&
-                            isLicenseFieldMissing(license, 'licenseEndDate')
-                        }
-                        compact={true}
-                        className="text-xs min-h-[20px] py-0.5"
-                        minDate={license.licenseStartDate || undefined}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">No. of Users</label>}
-                    <AsyncChipSelect
-                        type='template'
-                        value={license.numberOfUsers}
-                        onChange={(value) =>
-                            onUpdate(license.id, 'numberOfUsers', value || '')
-                        }
-                        placeholder='Count'
-                        isError={
-                            showValidationErrors &&
-                            isLicenseFieldMissing(license, 'numberOfUsers')
-                        }
-                        compact={true}
-                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                        onNewItemCreated={onNewItemCreated as any}
-                        accounts={accounts}
-                        currentRowId={license.id}
-                        currentRowEnterprise={license.enterprise}
-                        currentRowProduct={license.product}
-                        selectedEnterpriseName={selectedEnterpriseName}
-                        {...createLicenseTabNavigation('numberOfUsers')}
-                    />
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
-                    {!isTableRow && <label className="text-xs font-medium text-black mb-1">Contact</label>}
-                    <div className={`flex items-start justify-center pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
-                        <button
-                            onClick={() =>
-                                onOpenContactModal(
-                                    rowId,
-                                    license.id,
-                                    license.contactDetails,
-                                )
-                            }
-                            className='flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md'
-                            title='Edit contact details'
+                        className='group/delete flex items-center justify-center w-4 h-4 text-red-500 hover:text-white border border-red-300 hover:border-red-500 bg-white hover:bg-red-500 rounded-full transition-all duration-200 ease-out shadow-sm hover:shadow-md'
+                        title='Delete Stage'
+                    >
+                        <svg
+                            className='w-2 h-2 transition-transform duration-200'
+                            fill='none'
+                            stroke='currentColor'
+                            strokeWidth='2.5'
+                            viewBox='0 0 24 24'
                         >
-                            <svg
-                                className='w-4 h-4 text-blue-600 group-hover:text-blue-700'
-                                fill='none'
-                                viewBox='0 0 24 24'
-                                stroke='currentColor'
-                            >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-                                />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
-                    {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>}
-                    <div className={`flex items-start space-x-1 pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
-                        <input
-                            type='checkbox'
-                            checked={license.renewalNotice}
-                            onChange={(e) =>
-                                onUpdate(
-                                    license.id,
-                                    'renewalNotice',
-                                    e.target.checked,
-                                )
-                            }
-                            className='w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
-                        />
-                        <span className='text-xs text-gray-600'>Notify</span>
-                    </div>
+                            <path
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                                d='M6 12h12'
+                            />
+                        </svg>
+                    </motion.button>
+                )}
+            </div>
+
+            {/* Build Stage row content */}
+            <div
+                className='flex-1 grid gap-3 p-3 bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md transition-all duration-200'
+                style={{
+                    gridTemplateColumns: '1fr 200px 200px',
+                }}
+            >
+                {/* Stage Name */}
+                <div className='flex flex-col'>
+                    <label className='text-xs font-medium text-blue-700 mb-1'>
+                        Stage Name
+                    </label>
+                    <InlineEditableText
+                        value={stage.name}
+                        onCommit={(value) => onUpdate(stage.id, 'name', value)}
+                        placeholder='Enter stage name'
+                        className='text-sm px-2 py-1 border border-blue-200 rounded'
+                    />
                 </div>
 
-                {license.renewalNotice && (
-                    <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
-                        {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>}
-                        <AsyncChipSelect
-                            type='template'
-                            value={license.noticePeriodDays || ''}
-                            onChange={(value) =>
-                                onUpdate(
-                                    license.id,
-                                    'noticePeriodDays',
-                                    value || '',
-                                )
-                            }
-                            placeholder='Days'
-                            isError={
-                                showValidationErrors &&
-                                license.renewalNotice &&
-                                !license.noticePeriodDays
-                            }
-                            compact={true}
-                            onDropdownOptionUpdate={
-                                onDropdownOptionUpdate as any
-                            }
-                            onNewItemCreated={onNewItemCreated as any}
-                            accounts={accounts}
-                            currentRowId={license.id}
-                            currentRowEnterprise={license.enterprise}
-                            currentRowProduct={license.product}
-                            selectedEnterpriseName={selectedEnterpriseName}
-                            {...createLicenseTabNavigation('noticePeriodDays')}
-                        />
-                    </div>
-                )}
+                {/* Status */}
+                <div className='flex flex-col'>
+                    <label className='text-xs font-medium text-blue-700 mb-1'>
+                        Status
+                    </label>
+                    <InlineEditableText
+                        value={stage.status}
+                        onCommit={(value) =>
+                            onUpdate(stage.id, 'status', value)
+                        }
+                        placeholder='Enter status'
+                        className='text-sm px-2 py-1 border border-blue-200 rounded'
+                    />
+                </div>
+
+                {/* Deployed At */}
+                <div className='flex flex-col'>
+                    <label className='text-xs font-medium text-blue-700 mb-1'>
+                        Deployed At
+                    </label>
+                    <InlineEditableText
+                        value={stage.deployedAt}
+                        onCommit={(value) =>
+                            onUpdate(stage.id, 'deployedAt', value)
+                        }
+                        placeholder='Enter deployment date'
+                        className='text-sm px-2 py-1 border border-blue-200 rounded'
+                    />
+                </div>
             </div>
         </div>
     );
 }
 
-function SortableAccountRow({
+function SortableBuildRow({
     row,
     index,
     onEdit,
@@ -3602,9 +3559,11 @@ function SortableAccountRow({
     onDeleteClick,
     onOpenAddressModal,
     onOpenTechnicalUserModal,
-    selectedEnterpriseName = '',
+    dropdownOptions,
+    onBuildDetailClick,
+    buildCount = 0,
 }: {
-    row: AccountRow;
+    row: BuildRow;
     index: number;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
@@ -3615,10 +3574,10 @@ function SortableAccountRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (rowId: string, key: keyof AccountRow, value: any) => void;
+    onUpdateField: (rowId: string, key: keyof BuildRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onStartFill: (rowId: string, col: keyof AccountRow, value: string) => void;
+    onStartFill: (rowId: string, col: keyof BuildRow, value: string) => void;
     inFillRange: boolean;
     pinFirst?: boolean;
     firstColWidth?: string;
@@ -3626,23 +3585,30 @@ function SortableAccountRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'phones',
+        type: 'buildNames' | 'entities' | 'pipelines' | 'statuses',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    allRows?: AccountRow[];
+    allRows?: BuildRow[];
     onDeleteClick?: (rowId: string) => void;
-    onOpenAddressModal?: (row: AccountRow) => void;
-    onOpenTechnicalUserModal?: (row: AccountRow) => void;
-    selectedEnterpriseName?: string;
+    onOpenAddressModal?: (row: BuildRow) => void;
+    onOpenTechnicalUserModal?: (row: BuildRow) => void;
+    dropdownOptions?: {
+        buildNames?: Array<{id: string; name: string}>;
+        entities?: Array<{id: string; name: string}>;
+        pipelines?: Array<{id: string; name: string}>;
+        statuses?: Array<{id: string; name: string}>;
+    };
+    onBuildDetailClick?: (rowId: string) => void;
+    buildCount?: number;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3654,7 +3620,7 @@ function SortableAccountRow({
 
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
-        ['accountName', 'masterAccount', 'cloudType'].includes(col),
+        ['buildName', 'description', 'entity'].includes(col),
     );
 
     const createTabNavigation = (currentCol: string) => {
@@ -3856,7 +3822,7 @@ function SortableAccountRow({
     return (
         <div
             id={row.id}
-            data-account-id={row.id}
+            data-build-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
             className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
@@ -3932,7 +3898,7 @@ function SortableAccountRow({
                     </motion.button>
                 )}
             </div>
-            {cols.includes('accountName') && (
+            {cols.includes('buildName') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full ${
                         pinFirst && !shouldShowHorizontalScroll
@@ -3980,58 +3946,53 @@ function SortableAccountRow({
                     <div
                         className='text-slate-700 text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='accountName'
+                        data-col='buildName'
                         style={{width: '100%'}}
                     >
                         {enableDropdownChips ? (
                             <AsyncChipSelect
-                                type='accountName'
-                                value={(row as any).accountName || ''}
+                                type='buildName'
+                                value={(row as any).buildName || ''}
                                 onChange={(v) => {
                                     onUpdateField(
                                         row.id,
-                                        'accountName' as any,
+                                        'buildName' as any,
                                         v || '',
                                     );
                                 }}
                                 placeholder=''
-                                isError={isCellMissing(row.id, 'accountName')}
+                                isError={isCellMissing(row.id, 'buildName')}
                                 onDropdownOptionUpdate={
                                     onDropdownOptionUpdate as any
                                 }
                                 onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
+                                builds={allRows}
                                 currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.accountName || ''
-                                }
-                                currentRowProduct={
-                                    row.masterAccount || ''
-                                }
-                                selectedEnterpriseName={selectedEnterpriseName}
-                                {...createTabNavigation('accountName')}
+                                currentRowEnterprise={row.buildName || ''}
+                                currentRowProduct={row.description || ''}
+                                {...createTabNavigation('buildName')}
                             />
                         ) : (
                             <InlineEditableText
-                                value={row.accountName || ''}
+                                value={row.buildName || ''}
                                 onCommit={(v) => {
                                     onUpdateField(
                                         row.id,
-                                        'accountName' as any,
+                                        'buildName' as any,
                                         v,
                                     );
                                 }}
                                 className='text-[12px]'
                                 placeholder=''
-                                isError={isCellMissing(row.id, 'accountName')}
+                                isError={isCellMissing(row.id, 'buildName')}
                                 dataAttr={`${row.id}-accountName`}
-                                {...createTabNavigation('accountName')}
+                                {...createTabNavigation('buildName')}
                             />
                         )}
                     </div>
                 </div>
             )}
-            {cols.includes('masterAccount') && (
+            {cols.includes('description') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
@@ -4041,53 +4002,48 @@ function SortableAccountRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='masterAccount'
+                    data-col='description'
                     style={{width: '100%'}}
                 >
                     {enableDropdownChips ? (
                         <AsyncChipSelect
-                            type='masterAccount'
-                            value={(row as any).masterAccount || ''}
+                            type='description'
+                            value={(row as any).description || ''}
                             onChange={(v) =>
                                 onUpdateField(
                                     row.id,
-                                    'masterAccount' as any,
+                                    'description' as any,
                                     v || '',
                                 )
                             }
-                            placeholder='Enter master account'
-                            isError={isCellMissing(row.id, 'masterAccount')}
+                            placeholder='Enter description'
+                            isError={isCellMissing(row.id, 'description')}
                             onDropdownOptionUpdate={
                                 onDropdownOptionUpdate as any
                             }
                             onNewItemCreated={onNewItemCreated as any}
-                            accounts={allRows}
+                            builds={allRows}
                             currentRowId={row.id}
-                            currentRowEnterprise={
-                                row.accountName || ''
-                            }
-                            currentRowProduct={
-                                (row as any).masterAccount || ''
-                            }
-                            selectedEnterpriseName={selectedEnterpriseName}
-                            {...createTabNavigation('masterAccount')}
+                            currentRowEnterprise={row.buildName || ''}
+                            currentRowProduct={(row as any).description || ''}
+                            {...createTabNavigation('description')}
                         />
                     ) : (
                         <InlineEditableText
-                            value={(row as any).masterAccount || ''}
+                            value={(row as any).description || ''}
                             onCommit={(v) =>
-                                onUpdateField(row.id, 'masterAccount' as any, v)
+                                onUpdateField(row.id, 'description' as any, v)
                             }
                             className='text-[12px]'
                             dataAttr={`masterAccount-${row.id}`}
-                            isError={isCellMissing(row.id, 'masterAccount')}
-                            placeholder='Enter master account'
-                            {...createTabNavigation('masterAccount')}
+                            isError={isCellMissing(row.id, 'description')}
+                            placeholder='Enter description'
+                            {...createTabNavigation('description')}
                         />
                     )}
                 </div>
             )}
-            {cols.includes('cloudType') && (
+            {cols.includes('entity') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
@@ -4097,65 +4053,52 @@ function SortableAccountRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='cloudType'
+                    data-col='entity'
                     style={{width: '100%'}}
                 >
                     {enableDropdownChips ? (
-                        <SimpleDropdown
-                            value={(row as any).cloudType || ''}
-                            options={[
-                                {
-                                    value: 'Private Cloud',
-                                    label: 'Private Cloud',
-                                },
-                                {value: 'Public Cloud', label: 'Public Cloud'},
-                            ]}
+                        <AsyncChipSelect
+                            type='entity'
+                            value={(row as any).entity || ''}
                             onChange={(v) => {
                                 console.log(
-                                    '🔥 CRITICAL: CloudType dropdown onChange called:',
-                                    v,
+                                    '🔥 Entity onChange called:',
+                                    v || '',
                                     'for row:',
                                     row.id,
                                 );
+                                onUpdateField(row.id, 'entity' as any, v || '');
                                 console.log(
-                                    '🔥 CRITICAL: Current row.cloudType before update:',
-                                    (row as any).cloudType,
-                                );
-                                console.log(
-                                    '🔥 CRITICAL: Calling onUpdateField with:',
-                                    row.id,
-                                    'cloudType',
-                                    v || '',
-                                );
-                                onUpdateField(
-                                    row.id,
-                                    'cloudType' as any,
-                                    v || '',
+                                    '✅ onUpdateField called for entity',
                                 );
                             }}
-                            placeholder='Select...'
-                            className=''
-                            isError={isCellMissing(row.id, 'cloudType')}
-                            {...createTabNavigation('cloudType')}
+                            placeholder='Select entity...'
+                            isError={isCellMissing(row.id, 'entity')}
+                            dropdownOptions={{
+                                buildNames: dropdownOptions?.buildNames || [],
+                                entities: dropdownOptions?.entities || [],
+                                pipelines: dropdownOptions?.pipelines || []
+                            }}
+                            {...createTabNavigation('entity')}
                         />
                     ) : (
                         <InlineEditableText
-                            value={(row as any).cloudType || ''}
+                            value={(row as any).entity || ''}
                             onCommit={(v) =>
-                                onUpdateField(row.id, 'cloudType' as any, v)
+                                onUpdateField(row.id, 'entity' as any, v)
                             }
                             className='text-[12px]'
-                            dataAttr={`cloudType-${row.id}`}
-                            isError={isCellMissing(row.id, 'cloudType')}
-                            placeholder='Select cloud type'
-                            {...createTabNavigation('cloudType')}
+                            dataAttr={`entity-${row.id}`}
+                            isError={isCellMissing(row.id, 'entity')}
+                            placeholder='Enter entity'
+                            {...createTabNavigation('entity')}
                         />
                     )}
                 </div>
             )}
-            {cols.includes('address') && (
+            {cols.includes('pipeline') && (
                 <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
                             ? 'bg-blue-50'
                             : index % 2 === 0
@@ -4163,36 +4106,107 @@ function SortableAccountRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='address'
+                    data-col='pipeline'
                     style={{width: '100%'}}
+                >
+                    {enableDropdownChips ? (
+                        <AsyncChipSelect
+                            type='pipeline'
+                            value={(row as any).pipeline || ''}
+                            onChange={(v) => {
+                                console.log(
+                                    '🔥 Pipeline onChange called:',
+                                    v || '',
+                                    'for row:',
+                                    row.id,
+                                );
+                                onUpdateField(
+                                    row.id,
+                                    'pipeline' as any,
+                                    v || '',
+                                );
+                                console.log(
+                                    '✅ onUpdateField called for pipeline',
+                                );
+                            }}
+                            placeholder='Select pipeline...'
+                            isError={isCellMissing(row.id, 'pipeline')}
+                            dropdownOptions={{
+                                buildNames: dropdownOptions?.buildNames || [],
+                                entities: dropdownOptions?.entities || [],
+                                pipelines: dropdownOptions?.pipelines || []
+                            }}
+                            {...createTabNavigation('pipeline')}
+                        />
+                    ) : (
+                        <InlineEditableText
+                            value={(row as any).pipeline || ''}
+                            onCommit={(v) =>
+                                onUpdateField(row.id, 'pipeline' as any, v)
+                            }
+                            className='text-[12px]'
+                            dataAttr={`pipeline-${row.id}`}
+                            isError={isCellMissing(row.id, 'pipeline')}
+                            placeholder='Enter pipeline'
+                            {...createTabNavigation('pipeline')}
+                        />
+                    )}
+                </div>
+            )}
+            {cols.includes('status') && (
+                <div
+                    className='relative w-full border-r border-slate-200 overflow-hidden group/status'
+                    data-row-id={row.id}
+                    data-col='status'
+                    style={{width: '100%', height: '100%'}}
                 >
                     <button
                         onClick={() => {
-                            console.log('🔍 AccountsTable row object:', {
-                                id: row.id,
-                                accountName: row.accountName,
-                                addressData: row.addressData,
-                                addresses: row.addresses,
-                                allKeys: Object.keys(row),
-                            });
-                            onOpenAddressModal?.(row);
+                            const newStatus =
+                                row.status === 'Active' ? 'Inactive' : 'Active';
+                            console.log(
+                                `🔄 Status toggled: ${row.status} → ${newStatus}`,
+                            );
+                            onUpdateField(row.id, 'status', newStatus);
                         }}
-                        className='group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md'
-                        title={`Manage address for ${
-                            row.accountName || 'this account'
+                        className={`relative w-full h-full text-xs font-semibold transition-all duration-300 flex items-center justify-center ${
+                            row.status === 'Active'
+                                ? 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 text-blue-700 hover:from-blue-200 hover:via-blue-100 hover:to-blue-200'
+                                : 'bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 text-gray-600 hover:from-gray-200 hover:via-gray-100 hover:to-gray-200'
                         }`}
-                        tabIndex={-1}
+                        style={{
+                            minHeight: '100%',
+                        }}
                     >
-                        <MapPin className='w-5 h-5 text-blue-600 group-hover:text-blue-700' />
-                        {(row as any).address && (
-                            <div className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></div>
-                        )}
+                        <span className='relative z-10'>
+                            {row.status === 'Active' ? 'Active' : 'Inactive'}
+                        </span>
+                        {/* Modern shimmer sweep effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 pointer-events-none overflow-hidden transition-opacity duration-300`}
+                            style={{
+                                background:
+                                    row.status === 'Active'
+                                        ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)'
+                                        : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer 1.8s ease-in-out infinite',
+                            }}
+                        />
+                        {/* Glow border effect on hover */}
+                        <div
+                            className={`absolute inset-0 opacity-0 group-hover/status:opacity-100 transition-opacity duration-300 pointer-events-none ${
+                                row.status === 'Active'
+                                    ? 'shadow-[inset_0_0_15px_rgba(59,130,246,0.4)]'
+                                    : 'shadow-[inset_0_0_15px_rgba(107,114,128,0.3)]'
+                            }`}
+                        />
                     </button>
                 </div>
             )}
-            {cols.includes('technicalUser') && (
+            {cols.includes('artifact') && (
                 <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
+                    className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
                         isSelected
                             ? 'bg-blue-50'
                             : index % 2 === 0
@@ -4200,27 +4214,67 @@ function SortableAccountRow({
                             : 'bg-slate-50/70'
                     }`}
                     data-row-id={row.id}
-                    data-col='technicalUser'
+                    data-col='artifact'
                     style={{width: '100%'}}
                 >
-                    <button
-                        onClick={() => onOpenTechnicalUserModal?.(row)}
-                        className='group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md'
-                        title={`Manage technical users for ${
-                            row.accountName || 'this account'
-                        }`}
-                        tabIndex={-1}
-                    >
-                        <User className='w-5 h-5 text-blue-600 group-hover:text-blue-700' />
-                        {row.technicalUsers &&
-                            row.technicalUsers.length > 0 && (
-                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center'>
-                                    <span className='text-[8px] text-white font-bold'>
-                                        {row.technicalUsers.length}
-                                    </span>
-                                </div>
-                            )}
-                    </button>
+                    <InlineEditableText
+                        value={row.artifact || ''}
+                        onCommit={(v) =>
+                            onUpdateField(row.id, 'artifact' as any, v)
+                        }
+                        className='text-[12px]'
+                        dataAttr={`artifact-${row.id}`}
+                        isError={isCellMissing(row.id, 'artifact')}
+                        placeholder='Enter artifact'
+                        {...createTabNavigation('artifact')}
+                    />
+                </div>
+            )}
+            {cols.includes('build') && (
+                <div
+                    className={`group relative text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 cursor-pointer hover:bg-blue-50/50 transition-colors ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='build'
+                    style={{width: '100%'}}
+                >
+                    <div className='flex items-center justify-between gap-2'>
+                        <div className='flex items-center gap-2 flex-1'>
+                            <span className='text-sm font-semibold text-blue-600'>
+                                {buildCount || 0}
+                            </span>
+                            <span className='text-xs text-gray-500'>
+                                builds
+                            </span>
+                        </div>
+                        <button
+                            className='opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-out p-1 hover:bg-blue-100 rounded-md text-blue-600 flex-shrink-0'
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onBuildDetailClick?.(row.id);
+                            }}
+                            title='View build details'
+                        >
+                            <svg
+                                className='w-4 h-4'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M12 4v16m8-8H4'
+                                />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             )}
             {/* actions column removed */}
@@ -4239,274 +4293,100 @@ function SortableAccountRow({
     );
 }
 
-const AccountsTable = forwardRef<any, AccountsTableProps>(({
-    rows,
-    onEdit,
-    onDelete,
-    title,
-    groupByExternal,
-    onGroupByChange,
-    hideControls,
-    visibleColumns,
-    highlightQuery,
-    customColumnLabels,
-    enableDropdownChips = false,
-    dropdownOptions = {},
-    onUpdateField,
-    hideRowExpansion = false,
-    enableInlineEditing = true,
-    incompleteRowIds = [],
-    showValidationErrors = false,
-    hasBlankRow = false,
-    onDropdownOptionUpdate,
-    onNewItemCreated,
-    onShowAllColumns,
-    compressingRowId = null,
-    foldingRowId = null,
-    compressingLicenseId = null,
-    foldingLicenseId = null,
-    triggerValidation = false,
-    onValidationComplete,
-    onAddNewRow,
-    externalSortColumn,
-    externalSortDirection,
-    onSortChange,
-    isAIInsightsPanelOpen = false,
-    onLicenseValidationChange,
-    onLicenseDelete,
-    onCompleteLicenseDeletion,
-    onOpenAddressModal,
-    onOpenTechnicalUserModal,
-}, ref) => {
-    // Local validation state to track rows with errors
-    const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
-    
-    // State for license deletion
-    const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<string | null>(null);
-    const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
-    
-    // State for expanded rows and licenses
-    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
-    const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
-    const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
-    
-    // State for selected enterprise (from top-right breadcrumb)
-    const [selectedEnterpriseName, setSelectedEnterpriseName] = useState<string>('');
-
-    // ContactModal state for license contact details
-    const [contactModalData, setContactModalData] = useState<Contact[]>([]);
-    const [showContactModal, setShowContactModal] = useState(false);
-    const [contactModalRowId, setContactModalRowId] = useState<string | null>(null);
-    const [contactModalLicenseId, setContactModalLicenseId] = useState<string | null>(null);
-    const [contactModalAccountName, setContactModalAccountName] = useState<string>('');
-    const [contactModalMasterAccount, setContactModalMasterAccount] = useState<string>('');
-
-    // Use refs to track previous values and avoid infinite loops
-    const prevRowsRef = useRef<AccountRow[]>([]);
-    const orderRef = useRef<string[]>([]);
-    
-    // Keep local state for editing, but initialize it safely
-    const [localEdits, setLocalEdits] = useState<Record<string, Partial<AccountRow>>>({});
-    
-    // Use useMemo for base derived state with stable comparison
-    const { baseLocalRows, order } = useMemo(() => {
-        // Check if rows array length or IDs have changed (shallow comparison)
-        const currentIds = rows.map(r => r.id).join(',');
-        const prevIds = prevRowsRef.current.map(r => r.id).join(',');
-        
-        if (currentIds === prevIds && rows.length === prevRowsRef.current.length) {
-            return {
-                baseLocalRows: prevRowsRef.current,
-                order: orderRef.current
-            };
-        }
-        
-        // Update refs and create new state
-        prevRowsRef.current = rows.map(r => ({ ...r }));
-        const newOrder = rows.map(r => r.id);
-        orderRef.current = newOrder;
-        
-        return {
-            baseLocalRows: prevRowsRef.current,
-            order: newOrder
-        };
-    }, [rows]);
-    
-    // Apply local edits to create final localRows with stable reference
-    const localRows = useMemo(() => {
-        return baseLocalRows.map(row => {
-            const edits = localEdits[row.id];
-            if (!edits || Object.keys(edits).length === 0) {
-                return row; // Return same reference if no edits
-            }
-            return {
-                ...row,
-                ...edits
-            };
-        });
-    }, [baseLocalRows, localEdits]);
-    
-    // Initialize rowLicenses from rows prop only once
-    const [hasInitializedLicenses, setHasInitializedLicenses] = useState(false);
-
-    // Expose methods to parent component via ref
-    useImperativeHandle(ref, () => ({
-        completeLicenseDeletion: () => {
-            if (pendingDeleteLicenseId && pendingDeleteRowId) {
-                console.log('🗑️ Completing license deletion via ref:', pendingDeleteLicenseId);
-                setRowLicenses(prev => ({
-                    ...prev,
-                    [pendingDeleteRowId]: (prev[pendingDeleteRowId] || []).filter(license => license.id !== pendingDeleteLicenseId)
-                }));
-                setPendingDeleteLicenseId(null);
-                setPendingDeleteRowId(null);
-                console.log('✅ License removed from rowLicenses state via ref');
-            }
+const BuildsTable = forwardRef<any, BuildsTableProps>(
+    (
+        {
+            rows,
+            onEdit,
+            onDelete,
+            title,
+            groupByExternal,
+            onGroupByChange,
+            hideControls,
+            visibleColumns,
+            highlightQuery,
+            customColumnLabels,
+            enableDropdownChips = false,
+            dropdownOptions = {},
+            onUpdateField,
+            hideRowExpansion = false,
+            enableInlineEditing = true,
+            incompleteRowIds = [],
+            showValidationErrors = false,
+            hasBlankRow = false,
+            onDropdownOptionUpdate,
+            onNewItemCreated,
+            onShowAllColumns,
+            compressingRowId = null,
+            foldingRowId = null,
+            compressingStageId = null,
+            foldingStageId = null,
+            triggerValidation = false,
+            onValidationComplete,
+            onAddNewRow,
+            externalSortColumn,
+            externalSortDirection,
+            onSortChange,
+            isAIInsightsPanelOpen = false,
+            onOpenAddressModal,
+            onOpenTechnicalUserModal,
+            onBuildDetailClick,
+            getBuildCount,
         },
-        getCurrentLicenseState: () => {
-            return rowLicenses;
-        },
-        expandAllRows: () => {
-            const allRowIds = rows.map(row => row.id);
-            setExpandedRows(new Set(allRowIds));
-            
-            // Initialize licenses for all rows that don't have them
-            setRowLicenses(prevLicenses => {
-                const newLicenses = { ...prevLicenses };
-                allRowIds.forEach(rowId => {
-                    if (!newLicenses[rowId]) {
-                        newLicenses[rowId] = [];
-                    }
-                });
-                return newLicenses;
-            });
-        },
-        collapseAllRows: () => {
-            setExpandedRows(new Set());
-        }
-    }), [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses, rows]);
+        ref,
+    ) => {
+        // Local validation state to track rows with errors
+        const [validationErrors, setValidationErrors] = useState<Set<string>>(
+            new Set(),
+        );
 
-    // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (row: AccountRow, field: string): boolean => {
-        switch (field) {
-            case 'accountName':
-                return !row.accountName || row.accountName.trim() === '';
-            case 'masterAccount':
-                return !row.masterAccount || row.masterAccount.trim() === '';
-            case 'cloudType':
-                return !row.cloudType || row.cloudType.trim() === '';
-            case 'address':
-                return !row.address || row.address.trim() === '';
-            default:
-                return false;
-        }
-    };
-
-    // Enhanced helper function to check if a cell should be highlighted as missing
-    const isCellMissing = (rowId: string, field: string) => {
-        const row = localRows.find((r) => r.id === rowId);
-        if (!row) return false;
-
-        // State for license deletion
-        const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<
+        // State for stage deletion
+        const [pendingDeleteStageId, setPendingDeleteStageId] = useState<
             string | null
         >(null);
         const [pendingDeleteRowId, setPendingDeleteRowId] = useState<
             string | null
         >(null);
 
-        // State for expanded rows and licenses
+        // State for expanded rows and stages
         const [expandedRows, setExpandedRows] = useState<Set<string>>(
             new Set(),
         );
-        const [rowLicenses, setRowLicenses] = useState<
-            Record<string, License[]>
+        const [rowStages, setRowStages] = useState<
+            Record<string, BuildStage[]>
         >({});
-        const [pendingLicenseRows, setPendingLicenseRows] = useState<
-            Set<string>
-        >(new Set());
-        const [licenseValidationTriggered, setLicenseValidationTriggered] =
-            useState<Set<string>>(new Set());
-
-        // ContactModal state for license contact details
-        const [contactModalData, setContactModalData] = useState<Contact[]>([]);
-        const [showContactModal, setShowContactModal] = useState(false);
-        const [contactModalRowId, setContactModalRowId] = useState<
-            string | null
-        >(null);
-        const [contactModalLicenseId, setContactModalLicenseId] = useState<
-            string | null
-        >(null);
-        const [contactModalAccountName, setContactModalAccountName] =
-            useState<string>('');
-        const [contactModalMasterAccount, setContactModalMasterAccount] =
-            useState<string>('');
 
         // Use refs to track previous values and avoid infinite loops
-        const prevRowsRef = useRef<AccountRow[]>([]);
+        const prevRowsRef = useRef<BuildRow[]>([]);
         const orderRef = useRef<string[]>([]);
 
         // Keep local state for editing, but initialize it safely
         const [localEdits, setLocalEdits] = useState<
-            Record<string, Partial<AccountRow>>
+            Record<string, Partial<BuildRow>>
         >({});
 
         // Use useMemo for base derived state with stable comparison
         const {baseLocalRows, order} = useMemo(() => {
+            // Handle undefined or null rows
+            if (!rows || !Array.isArray(rows)) {
+                return {
+                    baseLocalRows: [],
+                    order: [],
+                };
+            }
+
             // Check if rows array length or IDs have changed (shallow comparison)
             const currentIds = rows.map((r) => r.id).join(',');
             const prevIds = prevRowsRef.current.map((r) => r.id).join(',');
 
-            // Also check if addresses or technicalUsers arrays have changed
-            let dataChanged = false;
             if (
                 currentIds === prevIds &&
                 rows.length === prevRowsRef.current.length
             ) {
-                // Check if any row data has actually changed
-                for (let i = 0; i < rows.length; i++) {
-                    const currentRow = rows[i];
-                    const prevRow = prevRowsRef.current[i];
-
-                    // Compare addresses arrays
-                    const currentAddresses = JSON.stringify(
-                        currentRow.addresses || [],
-                    );
-                    const prevAddresses = JSON.stringify(
-                        prevRow.addresses || [],
-                    );
-
-                    // Compare technicalUsers arrays
-                    const currentTechUsers = JSON.stringify(
-                        currentRow.technicalUsers || [],
-                    );
-                    const prevTechUsers = JSON.stringify(
-                        prevRow.technicalUsers || [],
-                    );
-
-                    // Compare other relevant fields
-                    if (
-                        currentAddresses !== prevAddresses ||
-                        currentTechUsers !== prevTechUsers ||
-                        currentRow.accountName !== prevRow.accountName ||
-                        currentRow.masterAccount !== prevRow.masterAccount ||
-                        currentRow.cloudType !== prevRow.cloudType ||
-                        currentRow.email !== prevRow.email ||
-                        currentRow.phone !== prevRow.phone ||
-                        currentRow.address !== prevRow.address
-                    ) {
-                        dataChanged = true;
-                        break;
-                    }
-                }
-
-                if (!dataChanged) {
-                    return {
-                        baseLocalRows: prevRowsRef.current,
-                        order: orderRef.current,
-                    };
-                }
+                return {
+                    baseLocalRows: prevRowsRef.current,
+                    order: orderRef.current,
+                };
             }
 
             // Update refs and create new state
@@ -4534,95 +4414,56 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             });
         }, [baseLocalRows, localEdits]);
 
-        // Initialize rowLicenses from rows prop only once
-        const [hasInitializedLicenses, setHasInitializedLicenses] =
-            useState(false);
+        // Initialize rowStages from rows prop only once
+        const [hasInitializedStages, setHasInitializedStages] = useState(false);
 
         // Expose methods to parent component via ref
         useImperativeHandle(
             ref,
             () => ({
-                completeLicenseDeletion: () => {
-                    if (pendingDeleteLicenseId && pendingDeleteRowId) {
+                completeStageDeletion: () => {
+                    if (pendingDeleteStageId && pendingDeleteRowId) {
                         console.log(
-                            '🗑️ Completing license deletion via ref:',
-                            pendingDeleteLicenseId,
+                            '🗑️ Completing stage deletion via ref:',
+                            pendingDeleteStageId,
                         );
-                        setRowLicenses((prev) => ({
+                        setRowStages((prev) => ({
                             ...prev,
                             [pendingDeleteRowId]: (
                                 prev[pendingDeleteRowId] || []
                             ).filter(
-                                (license) =>
-                                    license.id !== pendingDeleteLicenseId,
+                                (stage) => stage.id !== pendingDeleteStageId,
                             ),
                         }));
-                        setPendingDeleteLicenseId(null);
+                        setPendingDeleteStageId(null);
                         setPendingDeleteRowId(null);
                         console.log(
-                            '✅ License removed from rowLicenses state via ref',
+                            '✅ Stage removed from rowStages state via ref',
                         );
                     }
                 },
-                getCurrentLicenseState: () => {
-                    return rowLicenses;
+                getCurrentStageState: () => {
+                    return rowStages;
                 },
             }),
-            [pendingDeleteLicenseId, pendingDeleteRowId, rowLicenses],
+            [pendingDeleteStageId, pendingDeleteRowId, rowStages],
         );
 
         // Helper function to check if a field is missing/invalid
-        const isFieldMissing = (row: AccountRow, field: string): boolean => {
+        const isFieldMissing = (row: BuildRow, field: string): boolean => {
             switch (field) {
-                case 'accountName':
-                    return !row.accountName || row.accountName.trim() === '';
-                case 'masterAccount':
-                    return (
-                        !row.masterAccount || row.masterAccount.trim() === ''
-                    );
-                case 'cloudType':
-                    return !row.cloudType || row.cloudType.trim() === '';
-                case 'address':
-                    return !row.address || row.address.trim() === '';
+                case 'buildName':
+                    return !row.buildName || row.buildName.trim() === '';
+                case 'description':
+                    return !row.description || row.description.trim() === '';
+                case 'entity':
+                    return !row.entity || row.entity.trim() === '';
+                case 'pipeline':
+                    return !row.pipeline || row.pipeline.trim() === '';
                 default:
                     return false;
             }
-            setHasInitializedLicenses(true);
-        }
-    }, [rows, hasInitializedLicenses]);
-    
-    // Load selected enterprise from localStorage and listen for changes
-    useEffect(() => {
-        const loadSelectedEnterprise = () => {
-            try {
-                const savedName = window.localStorage.getItem('selectedEnterpriseName');
-                if (savedName) {
-                    setSelectedEnterpriseName(savedName);
-                    console.log(`🏢 Loaded selected enterprise: ${savedName}`);
-                }
-            } catch (error) {
-                console.warn('Failed to load selected enterprise:', error);
-            }
         };
-
-        // Load on mount
-        loadSelectedEnterprise();
-
-        // Listen for enterprise changes
-        const handleEnterpriseChange = () => {
-            loadSelectedEnterprise();
-        };
-
-        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
-        window.addEventListener('storage', handleEnterpriseChange);
-
-        return () => {
-            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
-            window.removeEventListener('storage', handleEnterpriseChange);
-        };
-    }, []);
-    
-    // No useEffect needed - using useMemo for derived state above
 
         // Enhanced helper function to check if a cell should be highlighted as missing
         const isCellMissing = (rowId: string, field: string) => {
@@ -4655,7 +4496,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             localRows.forEach((row) => {
                 // Check if any required field is missing
                 if (
-                    isFieldMissing(row, 'accountName') ||
+                    isFieldMissing(row, 'buildName') ||
                     isFieldMissing(row, 'email') ||
                     isFieldMissing(row, 'phone')
                 ) {
@@ -4668,20 +4509,20 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         };
 
         useEffect(() => {
-            if (!hasInitializedLicenses) {
-                const initialLicenses: Record<string, License[]> = {};
+            if (!hasInitializedStages) {
+                const initialStages: Record<string, BuildStage[]> = {};
                 rows.forEach((row) => {
-                    if (row.licenses && row.licenses.length > 0) {
-                        initialLicenses[row.id] = row.licenses;
+                    if (row.stages && row.stages.length > 0) {
+                        initialStages[row.id] = row.stages;
                     }
                 });
 
-                if (Object.keys(initialLicenses).length > 0) {
-                    setRowLicenses(initialLicenses);
+                if (Object.keys(initialStages).length > 0) {
+                    setRowStages(initialStages);
                 }
-                setHasInitializedLicenses(true);
+                setHasInitializedStages(true);
             }
-        }, [rows, hasInitializedLicenses]);
+        }, [rows, hasInitializedStages]);
 
         // No useEffect needed - using useMemo for derived state above
 
@@ -4695,7 +4536,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     const row = {...baseRow, ...(localEdits[baseRow.id] || {})};
                     // Check if any required field is missing
                     if (
-                        isFieldMissing(row, 'accountName') ||
+                        isFieldMissing(row, 'buildName') ||
                         isFieldMissing(row, 'email') ||
                         isFieldMissing(row, 'phone')
                     ) {
@@ -4703,29 +4544,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     }
                 });
 
-    // Persist helpers
-    // Debounced autosave per-row to avoid excessive API traffic
-    const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, AccountRow>>({});
-    function schedulePersist(row: AccountRow, delay = 600) {
-        const rowId = String(row.id);
-        latestRowRef.current[rowId] = row;
-        if (saveTimersRef.current[rowId])
-            clearTimeout(saveTimersRef.current[rowId]);
-        saveTimersRef.current[rowId] = setTimeout(() => {
-            const latest = latestRowRef.current[rowId];
-            if (latest) void persistAccountRow(latest);
-        }, delay);
-    }
-    useEffect(() => {
-        return () => {
-            // cleanup pending timers on unmount without forcing save
-            const currentTimers = saveTimersRef.current;
-            Object.values(currentTimers).forEach((t) =>
-                clearTimeout(t),
-            );
-        };
-    }, []);
+                setValidationErrors(errorRowIds);
 
                 if (onValidationComplete) {
                     onValidationComplete(Array.from(errorRowIds));
@@ -4755,22 +4574,22 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             () =>
                 order
                     .map((id) => localRows.find((r) => r.id === id))
-                    .filter(Boolean) as AccountRow[],
+                    .filter(Boolean) as BuildRow[],
             [order, localRows],
         );
 
         // Persist helpers
         // Debounced autosave per-row to avoid excessive API traffic
         const saveTimersRef = useRef<Record<string, any>>({});
-        const latestRowRef = useRef<Record<string, AccountRow>>({});
-        function schedulePersist(row: AccountRow, delay = 600) {
+        const latestRowRef = useRef<Record<string, BuildRow>>({});
+        function schedulePersist(row: BuildRow, delay = 600) {
             const rowId = String(row.id);
             latestRowRef.current[rowId] = row;
             if (saveTimersRef.current[rowId])
                 clearTimeout(saveTimersRef.current[rowId]);
             saveTimersRef.current[rowId] = setTimeout(() => {
                 const latest = latestRowRef.current[rowId];
-                if (latest) void persistAccountRow(latest);
+                if (latest) void persistBuildRow(latest);
             }, delay);
         }
         useEffect(() => {
@@ -4782,43 +4601,15 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             };
         }, []);
 
-        // Only show license validation during explicit save attempts with incomplete licenses
+        // Only show stage validation during explicit save attempts with incomplete stages
         const prevShowValidationErrors = useRef(false);
         useEffect(() => {
-            // Only trigger license validation when showValidationErrors changes from false to true (save attempt)
-            if (showValidationErrors && !prevShowValidationErrors.current) {
-                const rowsWithIncompleteLicenses = new Set<string>();
-                Object.keys(rowLicenses).forEach((rowId) => {
-                    const licenses = rowLicenses[rowId] || [];
-                    const hasIncompleteLicense = licenses.some(
-                        (license) =>
-                            !license.enterprise?.trim() ||
-                            !license.product?.trim() ||
-                            !license.service?.trim() ||
-                            !license.licenseStartDate?.trim() ||
-                            !license.licenseEndDate?.trim() ||
-                            !license.numberOfUsers?.trim() ||
-                            (license.renewalNotice &&
-                                !license.noticePeriodDays?.trim()),
-                    );
-                    // Include any row that has licenses with incomplete data
-                    if (hasIncompleteLicense) {
-                        rowsWithIncompleteLicenses.add(rowId);
-                    }
-                });
-                console.log(
-                    '🔍 License validation triggered for rows:',
-                    Array.from(rowsWithIncompleteLicenses),
-                );
-                setLicenseValidationTriggered(rowsWithIncompleteLicenses);
-            } else if (!showValidationErrors) {
-                setLicenseValidationTriggered(new Set());
-            }
-            prevShowValidationErrors.current = showValidationErrors;
-        }, [showValidationErrors, rowLicenses]);
-        async function persistAccountRow(row: AccountRow) {
+            // Only trigger stage validation when showValidationErrors changes from false to true (save attempt)
+            // Stage validation removed - not needed for build stages
+        }, [showValidationErrors]);
+        async function persistBuildRow(row: BuildRow) {
             try {
-                // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
+                // Skip auto-save for temporary rows - let the parent handle build linkage auto-save
                 if (String(row.id || '').startsWith('tmp-')) {
                     console.log(
                         '⏭️ Skipping old auto-save for temporary row, letting linkage auto-save handle it:',
@@ -4827,42 +4618,42 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     return;
                 }
                 const core = {
-                    // Core fields for account configuration
-                    accountName: row.accountName,
-                    masterAccount: row.masterAccount,
-                    cloudType: row.cloudType,
-                    address: row.address,
+                    // Core fields for build configuration
+                    accountName: row.buildName,
+                    masterAccount: row.description,
+                    cloudType: row.entity,
+                    address: row.pipeline,
                 } as any;
                 // Map UI state into backend details JSON expected by server
                 const details = {
                     // Account configuration specific fields
-                    accountName: row.accountName || '',
-                    masterAccount: row.masterAccount || '',
-                    cloudType: row.cloudType || '',
-                    address: row.address || '',
+                    accountName: row.buildName || '',
+                    masterAccount: row.description || '',
+                    cloudType: row.entity || '',
+                    address: row.pipeline || '',
                 } as any;
                 // Handle existing (non-temporary) rows
-                // Check if we're on account management page
+                // Check if we're on build management page
                 if (
                     typeof window !== 'undefined' &&
                     window.location.pathname.includes('/manage-accounts')
                 ) {
                     console.log(
-                        '🔄 Updating account linkage instead of enterprise:',
+                        '🔄 Updating build linkage instead of enterprise:',
                         row.id,
                     );
 
-                    // For account management, update the linkage via the parent's onUpdateField
-                    // The parent component will handle the account linkage updates
+                    // For build management, update the linkage via the parent's onUpdateField
+                    // The parent component will handle the build linkage updates
                     console.log(
-                        '⏭️ Skipping direct API call for account management page',
+                        '⏭️ Skipping direct API call for build management page',
                     );
                     return;
                 }
 
                 // For account management, all persistence is handled by parent component
                 console.log(
-                    '⏭️ Skipping API call - account management handled by parent',
+                    '⏭️ Skipping API call - build management handled by parent',
                 );
                 return;
             } catch (_e) {
@@ -4872,10 +4663,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         function updateRowField(
             rowId: string,
-            key: keyof AccountRow,
+            key: keyof BuildRow,
             value: any,
         ) {
-            let changed: AccountRow | null = null;
+            let changed: BuildRow | null = null;
 
             // Update local edits instead of directly modifying localRows
             setLocalEdits((prev) => {
@@ -4884,7 +4675,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 if (baseRow) {
                     const currentEdits = prev[rowId] || {};
                     const currentRow = {...baseRow, ...currentEdits};
-                    const next = {...currentRow, [key]: value} as AccountRow;
+                    const next = {...currentRow, [key]: value} as BuildRow;
                     changed = next;
 
                     return {
@@ -4911,7 +4702,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             }
         }
 
-        // License management functions
+        // Stage management functions
         const toggleRowExpansion = (rowId: string) => {
             setExpandedRows((prev) => {
                 const newSet = new Set(prev);
@@ -4919,10 +4710,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     newSet.delete(rowId);
                 } else {
                     newSet.add(rowId);
-                    // Initialize licenses if not exist
-                    if (!rowLicenses[rowId]) {
-                        setRowLicenses((prevLicenses) => ({
-                            ...prevLicenses,
+                    // Initialize stages if not exist
+                    if (!rowStages[rowId]) {
+                        setRowStages((prevStages) => ({
+                            ...prevStages,
                             [rowId]: [],
                         }));
                     }
@@ -4931,497 +4722,175 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             });
         };
 
-        // Expand all rows function
-        const expandAllRows = () => {
-            const allRowIds = orderedItems.map((row) => row.id);
-            setExpandedRows(new Set(allRowIds));
-
-            // Initialize licenses for all rows that don't have them
-            setRowLicenses((prevLicenses) => {
-                const newLicenses = {...prevLicenses};
-                allRowIds.forEach((rowId) => {
-                    if (!newLicenses[rowId]) {
-                        newLicenses[rowId] = [];
-                    }
-                });
-                return newLicenses;
-            });
-        };
-
-        // Collapse all rows function
-        const collapseAllRows = () => {
-            setExpandedRows(new Set());
-        };
-
         // Helper function to check if main row fields are complete
-        const isMainRowComplete = (row: AccountRow): boolean => {
+        const isMainRowComplete = (row: BuildRow): boolean => {
             return !!(
-                row.accountName &&
-                row.accountName.trim() &&
-                row.masterAccount &&
-                row.masterAccount.trim() &&
-                row.cloudType &&
-                row.cloudType.trim()
+                row.buildName &&
+                row.buildName.trim() &&
+                row.description &&
+                row.description.trim() &&
+                row.entity &&
+                row.entity.trim()
             );
         };
 
-        const addNewLicense = (rowId: string) => {
-            const newLicenseId = `license-${rowId}-${Date.now()}`;
-            const newLicense: License = {
-                id: newLicenseId,
-                enterprise: '',
-                product: '',
-                service: '',
-                licenseStartDate: '',
-                licenseEndDate: '',
-                numberOfUsers: '',
-                contactDetails: {
-                    id: generateId(),
-                    name: '',
-                    email: '',
-                    phone: '',
-                    department: '',
-                    designation: '',
-                    company: '',
-                },
-                renewalNotice: false,
-                noticePeriodDays: '',
+        const addNewStage = (rowId: string) => {
+            const newStageId = `stage-${rowId}-${Date.now()}`;
+            const newStage: BuildStage = {
+                id: newStageId,
+                name: '',
+                status: '',
+                deployedAt: '',
             };
 
-            // Ensure the row is expanded when adding a license
+            // Ensure the row is expanded when adding a stage
             setExpandedRows((prev) => {
                 const newSet = new Set(prev);
                 newSet.add(rowId);
                 return newSet;
             });
 
-            setRowLicenses((prev) => ({
+            setRowStages((prev) => ({
                 ...prev,
-                [rowId]: [...(prev[rowId] || []), newLicense],
+                [rowId]: [...(prev[rowId] || []), newStage],
             }));
 
-            // Clear license validation for this row when adding new license
-            setLicenseValidationTriggered((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(rowId);
-                return newSet;
-            });
-
-            // Mark this row as having pending licenses for validation
-            setPendingLicenseRows((prev) => {
-                const newSet = new Set(prev);
-                newSet.add(rowId);
-                return newSet;
-            });
-
-            // Don't trigger auto-save for adding empty license - only when fields are filled
-            // But still update parent state so validation can see the empty license
+            // Update parent state with the new stage
             if (onUpdateField) {
-                const currentLicenses = rowLicenses[rowId] || [];
-                const updatedLicenses = [...currentLicenses, newLicense];
-                onUpdateField(rowId, 'licenses', updatedLicenses);
+                const currentStages = rowStages[rowId] || [];
+                const updatedStages = [...currentStages, newStage];
+                onUpdateField(rowId, 'stages', updatedStages);
             }
 
-            // Don't clear validation errors when adding new license - let existing validation state persist
+            // Don't clear validation errors when adding new stage - let existing validation state persist
             // This allows multiple accounts to maintain their validation highlighting
 
             console.log(
-                '➕ Added new empty license, updated parent state but preserved validation state:',
+                '➕ Added new empty stage, updated parent state but preserved validation state:',
                 {
                     rowId,
-                    licenseId: newLicenseId,
+                    stageId: newStageId,
                 },
             );
         };
 
-        const updateLicense = (
+        const updateStage = (
             rowId: string,
-            licenseId: string,
-            field: keyof License,
-            value: string | boolean,
+            stageId: string,
+            field: keyof BuildStage,
+            value: string,
         ) => {
-            setRowLicenses((prev) => {
-                const updatedLicenses = {
+            setRowStages((prev) => {
+                const updatedStages = {
                     ...prev,
-                    [rowId]: (prev[rowId] || []).map((license) =>
-                        license.id === licenseId
-                            ? {...license, [field]: value}
-                            : license,
+                    [rowId]: (prev[rowId] || []).map((stage) =>
+                        stage.id === stageId
+                            ? {...stage, [field]: value}
+                            : stage,
                     ),
                 };
 
-                // Check if the license is now complete using the updated state
-                const updatedLicense = updatedLicenses[rowId]?.find(
-                    (l) => l.id === licenseId,
-                );
-                if (
-                    updatedLicense &&
-                    updatedLicense.enterprise &&
-                    updatedLicense.product &&
-                    updatedLicense.service &&
-                    updatedLicense.licenseStartDate &&
-                    updatedLicense.licenseEndDate &&
-                    updatedLicense.numberOfUsers &&
-                    (!updatedLicense.renewalNotice ||
-                        updatedLicense.noticePeriodDays)
-                ) {
-                    // License is complete, check if all licenses in row are complete
-                    const allLicenses = updatedLicenses[rowId] || [];
-                    const allComplete = allLicenses.every(
-                        (l) =>
-                            l.enterprise &&
-                            l.product &&
-                            l.service &&
-                            l.licenseStartDate &&
-                            l.licenseEndDate &&
-                            l.numberOfUsers &&
-                            (!l.renewalNotice || l.noticePeriodDays),
-                    );
-                    if (allComplete) {
-                        // Use setTimeout to avoid state update during render
-                        setTimeout(() => {
-                            setPendingLicenseRows((prev) => {
-                                const newSet = new Set(prev);
-                                newSet.delete(rowId);
-                                return newSet;
-                            });
-                        }, 0);
-                    }
-                } else if (updatedLicense) {
-                    // License is incomplete, ensure it's marked as pending
-                    setTimeout(() => {
-                        setPendingLicenseRows((prev) => {
-                            const newSet = new Set(prev);
-                            newSet.add(rowId);
-                            return newSet;
-                        });
-                    }, 0);
-                }
-
-                return updatedLicenses;
+                // Check if the stage is now complete using the updated state
+                return updatedStages;
             });
 
-            // Only trigger auto-save for license updates if ALL mandatory fields are complete
-            // This prevents auto-save from triggering on partial license completion
-            const isValueEmpty =
-                typeof value === 'boolean'
-                    ? false
-                    : !value || value.trim() === '';
-
-            if (!isValueEmpty && onUpdateField) {
-                // Get the updated licenses for this row
-                const updatedRowLicenses =
-                    rowLicenses[rowId]?.map((license) =>
-                        license.id === licenseId
-                            ? {...license, [field]: value}
-                            : license,
+            // Trigger auto-save for stage updates
+            if (onUpdateField) {
+                const updatedRowStages =
+                    rowStages[rowId]?.map((stage) =>
+                        stage.id === stageId
+                            ? {...stage, [field]: value}
+                            : stage,
                     ) || [];
 
-                // Check if this specific license now has all mandatory fields completed
-                const updatedLicense = updatedRowLicenses.find(
-                    (license) => license.id === licenseId,
-                );
-                const hasAllFields =
-                    updatedLicense &&
-                    updatedLicense.enterprise?.trim() &&
-                    updatedLicense.product?.trim() &&
-                    updatedLicense.service?.trim() &&
-                    updatedLicense.licenseStartDate?.trim() &&
-                    updatedLicense.licenseEndDate?.trim() &&
-                    updatedLicense.numberOfUsers?.trim() &&
-                    (!updatedLicense.renewalNotice ||
-                        updatedLicense.noticePeriodDays?.trim());
-
-                if (hasAllFields) {
-                    console.log(
-                        '🔄 Triggering auto-save for complete license:',
-                        {
-                            rowId,
-                            licenseId,
-                            field,
-                            value,
-                            hasAllFields,
-                            licenseData: updatedLicense,
-                        },
-                    );
-                    onUpdateField(rowId, 'licenses', updatedRowLicenses);
-                } else {
-                    console.log(
-                        '⏳ License incomplete, not triggering auto-save yet:',
-                        {
-                            rowId,
-                            licenseId,
-                            field,
-                            value,
-                            hasAllFields,
-                            licenseData: updatedLicense,
-                            missing: {
-                                enterprise: !updatedLicense?.enterprise?.trim(),
-                                product: !updatedLicense?.product?.trim(),
-                                service: !updatedLicense?.service?.trim(),
-                                licenseStartDate:
-                                    !updatedLicense?.licenseStartDate?.trim(),
-                                licenseEndDate:
-                                    !updatedLicense?.licenseEndDate?.trim(),
-                                numberOfUsers:
-                                    !updatedLicense?.numberOfUsers?.trim(),
-                                noticePeriodDays:
-                                    updatedLicense?.renewalNotice &&
-                                    !updatedLicense?.noticePeriodDays?.trim(),
-                            },
-                        },
-                    );
-                }
-            } else if (isValueEmpty) {
-                console.log(
-                    '❌ Not triggering auto-save for empty license field:',
-                    {
-                        rowId,
-                        licenseId,
-                        field,
-                        value,
-                        isValueEmpty,
-                    },
-                );
+                onUpdateField(rowId, 'stages', updatedRowStages);
             }
         };
 
-        const deleteLicense = async (rowId: string, licenseId: string) => {
+        const deleteStage = async (rowId: string, stageId: string) => {
             // Store the deletion context for completion after confirmation
-            setPendingDeleteLicenseId(licenseId);
+            setPendingDeleteStageId(stageId);
             setPendingDeleteRowId(rowId);
 
-            if (onLicenseDelete) {
-                // Use the parent's animation callback
-                await onLicenseDelete(licenseId);
-            } else {
-                // Direct deletion if no animation callback
-                setRowLicenses((prev) => ({
-                    ...prev,
-                    [rowId]: (prev[rowId] || []).filter(
-                        (license) => license.id !== licenseId,
-                    ),
-                }));
+            // Direct deletion
+            setRowStages((prev) => ({
+                ...prev,
+                [rowId]: (prev[rowId] || []).filter(
+                    (stage) => stage.id !== stageId,
+                ),
+            }));
 
-                // Trigger auto-save for license deletion
-                if (onUpdateField) {
-                    const updatedLicenses = (rowLicenses[rowId] || []).filter(
-                        (license) => license.id !== licenseId,
-                    );
-                    onUpdateField(rowId, 'licenses', updatedLicenses);
-                }
+            // Trigger auto-save for stage deletion
+            if (onUpdateField) {
+                const updatedStages = (rowStages[rowId] || []).filter(
+                    (stage) => stage.id !== stageId,
+                );
+                onUpdateField(rowId, 'stages', updatedStages);
             }
         };
 
-        // Complete the license deletion when animation and confirmation are done
-        const completeLicenseDeletion = () => {
-            if (pendingDeleteLicenseId && pendingDeleteRowId) {
+        // Complete the stage deletion when animation and confirmation are done
+        const completeStageDeletion = () => {
+            if (pendingDeleteStageId && pendingDeleteRowId) {
                 const rowId = pendingDeleteRowId;
-                const licenseId = pendingDeleteLicenseId;
+                const stageId = pendingDeleteStageId;
 
-                setRowLicenses((prev) => {
-                    const updatedLicenses = {
+                setRowStages((prev) => {
+                    const updatedStages = {
                         ...prev,
                         [rowId]: (prev[rowId] || []).filter(
-                            (license) => license.id !== licenseId,
+                            (stage) => stage.id !== stageId,
                         ),
                     };
 
-                    // Trigger auto-save for license deletion after animation
+                    // Trigger auto-save for stage deletion after animation
                     if (onUpdateField) {
                         onUpdateField(
                             rowId,
-                            'licenses',
-                            updatedLicenses[rowId] || [],
+                            'stages',
+                            updatedStages[rowId] || [],
                         );
                     }
 
-                    return updatedLicenses;
+                    return updatedStages;
                 });
 
-                setPendingDeleteLicenseId(null);
+                setPendingDeleteStageId(null);
                 setPendingDeleteRowId(null);
             }
         };
 
-        // Complete license deletion when animations and confirmation are done
-        useEffect(() => {
-            if (onCompleteLicenseDeletion) {
-                onCompleteLicenseDeletion();
-            }
-        }, [onCompleteLicenseDeletion]);
-
-        // Expose the completion function to parent via callback
-        useEffect(() => {
-            if (pendingDeleteLicenseId && pendingDeleteRowId) {
-                // Register the completion function
-                window.completeLicenseDeletion = () => {
-                    console.log(
-                        '🗑️ Completing license deletion in AccountsTable:',
-                        pendingDeleteLicenseId,
-                    );
-                    setRowLicenses((prev) => ({
-                        ...prev,
-                        [pendingDeleteRowId]: (
-                            prev[pendingDeleteRowId] || []
-                        ).filter(
-                            (license) => license.id !== pendingDeleteLicenseId,
-                        ),
-                    }));
-                    setPendingDeleteLicenseId(null);
-                    setPendingDeleteRowId(null);
-                    console.log('✅ License removed from rowLicenses state');
-                };
-            }
-        }, [pendingDeleteLicenseId, pendingDeleteRowId]);
-
-        const isLicenseFieldMissing = (
-            license: License,
-            field: keyof License,
+        const isStageFieldMissing = (
+            stage: BuildStage,
+            field: keyof BuildStage,
         ): boolean => {
-            let isMissing = false;
-            switch (field) {
-                case 'enterprise':
-                case 'product':
-                case 'service':
-                case 'licenseStartDate':
-                case 'licenseEndDate':
-                case 'numberOfUsers':
-                    isMissing = !license[field] || license[field].trim() === '';
-                    break;
-                case 'noticePeriodDays':
-                    // Only required if renewalNotice is enabled
-                    isMissing =
-                        license.renewalNotice &&
-                        (!license.noticePeriodDays ||
-                            license.noticePeriodDays.trim() === '');
-                    break;
-                default:
-                    isMissing = false;
-            }
-
-            // Debug logging for missing fields
-            if (isMissing && showValidationErrors) {
-                console.log(
-                    `🔴 License field missing - License ID: ${
-                        license.id
-                    }, Field: ${field}, Value: "${
-                        license[field] || ''
-                    }", showValidationErrors: ${showValidationErrors}`,
-                );
-            }
-
-            return isMissing;
-        };
-
-    const [groupBy, setGroupBy] = useState<
-        'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
-    >('none');
-    // sync external groupBy
-    React.useEffect(() => {
-        if (groupByExternal) setGroupBy(groupByExternal);
-    }, [groupByExternal]);
-
-    const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
-        () => [
-            // Only the required columns
-            'accountName',
-            'masterAccount',
-            'cloudType',
-            'address',
-            'technicalUser',
-        ],
-        [],
-    );
-    const cols = useMemo(() => {
-        const base = (columnOrder || []) as string[];
-        if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
-        if (visibleColumns.length === 0) return []; // If empty array, show no columns
-        const allowed = new Set(visibleColumns as string[]);
-        // Keep canonical order from columnOrder; filter by visibility
-        return base.filter((c) => allowed.has(c));
-    }, [visibleColumns, columnOrder]);
-
-    const colSizes = useMemo(() => ({
-        deleteButton: '8px', // Space for delete button with proper padding
-        accountName: '200px', // Account name column - increased for label + arrows + resize handle
-        masterAccount: '200px', // Master Account column
-        cloudType: '160px', // Cloud Type column
-        address: '120px', // Address column - increased width for icon + text alignment
-        technicalUser: '140px', // Technical User column - increased width for icon + text alignment
-        email: '220px', // Email column - increased for label + arrows + resize handle
-        phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
-    } as Record<string, string>), []);
-    const [customColumns, setCustomColumns] = useState<string[]>([]);
-    const [colWidths, setColWidths] = useState<Record<string, number>>({});
-    const [subItems, setSubItems] = useState<Record<string, string[]>>({});
-
-    const [pinFirst, setPinFirst] = useState(true);
-    const firstColWidth = '140px'; // enforce fixed width for first column
-    const gridTemplate = useMemo(() => {
-        // Always include delete button column first with fixed width
-        const deleteCol = '32px'; // Fixed width for delete button
-        
-        const base = cols.map((c, index) => {
-            // Use dynamic width if available, otherwise fall back to default
-            const dynamicWidth = colWidths[c];
-            
-            // Define minimum and maximum widths per column
-            const constraints = {
-                accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
-                masterAccount: { min: 190, max: 310 }, // Master Account column constraints
-                cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
-                address: { min: 120, max: 200 }, // Address column constraints - increased for icon + text
-                technicalUser: { min: 140, max: 220 }, // Technical User column constraints - increased for icon + text
-            };
-            
-            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
-            
-            if (dynamicWidth && dynamicWidth > 0) {
-                // For Services column, use minmax to fill remaining space
-                if (c === 'services') {
-                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
-                }
-                // Clamp the dynamic width within constraints for other columns
-                const clampedWidth = Math.max(
-                    columnConstraints.min, 
-                    Math.min(columnConstraints.max, dynamicWidth)
-                );
-            }
-        }, [rowLicenses, onLicenseValidationChange]);
-
-        // Function to check if there are any incomplete licenses
-        const hasIncompleteLicenses = () => {
-            return Object.entries(rowLicenses).some(([rowId, licenses]) =>
-                licenses.some(
-                    (license) =>
-                        !license.enterprise ||
-                        !license.product ||
-                        !license.service ||
-                        !license.licenseStartDate ||
-                        !license.licenseEndDate ||
-                        !license.numberOfUsers ||
-                        (license.renewalNotice && !license.noticePeriodDays),
-                ),
-            );
+            // Simple check if field is empty
+            return !stage[field] || stage[field].toString().trim() === '';
         };
 
         const [groupBy, setGroupBy] = useState<
-            'none' | 'accountName' | 'masterAccount' | 'cloudType' | 'address'
+            | 'none'
+            | 'buildName'
+            | 'description'
+            | 'entity'
+            | 'pipeline'
+            | 'status'
         >('none');
         // sync external groupBy
         React.useEffect(() => {
             if (groupByExternal) setGroupBy(groupByExternal);
         }, [groupByExternal]);
 
-        const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
+        const columnOrder: BuildsTableProps['visibleColumns'] = useMemo(
             () => [
-                // Only the required columns
-                'accountName',
-                'masterAccount',
-                'cloudType',
-                'address',
-                'technicalUser',
+                // Build-specific columns
+                'buildName',
+                'description',
+                'entity',
+                'pipeline',
+                'status',
+                'artifact',
+                'build',
             ],
             [],
         );
@@ -5436,13 +4905,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         const colSizes: Record<string, string> = {
             deleteButton: '8px', // Space for delete button with proper padding
-            accountName: '200px', // Account name column - increased for label + arrows + resize handle
-            masterAccount: '200px', // Master Account column
-            cloudType: '160px', // Cloud Type column
-            address: '120px', // Address column - increased width for icon + text alignment
-            technicalUser: '140px', // Technical User column - increased width for icon + text alignment
-            email: '220px', // Email column - increased for label + arrows + resize handle
-            phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
+            buildName: '200px', // Build name column
+            description: '250px', // Description column
+            entity: '160px', // Entity column
+            pipeline: '160px', // Pipeline column
+            status: '140px', // Status column
+            artifact: '180px', // Artifact column
+            build: '140px', // Build column
         };
         const [customColumns, setCustomColumns] = useState<string[]>([]);
         const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -5460,11 +4929,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
                 // Define minimum and maximum widths per column
                 const constraints = {
-                    accountName: {min: 180, max: 300}, // Increased min width to prevent arrow overlap
-                    masterAccount: {min: 190, max: 310}, // Master Account column constraints
-                    cloudType: {min: 160, max: 280}, // Cloud Type column constraints
-                    address: {min: 120, max: 200}, // Address column constraints - increased for icon + text
-                    technicalUser: {min: 140, max: 220}, // Technical User column constraints - increased for icon + text
+                    buildName: {min: 180, max: 300},
+                    description: {min: 200, max: 400},
+                    entity: {min: 140, max: 250},
+                    pipeline: {min: 140, max: 250},
+                    status: {min: 120, max: 200},
+                    artifact: {min: 150, max: 280},
+                    build: {min: 120, max: 200},
                 };
 
                 const columnConstraints = constraints[
@@ -5522,103 +4993,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         const handleDeleteClick = (rowId: string) => {
             if (onDelete) {
                 onDelete(rowId);
-            }
-        };
-
-        // ContactModal handlers for license contact details
-        const handleOpenContactModal = (
-            rowId: string,
-            licenseId: string,
-            initialData?: Contact,
-        ) => {
-            const row = localRows.find((r) => r.id === rowId);
-            setContactModalRowId(rowId);
-            setContactModalLicenseId(licenseId);
-            setContactModalAccountName(row?.accountName || '');
-            setContactModalMasterAccount(row?.masterAccount || '');
-            setContactModalData(initialData ? [initialData] : []);
-            setShowContactModal(true);
-        };
-
-        const handleCloseContactModal = () => {
-            setShowContactModal(false);
-            setContactModalData([]);
-            setContactModalRowId(null);
-            setContactModalLicenseId(null);
-            setContactModalAccountName('');
-            setContactModalMasterAccount('');
-        };
-
-        const handleContactModalSave = async (contacts: Contact[]) => {
-            if (!contactModalRowId || !contactModalLicenseId) return;
-
-            // Update the license's contact details with the first contact
-            const contactData =
-                contacts.length > 0
-                    ? contacts[0]
-                    : {
-                          id: generateId(),
-                          name: '',
-                          email: '',
-                          phone: '',
-                          department: '',
-                          designation: '',
-                          company: '',
-                      };
-
-            console.log(
-                '💾 Saving contact details for license:',
-                contactModalLicenseId,
-                'Contact:',
-                contactData,
-            );
-
-            // Persist to backend API
-            try {
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-                const response = await fetch(
-                    `${apiBase}/api/accounts/${contactModalRowId}/licenses/${contactModalLicenseId}`,
-                    {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            contactDetails: contactData,
-                        }),
-                    },
-                );
-
-                if (!response.ok) {
-                    throw new Error('Failed to update license contact details');
-                }
-
-                console.log('✅ Contact details saved to backend successfully');
-
-                // Update local state
-                setRowLicenses((prev) => {
-                    const rowLicenses = prev[contactModalRowId] || [];
-                    const updatedLicenses = rowLicenses.map((license) => {
-                        if (license.id === contactModalLicenseId) {
-                            return {
-                                ...license,
-                                contactDetails: contactData,
-                            };
-                        }
-                        return license;
-                    });
-
-                    return {
-                        ...prev,
-                        [contactModalRowId]: updatedLicenses,
-                    };
-                });
-
-                handleCloseContactModal();
-            } catch (error) {
-                console.error('❌ Error saving contact details:', error);
-                // Optionally show an error toast to the user
             }
         };
 
@@ -5838,12 +5212,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         // Use external sort state if provided, otherwise fall back to internal state
         const [internalSortCol, setInternalSortCol] = useState<
-            | 'accountName'
-            | 'email'
-            | 'phone'
-            | 'status'
-            | 'servicesCount'
-            | null
+            'buildName' | 'email' | 'phone' | 'status' | 'servicesCount' | null
         >(null);
         const [internalSortDir, setInternalSortDir] = useState<
             'asc' | 'desc' | null
@@ -5871,7 +5240,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         const sortDir = externalSortDirection || internalSortDir;
 
         const toggleSort = (
-            col: 'accountName' | 'email' | 'phone' | 'status' | 'servicesCount',
+            col: 'buildName' | 'email' | 'phone' | 'status' | 'servicesCount',
             direction?: 'asc' | 'desc',
         ) => {
             let nextDir: 'asc' | 'desc';
@@ -5951,23 +5320,23 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 return {'All Records': displayItems};
             }
 
-            const groups: Record<string, AccountRow[]> = {};
+            const groups: Record<string, BuildRow[]> = {};
 
             displayItems.forEach((item) => {
                 let groupKey = '';
 
                 switch (groupBy) {
-                    case 'accountName':
-                        groupKey = item.accountName || '(No Account Name)';
+                    case 'buildName':
+                        groupKey = item.buildName || '(No Build Name)';
                         break;
-                    case 'masterAccount':
-                        groupKey = item.masterAccount || '(No Master Account)';
+                    case 'description':
+                        groupKey = item.description || '(No Description)';
                         break;
-                    case 'cloudType':
-                        groupKey = item.cloudType || '(No Cloud Type)';
+                    case 'entity':
+                        groupKey = item.entity || '(No Entity)';
                         break;
-                    case 'address':
-                        groupKey = item.address || '(No Address)';
+                    case 'pipeline':
+                        groupKey = item.pipeline || '(No Pipeline)';
                         break;
                     default:
                         groupKey = 'All Records';
@@ -5980,7 +5349,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             });
 
             // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-            const sortedGroups: Record<string, AccountRow[]> = {};
+            const sortedGroups: Record<string, BuildRow[]> = {};
             const sortedKeys = Object.keys(groups).sort((a, b) => {
                 const aIsEmpty = a.startsWith('(No ');
                 const bIsEmpty = b.startsWith('(No ');
@@ -6019,7 +5388,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 const contentWidth = tableContainerRef.current.scrollWidth;
                 const containerWidth = tableContainerRef.current.clientWidth;
 
-                // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
+                // Increased buffer to compensate for hover scale effects (scale: 1.02 = 2% increase)
                 const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
 
                 // Only show scrollbar when content genuinely exceeds container accounting for hover effects
@@ -6283,37 +5652,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     .bg-slate-50 {
                         overflow: hidden;
                     }
-                `
-            }} />
-
-            {cols.length === 0 ? (
-                <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
-                    <div className='flex flex-col items-center space-y-4'>
-                        <svg
-                            className='w-12 h-12 text-slate-400'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                            stroke='currentColor'
-                        >
-                            <path
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                                strokeWidth={1.5}
-                                d='M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
-                            />
-                        </svg>
-                        <div className='space-y-2'>
-                            <h3 className='text-lg font-medium text-slate-900'>
-                                No columns are visible
-                            </h3>
-                            <p className='text-sm text-slate-500 max-w-sm'>
-                                All columns have been hidden. Use the Show/Hide button in the toolbar to select which columns to display, or click the button below to show all columns.
-                            </p>
-                        </div>
-                        {onShowAllColumns && (
-                            <button
-                                onClick={onShowAllColumns}
-                                className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200'
+                `,
+                    }}
+                />
+                {cols.length === 0 ? (
+                    <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
+                        <div className='flex flex-col items-center space-y-4'>
+                            <svg
+                                className='w-12 h-12 text-slate-400'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
                             >
                                 <path
                                     strokeLinecap='round'
@@ -6385,11 +5734,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         >
                             {(() => {
                                 const defaultLabels: Record<string, string> = {
-                                    accountName: 'Account Name',
-                                    masterAccount: 'Master Account',
-                                    cloudType: 'Cloud Type',
-                                    address: 'Address',
-                                    technicalUser: 'Technical User',
+                                    buildName: 'Job Name',
+                                    description: 'Description',
+                                    entity: 'Entity',
+                                    pipeline: 'Pipeline',
+                                    status: 'Status',
+                                    artifact: 'Artifact',
+                                    build: 'Build',
                                 };
 
                                 // Merge custom labels with defaults
@@ -6400,11 +5751,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
                                 const iconFor: Record<string, React.ReactNode> =
                                     {
-                                        accountName: <User size={14} />,
-                                        masterAccount: <Building2 size={14} />,
-                                        cloudType: <FileText size={14} />,
-                                        address: <MapPin size={14} />,
-                                        technicalUser: <User size={14} />,
+                                        buildName: <FileText size={14} />,
+                                        description: <FileText size={14} />,
+                                        entity: <Building2 size={14} />,
+                                        pipeline: <Activity size={14} />,
+                                        status: <Bell size={14} />,
+                                        artifact: <Package size={14} />,
+                                        build: <Cpu size={14} />,
                                     };
                                 return (
                                     <div
@@ -6430,28 +5783,140 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                             <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
                                                 {/* Empty header for delete column */}
                                             </div>
-                                            {[
-                                                'accountName',
-                                                'masterAccount',
-                                                'cloudType',
-                                                'email',
-                                                'phone',
-                                            ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'phone' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
-                                                    <button
-                                                        onClick={() => toggleSort(c as any, 'asc')}
-                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
-                                                    >
-                                                        <ArrowUp
-                                                            size={sortCol === c && sortDir === 'asc' ? 14 : 12}
-                                                        />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleSort(c as any, 'desc')}
-                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
-                                                    >
-                                                        <ArrowDown
-                                                            size={sortCol === c && sortDir === 'desc' ? 14 : 12}
+
+                                            {cols.map((c, idx) => (
+                                                <div
+                                                    key={c}
+                                                    className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
+                                                        idx === 0
+                                                            ? 'border-l-0'
+                                                            : ''
+                                                    } ${
+                                                        idx === 0 &&
+                                                        pinFirst &&
+                                                        !shouldShowHorizontalScroll
+                                                            ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                            : ''
+                                                    } ${
+                                                        c === 'phone'
+                                                            ? 'border-r-0'
+                                                            : 'border-r border-slate-200' // Remove right border for Phone column
+                                                    }`}
+                                                    style={
+                                                        c === 'phone'
+                                                            ? {
+                                                                  minWidth:
+                                                                      '400px',
+                                                              }
+                                                            : undefined
+                                                    } // Match Phone column minimum width
+                                                >
+                                                    <div className='flex items-center gap-2'>
+                                                        {iconFor[c] &&
+                                                            iconFor[c]}
+                                                        <span>
+                                                            {labelFor[c] || c}
+                                                        </span>
+                                                    </div>
+                                                    {[
+                                                        'buildName',
+                                                        'description',
+                                                        'entity',
+                                                        'email',
+                                                        'phone',
+                                                    ].includes(c) && (
+                                                        <div
+                                                            className={`inline-flex items-center ml-4 ${
+                                                                c === 'phone'
+                                                                    ? ''
+                                                                    : 'absolute right-8 top-1/2 -translate-y-1/2'
+                                                            }`}
+                                                        >
+                                                            <button
+                                                                onClick={() =>
+                                                                    toggleSort(
+                                                                        c as any,
+                                                                        'asc',
+                                                                    )
+                                                                }
+                                                                className={`${
+                                                                    sortCol ===
+                                                                        c &&
+                                                                    sortDir ===
+                                                                        'asc'
+                                                                        ? 'text-blue-600 font-bold'
+                                                                        : 'text-slate-400'
+                                                                } transition-all duration-200 hover:text-slate-600`}
+                                                            >
+                                                                <ArrowUp
+                                                                    size={
+                                                                        sortCol ===
+                                                                            c &&
+                                                                        sortDir ===
+                                                                            'asc'
+                                                                            ? 20
+                                                                            : 16
+                                                                    }
+                                                                />
+                                                            </button>
+                                                            <button
+                                                                onClick={() =>
+                                                                    toggleSort(
+                                                                        c as any,
+                                                                        'desc',
+                                                                    )
+                                                                }
+                                                                className={`${
+                                                                    sortCol ===
+                                                                        c &&
+                                                                    sortDir ===
+                                                                        'desc'
+                                                                        ? 'text-blue-600 font-bold'
+                                                                        : 'text-slate-400'
+                                                                } transition-all duration-200 hover:text-slate-600`}
+                                                            >
+                                                                <ArrowDown
+                                                                    size={
+                                                                        sortCol ===
+                                                                            c &&
+                                                                        sortDir ===
+                                                                            'desc'
+                                                                            ? 20
+                                                                            : 16
+                                                                    }
+                                                                />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {/* Show resize handle for resizable columns but not for Phone (last column) */}
+                                                    {[
+                                                        'buildName',
+                                                        'description',
+                                                        'entity',
+                                                        'pipeline',
+                                                        'email',
+                                                    ].includes(c) && (
+                                                        <div
+                                                            onMouseDown={(
+                                                                e: any,
+                                                            ) =>
+                                                                startResize(
+                                                                    c,
+                                                                    e,
+                                                                )
+                                                            }
+                                                            className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                            title={`Resize ${
+                                                                labelFor[c] || c
+                                                            } column`}
+                                                        >
+                                                            <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
+                                                        </div>
+                                                    )}
+                                                    {c === 'buildName' && (
+                                                        <span
+                                                            aria-hidden
+                                                            className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
                                                         />
                                                     )}
                                                 </div>
@@ -6473,7 +5938,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                 <div className='mt-2'>
                                     {displayItems.map((r, idx) => (
                                         <div key={r.id}>
-                                            <SortableAccountRow
+                                            <SortableBuildRow
                                                 row={r}
                                                 index={idx}
                                                 cols={cols}
@@ -6528,184 +5993,76 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 onOpenTechnicalUserModal={
                                                     onOpenTechnicalUserModal
                                                 }
+                                                dropdownOptions={
+                                                    dropdownOptions
+                                                }
+                                                onBuildDetailClick={
+                                                    onBuildDetailClick
+                                                }
+                                                buildCount={
+                                                    getBuildCount
+                                                        ? getBuildCount(r.id)
+                                                        : 0
+                                                }
                                             />
                                             {expandedRows.has(r.id) && (
                                                 <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
                                                     {/* Vertical connection line from chevron */}
                                                     <div className='absolute -left-2 top-0 bottom-0 w-px bg-blue-400'></div>
 
-                                                    {/* License section header */}
+                                                    {/* Stage section header */}
                                                     <div className='p-3 pb-2'>
                                                         <h4 className='text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2'>
                                                             <FileText className='w-4 h-4' />
-                                                            Licenses for{' '}
-                                                            {r.accountName ||
-                                                                'Account'}
+                                                            Deployment Stages
+                                                            for{' '}
+                                                            {r.buildName ||
+                                                                'Build'}
                                                         </h4>
 
-                                                        {/* Render existing licenses */}
+                                                        {/* Render existing deployment stages */}
                                                         <div className='space-y-2'>
                                                             {(
-                                                                rowLicenses[
+                                                                rowStages[
                                                                     r.id
                                                                 ] || []
-                                                            ).map((license) => (
-                                                                <LicenseSubRow
+                                                            ).map((stage) => (
+                                                                <StageSubRow
                                                                     key={
-                                                                        license.id
+                                                                        stage.id
                                                                     }
-                                                                    license={
-                                                                        license
+                                                                    stage={
+                                                                        stage
                                                                     }
                                                                     rowId={r.id}
                                                                     onUpdate={(
-                                                                        licenseId,
+                                                                        stageId,
                                                                         field,
                                                                         value,
                                                                     ) =>
-                                                                        updateLicense(
+                                                                        updateStage(
                                                                             r.id,
-                                                                            licenseId,
+                                                                            stageId,
                                                                             field,
                                                                             value,
                                                                         )
                                                                     }
                                                                     onDelete={(
-                                                                        licenseId,
+                                                                        stageId,
                                                                     ) =>
-                                                                        deleteLicense(
+                                                                        deleteStage(
                                                                             r.id,
-                                                                            licenseId,
+                                                                            stageId,
                                                                         )
                                                                     }
-                                                                    showValidationErrors={
-                                                                        showValidationErrors &&
-                                                                        licenseValidationTriggered.has(
-                                                                            r.id,
-                                                                        )
+                                                                    compressingStageId={
+                                                                        compressingStageId
                                                                     }
-                                                                    isLicenseFieldMissing={
-                                                                        isLicenseFieldMissing
-                                                                    }
-                                                                    compressingLicenseId={
-                                                                        compressingLicenseId
-                                                                    }
-                                                                    foldingLicenseId={
-                                                                        foldingLicenseId
-                                                                    }
-                                                                    onDeleteClick={
-                                                                        onLicenseDelete
-                                                                    }
-                                                                    onDropdownOptionUpdate={
-                                                                        onDropdownOptionUpdate as any
-                                                                    }
-                                                                    onNewItemCreated={
-                                                                        onNewItemCreated as any
-                                                                    }
-                                                                    onOpenContactModal={
-                                                                        handleOpenContactModal
-                                                                    }
-                                                                    accounts={
-                                                                        rows
+                                                                    foldingStageId={
+                                                                        foldingStageId
                                                                     }
                                                                 />
                                                             ))}
-                                                        </div>
-
-                                                        {/* Add New License Button */}
-                                                        <div className='mt-4 ml-6'>
-                                                            <motion.button
-                                                                whileHover={{
-                                                                    scale: 1.02,
-                                                                    y: -1,
-                                                                }}
-                                                                whileTap={{
-                                                                    scale: 0.98,
-                                                                }}
-                                                                onClick={() =>
-                                                                    addNewLicense(
-                                                                        r.id,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    // Check if main row fields are incomplete
-                                                                    !isMainRowComplete(
-                                                                        r,
-                                                                    ) ||
-                                                                    // Check if there are any incomplete licenses in this row
-                                                                    (
-                                                                        rowLicenses[
-                                                                            r.id
-                                                                        ] || []
-                                                                    ).some(
-                                                                        (
-                                                                            license,
-                                                                        ) =>
-                                                                            !license.enterprise ||
-                                                                            !license.product ||
-                                                                            !license.service ||
-                                                                            !license.licenseStartDate ||
-                                                                            !license.licenseEndDate ||
-                                                                            !license.numberOfUsers ||
-                                                                            (license.renewalNotice &&
-                                                                                !license.noticePeriodDays),
-                                                                    )
-                                                                }
-                                                                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
-                                                                    !isMainRowComplete(
-                                                                        r,
-                                                                    ) ||
-                                                                    (
-                                                                        rowLicenses[
-                                                                            r.id
-                                                                        ] || []
-                                                                    ).some(
-                                                                        (
-                                                                            license,
-                                                                        ) =>
-                                                                            !license.enterprise ||
-                                                                            !license.product ||
-                                                                            !license.service ||
-                                                                            !license.licenseStartDate ||
-                                                                            !license.licenseEndDate ||
-                                                                            !license.numberOfUsers ||
-                                                                            (license.renewalNotice &&
-                                                                                !license.noticePeriodDays),
-                                                                    )
-                                                                        ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                                                                        : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm hover:shadow-md'
-                                                                }`}
-                                                                title={
-                                                                    !isMainRowComplete(
-                                                                        r,
-                                                                    )
-                                                                        ? 'Complete main row fields (Account Name, Master Account, Cloud Type) before adding licenses'
-                                                                        : (
-                                                                              rowLicenses[
-                                                                                  r
-                                                                                      .id
-                                                                              ] ||
-                                                                              []
-                                                                          ).some(
-                                                                              (
-                                                                                  license,
-                                                                              ) =>
-                                                                                  !license.enterprise ||
-                                                                                  !license.product ||
-                                                                                  !license.service ||
-                                                                                  !license.licenseStartDate ||
-                                                                                  !license.licenseEndDate ||
-                                                                                  !license.numberOfUsers ||
-                                                                                  (license.renewalNotice &&
-                                                                                      !license.noticePeriodDays),
-                                                                          )
-                                                                        ? 'Complete existing licenses before adding new ones'
-                                                                        : 'Add New License'
-                                                                }
-                                                            >
-                                                                <Plus className='w-4 h-4' />
-                                                                Add New License
-                                                            </motion.button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -6724,7 +6081,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 width: '100%',
                                             }}
                                             onClick={onAddNewRow}
-                                            title='Add new account row'
+                                            title='Add new build row'
                                         >
                                             {/* Empty delete button space */}
                                             <div className='flex items-center justify-center px-2 py-1'>
@@ -6758,311 +6115,185 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                        );
-                    })()}
-                    {groupBy === 'none' ? (
-                        <div className='mt-2'>
-                            {displayItems.map((r, idx) => (
-                                <div key={r.id}>
-                                    <SortableAccountRow
-                                        row={r}
-                                        index={idx}
-                                        cols={cols}
-                                        gridTemplate={gridTemplate}
-                                        highlightQuery={highlightQuery}
-                                        onEdit={onEdit}
-                                        onDelete={onDelete}
-                                        customColumns={customColumns}
-                                        pinFirst={pinFirst}
-                                        firstColWidth={firstColWidth}
-                                        isExpanded={expandedRows.has(r.id)}
-                                        onToggle={toggleRowExpansion}
-                                        hideRowExpansion={hideRowExpansion}
-                                        enableDropdownChips={
-                                            enableDropdownChips
-                                        }
-                                        onDropdownOptionUpdate={
-                                            onDropdownOptionUpdate
-                                        }
-                                        onNewItemCreated={onNewItemCreated}
-                                        isCellMissing={isCellMissing}
-                                        compressingRowId={compressingRowId}
-                                        foldingRowId={foldingRowId}
-                                        allRows={rows}
-                                        expandedContent={null}
-                                        onUpdateField={updateRowField}
-                                        isSelected={selectedRowId === r.id}
-                                        onSelect={(id: string) => setSelectedRowId(id)}
-                                        onStartFill={() => {}}
-                                        inFillRange={false}
-                                        onDeleteClick={handleDeleteClick}
-                                        shouldShowHorizontalScroll={shouldShowHorizontalScroll}
-                                        onOpenAddressModal={onOpenAddressModal}
-                                        onOpenTechnicalUserModal={onOpenTechnicalUserModal}
-                                        selectedEnterpriseName={selectedEnterpriseName}
-                                    />
-                                    {expandedRows.has(r.id) && (
-                                        <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
-                                            {/* Vertical connection line from chevron */}
-                                            <div className="absolute -left-2 top-0 bottom-0 w-px bg-blue-400"></div>
-                                            
-                                            {/* License section header */}
-                                            <div className="p-3 pb-2">
-                                                <h4 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
-                                                    <FileText className="w-4 h-4" />
-                                                    Licenses for {r.accountName || 'Account'}
-                                                </h4>
-                                                
-                                                {/* License Table Container */}
-                                                <div className="ml-6">
-                                                    {/* Table Header */}
-                                                    <div 
-                                                        className="grid gap-3 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black"
-                                                        style={{
-                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
-                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
-                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
-                                                        }}
-                                                    >
-                                                        <div></div>
-                                                        <div>Enterprise</div>
-                                                        <div>Product</div>
-                                                        <div>Service</div>
-                                                        <div>Start Date</div>
-                                                        <div>End Date</div>
-                                                        <div>Users</div>
-                                                        <div>Contact</div>
-                                                        <div>Renewal</div>
-                                                        {(rowLicenses[r.id] || []).some(license => license.renewalNotice) && (
-                                                            <div>Notice (days)</div>
-                                                        )}
-                                                    </div>
-                                                    
+                            ) : (
+                                <div className='space-y-4 mt-2'>
+                                    {Object.entries(groupedItems).map(
+                                        ([groupName, groupRows]) => (
+                                            <div
+                                                key={groupName}
+                                                className='border border-slate-200 rounded-lg'
+                                            >
+                                                {/* Group Header */}
+                                                <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
+                                                    <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
+                                                        <span>{groupName}</span>
+                                                        <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
+                                                            {groupRows.length}{' '}
+                                                            record
+                                                            {groupRows.length !==
+                                                            1
+                                                                ? 's'
+                                                                : ''}
+                                                        </span>
+                                                    </h4>
+                                                </div>
 
-                                                    
-                                                    {/* Existing License Rows */}
-                                                    {(rowLicenses[r.id] || []).map((license, index) => (
-                                                        <div key={license.id} className={`${index === (rowLicenses[r.id] || []).length - 1 ? 'rounded-b-lg' : ''}`}>
-                                                            <LicenseSubRow
-                                                                license={license}
-                                                                rowId={r.id}
-                                                                onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
-                                                                onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
-                                                                showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
-                                                                isLicenseFieldMissing={isLicenseFieldMissing}
-                                                                compressingLicenseId={compressingLicenseId}
-                                                                foldingLicenseId={foldingLicenseId}
-                                                                onDeleteClick={onLicenseDelete}
-                                                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                                                onNewItemCreated={onNewItemCreated as any}
-                                                                onOpenContactModal={handleOpenContactModal}
-                                                                accounts={rows}
-                                                                isTableRow={true}
-                                                                isLastRow={index === (rowLicenses[r.id] || []).length - 1}
-                                                                selectedEnterpriseName={selectedEnterpriseName}
+                                                {/* Group Rows */}
+                                                <div className='border-b border-slate-200 overflow-hidden'>
+                                                    {groupRows.map((r, idx) => (
+                                                        <div key={r.id}>
+                                                            <SortableBuildRow
+                                                                row={r}
+                                                                index={idx}
+                                                                cols={cols}
+                                                                gridTemplate={
+                                                                    gridTemplate
+                                                                }
+                                                                highlightQuery={
+                                                                    highlightQuery
+                                                                }
+                                                                onEdit={onEdit}
+                                                                onDelete={
+                                                                    onDelete
+                                                                }
+                                                                customColumns={
+                                                                    customColumns
+                                                                }
+                                                                pinFirst={
+                                                                    pinFirst
+                                                                }
+                                                                firstColWidth={
+                                                                    firstColWidth
+                                                                }
+                                                                isExpanded={expandedRows.has(
+                                                                    r.id,
+                                                                )}
+                                                                onToggle={
+                                                                    toggleRowExpansion
+                                                                }
+                                                                hideRowExpansion={
+                                                                    hideRowExpansion
+                                                                }
+                                                                enableDropdownChips={
+                                                                    enableDropdownChips
+                                                                }
+                                                                onDropdownOptionUpdate={
+                                                                    onDropdownOptionUpdate
+                                                                }
+                                                                onNewItemCreated={
+                                                                    onNewItemCreated
+                                                                }
+                                                                isCellMissing={
+                                                                    isCellMissing
+                                                                }
+                                                                compressingRowId={
+                                                                    compressingRowId
+                                                                }
+                                                                foldingRowId={
+                                                                    foldingRowId
+                                                                }
+                                                                allRows={rows}
+                                                                expandedContent={
+                                                                    null
+                                                                }
+                                                                onUpdateField={
+                                                                    updateRowField
+                                                                }
+                                                                isSelected={
+                                                                    selectedRowId ===
+                                                                    r.id
+                                                                }
+                                                                onSelect={(
+                                                                    id: string,
+                                                                ) =>
+                                                                    setSelectedRowId(
+                                                                        id,
+                                                                    )
+                                                                }
+                                                                onStartFill={() => {}}
+                                                                inFillRange={
+                                                                    false
+                                                                }
+                                                                onDeleteClick={
+                                                                    handleDeleteClick
+                                                                }
+                                                                shouldShowHorizontalScroll={
+                                                                    shouldShowHorizontalScroll
+                                                                }
+                                                                onOpenAddressModal={
+                                                                    onOpenAddressModal
+                                                                }
+                                                                onOpenTechnicalUserModal={
+                                                                    onOpenTechnicalUserModal
+                                                                }
+                                                                dropdownOptions={
+                                                                    dropdownOptions
+                                                                }
                                                             />
                                                         </div>
                                                     ))}
-                                                    
-                                                    {/* Add New License Button */}
-                                                    <div 
-                                                        className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
-                                                        style={{
-                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
-                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
-                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px",
-                                                            minWidth: 'max-content',
-                                                            width: '100%'
-                                                        }}
-                                                        onClick={() => {
-                                                            // Check if main row is complete and all existing licenses are complete
-                                                            if (isMainRowComplete(r) && !(rowLicenses[r.id] || []).some(license => 
-                                                                !license.enterprise || !license.product || !license.service ||
-                                                                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                (license.renewalNotice && !license.noticePeriodDays)
-                                                            )) {
-                                                                addNewLicense(r.id);
-                                                            }
-                                                        }}
-                                                        title={
-                                                            !isMainRowComplete(r)
-                                                                ? 'Complete main row fields first'
-                                                                : (rowLicenses[r.id] || []).some(license => 
-                                                                    !license.enterprise || !license.product || !license.service ||
-                                                                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                    (license.renewalNotice && !license.noticePeriodDays)
-                                                                )
-                                                                ? 'Complete existing licenses first'
-                                                                : 'Add new license'
-                                                        }
+                                                </div>
+                                            </div>
+                                        ),
+                                    )}
+
+                                    {/* Add New Row Button for grouped view */}
+                                    {onAddNewRow && (
+                                        <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                            <div
+                                                className='grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group'
+                                                style={{
+                                                    gridTemplateColumns:
+                                                        gridTemplate,
+                                                    minWidth: 'max-content',
+                                                    width: '100%',
+                                                }}
+                                                onClick={onAddNewRow}
+                                                title='Add new build row'
+                                            >
+                                                {/* Empty delete button space */}
+                                                <div className='flex items-center justify-center px-2 py-1'>
+                                                    {/* No delete icon for add row */}
+                                                </div>
+
+                                                {/* Add new row content spanning all columns */}
+                                                <div
+                                                    className='flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600'
+                                                    style={{
+                                                        gridColumn: `span ${cols.length}`,
+                                                    }}
+                                                >
+                                                    <svg
+                                                        className='w-4 h-4'
+                                                        fill='none'
+                                                        viewBox='0 0 24 24'
+                                                        stroke='currentColor'
                                                     >
-                                                        {/* Empty delete button space */}
-                                                        <div className='flex items-center justify-center px-2 py-1'>
-                                                            {/* No delete icon for add license row */}
-                                                        </div>
-                                                        
-                                                        {/* Add new license content spanning all columns */}
-                                                        <div 
-                                                            className={`flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 ${
-                                                                (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
-                                                                    !license.enterprise || !license.product || !license.service ||
-                                                                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                                                                    (license.renewalNotice && !license.noticePeriodDays)
-                                                                ))
-                                                                ? 'text-slate-400 cursor-not-allowed'
-                                                                : 'text-slate-500 group-hover:text-blue-600'
-                                                            }`} 
-                                                            style={{gridColumn: `span ${(rowLicenses[r.id] || []).some(license => license.renewalNotice) ? '9' : '8'}`}}
-                                                        >
-                                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
-                                                            </svg>
-                                                            <span className='italic'>Add New License</span>
-                                                        </div>
-                                                    </div>
+                                                        <path
+                                                            strokeLinecap='round'
+                                                            strokeLinejoin='round'
+                                                            strokeWidth={2}
+                                                            d='M12 4v16m8-8H4'
+                                                        />
+                                                    </svg>
+                                                    <span className='italic'>
+                                                        Add New Row
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            ))}
-                            
-                            {/* Add New Row Button */}
-                            {onAddNewRow && (
-                                <div 
-                                    className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
-                                    style={{
-                                        gridTemplateColumns: gridTemplate, 
-                                        minWidth: 'max-content',
-                                        width: '100%'
-                                    }}
-                                    onClick={onAddNewRow}
-                                    title="Add new account row"
-                                >
-                                    {/* Empty delete button space */}
-                                    <div className='flex items-center justify-center px-2 py-1'>
-                                        {/* No delete icon for add row */}
-                                    </div>
-                                    
-                                    {/* Add new row content spanning all columns */}
-                                    <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
-                                        <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
-                                        </svg>
-                                        <span className='italic'>Add New Row</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className='space-y-4 mt-2'>
-                            {Object.entries(groupedItems).map(([groupName, groupRows]) => (
-                                <div key={groupName} className='border border-slate-200 rounded-lg'>
-                                    {/* Group Header */}
-                                    <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
-                                        <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
-                                            <span>{groupName}</span>
-                                            <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
-                                                {groupRows.length} record{groupRows.length !== 1 ? 's' : ''}
-                                            </span>
-                                        </h4>
-                                    </div>
-                                    
-                                    {/* Group Rows */}
-                                    <div className='border-b border-slate-200 overflow-hidden'>
-                                        {groupRows.map((r, idx) => (
-                                            <div key={r.id}>
-                                                <SortableAccountRow
-                                                    row={r}
-                                                    index={idx}
-                                                    cols={cols}
-                                                    gridTemplate={gridTemplate}
-                                                    highlightQuery={highlightQuery}
-                                                    onEdit={onEdit}
-                                                    onDelete={onDelete}
-                                                    customColumns={customColumns}
-                                                    pinFirst={pinFirst}
-                                                    firstColWidth={firstColWidth}
-                                                    isExpanded={expandedRows.has(r.id)}
-                                                    onToggle={toggleRowExpansion}
-                                                    hideRowExpansion={hideRowExpansion}
-                                                    enableDropdownChips={
-                                                        enableDropdownChips
-                                                    }
-                                                    onDropdownOptionUpdate={
-                                                        onDropdownOptionUpdate
-                                                    }
-                                                    onNewItemCreated={onNewItemCreated}
-                                                    isCellMissing={isCellMissing}
-                                                    compressingRowId={compressingRowId}
-                                                    foldingRowId={foldingRowId}
-                                                    allRows={rows}
-                                                    expandedContent={null}
-                                                    onUpdateField={updateRowField}
-                                                    isSelected={selectedRowId === r.id}
-                                                    onSelect={(id: string) => setSelectedRowId(id)}
-                                                    onStartFill={() => {}}
-                                                    inFillRange={false}
-                                                    onDeleteClick={handleDeleteClick}
-                                                    shouldShowHorizontalScroll={shouldShowHorizontalScroll}
-                                                    onOpenAddressModal={onOpenAddressModal}
-                                                    onOpenTechnicalUserModal={onOpenTechnicalUserModal}
-                                                    selectedEnterpriseName={selectedEnterpriseName}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                            
-                            {/* Add New Row Button for grouped view */}
-                            {onAddNewRow && (
-                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
-                                    <div 
-                                        className="grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
-                                        style={{
-                                            gridTemplateColumns: gridTemplate, 
-                                            minWidth: 'max-content',
-                                            width: '100%'
-                                        }}
-                                        onClick={onAddNewRow}
-                                        title="Add new account row"
-                                    >
-                                        {/* Empty delete button space */}
-                                        <div className='flex items-center justify-center px-2 py-1'>
-                                            {/* No delete icon for add row */}
-                                        </div>
-                                        
-                                        {/* Add new row content spanning all columns */}
-                                        <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
-                                            <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
-                                            </svg>
-                                            <span className='italic'>Add New Row</span>
-                                        </div>
-                                    </div>
-                                </div>
                             )}
                         </div>
                     </div>
                 )}
-
-                {/* ContactModal for license contact details */}
-                <ContactModal
-                    isOpen={showContactModal}
-                    onClose={handleCloseContactModal}
-                    onSave={handleContactModalSave}
-                    accountName={contactModalAccountName}
-                    masterAccount={contactModalMasterAccount}
-                    initialContacts={contactModalData}
-                />
             </div>
         );
     },
 );
 
 // Set the display name for debugging
-AccountsTable.displayName = 'AccountsTable';
+BuildsTable.displayName = 'BuildsTable';
 
-export default AccountsTable;
+export default BuildsTable;

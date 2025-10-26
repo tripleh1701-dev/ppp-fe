@@ -1,13 +1,15 @@
 'use client';
 
-import {useState, useEffect, useCallback, useMemo} from 'react';
+import {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import Link from 'next/link';
 import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
 import SecurityGovernancePanel from './SecurityGovernancePanel';
 import PipelinePanel from './PipelinePanel';
+import BuildsPanel from './BuildsPanel';
 import {motion} from 'framer-motion';
+import {logout} from '@/utils/auth';
 
 interface NavigationItem {
     id: string;
@@ -88,7 +90,17 @@ const getIconSvg = (iconName: string) => {
         overview: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />`,
         inbox: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />`,
         dashboard: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />`,
-        pipelines: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />`,
+        pipelines: `
+            <!-- Connected boxes representing pipeline stages -->
+            <rect x="3" y="9" width="5" height="6" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} fill="none"/>
+            <rect x="16" y="9" width="5" height="6" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} fill="none"/>
+            <!-- Connecting line with arrow -->
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h8"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M14 10l2 2-2 2"/>
+            <!-- Small download/connection node at bottom -->
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v3"/>
+            <rect x="10.5" y="18" width="3" height="3" rx="0.5" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} fill="none"/>
+        `,
         builds: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />`,
         security: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />`,
         settings: `<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />`,
@@ -118,44 +130,43 @@ export default function NavigationSidebar({
     const [isSecurityGovernanceOpen, setIsSecurityGovernanceOpen] =
         useState(false);
     const [isPipelineOpen, setIsPipelineOpen] = useState(false);
+    const [isBuildsOpen, setIsBuildsOpen] = useState(false);
     const [previousPathname, setPreviousPathname] = useState(currentPath);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const menuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [currentUser, setCurrentUser] = useState({
-        firstName: 'Nihar',
-        lastName: 'Sharma',
-        emailAddress: 'nihar.sharma@systiva.com',
-        role: 'Administrator',
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
+        role: 'User',
     });
 
-    // Load current user data from API
+    // Cleanup timeout on unmount
     useEffect(() => {
-        const loadCurrentUser = async () => {
+        return () => {
+            if (menuCloseTimeoutRef.current) {
+                clearTimeout(menuCloseTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Load current user data from localStorage (set during login)
+    useEffect(() => {
+        const loadCurrentUser = () => {
             try {
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-                const response = await fetch(
-                    `${apiBase}/api/auth/current-user`,
-                );
-                if (response.ok) {
-                    const userData = await response.json();
+                // Get user from localStorage where it was stored during login
+                const userStr = localStorage.getItem('systiva_user');
+                if (userStr) {
+                    const userData = JSON.parse(userStr);
                     setCurrentUser({
-                        firstName: userData.firstName || 'Nihar',
-                        lastName: userData.lastName || 'Sharma',
-                        emailAddress:
-                            userData.emailAddress || 'nihar.sharma@systiva.com',
-                        role: userData.role || 'Administrator',
+                        firstName: userData.firstName || '',
+                        lastName: userData.lastName || '',
+                        emailAddress: userData.email || '',
+                        role: userData.role || 'User',
                     });
-                } else {
-                    // Fallback to default user if API fails
-                    console.log(
-                        'Using fallback user: Nihar Sharma (Administrator)',
-                    );
                 }
             } catch (error) {
-                console.error(
-                    'Error loading current user, using fallback:',
-                    error,
-                );
-                // Keep the default fallback user (Nihar Sharma)
+                console.error('Error loading current user:', error);
             }
         };
 
@@ -203,6 +214,7 @@ export default function NavigationSidebar({
             if (isAccountSettingsOpen) setIsAccountSettingsOpen(false);
             if (isAccessControlOpen) setIsAccessControlOpen(false);
             if (isSecurityGovernanceOpen) setIsSecurityGovernanceOpen(false);
+            if (isBuildsOpen) setIsBuildsOpen(false);
         }
         setPreviousPathname(currentPath);
     }, [
@@ -211,6 +223,7 @@ export default function NavigationSidebar({
         isAccountSettingsOpen,
         isAccessControlOpen,
         isSecurityGovernanceOpen,
+        isBuildsOpen,
     ]);
 
     // Handle mobile close on navigation
@@ -235,6 +248,7 @@ export default function NavigationSidebar({
                 setIsAccessControlOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -243,6 +257,7 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsSecurityGovernanceOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -251,6 +266,7 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsAccessControlOpen(false);
                 setIsPipelineOpen(false);
+                setIsBuildsOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -259,6 +275,16 @@ export default function NavigationSidebar({
                 setIsAccountSettingsOpen(false); // <-- close other panels
                 setIsAccessControlOpen(false);
                 setIsSecurityGovernanceOpen(false);
+                setIsBuildsOpen(false);
+                if (isMobile && onToggleCollapse) onToggleCollapse();
+                return;
+            }
+            if (item.id === 'builds') {
+                setIsBuildsOpen(true);
+                setIsAccountSettingsOpen(false); // <-- close other panels
+                setIsAccessControlOpen(false);
+                setIsSecurityGovernanceOpen(false);
+                setIsPipelineOpen(false);
                 if (isMobile && onToggleCollapse) onToggleCollapse();
                 return;
             }
@@ -267,6 +293,7 @@ export default function NavigationSidebar({
             setIsAccessControlOpen(false);
             setIsSecurityGovernanceOpen(false);
             setIsPipelineOpen(false);
+            setIsBuildsOpen(false);
             handleNavigation(item.href);
         },
         [isMobile, onToggleCollapse, handleNavigation],
@@ -301,8 +328,8 @@ export default function NavigationSidebar({
                 {/* Curved Right Edge / Boundary removed to eliminate white border */}
 
                 {/* Minimal Collapse Handle (middle, outside) */}
-                {!isMobile && (
-                    <div className='absolute -right-4 bottom-20 -translate-y-1/2 z-40 pointer-events-auto group'>
+                {!isMobile && !isUserMenuOpen && (
+                    <div className='absolute -right-4 bottom-40 -translate-y-1/2 z-[60] pointer-events-auto group'>
                         <button
                             onClick={onToggleCollapse}
                             className='relative w-8 h-8 rounded-full bg-brand-gradient text-white transition-all duration-200 flex items-center justify-center shadow-lg ring-2 ring-white/40 hover:shadow-xl hover:scale-110 opacity-100'
@@ -558,15 +585,36 @@ export default function NavigationSidebar({
                     }`}
                 >
                     {/* Keep only profile here to avoid duplicates of settings/access */}
-                    <div className='mt-2'>
+                    <div className='mt-2 relative'>
                         <div
                             className={`flex items-center ${
                                 isCollapsed ? 'justify-center' : 'space-x-3'
-                            } relative`}
-                            onMouseEnter={() =>
-                                isCollapsed && setHoveredItem('user-profile')
+                            } cursor-pointer hover:bg-white/5 rounded-lg p-2 transition-colors`}
+                            onMouseEnter={() => {
+                                // Clear any pending close timeout
+                                if (menuCloseTimeoutRef.current) {
+                                    clearTimeout(menuCloseTimeoutRef.current);
+                                    menuCloseTimeoutRef.current = null;
+                                }
+                                if (!isCollapsed) setIsUserMenuOpen(true);
+                                if (isCollapsed) setHoveredItem('user-profile');
+                            }}
+                            onMouseLeave={() => {
+                                if (!isCollapsed) {
+                                    // Add delay before closing
+                                    menuCloseTimeoutRef.current = setTimeout(
+                                        () => {
+                                            setIsUserMenuOpen(false);
+                                        },
+                                        200,
+                                    );
+                                }
+                                setHoveredItem(null);
+                            }}
+                            onClick={() =>
+                                !isCollapsed &&
+                                setIsUserMenuOpen(!isUserMenuOpen)
                             }
-                            onMouseLeave={() => setHoveredItem(null)}
                         >
                             <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-lg flex-shrink-0'>
                                 <span className='text-white font-semibold text-sm'>
@@ -603,6 +651,161 @@ export default function NavigationSidebar({
                                 </div>
                             )}
                         </div>
+
+                        {/* User Dropdown Menu */}
+                        {!isCollapsed && isUserMenuOpen && (
+                            <div
+                                className='absolute bottom-2 left-full ml-1 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 transition-all duration-300 ease-out'
+                                style={{
+                                    animation: 'slideRight 0.3s ease-out',
+                                }}
+                                onMouseEnter={() => {
+                                    // Clear any pending close timeout
+                                    if (menuCloseTimeoutRef.current) {
+                                        clearTimeout(
+                                            menuCloseTimeoutRef.current,
+                                        );
+                                        menuCloseTimeoutRef.current = null;
+                                    }
+                                    setIsUserMenuOpen(true);
+                                }}
+                                onMouseLeave={() => {
+                                    // Add delay before closing
+                                    menuCloseTimeoutRef.current = setTimeout(
+                                        () => {
+                                            setIsUserMenuOpen(false);
+                                        },
+                                        200,
+                                    );
+                                }}
+                            >
+                                <style jsx>{`
+                                    @keyframes slideRight {
+                                        from {
+                                            opacity: 0;
+                                            transform: translateX(-5px)
+                                                scale(0.95);
+                                        }
+                                        to {
+                                            opacity: 1;
+                                            transform: translateX(0) scale(1);
+                                        }
+                                    }
+                                `}</style>
+                                {/* User Info Header */}
+                                <div className='px-3 py-2.5 border-b border-slate-200 bg-slate-50'>
+                                    <div className='flex items-center gap-2.5'>
+                                        <div className='w-10 h-10 bg-gradient-to-r from-[#0171EC] to-[#05E9FE] rounded-full flex items-center justify-center shadow-md flex-shrink-0'>
+                                            <span className='text-white font-semibold text-sm'>
+                                                {getUserInitials(
+                                                    currentUser.firstName,
+                                                    currentUser.lastName,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className='flex-1 min-w-0'>
+                                            <p className='text-sm font-semibold text-slate-900 truncate'>
+                                                {currentUser.firstName}{' '}
+                                                {currentUser.lastName}
+                                            </p>
+                                            <p className='text-xs text-slate-600 truncate'>
+                                                {currentUser.emailAddress}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Menu Items */}
+                                <div className='py-1'>
+                                    <button
+                                        onClick={() => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            router.push('/profile');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+                                            />
+                                        </svg>
+                                        Profile Overview
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            router.push('/privacy-policy');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                                            />
+                                        </svg>
+                                        Privacy Policy
+                                    </button>
+
+                                    <div className='border-t border-slate-200 my-1'></div>
+
+                                    <button
+                                        onClick={async () => {
+                                            if (menuCloseTimeoutRef.current) {
+                                                clearTimeout(
+                                                    menuCloseTimeoutRef.current,
+                                                );
+                                            }
+                                            setIsUserMenuOpen(false);
+                                            await logout();
+                                            router.push('/login');
+                                        }}
+                                        className='w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2'
+                                    >
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1'
+                                            />
+                                        </svg>
+                                        Sign Out
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </motion.div>
@@ -639,6 +842,15 @@ export default function NavigationSidebar({
                 <PipelinePanel
                     isOpen={isPipelineOpen}
                     onClose={() => setIsPipelineOpen(false)}
+                    sidebarWidth={isCollapsed ? 48 : 208}
+                />
+            )}
+
+            {/* Builds Panel */}
+            {isBuildsOpen && (
+                <BuildsPanel
+                    isOpen={isBuildsOpen}
+                    onClose={() => setIsBuildsOpen(false)}
                     sidebarWidth={isCollapsed ? 48 : 208}
                 />
             )}
