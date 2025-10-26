@@ -2060,7 +2060,7 @@ function AsyncChipSelect({
             console.log(`🔄 VALUE SYNC for ${type}: "${current}" -> "${value}"`);
             setCurrent(value);
         }
-    }, [value, current, type]);
+    }, [value, type]); // Remove current from deps to avoid infinite loops
 
     // Helper function to check if an option is in use (with composite key constraint)
     const isOptionInUse = React.useCallback(
@@ -2394,7 +2394,7 @@ function AsyncChipSelect({
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
     
     // Debug display logic
-    const shouldShowChip = (current && current.trim()) || (value && value.trim());
+    const shouldShowChip = current?.trim() || value?.trim();
     const shouldShowInput = !shouldShowChip || open;
     
     if (type === 'enterprise' || type === 'product' || type === 'service') {
@@ -2471,9 +2471,9 @@ function AsyncChipSelect({
                             onClick={(e: any) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                onChange('');
                                 setCurrent('');
                                 setQuery('');
+                                onChange('');
                             }}
                             className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
                             aria-label='Remove'
@@ -2503,16 +2503,16 @@ function AsyncChipSelect({
                                 
                                 // Clear current selection if user clears the input completely
                                 if (newValue === '') {
-                                    onChange('');
                                     setCurrent('');
+                                    onChange('');
                                 }
                             }}
                             onBlur={(e: any) => {
                                 // Create chip from entered text when focus is lost
                                 const newValue = query.trim();
                                 if (newValue) {
-                                    onChange(newValue);
                                     setCurrent(newValue);
+                                    onChange(newValue);
                                     setQuery('');
                                 }
                                 setOpen(false);
@@ -2532,6 +2532,7 @@ function AsyncChipSelect({
                                     // Save current value immediately
                                     const newValue = query.trim();
                                     if (newValue) {
+                                        setCurrent(newValue);
                                         onChange(newValue);
                                         setQuery('');
                                         setOpen(false);
@@ -2580,12 +2581,19 @@ function AsyncChipSelect({
             </div>
             
             {/* Full Autocomplete Dropdown - Portal Based */}
-            {open && dropdownPortalPos && (allOptions.length > 0 || loading || ['enterprise', 'product', 'service'].includes(type)) && createPortal(
+            {open && dropdownPortalPos && (allOptions.length > 0 || loading || ['enterprise', 'product', 'service'].includes(type)) && (() => {
+                console.log(`🔍 DROPDOWN RENDER: ${type} - options:${allOptions.length}, loading:${loading}, portalPos:`, dropdownPortalPos);
+                return createPortal(
                 <div 
                     ref={dropdownRef}
                     className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
+                    onMouseDown={(e: any) => {
+                        // Allow button clicks but prevent closing the dropdown
+                        const target = e.target as HTMLElement;
+                        if (!target.closest('button')) {
+                            e.stopPropagation();
+                        }
+                    }}
                     style={{
                         position: 'fixed',
                         top: `${dropdownPortalPos.top}px`,
@@ -2657,13 +2665,28 @@ function AsyncChipSelect({
                                                                 className='relative group'
                                                             >
                                                                 <button
-                                                                    onClick={() => {
-                                                                        console.log(`🎯 SELECTION: ${type} - Selecting "${opt.name}" for license`); 
-                                                                        const success = onChange(opt.name);
+                                                                    onMouseDown={(e) => {
+                                                                        console.log(`🖱️ Button mousedown: ${type} - "${opt.name}"`);
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    }}
+                                                                    onClick={(e) => {
+                                                                        console.log(`🎯 SELECTION CLICK: ${type} - Selecting "${opt.name}" for license`); 
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        
+                                                                        // Update local state immediately for instant UI feedback
                                                                         setCurrent(opt.name);
                                                                         setQuery('');
                                                                         setOpen(false);
-                                                                        console.log(`✅ SELECTION: onChange called for ${type}, success:`, success);
+                                                                        
+                                                                        // Call parent onChange
+                                                                        try {
+                                                                            const success = onChange(opt.name);
+                                                                            console.log(`✅ SELECTION SUCCESS: onChange called for ${type}, result:`, success);
+                                                                        } catch (error) {
+                                                                            console.error(`❌ SELECTION ERROR: onChange failed for ${type}:`, error);
+                                                                        }
                                                                     }}
                                                                     className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between`}
                                                                     style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
@@ -2747,8 +2770,8 @@ function AsyncChipSelect({
                                                                     setAllOptions((prev) => [...prev, created!]);
                                                                     
                                                                     // Set the new value
-                                                                    onChange(created.name);
                                                                     setCurrent(created.name);
+                                                                    onChange(created.name);
                                                                     setQuery('');
                                                                     setOpen(false);
                                                                     
@@ -2792,8 +2815,8 @@ function AsyncChipSelect({
                                                                 setAllOptions((prev) => [...prev, created]);
                                                                 
                                                                 // Set the new value
-                                                                onChange(created.name);
                                                                 setCurrent(created.name);
+                                                                onChange(created.name);
                                                                 setQuery('');
                                                                 setOpen(false);
                                                                 
@@ -2829,8 +2852,8 @@ function AsyncChipSelect({
                     </div>
                 </div>,
                 document.body
-            )
-        }
+            );
+            })()}
         </div>
     );
 }
@@ -3217,7 +3240,6 @@ function LicenseSubRow({
                             currentRowId={license.id}
                             currentRowEnterprise={license.enterprise}
                             currentRowProduct={license.product}
-                            selectedEnterpriseName={selectedEnterpriseName}
                             {...createLicenseTabNavigation('noticePeriodDays')}
                         />
                     </div>
@@ -3658,7 +3680,6 @@ function SortableAccountRow({
                                 currentRowProduct={
                                     row.masterAccount || ''
                                 }
-                                selectedEnterpriseName={selectedEnterpriseName}
                                 {...createTabNavigation('accountName')}
                             />
                         ) : (
@@ -3711,7 +3732,6 @@ function SortableAccountRow({
                             currentRowProduct={
                                 (row as any).masterAccount || ''
                             }
-                            selectedEnterpriseName={selectedEnterpriseName}
                             {...createTabNavigation('masterAccount')}
                         />
                     ) : (
@@ -5644,7 +5664,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
                                         onOpenTechnicalUserModal={onOpenTechnicalUserModal}
-                                        selectedEnterpriseName={selectedEnterpriseName}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
@@ -5851,7 +5870,6 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
                                                     onOpenTechnicalUserModal={onOpenTechnicalUserModal}
-                                                    selectedEnterpriseName={selectedEnterpriseName}
                                                 />
                                             </div>
                                         ))}

@@ -310,12 +310,16 @@ export default function ManageAccounts() {
             const isOutsideGroup =
                 groupRef.current && !groupRef.current.contains(target);
 
-            // If click is outside all dialogs, close them (search remains open)
+            // Check if click is on a filter suggestion dropdown
+            const isOnFilterSuggestion = (target as Element).closest('.filter-suggestions-dropdown');
+
+            // If click is outside all dialogs and not on a filter suggestion, close them (search remains open)
             if (
                 isOutsideFilter &&
                 isOutsideSort &&
                 isOutsideHide &&
-                isOutsideGroup
+                isOutsideGroup &&
+                !isOnFilterSuggestion
             ) {
                 closeAllDialogs();
             }
@@ -548,6 +552,11 @@ export default function ManageAccounts() {
         // Dispatch custom event to clear table sorting
         const clearEvent = new CustomEvent('clearTableSorting');
         window.dispatchEvent(clearEvent);
+    };
+
+    const clearGroupBy = () => {
+        setActiveGroupLabel('None');
+        closeAllDialogs();
     };
 
     const clearAllFilters = () => {
@@ -1034,10 +1043,17 @@ export default function ManageAccounts() {
                     config.licenses &&
                     config.licenses.length > 0 &&
                     config.licenses.some((license: any) => {
-                        const hasName = license.name?.trim();
-                        const hasType = license.type?.trim();
-                        const hasStatus = license.status?.trim();
-                        return !hasName || !hasType || !hasStatus;
+                        const hasEnterprise = license.enterprise?.trim();
+                        const hasProduct = license.product?.trim();
+                        const hasService = license.service?.trim();
+                        const hasLicenseStartDate = license.licenseStartDate?.trim();
+                        const hasLicenseEndDate = license.licenseEndDate?.trim();
+                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                        const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                        
+                        return !hasEnterprise || !hasProduct || !hasService || 
+                               !hasLicenseStartDate || !hasLicenseEndDate || 
+                               !hasNumberOfUsers || !hasValidNoticePeriod;
                     });
 
                 // When validation errors are being shown, include completely blank rows for highlighting
@@ -2158,6 +2174,35 @@ export default function ManageAccounts() {
         const incomplete = getIncompleteRows();
         const hasChanges = getUnsavedChanges();
         
+        console.log('🚨 Navigation attempt blocked check:', {
+            incompleteCount: incomplete.length,
+            incompleteIds: incomplete,
+            hasChanges,
+            pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
+            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
+            autoSaveTimerActive: !!autoSaveTimerRef.current,
+            effectiveAccounts: getEffectiveAccounts().map(acc => ({
+                id: acc.id,
+                accountName: acc.accountName,
+                masterAccount: acc.masterAccount,
+                cloudType: acc.cloudType,
+                licensesCount: acc.licenses?.length || 0,
+                licensesComplete: acc.licenses?.every((license: any) => {
+                    const hasEnterprise = license.enterprise?.trim();
+                    const hasProduct = license.product?.trim();
+                    const hasService = license.service?.trim();
+                    const hasLicenseStartDate = license.licenseStartDate?.trim();
+                    const hasLicenseEndDate = license.licenseEndDate?.trim();
+                    const hasNumberOfUsers = license.numberOfUsers?.trim();
+                    const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                    
+                    return hasEnterprise && hasProduct && hasService && 
+                           hasLicenseStartDate && hasLicenseEndDate && 
+                           hasNumberOfUsers && hasValidNoticePeriod;
+                }) || true
+            }))
+        });
+        
         if (incomplete.length > 0 || hasChanges) {
             setIncompleteRows(incomplete);
             setPendingNavigation(() => navigationFn);
@@ -2758,6 +2803,11 @@ export default function ManageAccounts() {
                 displayOrder: displayOrderRef.current.get(c.id),
             })),
         );
+        
+        // Update dropdown options when accounts change
+        if (accounts.length > 0) {
+            loadDropdownOptions();
+        }
     }, [accounts]);
 
     // Ref for AccountsTable to access its methods
@@ -3612,6 +3662,12 @@ export default function ManageAccounts() {
                                                         value={filterForm.accountName}
                                                         onChange={(e) => {
                                                             const value = e.target.value;
+                                                            console.log('🔍 Account filter onChange:', { 
+                                                                value, 
+                                                                dropdownOptionsLength: dropdownOptions.accountNames.length,
+                                                                availableAccountNames: dropdownOptions.accountNames.map(a => a.name)
+                                                            });
+                                                            
                                                             setFilterForm({
                                                                 ...filterForm,
                                                                 accountName: value,
@@ -3621,12 +3677,17 @@ export default function ManageAccounts() {
                                                             const filtered = dropdownOptions.accountNames.filter(account =>
                                                                 account.name.toLowerCase().includes(value.toLowerCase())
                                                             );
+                                                            console.log('🔍 Filtered accounts:', filtered.map(a => a.name));
+                                                            
                                                             // Remove duplicates based on name
                                                             const uniqueFiltered = filtered.filter((account, index, self) =>
                                                                 index === self.findIndex(a => a.name === account.name)
                                                             );
                                                             setFilteredAccountNames(uniqueFiltered);
-                                                            setShowAccountSuggestions(value.length > 0 && filtered.length > 0);
+                                                            
+                                                            const shouldShow = value.length > 0 && filtered.length > 0;
+                                                            console.log('🔍 Should show suggestions:', shouldShow, { valueLength: value.length, filteredLength: filtered.length });
+                                                            setShowAccountSuggestions(shouldShow);
                                                             setSelectedAccountIndex(-1);
                                                         }}
                                                         onKeyDown={(e) => {
@@ -3661,18 +3722,18 @@ export default function ManageAccounts() {
                                                                 setShowAccountSuggestions(true);
                                                             }
                                                         }}
-                                                        placeholder='Type to search accounts...'
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                     {showAccountSuggestions && (
-                                                        <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
                                                             {filteredAccountNames.map((account, index) => (
                                                                 <div
                                                                     key={account.id}
                                                                     className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                                                                         index === selectedAccountIndex ? 'bg-blue-100' : ''
                                                                     }`}
-                                                                    onClick={() => {
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault(); // Prevent input blur
                                                                         setFilterForm({
                                                                             ...filterForm,
                                                                             accountName: account.name,
@@ -3700,6 +3761,12 @@ export default function ManageAccounts() {
                                                         value={filterForm.masterAccount}
                                                         onChange={(e) => {
                                                             const value = e.target.value;
+                                                            console.log('🔍 Master Account filter onChange:', { 
+                                                                value, 
+                                                                dropdownOptionsLength: dropdownOptions.masterAccounts.length,
+                                                                availableMasterAccounts: dropdownOptions.masterAccounts.map(m => m.name)
+                                                            });
+                                                            
                                                             setFilterForm({
                                                                 ...filterForm,
                                                                 masterAccount: value,
@@ -3709,12 +3776,17 @@ export default function ManageAccounts() {
                                                             const filtered = dropdownOptions.masterAccounts.filter(master =>
                                                                 master.name.toLowerCase().includes(value.toLowerCase())
                                                             );
+                                                            console.log('🔍 Filtered master accounts:', filtered.map(m => m.name));
+                                                            
                                                             // Remove duplicates based on name
                                                             const uniqueFiltered = filtered.filter((master, index, self) =>
                                                                 index === self.findIndex(m => m.name === master.name)
                                                             );
                                                             setFilteredMasterAccounts(uniqueFiltered);
-                                                            setShowMasterAccountSuggestions(value.length > 0 && filtered.length > 0);
+                                                            
+                                                            const shouldShow = value.length > 0 && filtered.length > 0;
+                                                            console.log('🔍 Should show master account suggestions:', shouldShow, { valueLength: value.length, filteredLength: filtered.length });
+                                                            setShowMasterAccountSuggestions(shouldShow);
                                                             setSelectedMasterAccountIndex(-1);
                                                         }}
                                                         onKeyDown={(e) => {
@@ -3749,18 +3821,18 @@ export default function ManageAccounts() {
                                                                 setShowMasterAccountSuggestions(true);
                                                             }
                                                         }}
-                                                        placeholder='Type to search master accounts...'
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                     {showMasterAccountSuggestions && (
-                                                        <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
                                                             {filteredMasterAccounts.map((master, index) => (
                                                                 <div
                                                                     key={master.id}
                                                                     className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                                                                         index === selectedMasterAccountIndex ? 'bg-blue-100' : ''
                                                                     }`}
-                                                                    onClick={() => {
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault(); // Prevent input blur
                                                                         setFilterForm({
                                                                             ...filterForm,
                                                                             masterAccount: master.name,
@@ -4096,32 +4168,51 @@ export default function ManageAccounts() {
                                 )}
                             </button>
                             {groupOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
                                     <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
                                         <div className='text-xs font-semibold'>
                                             Group by
                                         </div>
+                                        {ActiveGroupLabel !== 'None' && (
+                                            <button
+                                                onClick={clearGroupBy}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
                                     <div className='p-3'>
                                         <div className='space-y-3'>
                                             <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Column
+                                                </label>
                                                 <div className='relative'>
                                                     <select
-                                                        value={ActiveGroupLabel}
-                                                        onChange={(e) =>
-                                                            setGroupByFromLabel(
-                                                                e.target.value,
-                                                            )
-                                                        }
+                                                        value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setGroupByFromLabel(value || 'None');
+                                                        }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option>None</option>
-                                                        <option>Account</option>
-                                                        <option>Master Account</option>
-                                                        <option>Cloud Type</option>
+                                                        <option value=''>Select column...</option>
+                                                        <option value='Account'>Account</option>
+                                                        <option value='Master Account'>Master Account</option>
+                                                        <option value='Cloud Type'>Cloud Type</option>
                                                     </select>
                                                 </div>
                                             </div>
+
+                                            {/* Current Group Display */}
+                                            {ActiveGroupLabel !== 'None' && (
+                                                <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
+                                                    <span className='font-medium text-orange-800'>
+                                                        Grouped by: {ActiveGroupLabel}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -4487,26 +4578,35 @@ export default function ManageAccounts() {
                                             });
 
                                             // For existing rows, trigger auto-save timer for license changes
-                                            // But only if the licenses contain actual data (not empty licenses)
+                                            // But only if the licenses are complete (not just partially filled)
                                             if (!rowId.startsWith('tmp-')) {
-                                                const hasValidLicenseData =
+                                                const hasCompleteLicenseData =
                                                     Array.isArray(value) &&
-                                                    value.some(
-                                                        (license: any) =>
-                                                            license.enterprise?.trim() ||
-                                                            license.product?.trim() ||
-                                                            license.service?.trim() ||
-                                                            license.licenseStartDate?.trim() ||
-                                                            license.licenseStart?.trim() ||
-                                                            license.licenseEndDate?.trim() ||
-                                                            license.licenseEnd?.trim() ||
-                                                            license.numberOfUsers?.trim() ||
-                                                            license.users?.trim(),
-                                                    );
+                                                    value.length > 0 &&
+                                                    value.every((license: any) => {
+                                                        const hasEnterprise = license.enterprise?.trim();
+                                                        const hasProduct = license.product?.trim();
+                                                        const hasService = license.service?.trim();
+                                                        const hasLicenseStartDate = license.licenseStartDate?.trim();
+                                                        const hasLicenseEndDate = license.licenseEndDate?.trim();
+                                                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                                                        const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                                                        
+                                                        return hasEnterprise && hasProduct && hasService && 
+                                                               hasLicenseStartDate && hasLicenseEndDate && 
+                                                               hasNumberOfUsers && hasValidNoticePeriod;
+                                                    });
 
-                                                if (hasValidLicenseData) {
+                                                console.log('📊 License completeness check:', {
+                                                    rowId,
+                                                    hasCompleteLicenseData,
+                                                    licensesCount: Array.isArray(value) ? value.length : 0,
+                                                    licenses: value
+                                                });
+
+                                                if (hasCompleteLicenseData) {
                                                     console.log(
-                                                        '🔄 Triggering auto-save timer for license change on existing account:',
+                                                        '🔄 Triggering auto-save timer for complete license data on existing account:',
                                                         rowId,
                                                     );
 
@@ -4524,8 +4624,17 @@ export default function ManageAccounts() {
                                                     debouncedAutoSave();
                                                 } else {
                                                     console.log(
-                                                        '❌ Not triggering auto-save for empty license data:',
+                                                        '❌ Not triggering auto-save for incomplete license data:',
                                                         rowId,
+                                                    );
+                                                    
+                                                    // Remove from modified records if license is incomplete
+                                                    setModifiedExistingRecords(
+                                                        (prev) => {
+                                                            const newSet = new Set(prev);
+                                                            newSet.delete(rowId);
+                                                            return newSet;
+                                                        },
                                                     );
                                                 }
                                             } else {
