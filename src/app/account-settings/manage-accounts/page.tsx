@@ -161,6 +161,7 @@ export default function ManageAccounts() {
         products: [] as Array<{id: string; name: string}>,
         services: [] as Array<{id: string; name: string}>,
         accountNames: [] as Array<{id: string; name: string}>,
+        masterAccounts: [] as Array<{id: string; name: string}>,
         cloudTypes: [
             {id: 'private-cloud', name: 'Private Cloud'},
             {id: 'public-cloud', name: 'Public Cloud'},
@@ -181,7 +182,7 @@ export default function ManageAccounts() {
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'Account' | 'Master Account' | 'Cloud Type' | 'Address'
+        'None' | 'Account' | 'Master Account' | 'Cloud Type'
     >('None');
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
         'accountName',
@@ -236,15 +237,21 @@ export default function ManageAccounts() {
                 ]);
 
             // Extract unique account names from existing accounts
-            const uniqueAccountNames = Array.from(
-                new Set(
-                    accounts
-                        .map((account) => account.accountName)
-                        .filter(Boolean),
-                ),
-            ).map((name, index) => ({
-                id: `account-${index}`,
-                name: name,
+            const uniqueAccountNames = Array.from(new Set(accounts
+                .map(account => account.accountName)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `account-${name}-${index}`,
+                name: name
+            }));
+            
+            // Extract unique master account names from existing accounts
+            const uniqueMasterAccounts = Array.from(new Set(accounts
+                .map(account => account.masterAccount)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `master-${name}-${index}`,
+                name: name
             }));
 
             setDropdownOptions({
@@ -252,6 +259,7 @@ export default function ManageAccounts() {
                 products: productsRes || [],
                 services: servicesRes || [],
                 accountNames: uniqueAccountNames,
+                masterAccounts: uniqueMasterAccounts,
                 cloudTypes: [
                     {id: 'private-cloud', name: 'Private Cloud'},
                     {id: 'public-cloud', name: 'Public Cloud'},
@@ -356,19 +364,11 @@ export default function ManageAccounts() {
     };
 
     // All available columns
-    type ColumnType =
-        | 'accountName'
-        | 'masterAccount'
-        | 'cloudType'
-        | 'address'
-        | 'technicalUser';
-    const allCols: ColumnType[] = [
-        'accountName',
-        'masterAccount',
-        'cloudType',
-        'address',
-        'technicalUser',
-    ];
+    type ColumnType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'technicalUser';
+    const allCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType', 'address', 'technicalUser'];
+    
+    // Columns available in toolbar panels (excludes address and technicalUser)
+    const toolbarCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType'];
 
     // Process account data with filtering, sorting, and search
     const processedConfigs = React.useMemo(() => {
@@ -404,11 +404,7 @@ export default function ManageAccounts() {
                 (config) => config.cloudType === activeFilters.cloudType,
             );
         }
-        if (activeFilters.address) {
-            filtered = filtered.filter(
-                (config) => config.address === activeFilters.address,
-            );
-        }
+        // Address filter removed from UI but data processing remains intact
 
         // Apply sorting only when both column and direction are explicitly set
         if (
@@ -526,8 +522,15 @@ export default function ManageAccounts() {
         accountName: '',
         masterAccount: '',
         cloudType: '',
-        address: '',
     });
+    
+    // Autocomplete states
+    const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
+    const [showMasterAccountSuggestions, setShowMasterAccountSuggestions] = useState(false);
+    const [filteredAccountNames, setFilteredAccountNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredMasterAccounts, setFilteredMasterAccounts] = useState<Array<{id: string; name: string}>>([]);
+    const [selectedAccountIndex, setSelectedAccountIndex] = useState(-1);
+    const [selectedMasterAccountIndex, setSelectedMasterAccountIndex] = useState(-1);
 
     const handleApplyFilters = () => {
         const newFilters: Record<string, any> = {};
@@ -541,32 +544,19 @@ export default function ManageAccounts() {
         if (filterForm.cloudType.trim()) {
             newFilters.cloudType = filterForm.cloudType.trim();
         }
-        if (filterForm.address.trim()) {
-            newFilters.address = filterForm.address.trim();
-        }
 
         setActiveFilters(newFilters);
         closeAllDialogs();
     };
 
     const handleClearFilters = () => {
-        setFilterForm({
-            accountName: '',
-            masterAccount: '',
-            cloudType: '',
-            address: '',
-        });
+        setFilterForm({accountName: '', masterAccount: '', cloudType: ''});
         setActiveFilters({});
         closeAllDialogs();
     };
 
     const setGroupByFromLabel = (label: string) => {
-        const l = label as
-            | 'None'
-            | 'Account'
-            | 'Master Account'
-            | 'Cloud Type'
-            | 'Address';
+        const l = label as 'None' | 'Account' | 'Master Account' | 'Cloud Type';
         setActiveGroupLabel(l);
     };
 
@@ -577,8 +567,6 @@ export default function ManageAccounts() {
             ? 'masterAccount'
             : ActiveGroupLabel === 'Cloud Type'
             ? 'cloudType'
-            : ActiveGroupLabel === 'Address'
-            ? 'address'
             : 'none';
 
     // Helper function to save accounts via API (replaced localStorage)
@@ -2560,6 +2548,20 @@ export default function ManageAccounts() {
     // Ref for AccountsTable to access its methods
     const accountsTableRef = useRef<any>(null);
 
+    // Expand all rows function
+    const expandAllRows = () => {
+        if (accountsTableRef.current) {
+            accountsTableRef.current.expandAllRows();
+        }
+    };
+
+    // Collapse all rows function
+    const collapseAllRows = () => {
+        if (accountsTableRef.current) {
+            accountsTableRef.current.collapseAllRows();
+        }
+    };
+
     // Function to delete license from the table
     const deleteLicenseFromTable = async (licenseId: string) => {
         console.log('🗑️ Deleting license from all accounts:', licenseId);
@@ -3317,19 +3319,83 @@ export default function ManageAccounts() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={
-                                                            filterForm.accountName
-                                                        }
-                                                        onChange={(e) =>
+                                                        value={filterForm.accountName}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                accountName:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
+                                                                accountName: value,
+                                                            });
+                                                            
+                                                            // Filter account names and ensure uniqueness
+                                                            const filtered = dropdownOptions.accountNames.filter(account =>
+                                                                account.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            // Remove duplicates based on name
+                                                            const uniqueFiltered = filtered.filter((account, index, self) =>
+                                                                index === self.findIndex(a => a.name === account.name)
+                                                            );
+                                                            setFilteredAccountNames(uniqueFiltered);
+                                                            setShowAccountSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedAccountIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedAccountIndex(prev => 
+                                                                    prev < filteredAccountNames.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedAccountIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedAccountIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredAccountNames[selectedAccountIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    accountName: selected.name,
+                                                                });
+                                                                setShowAccountSuggestions(false);
+                                                                setSelectedAccountIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowAccountSuggestions(false);
+                                                                setSelectedAccountIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Delay hiding suggestions to allow clicking
+                                                            setTimeout(() => setShowAccountSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.accountName && filteredAccountNames.length > 0) {
+                                                                setShowAccountSuggestions(true);
+                                                            }
+                                                        }}
+                                                        placeholder='Type to search accounts...'
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
+                                                    {showAccountSuggestions && (
+                                                        <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredAccountNames.map((account, index) => (
+                                                                <div
+                                                                    key={account.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedAccountIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onClick={() => {
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            accountName: account.name,
+                                                                        });
+                                                                        setShowAccountSuggestions(false);
+                                                                        setSelectedAccountIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {account.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -3341,19 +3407,83 @@ export default function ManageAccounts() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={
-                                                            filterForm.masterAccount
-                                                        }
-                                                        onChange={(e) =>
+                                                        value={filterForm.masterAccount}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                masterAccount:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
+                                                                masterAccount: value,
+                                                            });
+                                                            
+                                                            // Filter master account names and ensure uniqueness
+                                                            const filtered = dropdownOptions.masterAccounts.filter(master =>
+                                                                master.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            // Remove duplicates based on name
+                                                            const uniqueFiltered = filtered.filter((master, index, self) =>
+                                                                index === self.findIndex(m => m.name === master.name)
+                                                            );
+                                                            setFilteredMasterAccounts(uniqueFiltered);
+                                                            setShowMasterAccountSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedMasterAccountIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedMasterAccountIndex(prev => 
+                                                                    prev < filteredMasterAccounts.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedMasterAccountIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedMasterAccountIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredMasterAccounts[selectedMasterAccountIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    masterAccount: selected.name,
+                                                                });
+                                                                setShowMasterAccountSuggestions(false);
+                                                                setSelectedMasterAccountIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowMasterAccountSuggestions(false);
+                                                                setSelectedMasterAccountIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Delay hiding suggestions to allow clicking
+                                                            setTimeout(() => setShowMasterAccountSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.masterAccount && filteredMasterAccounts.length > 0) {
+                                                                setShowMasterAccountSuggestions(true);
+                                                            }
+                                                        }}
+                                                        placeholder='Type to search master accounts...'
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
+                                                    {showMasterAccountSuggestions && (
+                                                        <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredMasterAccounts.map((master, index) => (
+                                                                <div
+                                                                    key={master.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedMasterAccountIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onClick={() => {
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            masterAccount: master.name,
+                                                                        });
+                                                                        setShowMasterAccountSuggestions(false);
+                                                                        setSelectedMasterAccountIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {master.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -3381,29 +3511,7 @@ export default function ManageAccounts() {
                                                 </div>
                                             </div>
 
-                                            {/* Address Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Address
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={
-                                                            filterForm.address
-                                                        }
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                address:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
+
                                         </div>
                                     </div>
                                 </div>
@@ -3480,19 +3588,10 @@ export default function ManageAccounts() {
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>
-                                                            Select column...
-                                                        </option>
-                                                        {allCols.map((col) => (
-                                                            <option
-                                                                key={col}
-                                                                value={col}
-                                                            >
-                                                                {
-                                                                    columnLabels[
-                                                                        col
-                                                                    ]
-                                                                }
+                                                        <option value=''>Select column...</option>
+                                                        {toolbarCols.map((col) => (
+                                                            <option key={col} value={col}>
+                                                                {columnLabels[col]}
                                                             </option>
                                                         ))}
                                                     </select>
@@ -3728,13 +3827,8 @@ export default function ManageAccounts() {
                                                     >
                                                         <option>None</option>
                                                         <option>Account</option>
-                                                        <option>
-                                                            Master Account
-                                                        </option>
-                                                        <option>
-                                                            Cloud Type
-                                                        </option>
-                                                        <option>Address</option>
+                                                        <option>Master Account</option>
+                                                        <option>Cloud Type</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -3821,6 +3915,45 @@ export default function ManageAccounts() {
                                     ? `Save (${autoSaveCountdown}s)`
                                     : 'Save'}
                             </span>
+                        </button>
+                    </div>
+                    
+                    {/* Right side buttons - Expand/Collapse at extreme right */}
+                    <div className='flex items-center gap-2'>
+                        {/* Expand All Button */}
+                        <button
+                            onClick={expandAllRows}
+                            className="group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-emerald-300 bg-emerald-50 text-emerald-600 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-lg"
+                            title="Expand All Accounts"
+                        >
+                            <svg className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='1.5' viewBox='0 0 16 16'>
+                                {/* Top-left arrow */}
+                                <path d='M2 2 L6 6 M2 2 L2 6 M2 2 L6 2' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Top-right arrow */}
+                                <path d='M14 2 L10 6 M14 2 L14 6 M14 2 L10 2' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Bottom-left arrow */}
+                                <path d='M2 14 L6 10 M2 14 L2 10 M2 14 L6 14' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Bottom-right arrow */}
+                                <path d='M14 14 L10 10 M14 14 L14 10 M14 14 L10 14' strokeLinecap='round' strokeLinejoin='round' />
+                            </svg>
+                        </button>
+
+                        {/* Collapse All Button */}
+                        <button
+                            onClick={collapseAllRows}
+                            className="group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 hover:shadow-lg"
+                            title="Collapse All Accounts"
+                        >
+                            <svg className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='1.5' viewBox='0 0 16 16'>
+                                {/* Top-left arrow pointing inward */}
+                                <path d='M6 6 L2 2 M6 6 L6 2 M6 6 L2 6' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Top-right arrow pointing inward */}
+                                <path d='M10 6 L14 2 M10 6 L10 2 M10 6 L14 6' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Bottom-left arrow pointing inward */}
+                                <path d='M6 10 L2 14 M6 10 L6 14 M6 10 L2 10' strokeLinecap='round' strokeLinejoin='round' />
+                                {/* Bottom-right arrow pointing inward */}
+                                <path d='M10 10 L14 14 M10 10 L10 14 M10 10 L14 10' strokeLinecap='round' strokeLinejoin='round' />
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -3984,7 +4117,19 @@ export default function ManageAccounts() {
                                 <AccountsTable
                                     ref={accountsTableRef}
                                     isAIInsightsPanelOpen={!isAIPanelCollapsed}
-                                    rows={accountTableRows}
+                                    rows={processedConfigs.map<AccountRow>(
+                                        (a: any) => ({
+                                            id: a.id || '',
+                                            accountName: a.accountName || '',
+                                            masterAccount: a.masterAccount || '',
+                                            cloudType: a.cloudType || '',
+                                            email: a.email || '',
+                                            phone: a.phone || '',
+                                            address: a.address || '',
+                                            technicalUsers: a.technicalUsers || [],
+                                            licenses: a.licenses || [],
+                                        }),
+                                    )}
                                     onEdit={(id) => {
                                         const cfg = accounts.find(
                                             (x) => x.id === id,
@@ -4516,25 +4661,93 @@ export default function ManageAccounts() {
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirmation && (
-                <ConfirmModal
-                    open={showDeleteConfirmation}
-                    title='Confirm Delete'
-                    message={
-                        deleteType === 'account'
-                            ? 'Are you sure you want to delete this account?'
-                            : 'Are you sure you want to delete this license details?'
-                    }
-                    confirmText='Yes'
-                    cancelText='No'
-                    loading={deletingRow}
-                    loadingText={
-                        deleteType === 'license'
-                            ? 'Deleting License...'
-                            : 'Deleting...'
-                    }
-                    onConfirm={handleDeleteConfirm}
-                    onCancel={handleDeleteCancel}
-                />
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={handleDeleteCancel}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            {deleteType === 'account' 
+                                                ? "Are you sure you want to delete this account?"
+                                                : "Are you sure you want to delete this license details?"
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    onClick={handleDeleteConfirm}
+                                >
+                                    {deletingRow ? (
+                                        <>
+                                            <svg
+                                                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                            >
+                                                <circle
+                                                    className='opacity-25'
+                                                    cx='12'
+                                                    cy='12'
+                                                    r='10'
+                                                    stroke='currentColor'
+                                                    strokeWidth='4'
+                                                ></circle>
+                                                <path
+                                                    className='opacity-75'
+                                                    fill='currentColor'
+                                                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                                ></path>
+                                            </svg>
+                                            {deleteType === 'license' ? 'Deleting License...' : 'Deleting...'}
+                                        </>
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </button>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    onClick={handleDeleteCancel}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
             )}
 
             {/* Blue-themed Notification Component - Positioned above Save button */}

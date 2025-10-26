@@ -9,6 +9,8 @@ interface DateChipSelectProps {
     isError?: boolean;
     compact?: boolean;
     className?: string;
+    minDate?: string; // Minimum selectable date (YYYY-MM-DD format)
+    maxDate?: string; // Maximum selectable date (YYYY-MM-DD format)
 }
 
 const DateChipSelect: React.FC<DateChipSelectProps> = ({
@@ -17,7 +19,9 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
     placeholder = "Select date",
     isError = false,
     compact = false,
-    className = ""
+    className = "",
+    minDate,
+    maxDate
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -167,7 +171,7 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
             {isOpen && position && createPortal(
                 <div
                     ref={calendarRef}
-                    className="z-[9999] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
+                    className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
                     style={{
                         position: 'fixed',
                         top: `${position.top}px`,
@@ -233,20 +237,27 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
                                 // Format date as YYYY-MM-DD using local date components to avoid timezone issues
                                 const dateString = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
                                 const isSelected = value === dateString;
+                                
+                                // Check if date is within allowed range
+                                const isDisabledByRange = (minDate && dateString < minDate) || (maxDate && dateString > maxDate);
+                                // Allow selection of dates from adjacent months if they're within the valid range
+                                const isDisabled = Boolean(isDisabledByRange);
 
                                 return (
                                     <button
                                         key={index}
-                                        onClick={() => isCurrentMonth && handleDateSelect(dateString)}
-                                        disabled={!isCurrentMonth}
-                                        className={`p-2 text-sm rounded-lg transition-all duration-200 hover:scale-105 ${
-                                            !isCurrentMonth
-                                                ? 'text-gray-300 cursor-not-allowed'
+                                        onClick={() => !isDisabled && handleDateSelect(dateString)}
+                                        disabled={isDisabled}
+                                        className={`p-2 text-sm rounded-lg transition-all duration-200 ${
+                                            isDisabled
+                                                ? 'text-gray-300 cursor-not-allowed bg-gray-100'
                                                 : isSelected
                                                 ? 'bg-blue-600 text-white font-semibold shadow-lg scale-105'
                                                 : isToday
-                                                ? 'bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200 border-2 border-blue-300'
-                                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md'
+                                                ? 'bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200 border-2 border-blue-300 hover:scale-105'
+                                                : !isCurrentMonth
+                                                ? 'text-gray-400 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md hover:scale-105' // Adjacent month dates (lighter but clickable)
+                                                : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md hover:scale-105'
                                         }`}
                                     >
                                         {day.getDate()}

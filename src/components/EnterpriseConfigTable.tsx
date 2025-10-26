@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
     ArrowUp,
@@ -178,16 +178,14 @@ const ChipDropdown = ({
             </div>
 
             {isOpen && (
-                <div className='absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
-                    <div className='p-2 border-b'>
+                <div className='absolute w-full mt-1 bg-gray-50 border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto before:content-[""] before:absolute before:-top-2 before:left-4 before:w-0 before:h-0 before:border-l-[8px] before:border-l-transparent before:border-r-[8px] before:border-r-transparent before:border-b-[8px] before:border-b-gray-50 after:content-[""] after:absolute after:-top-[10px] after:left-[14px] after:w-0 after:h-0 after:border-l-[10px] after:border-l-transparent after:border-r-[10px] after:border-r-transparent after:border-b-[10px] after:border-b-gray-200'>
+                    <div className='p-3 border-b border-gray-200 bg-gray-50'>
                         <input
                             type='text'
                             placeholder='Search...'
                             value={searchTerm}
-                            onChange={(
-                                e: React.ChangeEvent<HTMLInputElement>,
-                            ) => setSearchTerm(e.target.value)}
-                            className='w-full p-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                            className='w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white'
                             autoFocus
                         />
                     </div>
@@ -208,10 +206,10 @@ const ChipDropdown = ({
                                             }
                                         }
                                     }}
-                                    className={`p-2 text-sm cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
+                                    className={`p-3 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between transition-colors duration-150 ${
                                         isSelected
-                                            ? 'bg-blue-50 text-blue-600'
-                                            : ''
+                                            ? 'bg-blue-100 text-blue-700 font-medium'
+                                            : 'text-gray-700'
                                     }`}
                                 >
                                     <span>{option.name}</span>
@@ -223,7 +221,7 @@ const ChipDropdown = ({
                         })}
 
                         {filteredOptions.length === 0 && searchTerm && (
-                            <div className='p-2 text-sm text-gray-500'>
+                            <div className='p-3 text-sm text-gray-500 text-center italic'>
                                 No options found
                             </div>
                         )}
@@ -1040,10 +1038,8 @@ function ServicesMultiSelect({
                             moreServicesPos &&
                             createPortal(
                                 <div
-                                    className='z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
-                                    onMouseDown={(e: any) =>
-                                        e.stopPropagation()
-                                    }
+                                    className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
+                                    onMouseDown={(e: any) => e.stopPropagation()}
                                     onClick={(e: any) => e.stopPropagation()}
                                     style={{
                                         position: 'fixed',
@@ -1350,7 +1346,7 @@ function ServicesMultiSelect({
                 createPortal(
                     <div
                         ref={dropdownRef}
-                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
                         onMouseDown={(e: any) => e.stopPropagation()}
                         onClick={(e: any) => e.stopPropagation()}
                         style={{
@@ -1845,81 +1841,25 @@ function AsyncChipSelect({
     } | null>(null);
     // Portal-based dropdown to avoid table clipping
 
-    // Function to calculate optimal dropdown position
+    // Function to calculate optimal dropdown position - always prefer below
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
 
         const containerRect = containerRef.current.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
-        const dropdownHeight = 300; // Max height of dropdown
-        const spaceBelow = viewportHeight - containerRect.bottom;
-        const spaceAbove = containerRect.top;
-
-        // Find the table container to ensure dropdown stays within table bounds
-        const tableContainer =
-            containerRef.current.closest('.compact-table') ||
-            containerRef.current.closest('[role="table"]') ||
-            containerRef.current.closest('.rounded-xl') ||
-            containerRef.current.closest('.overflow-auto') ||
-            containerRef.current.closest('.w-full.compact-table') ||
-            document.querySelector('.compact-table') ||
-            document.body;
-        const tableRect = tableContainer.getBoundingClientRect();
-
-        // Calculate portal position with table container constraints
-        const maxWidth = Math.min(
-            120,
-            tableRect.width - 64,
-            viewportWidth - 64,
-        ); // Reduced to match dropdown width
-        const width = Math.max(100, Math.min(maxWidth, containerRect.width));
-
-        // Ensure dropdown stays within table container horizontally with more padding
-        const idealLeft = containerRect.left;
-        const maxLeft = Math.min(
-            tableRect.right - width - 32,
-            viewportWidth - width - 32,
-        ); // More padding
-        const minLeft = Math.max(tableRect.left + 32, 32); // More padding
-        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
-
-        // Prefer below if there's enough space, otherwise use above if there's more space above
-        let top;
-        if (
-            spaceBelow >= dropdownHeight ||
-            (spaceBelow >= spaceAbove && spaceBelow >= 150)
-        ) {
-            setDropdownPosition('below');
-            top = containerRect.bottom + 4;
-            // Ensure it doesn't go below table bounds
-            if (top + dropdownHeight > tableRect.bottom) {
-                top = Math.max(
-                    tableRect.top + 10,
-                    containerRect.top - dropdownHeight - 4,
-                );
-                setDropdownPosition('above');
-            }
-        } else {
-            setDropdownPosition('above');
-            top = Math.max(
-                tableRect.top + 10,
-                containerRect.top - dropdownHeight - 4,
-            );
-        }
-
-        // Final constraint to ensure dropdown is within table bounds
-        top = Math.max(top, tableRect.top + 10);
-        top = Math.min(top, tableRect.bottom - 100);
-
-        setDropdownPortalPos({top, left, width});
-        console.log('📍 Dropdown position calculated:', {
-            top,
-            left,
-            width,
-            position: spaceBelow >= dropdownHeight ? 'below' : 'above',
-            tableRect,
-        });
+        
+        // Always position below the field
+        setDropdownPosition('below');
+        
+        // Calculate width to match container
+        const width = Math.max(140, Math.min(200, containerRect.width));
+        
+        // Position directly below the field
+        const top = containerRect.bottom + 2;
+        const left = containerRect.left;
+        
+        setDropdownPortalPos({ top, left, width });
+        console.log('📍 Dropdown position calculated:', { top, left, width, position: 'below' });
     }, []);
 
     // Calculate position when dropdown opens
@@ -2520,365 +2460,110 @@ function AsyncChipSelect({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 ${sizeClass} rounded border ${
-                            isError
-                                ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
-                                : 'border-blue-300 bg-white hover:bg-slate-50'
-                        } text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${
-                            isError
-                                ? 'focus:ring-red-200 focus:border-red-500'
-                                : 'focus:ring-blue-200 focus:border-blue-500'
-                        }`}
+                        className={`w-full text-left px-2 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
                         placeholder=''
                     />
                 ) : null}
             </div>
 
             {/* Full Autocomplete Dropdown - Portal Based */}
-            {open &&
-                dropdownPortalPos &&
-                createPortal(
-                    <div
-                        ref={dropdownRef}
-                        className='z-[9999] bg-white border border-gray-200 rounded-md shadow-md'
-                        onMouseDown={(e: any) => e.stopPropagation()}
-                        onClick={(e: any) => e.stopPropagation()}
-                        style={{
-                            position: 'fixed',
-                            top: `${dropdownPortalPos.top}px`,
-                            left: `${dropdownPortalPos.left}px`,
-                            width: `${Math.min(
-                                dropdownPortalPos.width,
-                                180,
-                            )}px`,
-                            maxWidth: '180px',
-                            minWidth: '140px',
-                        }}
-                    >
-                        <div className='py-1'>
-                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
-                                {loading ? (
-                                    <div className='px-3 py-2 text-slate-500'>
-                                        Loading…
-                                    </div>
-                                ) : (
-                                    (() => {
-                                        // Filter options that match the query (show all if no query)
-                                        const filteredOptions = query.trim()
-                                            ? options
-                                                  .filter(
-                                                      (opt) =>
-                                                          opt.name
-                                                              .toLowerCase()
-                                                              .startsWith(
-                                                                  query.toLowerCase(),
-                                                              ) ||
-                                                          opt.name
-                                                              .toLowerCase()
-                                                              .includes(
-                                                                  query.toLowerCase(),
-                                                              ),
-                                                  )
-                                                  .sort((a, b) => {
-                                                      const aLower =
-                                                          a.name.toLowerCase();
-                                                      const bLower =
-                                                          b.name.toLowerCase();
-                                                      const queryLower =
-                                                          query.toLowerCase();
-
-                                                      // Prioritize starts with matches
-                                                      const aStartsWith =
-                                                          aLower.startsWith(
-                                                              queryLower,
-                                                          );
-                                                      const bStartsWith =
-                                                          bLower.startsWith(
-                                                              queryLower,
-                                                          );
-
-                                                      if (
-                                                          aStartsWith &&
-                                                          !bStartsWith
-                                                      )
-                                                          return -1;
-                                                      if (
-                                                          bStartsWith &&
-                                                          !aStartsWith
-                                                      )
-                                                          return 1;
-
-                                                      return aLower.localeCompare(
-                                                          bLower,
-                                                      );
-                                                  })
-                                            : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-
-                                        console.log(
-                                            `Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`,
-                                            filteredOptions,
-                                        );
-
-                                        // Check if query exactly matches an existing option
-                                        const exactMatch = query.trim()
-                                            ? options.find(
-                                                  (opt) =>
-                                                      opt.name.toLowerCase() ===
-                                                      query
-                                                          .toLowerCase()
-                                                          .trim(),
-                                              )
-                                            : null;
-
-                                        const showCreateNew =
-                                            query.trim() && !exactMatch;
-
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px'
+                    }}
+                >
+                    {/* Integrated pointer as part of the panel - positioned to align with input field */}
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                        <div className='relative z-10'>
+                            <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto max-h-44'>
+                            {loading ? (
+                                <div className='px-3 py-2 text-slate-500'>
+                                    Loading…
+                                </div>
+                            ) : (
+                                (() => {
+                                    // Filter options that match the query (show all if no query)
+                                    const filteredOptions = query.trim() 
+                                        ? options.filter(opt => 
+                                            opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                            opt.name.toLowerCase().includes(query.toLowerCase())
+                                        ).sort((a, b) => {
+                                            const aLower = a.name.toLowerCase();
+                                            const bLower = b.name.toLowerCase();
+                                            const queryLower = query.toLowerCase();
+                                            
+                                            // Prioritize starts with matches
+                                            const aStartsWith = aLower.startsWith(queryLower);
+                                            const bStartsWith = bLower.startsWith(queryLower);
+                                            
+                                            if (aStartsWith && !bStartsWith) return -1;
+                                            if (bStartsWith && !aStartsWith) return 1;
+                                            
+                                            return aLower.localeCompare(bLower);
+                                        })
+                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                    
+                                    console.log(`Dropdown for ${type}: filteredOptions.length=${filteredOptions.length}`, filteredOptions);
+                                    
+                                    // Check if query exactly matches an existing option
+                                    const exactMatch = query.trim() ? options.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    ) : null;
+                                    
+                                    if (filteredOptions.length === 0) {
                                         return (
-                                            <div>
-                                                {/* Show existing matching options */}
-                                                {filteredOptions.length > 0 && (
-                                                    <div>
-                                                        {filteredOptions.map(
-                                                            (opt, idx) => (
-                                                                <div
-                                                                    key={opt.id}
-                                                                    onClick={() => {
-                                                                        onChange(
-                                                                            opt.name,
-                                                                        );
-                                                                        setCurrent(
-                                                                            opt.name,
-                                                                        );
-                                                                        setQuery(
-                                                                            '',
-                                                                        );
-                                                                        setOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                    className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
-                                                                >
-                                                                    {opt.name}
-                                                                </div>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                {/* Show "Create New" option */}
-                                                {showCreateNew && (
-                                                    <div className='border-t border-slate-200'>
-                                                        <button
-                                                            onClick={async () => {
-                                                                try {
-                                                                    let created: {
-                                                                        id: string;
-                                                                        name: string;
-                                                                    } | null =
-                                                                        null;
-
-                                                                    if (
-                                                                        type ===
-                                                                        'enterprise'
-                                                                    ) {
-                                                                        created =
-                                                                            await api.post<{
-                                                                                id: string;
-                                                                                name: string;
-                                                                            }>(
-                                                                                '/api/enterprises',
-                                                                                {
-                                                                                    name: query.trim(),
-                                                                                },
-                                                                            );
-                                                                    } else if (
-                                                                        type ===
-                                                                        'product'
-                                                                    ) {
-                                                                        created =
-                                                                            await api.post<{
-                                                                                id: string;
-                                                                                name: string;
-                                                                            }>(
-                                                                                '/api/products',
-                                                                                {
-                                                                                    name: query.trim(),
-                                                                                },
-                                                                            );
-                                                                    } else if (
-                                                                        type ===
-                                                                        'service'
-                                                                    ) {
-                                                                        created =
-                                                                            await api.post<{
-                                                                                id: string;
-                                                                                name: string;
-                                                                            }>(
-                                                                                '/api/services',
-                                                                                {
-                                                                                    name: query.trim(),
-                                                                                },
-                                                                            );
-                                                                    }
-
-                                                                    if (
-                                                                        created
-                                                                    ) {
-                                                                        // Update options list
-                                                                        setOptions(
-                                                                            (
-                                                                                prev,
-                                                                            ) => [
-                                                                                ...prev,
-                                                                                created!,
-                                                                            ],
-                                                                        );
-                                                                        setAllOptions(
-                                                                            (
-                                                                                prev,
-                                                                            ) => [
-                                                                                ...prev,
-                                                                                created!,
-                                                                            ],
-                                                                        );
-
-                                                                        // Set the new value
-                                                                        onChange(
-                                                                            created.name,
-                                                                        );
-                                                                        setCurrent(
-                                                                            created.name,
-                                                                        );
-                                                                        setQuery(
-                                                                            '',
-                                                                        );
-                                                                        setOpen(
-                                                                            false,
-                                                                        );
-
-                                                                        // Notify parent component
-                                                                        if (
-                                                                            onNewItemCreated
-                                                                        ) {
-                                                                            const dropdownType =
-                                                                                type ===
-                                                                                'enterprise'
-                                                                                    ? 'enterprises'
-                                                                                    : type ===
-                                                                                      'product'
-                                                                                    ? 'products'
-                                                                                    : 'services';
-                                                                            onNewItemCreated(
-                                                                                dropdownType,
-                                                                                created,
-                                                                            );
-                                                                        }
-                                                                    }
-                                                                } catch (error) {
-                                                                    console.log(
-                                                                        `API creation failed for ${type}, creating local entry`,
-                                                                    );
-
-                                                                    // Fallback: create a local entry when API fails
-                                                                    const newId = `local-${Date.now()}-${Math.random()
-                                                                        .toString(
-                                                                            36,
-                                                                        )
-                                                                        .substr(
-                                                                            2,
-                                                                            9,
-                                                                        )}`;
-                                                                    const created =
-                                                                        {
-                                                                            id: newId,
-                                                                            name: query.trim(),
-                                                                        };
-
-                                                                    // Update options list
-                                                                    setOptions(
-                                                                        (
-                                                                            prev,
-                                                                        ) => [
-                                                                            ...prev,
-                                                                            created,
-                                                                        ],
-                                                                    );
-                                                                    setAllOptions(
-                                                                        (
-                                                                            prev,
-                                                                        ) => [
-                                                                            ...prev,
-                                                                            created,
-                                                                        ],
-                                                                    );
-
-                                                                    // Set the new value
-                                                                    onChange(
-                                                                        created.name,
-                                                                    );
-                                                                    setCurrent(
-                                                                        created.name,
-                                                                    );
-                                                                    setQuery(
-                                                                        '',
-                                                                    );
-                                                                    setOpen(
-                                                                        false,
-                                                                    );
-
-                                                                    // Notify parent component
-                                                                    if (
-                                                                        onNewItemCreated
-                                                                    ) {
-                                                                        const dropdownType =
-                                                                            type ===
-                                                                            'enterprise'
-                                                                                ? 'enterprises'
-                                                                                : type ===
-                                                                                  'product'
-                                                                                ? 'products'
-                                                                                : 'services';
-                                                                        onNewItemCreated(
-                                                                            dropdownType,
-                                                                            created,
-                                                                        );
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150'
-                                                        >
-                                                            + Create &quot;
-                                                            {query.trim()}&quot;
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {/* Show "No results" message */}
-                                                {filteredOptions.length === 0 &&
-                                                    !showCreateNew && (
-                                                        <div className='px-3 py-2 text-center text-sm text-slate-500'>
-                                                            {query.trim() ? (
-                                                                <div>
-                                                                    No {type}s
-                                                                    found
-                                                                    matching
-                                                                    &quot;
-                                                                    {query}
-                                                                    &quot;
-                                                                </div>
-                                                            ) : (
-                                                                <div>
-                                                                    No {type}s
-                                                                    available
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                No matches
                                             </div>
                                         );
-                                    })()
-                                )}
-                            </div>
+                                    }
+
+                                    return filteredOptions.map((opt, idx) => {
+                                        const palette = [
+                                            { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                            { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                            { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                            { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                        ];
+                                        const tone = palette[idx % palette.length];
+                                        
+                                        return (
+                                            <motion.div
+                                                key={opt.id}
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                whileHover={{scale: 1.02, y: -1}}
+                                                transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                className='relative group'
+                                            >
+                                                <button
+                                                    onClick={() => {
+                                                        onChange(opt.name);
+                                                        setCurrent(opt.name);
+                                                        setQuery('');
+                                                        setOpen(false);
+                                                    }}
+                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible`}
+                                                    style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                >
+                                                    <span className='relative z-10 block'>{opt.name}</span>
+                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                </button>
+                                            </motion.div>
+                                        );
+                                    });
+                                })()
+                            )}
                         </div>
                     </div>,
                     document.body,
@@ -3525,8 +3210,12 @@ export default function EnterpriseConfigTable({
         return isFieldMissing(row, field);
     };
 
+    // Keep a local order for row management. Sync when rows change
+    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
+    const [localRows, setLocalRows] = useState<EnterpriseConfigRow[]>(rows);
+
     // Function to validate all rows and highlight missing fields
-    const validateAndHighlightErrors = () => {
+    const validateAndHighlightErrors = useCallback(() => {
         const errorRowIds = new Set<string>();
 
         localRows.forEach((row) => {
@@ -3542,11 +3231,7 @@ export default function EnterpriseConfigTable({
 
         setValidationErrors(errorRowIds);
         return errorRowIds;
-    };
-
-    // Keep a local order for row management. Sync when rows change
-    const [order, setOrder] = useState<string[]>(() => rows.map((r) => r.id));
-    const [localRows, setLocalRows] = useState<EnterpriseConfigRow[]>(rows);
+    }, [localRows]);
     useEffect(() => {
         // Preserve existing order; append any new ids
         const existing = new Set(order);
@@ -3571,8 +3256,7 @@ export default function EnterpriseConfigTable({
                 onValidationComplete(Array.from(errorRowIds));
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [triggerValidation]);
+    }, [triggerValidation, validateAndHighlightErrors, onValidationComplete]);
 
     // Effect to highlight errors when incompleteRowIds changes from parent
     useEffect(() => {
@@ -3584,8 +3268,7 @@ export default function EnterpriseConfigTable({
             // Only update if there are errors to clear (prevents unnecessary re-renders)
             setValidationErrors((prev) => (prev.size > 0 ? new Set() : prev));
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [incompleteRowIds, showValidationErrors]);
+    }, [incompleteRowIds, showValidationErrors, validateAndHighlightErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -3612,7 +3295,8 @@ export default function EnterpriseConfigTable({
     useEffect(() => {
         return () => {
             // cleanup pending timers on unmount without forcing save
-            Object.values(saveTimersRef.current).forEach((t) =>
+            const currentTimers = saveTimersRef.current;
+            Object.values(currentTimers).forEach((t) =>
                 clearTimeout(t),
             );
         };
@@ -3721,12 +3405,12 @@ export default function EnterpriseConfigTable({
         return base.filter((c) => allowed.has(c));
     }, [visibleColumns, columnOrder]);
 
-    const colSizes: Record<string, string> = {
+    const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
         enterprise: '180px', // Reduced width to give more space for Services column
         product: '200px', // Further reduced width for product names
         services: 'minmax(600px, 1fr)', // Increased minimum width to 600px for more space
-    };
+    } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());

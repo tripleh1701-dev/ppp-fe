@@ -55,6 +55,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
     const [originalUsers, setOriginalUsers] = useState<TechnicalUser[]>([]);
     const [validationErrors, setValidationErrors] = useState<{[key: string]: string[]}>({});
+    const [validationMessages, setValidationMessages] = useState<{[key: string]: Record<string, string>}>({});
 
     // Helper function to check if a user is complete
     const isUserComplete = (user: TechnicalUser): boolean => {
@@ -66,10 +67,104 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                  user.password?.trim());
     };
 
-    // Validation functions
-    const validateEmail = (email: string): boolean => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email.trim());
+    // Enhanced validation functions
+    const validateName = (name: string, fieldName: string): { isValid: boolean; error?: string } => {
+        const trimmed = name.trim();
+        
+        if (!trimmed) {
+            return { isValid: false, error: `${fieldName} is required` };
+        }
+        
+        if (trimmed.length < 2) {
+            return { isValid: false, error: `${fieldName} must be at least 2 characters long` };
+        }
+        
+        if (trimmed.length > 50) {
+            return { isValid: false, error: `${fieldName} must not exceed 50 characters` };
+        }
+        
+        // Allow letters, spaces, hyphens, and apostrophes
+        const nameRegex = /^[a-zA-Z\s\-']+$/;
+        if (!nameRegex.test(trimmed)) {
+            return { isValid: false, error: `${fieldName} can only contain letters, spaces, hyphens, and apostrophes` };
+        }
+        
+        // Check for multiple consecutive spaces or special characters
+        if (/\s{2,}|[-']{2,}/.test(trimmed)) {
+            return { isValid: false, error: `${fieldName} cannot contain consecutive spaces or special characters` };
+        }
+        
+        return { isValid: true };
+    };
+
+    const validateEmail = (email: string): { isValid: boolean; error?: string } => {
+        const trimmed = email.trim();
+        
+        if (!trimmed) {
+            return { isValid: false, error: 'Email address is required' };
+        }
+        
+        // More comprehensive email regex
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        if (!emailRegex.test(trimmed)) {
+            return { isValid: false, error: 'Please enter a valid email address' };
+        }
+        
+        if (trimmed.length > 254) {
+            return { isValid: false, error: 'Email address is too long' };
+        }
+        
+        return { isValid: true };
+    };
+
+    const validatePassword = (password: string): { isValid: boolean; error?: string } => {
+        if (!password) {
+            return { isValid: false, error: 'Password is required' };
+        }
+        
+        if (password.length < 8) {
+            return { isValid: false, error: 'Password must be at least 8 characters long' };
+        }
+        
+        if (password.length > 128) {
+            return { isValid: false, error: 'Password must not exceed 128 characters' };
+        }
+        
+        // Check for at least one uppercase letter
+        if (!/[A-Z]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one uppercase letter' };
+        }
+        
+        // Check for at least one lowercase letter
+        if (!/[a-z]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one lowercase letter' };
+        }
+        
+        // Check for at least one number
+        if (!/\d/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one number' };
+        }
+        
+        // Check for at least one special character
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+            return { isValid: false, error: 'Password must contain at least one special character (!@#$%^&*...)' };
+        }
+        
+        // Check for common weak patterns
+        const commonPatterns = [
+            /(.)\1{2,}/, // Three or more consecutive identical characters
+            /123|234|345|456|567|678|789|890/, // Sequential numbers
+            /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i, // Sequential letters
+        ];
+        
+        for (const pattern of commonPatterns) {
+            if (pattern.test(password)) {
+                return { isValid: false, error: 'Password contains common patterns and is not secure enough' };
+            }
+        }
+        
+        return { isValid: true };
     };
 
     const validateDate = (date: string): boolean => {
@@ -78,32 +173,63 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         return !isNaN(dateObj.getTime());
     };
 
-    const validateUser = (user: TechnicalUser): string[] => {
+    const validateUser = (user: TechnicalUser): { errors: string[]; messages: Record<string, string> } => {
         const errors: string[] = [];
+        const messages: Record<string, string> = {};
         
-        if (!user.firstName?.trim()) {
+        // Validate First Name
+        const firstNameValidation = validateName(user.firstName || '', 'First name');
+        if (!firstNameValidation.isValid) {
             errors.push('firstName');
+            messages.firstName = firstNameValidation.error || 'First name is invalid';
         }
-        if (!user.lastName?.trim()) {
+        
+        // Validate Middle Name (optional, but if provided should be valid)
+        if (user.middleName && user.middleName.trim()) {
+            const middleNameValidation = validateName(user.middleName, 'Middle name');
+            if (!middleNameValidation.isValid) {
+                errors.push('middleName');
+                messages.middleName = middleNameValidation.error || 'Middle name is invalid';
+            }
+        }
+        
+        // Validate Last Name
+        const lastNameValidation = validateName(user.lastName || '', 'Last name');
+        if (!lastNameValidation.isValid) {
             errors.push('lastName');
+            messages.lastName = lastNameValidation.error || 'Last name is invalid';
         }
-        if (!user.emailAddress?.trim()) {
+        
+        // Validate Email Address
+        const emailValidation = validateEmail(user.emailAddress || '');
+        if (!emailValidation.isValid) {
             errors.push('emailAddress');
-        } else if (!validateEmail(user.emailAddress)) {
-            errors.push('emailAddress');
+            messages.emailAddress = emailValidation.error || 'Email address is invalid';
         }
+        
+        // Validate Password
+        const passwordValidation = validatePassword(user.password || '');
+        if (!passwordValidation.isValid) {
+            errors.push('password');
+            messages.password = passwordValidation.error || 'Password is invalid';
+        }
+        
+        // Validate Start Date
         if (!user.startDate?.trim()) {
             errors.push('startDate');
+            messages.startDate = 'Start date is required';
         } else if (!validateDate(user.startDate)) {
             errors.push('startDate');
+            messages.startDate = 'Please enter a valid start date';
         }
+        
+        // Validate End Date
         if (!user.endDate?.trim()) {
             errors.push('endDate');
+            messages.endDate = 'End date is required';
         } else if (!validateDate(user.endDate)) {
             errors.push('endDate');
-        }
-        if (!user.password?.trim()) {
-            errors.push('password');
+            messages.endDate = 'Please enter a valid end date';
         }
         
         // Validate date range
@@ -112,25 +238,29 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             const endDate = new Date(user.endDate);
             if (startDate >= endDate) {
                 errors.push('dateRange');
+                messages.dateRange = 'End date must be after start date';
             }
         }
         
-        return errors;
+        return { errors, messages };
     };
 
     const validateAllUsers = (): boolean => {
         const errors: {[key: string]: string[]} = {};
+        const messages: {[key: string]: Record<string, string>} = {};
         let hasErrors = false;
 
         users.forEach(user => {
-            const userErrors = validateUser(user);
-            if (userErrors.length > 0) {
-                errors[user.id] = userErrors;
+            const validation = validateUser(user);
+            if (validation.errors.length > 0) {
+                errors[user.id] = validation.errors;
+                messages[user.id] = validation.messages;
                 hasErrors = true;
             }
         });
 
         setValidationErrors(errors);
+        setValidationMessages(messages);
         return !hasErrors;
     };
 
@@ -209,7 +339,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             return newSet;
         });
         
-        // Clear validation errors for this field when user starts typing
+        // Clear validation errors and messages for this field when user starts typing
         setValidationErrors(prev => {
             const newErrors = { ...prev };
             if (newErrors[id]) {
@@ -219,6 +349,21 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 }
             }
             return newErrors;
+        });
+        
+        setValidationMessages(prev => {
+            const newMessages = { ...prev };
+            if (newMessages[id]) {
+                const fieldMessages = { ...newMessages[id] };
+                delete fieldMessages[field as string];
+                delete fieldMessages.dateRange; // Also clear dateRange message
+                if (Object.keys(fieldMessages).length === 0) {
+                    delete newMessages[id];
+                } else {
+                    newMessages[id] = fieldMessages;
+                }
+            }
+            return newMessages;
         });
         
         setUsers(prev => {
@@ -232,8 +377,70 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         });
     }, []);
 
-    const handleEmailBlur = useCallback((userId: string, email: string, inputElement: HTMLInputElement) => {
-        if (email.trim() && !validateEmail(email)) {
+    const handleNameBlur = useCallback((userId: string, fieldName: 'firstName' | 'middleName' | 'lastName', value: string) => {
+        const displayName = fieldName === 'firstName' ? 'First name' : fieldName === 'middleName' ? 'Middle name' : 'Last name';
+        
+        // Skip validation for optional middle name if it's empty
+        if (fieldName === 'middleName' && !value.trim()) {
+            return true;
+        }
+        
+        const validation = validateName(value, displayName);
+        
+        if (!validation.isValid) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (!newErrors[userId]) {
+                    newErrors[userId] = [];
+                }
+                if (!newErrors[userId].includes(fieldName)) {
+                    newErrors[userId].push(fieldName);
+                }
+                return newErrors;
+            });
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (!newMessages[userId]) {
+                    newMessages[userId] = {};
+                }
+                newMessages[userId][fieldName] = validation.error || `${displayName} is invalid`;
+                return newMessages;
+            });
+            
+            return false; // Indicate validation failed
+        } else {
+            // Clear validation error if it passes
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (newErrors[userId]) {
+                    newErrors[userId] = newErrors[userId].filter(error => error !== fieldName);
+                    if (newErrors[userId].length === 0) {
+                        delete newErrors[userId];
+                    }
+                }
+                return newErrors;
+            });
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (newMessages[userId] && newMessages[userId][fieldName]) {
+                    delete newMessages[userId][fieldName];
+                    if (Object.keys(newMessages[userId]).length === 0) {
+                        delete newMessages[userId];
+                    }
+                }
+                return newMessages;
+            });
+        }
+        
+        return true; // Indicate validation passed
+    }, []);
+
+    const handleEmailBlur = useCallback((userId: string, email: string) => {
+        const validation = validateEmail(email);
+        
+        if (!validation.isValid) {
             setValidationErrors(prev => {
                 const newErrors = { ...prev };
                 if (!newErrors[userId]) {
@@ -244,35 +451,99 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 }
                 return newErrors;
             });
-            // Prevent navigation by returning focus to the email field
-            setTimeout(() => {
-                inputElement.focus();
-            }, 0);
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (!newMessages[userId]) {
+                    newMessages[userId] = {};
+                }
+                newMessages[userId].emailAddress = validation.error || 'Email address is invalid';
+                return newMessages;
+            });
+            
             return false; // Indicate validation failed
+        } else {
+            // Clear validation error if it passes
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (newErrors[userId]) {
+                    newErrors[userId] = newErrors[userId].filter(error => error !== 'emailAddress');
+                    if (newErrors[userId].length === 0) {
+                        delete newErrors[userId];
+                    }
+                }
+                return newErrors;
+            });
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (newMessages[userId] && newMessages[userId].emailAddress) {
+                    delete newMessages[userId].emailAddress;
+                    if (Object.keys(newMessages[userId]).length === 0) {
+                        delete newMessages[userId];
+                    }
+                }
+                return newMessages;
+            });
         }
+        
         return true; // Indicate validation passed
     }, []);
 
-    const handleDateBlur = useCallback((userId: string, field: 'startDate' | 'endDate', date: string, inputElement: HTMLInputElement) => {
-        if (date.trim() && !validateDate(date)) {
+    const handlePasswordBlur = useCallback((userId: string, password: string) => {
+        const validation = validatePassword(password);
+        
+        if (!validation.isValid) {
             setValidationErrors(prev => {
                 const newErrors = { ...prev };
                 if (!newErrors[userId]) {
                     newErrors[userId] = [];
                 }
-                if (!newErrors[userId].includes(field)) {
-                    newErrors[userId].push(field);
+                if (!newErrors[userId].includes('password')) {
+                    newErrors[userId].push('password');
                 }
                 return newErrors;
             });
-            // Prevent navigation by returning focus to the date field
-            setTimeout(() => {
-                inputElement.focus();
-            }, 0);
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (!newMessages[userId]) {
+                    newMessages[userId] = {};
+                }
+                newMessages[userId].password = validation.error || 'Password is invalid';
+                return newMessages;
+            });
+            
             return false; // Indicate validation failed
+        } else {
+            // Clear validation error if it passes
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (newErrors[userId]) {
+                    newErrors[userId] = newErrors[userId].filter(error => error !== 'password');
+                    if (newErrors[userId].length === 0) {
+                        delete newErrors[userId];
+                    }
+                }
+                return newErrors;
+            });
+            
+            setValidationMessages(prev => {
+                const newMessages = { ...prev };
+                if (newMessages[userId] && newMessages[userId].password) {
+                    delete newMessages[userId].password;
+                    if (Object.keys(newMessages[userId]).length === 0) {
+                        delete newMessages[userId];
+                    }
+                }
+                return newMessages;
+            });
         }
+        
         return true; // Indicate validation passed
     }, []);
+
+
 
     const removeUser = (id: string) => {
         if (users.length > 1) {
@@ -292,6 +563,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         onSave(validUsers);
         setHasUnsavedChanges(false);
         setValidationErrors({}); // Clear validation errors on successful save
+        setValidationMessages({}); // Clear validation messages on successful save
         onClose();
     };
 
@@ -336,12 +608,13 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Left Panel - Pipeline Canvas Style (Narrow) */}
+                {/* Left Panel - Sidebar Image */}
                 <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
-                    {/* Panel Content - Empty (no icons) */}
-                    <div className="flex-1 relative z-10">
-                        {/* Empty space - no content */}
-                    </div>
+                    <img 
+                        src="/images/logos/sidebar.png" 
+                        alt="Sidebar" 
+                        className="w-full h-full object-cover"
+                    />
                     
                     {/* Middle Text - Rotated and Bold */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
@@ -349,15 +622,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                             <Users className="h-4 w-4" />
                             <span>Manage Tech User</span>
                         </div>
-                    </div>
-                    
-                    {/* Logo Watermark - Bottom of Panel */}
-                    <div className="absolute bottom-2 left-1 right-1 h-16">
-                        <img 
-                            src="/images/logos/logo.svg" 
-                            alt="Logo" 
-                            className="w-full h-full object-contain opacity-20"
-                        />
                     </div>
                 </div>
 
@@ -486,6 +750,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.firstName || ''}
                                                         onChange={(e) => updateUser(user.id, 'firstName', e.target.value)}
+                                                        onBlur={(e) => handleNameBlur(user.id, 'firstName', e.target.value)}
                                                         className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('firstName')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -493,7 +758,9 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         }`}
                                                     />
                                                     {validationErrors[user.id]?.includes('firstName') && (
-                                                        <p className="text-red-500 text-xs mt-1">First name is required</p>
+                                                        <p className="text-red-500 text-xs mt-1">
+                                                            {validationMessages[user.id]?.firstName || 'First name is required'}
+                                                        </p>
                                                     )}
                                                 </div>
                                                 
@@ -505,8 +772,18 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.middleName || ''}
                                                         onChange={(e) => updateUser(user.id, 'middleName', e.target.value)}
-                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-colors bg-white min-h-[28px]"
+                                                        onBlur={(e) => handleNameBlur(user.id, 'middleName', e.target.value)}
+                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                            validationErrors[user.id]?.includes('middleName')
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                        }`}
                                                     />
+                                                    {validationErrors[user.id]?.includes('middleName') && (
+                                                        <p className="text-red-500 text-xs mt-1">
+                                                            {validationMessages[user.id]?.middleName || 'Middle name is invalid'}
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 
                                                 <div>
@@ -517,6 +794,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.lastName || ''}
                                                         onChange={(e) => updateUser(user.id, 'lastName', e.target.value)}
+                                                        onBlur={(e) => handleNameBlur(user.id, 'lastName', e.target.value)}
                                                         className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('lastName')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -524,7 +802,9 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         }`}
                                                     />
                                                     {validationErrors[user.id]?.includes('lastName') && (
-                                                        <p className="text-red-500 text-xs mt-1">Last name is required</p>
+                                                        <p className="text-red-500 text-xs mt-1">
+                                                            {validationMessages[user.id]?.lastName || 'Last name is required'}
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
@@ -537,7 +817,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     type="email"
                                                     value={user.emailAddress || ''}
                                                     onChange={(e) => updateUser(user.id, 'emailAddress', e.target.value)}
-                                                    onBlur={(e) => handleEmailBlur(user.id, e.target.value, e.target)}
+                                                    onBlur={(e) => handleEmailBlur(user.id, e.target.value)}
                                                     className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[user.id]?.includes('emailAddress')
                                                             ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -546,7 +826,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                 />
                                                 {validationErrors[user.id]?.includes('emailAddress') && (
                                                     <p className="text-red-500 text-xs mt-1">
-                                                        {!user.emailAddress?.trim() ? 'Email address is required' : 'Please enter a valid email address'}
+                                                        {validationMessages[user.id]?.emailAddress || 'Email address is invalid'}
                                                     </p>
                                                 )}
                                             </div>
@@ -591,7 +871,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     />
                                                     {validationErrors[user.id]?.includes('startDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
-                                                            {!user.startDate?.trim() ? 'Start date is required' : 'Please enter a valid date'}
+                                                            {validationMessages[user.id]?.startDate || 'Start date is required'}
                                                         </p>
                                                     )}
                                                 </div>
@@ -609,11 +889,13 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     />
                                                     {validationErrors[user.id]?.includes('endDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
-                                                            {!user.endDate?.trim() ? 'End date is required' : 'Please enter a valid date'}
+                                                            {validationMessages[user.id]?.endDate || 'End date is required'}
                                                         </p>
                                                     )}
                                                     {validationErrors[user.id]?.includes('dateRange') && (
-                                                        <p className="text-red-500 text-xs mt-1">End date must be after start date</p>
+                                                        <p className="text-red-500 text-xs mt-1">
+                                                            {validationMessages[user.id]?.dateRange || 'End date must be after start date'}
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
@@ -626,6 +908,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     type="password"
                                                     value={user.password || ''}
                                                     onChange={(e) => updateUser(user.id, 'password', e.target.value)}
+                                                    onBlur={(e) => handlePasswordBlur(user.id, e.target.value)}
                                                     className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[user.id]?.includes('password')
                                                             ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -633,7 +916,9 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     }`}
                                                 />
                                                 {validationErrors[user.id]?.includes('password') && (
-                                                    <p className="text-red-500 text-xs mt-1">Password is required</p>
+                                                    <p className="text-red-500 text-xs mt-1">
+                                                        {validationMessages[user.id]?.password || 'Password is required'}
+                                                    </p>
                                                 )}
                                             </div>
                                             

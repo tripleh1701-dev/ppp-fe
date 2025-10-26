@@ -222,6 +222,7 @@ export default function ManageRoles() {
     // Track the latest request to prevent race conditions
     const loadRolesRequestId = useRef(0);
 
+    // Load initial data
     // Debug: Log whenever tableData changes
     useEffect(() => {
         console.log('🔄 tableData STATE CHANGED:', {
@@ -421,7 +422,7 @@ export default function ManageRoles() {
             isSystiva: selectedAccount.isSystiva,
         });
         loadRoles();
-    }, [selectedAccount.id, selectedAccount.name, loadRoles]);
+    }, [selectedAccount.id, selectedAccount.name, selectedAccount.isSystiva, loadRoles]);
 
     // Debounced auto-save (10-second timer with countdown)
     const debouncedAutoSave = useCallback(() => {

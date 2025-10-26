@@ -297,6 +297,17 @@ input[type='email']::placeholder {
     font-weight: 400 !important;
 }
 
+/* ManageUsersTable input font weight override */
+.manage-users-table input,
+[data-table='manage-users'] input,
+.manage-users-table input[type='text'],
+.manage-users-table input[type='email'],
+.manage-users-table textarea,
+.manage-users-table select {
+    font-weight: normal !important;
+    font-family: inherit !important;
+}
+
 /* HOVER EDIT FUNCTIONALITY */
 /* Cell hover edit styling */
 .task-cell:hover,
@@ -526,14 +537,14 @@ select[name='status'][value='Inactive'],
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-    vertical-align: middle !important;
     overflow: hidden !important;
     position: relative !important;
     z-index: 1 !important;
     height: 44px !important;
     min-height: 44px !important;
     max-height: 44px !important;
-    display: block !important;
+    display: flex !important;
+    align-items: center !important;
     width: 100% !important;
 }
 
@@ -749,6 +760,7 @@ select[name='status'][value='Inactive'],
 /* Override any default select styling */
 .task-cell select {
     outline: none !important;
+    appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
 }
@@ -2666,65 +2678,109 @@ body {
 
 /* Headings - Compact hierarchy */
 .heading-xl {
-    @apply text-xl font-bold text-slate-900 leading-tight;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
 }
 
 .heading-lg {
-    @apply text-lg font-bold text-slate-900 leading-tight;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
 }
 
 .heading-md {
-    @apply text-base font-semibold text-slate-900 leading-snug;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.375;
 }
 
 .heading-sm {
-    @apply text-sm font-semibold text-slate-900 leading-snug;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.375;
 }
 
 /* Body text - Compact and readable */
 .text-body-lg {
-    @apply text-sm font-medium text-slate-700 leading-relaxed;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+    line-height: 1.625;
 }
 
 .text-body {
-    @apply text-xs font-medium text-slate-700 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #334155;
+    line-height: 1.625;
 }
 
 .text-body-sm {
-    @apply text-xs font-medium text-slate-600 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    line-height: 1.625;
 }
 
 /* Screen descriptions and helper text - Compact */
 .screen-description {
-    @apply text-xs font-normal text-slate-600 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.625;
 }
 
 .helper-text {
-    @apply text-xs font-normal text-slate-500 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #64748b;
+    line-height: 1.625;
 }
 
 /* Breadcrumbs - Compact styling */
 .breadcrumb-text {
-    @apply text-xs font-medium text-slate-600 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    line-height: 1.625;
 }
 
 /* Table controls - Compact styling */
 .table-control {
-    @apply text-xs font-medium text-slate-600 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    line-height: 1.625;
 }
 
 /* AI Assistant text - Compact styling */
 .ai-text {
-    @apply text-xs font-medium text-slate-700 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #334155;
+    line-height: 1.625;
 }
 
 /* Labels and small text - Compact */
 .label-text {
-    @apply text-xs font-semibold text-slate-700 leading-relaxed uppercase tracking-wide;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.625;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .small-label {
-    @apply text-xs font-medium text-slate-600 leading-relaxed;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    line-height: 1.625;
 }
 
 /* ===== LAYOUT UTILITIES ===== */
@@ -2732,24 +2788,30 @@ body {
 
 /* Container utilities for dense, content-rich layouts */
 .container-dense {
-    @apply max-w-[1440px] mx-auto px-6;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 .container-fluid {
-    @apply w-full px-6;
+    width: 100%;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 /* Spacing utilities for 80% zoom effect */
 .spacing-dense {
-    @apply gap-4;
+    gap: 1rem;
 }
 
 .spacing-normal {
-    @apply gap-6;
+    gap: 1.5rem;
 }
 
 .spacing-relaxed {
-    @apply gap-8;
+    gap: 2rem;
 }
 
 /* ===== COMPONENT STYLES ===== */
@@ -2757,122 +2819,205 @@ body {
 
 /* Cards - Professional appearance */
 .card-base {
-    @apply bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: all 0.2s;
+}
+
+.card-base:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 .card-compact {
-    @apply p-4;
+    padding: 1rem;
 }
 
 .card-normal {
-    @apply p-6;
+    padding: 1.5rem;
 }
 
 .card-relaxed {
-    @apply p-8;
+    padding: 2rem;
 }
 
 /* Buttons - Consistent styling */
 .btn-primary {
-    @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200;
+    background-color: #2563eb;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
 }
 
 .btn-secondary {
-    @apply bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors duration-200;
+    background-color: #f1f5f9;
+    color: #334155;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background-color: #e2e8f0;
 }
 
 .btn-sm {
-    @apply px-3 py-1.5 text-sm;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
 }
 
 .btn-md {
-    @apply px-4 py-2 text-sm;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
 }
 
 .btn-lg {
-    @apply px-6 py-3 text-base;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
 }
 
 /* Inputs - Consistent styling */
 .input-base {
-    @apply w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors duration-200;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-base::placeholder {
+    color: #64748b;
+}
+
+.input-base:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
 }
 
 .input-sm {
-    @apply px-2.5 py-1.5 text-xs;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
 }
 
 .input-md {
-    @apply px-3 py-2 text-sm;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
 }
 
 .input-lg {
-    @apply px-4 py-3 text-base;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
 }
 
 /* Tables - Professional appearance */
 .table-base {
-    @apply w-full text-sm;
+    width: 100%;
+    font-size: 0.875rem;
 }
 
 .table-header {
-    @apply bg-slate-50 border-b border-slate-200;
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .table-header-cell {
-    @apply px-4 py-3 text-left font-semibold text-slate-900;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #0f172a;
 }
 
 .table-cell {
-    @apply px-4 py-3 border-b border-slate-100 text-slate-700;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
 }
 
 /* Enhanced table styling */
 .table-enhanced {
-    @apply w-full bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden;
+    width: 100%;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
 }
 
 .table-enhanced-header {
-    @apply bg-slate-50 border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900;
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
 }
 
 .table-enhanced-row {
-    @apply border-b border-slate-100 hover:bg-slate-50 transition-colors duration-200 ease-in-out;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.table-enhanced-row:hover {
+    background-color: #f8fafc;
 }
 
 .table-enhanced-cell {
-    @apply px-4 py-3 text-sm text-slate-700;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: #334155;
 }
 
 /* Standardized row heights */
 .table-row-h-12 {
-    @apply h-12;
+    height: 3rem;
 }
 
 .table-row-h-14 {
-    @apply h-14;
+    height: 3.5rem;
 }
 
 /* Enhanced hover effects */
 .hover-lift {
-    @apply hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ease-in-out;
+    transition: all 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    transform: translateY(-0.125rem);
 }
 
 .hover-glow {
-    @apply hover:shadow-lg hover:ring-2 hover:ring-primary-500/20 transition-all duration-200 ease-in-out;
+    transition: all 0.2s ease-in-out;
+}
+
+.hover-glow:hover {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
 }
 
 /* Smooth animations */
 .animate-smooth {
-    @apply transition-all duration-200 ease-in-out;
+    transition: all 0.2s ease-in-out;
 }
 
 .animate-fast {
-    @apply transition-all duration-150 ease-in-out;
+    transition: all 0.15s ease-in-out;
 }
 
 .animate-slow {
-    @apply transition-all duration-300 ease-in-out;
+    transition: all 0.3s ease-in-out;
 }
 
 /* ===== RESPONSIVE UTILITIES ===== */
@@ -2880,21 +3025,23 @@ body {
 
 @media (max-width: 768px) {
     .container-dense {
-        @apply px-4;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
 
     .card-normal {
-        @apply p-4;
+        padding: 1rem;
     }
 
     .spacing-normal {
-        @apply gap-4;
+        gap: 1rem;
     }
 }
 
 @media (max-width: 1024px) {
     .container-dense {
-        @apply px-5;
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
     }
 }
 
@@ -2902,32 +3049,36 @@ body {
 /* Ensure proper contrast and readability */
 
 /* Focus states */
-.focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2;
+.focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2), 0 0 0 4px rgb(59 130 246 / 0.1);
 }
 
 /* Selection styling */
 ::selection {
-    @apply bg-primary-100 text-primary-900;
+    background-color: #dbeafe;
+    color: #1e3a8a;
 }
 
 ::-moz-selection {
-    @apply bg-primary-100 text-primary-900;
+    background-color: #dbeafe;
+    color: #1e3a8a;
 }
 
 /* ===== ANIMATIONS ===== */
 /* Smooth transitions and micro-interactions */
 
 .transition-base {
-    @apply transition-all duration-200 ease-in-out;
+    transition: all 0.2s ease-in-out;
 }
 
 .transition-fast {
-    @apply transition-all duration-150 ease-in-out;
+    transition: all 0.15s ease-in-out;
 }
 
 .transition-slow {
-    @apply transition-all duration-300 ease-in-out;
+    transition: all 0.3s ease-in-out;
 }
 
 /* ===== LEGACY SUPPORT ===== */
@@ -2955,23 +3106,35 @@ body {
 
 /* Ensure page areas scroll when needed */
 .main-scroll {
-    @apply overflow-auto;
+    overflow: auto;
 }
 
 /* Links */
 a {
-    @apply text-primary-600 hover:text-primary-700 transition-colors duration-200;
+    color: #2563eb;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: #1d4ed8;
 }
 
 /* ===== UTILITY OVERRIDES ===== */
 /* Override any conflicting Tailwind utilities */
 
 .text-responsive {
-    @apply text-sm font-medium text-slate-700 leading-relaxed;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+    line-height: 1.625;
 }
 
 .container-responsive {
-    @apply max-w-[1440px] mx-auto px-6;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 /* ===== PIPELINE HEADER ANIMATIONS ===== */
@@ -3032,6 +3195,75 @@ div .search-placeholder::placeholder,
     font-size: 12px !important;
 }
 
+/* ManageUsersTable specific input font-weight fix - HIGHEST SPECIFICITY */
+.manage-users-table input,
+.manage-users-table textarea,
+.manage-users-table input[type="text"],
+.manage-users-table input[type="email"],
+.manage-users-table input[type="password"],
+.manage-users-table input[type="date"],
+.manage-users-table input:focus,
+.manage-users-table textarea:focus,
+.manage-users-table input[type="text"]:focus,
+.manage-users-table input[type="email"]:focus,
+.manage-users-table input[type="password"]:focus,
+.manage-users-table input[type="date"]:focus,
+.manage-users-table div input,
+.manage-users-table div textarea,
+.manage-users-table * input,
+.manage-users-table * textarea {
+    font-weight: 400 !important;
+    font-weight: normal !important;
+}
+
+/* Override any bold font inheritance in ManageUsersTable */
+.manage-users-table input *,
+.manage-users-table textarea * {
+    font-weight: normal !important;
+}
+
+/* Ultra-specific fix for cursor/caret font-weight */
+.manage-users-table input:focus,
+.manage-users-table textarea:focus {
+    font-weight: 400 !important;
+    caret-color: #374151 !important;
+}
+
+/* Force normal font-weight on all text content in inputs */
+html body .manage-users-table input,
+html body .manage-users-table textarea,
+html body .manage-users-table input:focus,
+html body .manage-users-table textarea:focus {
+    font-weight: 400 !important;
+    font-style: normal !important;
+}
+
+/* Ensure ManageUsersTable containers don't clip focus rings */
+.manage-users-table,
+.manage-users-table * {
+    overflow: visible !important;
+}
+
+.manage-users-table .task-cell,
+.manage-users-table .column-header,
+.manage-users-table div[data-col],
+.manage-users-table div[data-row-id] {
+    overflow: visible !important;
+    position: relative !important;
+}
+
+/* Ensure focus rings are properly displayed */
+.manage-users-table input:focus,
+.manage-users-table textarea:focus,
+.manage-users-table select:focus {
+    z-index: 10 !important;
+    position: relative !important;
+}
+
+/* Ensure grid containers allow focus ring overflow */
+.manage-users-table .task-row,
+.manage-users-table .table-header {
+    overflow: visible !important;
 /* ===== PIPELINE DROPDOWN BLUE THEME ===== */
 /* Subtle blue theme styling for pipeline dropdown selector */
 

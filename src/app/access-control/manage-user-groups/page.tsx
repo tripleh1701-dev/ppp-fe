@@ -204,6 +204,7 @@ export default function ManageUserGroups() {
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
     const tableDataRef = useRef<UserGroup[]>([]);
+    const autoSaveGroupRef = useRef<((groupData: UserGroup, isNewGroup?: boolean) => Promise<void>) | null>(null);
     const [savingStates, setSavingStates] = useState<
         Record<string, 'saving' | 'saved' | 'error'>
     >({});
@@ -603,7 +604,9 @@ export default function ManageUserGroups() {
                     );
 
                     for (const group of groupsToSave) {
-                        await autoSaveGroup(group, true);
+                        if (autoSaveGroupRef.current) {
+                            await autoSaveGroupRef.current(group, true);
+                        }
                     }
 
                     // Show success animation
@@ -929,6 +932,11 @@ export default function ManageUserGroups() {
         },
         [],
     );
+
+    // Update ref to track current autoSaveGroup function
+    useEffect(() => {
+        autoSaveGroupRef.current = autoSaveGroup;
+    }, [autoSaveGroup]);
 
     // Manual Save All function
     const handleSaveAll = async () => {

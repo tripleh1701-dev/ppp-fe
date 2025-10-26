@@ -1566,6 +1566,13 @@ select option[value=''] {
     font-size: 13px;
     font-weight: 600;
     color: #fff;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    min-width: 60px;
+    text-align: center;
 }
 
 .status-working {
@@ -3016,21 +3023,124 @@ textarea::placeholder {
     background: #e9ecef;
 }
 
-/* Status pill styles for new status options */
-.status-Active {
-    background: #00c875;
+/* Full-cell status button styles */
+.status-cell-button {
+    width: 100%;
+    height: 100%;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    font-size: 9px;
+    font-weight: 600;
+    text-align: center;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -1px; /* Ensure full cell coverage */
+    border-radius: 8px;
+    padding: 1px; /* Minimal padding for compact width */
+}
+
+.status-cell-active {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     color: white;
 }
 
-.status-Inactive {
-    background: #e2445c;
+.status-cell-inactive {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
     color: white;
 }
 
-.status-default {
-    background: #fdab3d;
-    color: white;
+/* Full cell wrapping effect */
+.status-cell-button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
 }
+
+/* Cell background wrapping effect */
+.status-cell-button:hover::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.4) 25%,
+        rgba(255, 255, 255, 0.6) 50%,
+        rgba(255, 255, 255, 0.4) 75%,
+        rgba(255, 255, 255, 0.2) 100%
+    );
+    animation: cellWrapEffect 0.8s ease-in-out forwards;
+    border-radius: 6px;
+    z-index: 1;
+}
+
+/* Shimmer overlay for dynamic effect */
+.status-cell-button:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.8) 50%,
+        transparent 100%
+    );
+    animation: cellShimmer 1.2s ease-in-out forwards;
+    z-index: 2;
+}
+
+.status-cell-button:active {
+    transform: scale(0.98);
+}
+
+/* Full cell wrapping animation */
+@keyframes cellWrapEffect {
+    0% {
+        opacity: 0;
+        transform: scale(1) rotateY(0deg);
+        background-size: 100% 100%;
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05) rotateY(5deg);
+        background-size: 110% 110%;
+    }
+    100% {
+        opacity: 0.8;
+        transform: scale(1.02) rotateY(3deg);
+        background-size: 105% 105%;
+    }
+}
+
+/* Shimmer animation */
+@keyframes cellShimmer {
+    0% {
+        left: -100%;
+        opacity: 0;
+    }
+    50% {
+        left: 0%;
+        opacity: 1;
+    }
+    100% {
+        left: 100%;
+        opacity: 0;
+    }
+}
+
+
 
 /* Empty state styles - simple grayed row */
 .add-task-row.empty-state {
