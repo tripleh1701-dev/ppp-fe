@@ -49,9 +49,9 @@ const AddressModal: React.FC<AddressModalProps> = ({
 
     // Helper function to check if an address is complete
     const isAddressComplete = (address: Address): boolean => {
-        // Only check for fields with asterisks (*) - Address Line 1 and Country
-        return !!(address.addressLine1?.trim() && 
-                 address.country?.trim());
+        // For database records, just check if addressLine1 exists
+        // For UI validation, we can be more strict in the validateAddress function
+        return !!(address.addressLine1?.trim());
     };
 
     // Validation functions
@@ -95,10 +95,22 @@ const AddressModal: React.FC<AddressModalProps> = ({
     // Reset addresses when modal opens/closes
     useEffect(() => {
         if (isOpen) {
+            console.log('🔍 AddressModal opened with initialAddresses:', initialAddresses);
             if (initialAddresses.length > 0) {
+                console.log('📦 Loading initial addresses:', initialAddresses);
                 setAddresses(initialAddresses);
                 setOriginalAddresses(JSON.parse(JSON.stringify(initialAddresses))); // Deep copy
                 setActivelyEditingNewAddress(new Set());
+                
+                // Debug: Check completion status of each address
+                initialAddresses.forEach((addr, index) => {
+                    const isComplete = !!(addr.addressLine1?.trim());
+                    console.log(`🏠 Address ${index + 1} completion check:`, {
+                        addressLine1: addr.addressLine1,
+                        isComplete,
+                        fullAddress: addr
+                    });
+                });
             } else {
                 const newId = generateId();
                 const newAddresses = [{
@@ -436,7 +448,22 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                     </div>
                                     
                                     {/* Address Form Fields - Always show for incomplete addresses, actively editing addresses, or when explicitly editing */}
-                                    {(!isAddressComplete(address) || activelyEditingNewAddress.has(address.id) || editingAddressId === address.id) ? (
+                                    {(() => {
+                                        const isComplete = isAddressComplete(address);
+                                        const isActivelyEditing = activelyEditingNewAddress.has(address.id);
+                                        const isExplicitlyEditing = editingAddressId === address.id;
+                                        const showEditForm = (!isComplete || isActivelyEditing || isExplicitlyEditing);
+                                        
+                                        console.log(`🎯 Address ${address.id} view decision:`, {
+                                            isComplete,
+                                            isActivelyEditing,
+                                            isExplicitlyEditing,
+                                            showEditForm,
+                                            addressData: address
+                                        });
+                                        
+                                        return showEditForm;
+                                    })() ? (
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Plus, User, Save, Edit2, XCircle, Mail, Calendar, Lock, Users, Shield } from 'lucide-react';
+import { X, Plus, User, Save, Edit2, XCircle, Mail, Calendar, Lock, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateId } from '@/utils/id-generator';
@@ -56,15 +56,15 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     const [originalUsers, setOriginalUsers] = useState<TechnicalUser[]>([]);
     const [validationErrors, setValidationErrors] = useState<{[key: string]: string[]}>({});
     const [validationMessages, setValidationMessages] = useState<{[key: string]: Record<string, string>}>({});
+    const [passwordVisibility, setPasswordVisibility] = useState<{[key: string]: boolean}>({});
 
     // Helper function to check if a user is complete
     const isUserComplete = (user: TechnicalUser): boolean => {
+        // For database records, just check basic identifying fields
+        // For UI validation, we can be more strict in other validation functions
         return !!(user.firstName?.trim() && 
                  user.lastName?.trim() && 
-                 user.emailAddress?.trim() && 
-                 user.startDate?.trim() && 
-                 user.endDate?.trim() && 
-                 user.password?.trim());
+                 user.emailAddress?.trim());
     };
 
     // Enhanced validation functions
@@ -167,6 +167,42 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         return { isValid: true };
     };
 
+    const getPasswordRequirements = (password: string) => {
+        return [
+            {
+                text: "At least 8 characters long",
+                met: password.length >= 8
+            },
+            {
+                text: "Contains uppercase letter (A-Z)",
+                met: /[A-Z]/.test(password)
+            },
+            {
+                text: "Contains lowercase letter (a-z)",
+                met: /[a-z]/.test(password)
+            },
+            {
+                text: "Contains number (0-9)",
+                met: /\d/.test(password)
+            },
+            {
+                text: "Contains special character (!@#$%^&*...)",
+                met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            },
+            {
+                text: "No common patterns (123, abc, aaa)",
+                met: !/(.)\1{2,}|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i.test(password)
+            }
+        ];
+    };
+
+    const togglePasswordVisibility = (userId: string) => {
+        setPasswordVisibility(prev => ({
+            ...prev,
+            [userId]: !prev[userId]
+        }));
+    };
+
     const validateDate = (date: string): boolean => {
         if (!date.trim()) return false;
         const dateObj = new Date(date);
@@ -267,10 +303,24 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     // Reset users when modal opens/closes
     useEffect(() => {
         if (isOpen) {
+            console.log('🔍 TechnicalUserModal opened with initialUsers:', initialUsers);
             if (initialUsers.length > 0) {
+                console.log('👥 Loading initial users:', initialUsers);
                 setUsers(initialUsers);
                 setOriginalUsers(JSON.parse(JSON.stringify(initialUsers))); // Deep copy
                 setActivelyEditingNewUser(new Set());
+                
+                // Debug: Check completion status of each user
+                initialUsers.forEach((user, index) => {
+                    const isComplete = !!(user.firstName?.trim() && user.lastName?.trim() && user.emailAddress?.trim());
+                    console.log(`👤 User ${index + 1} completion check:`, {
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        emailAddress: user.emailAddress,
+                        isComplete,
+                        fullUser: user
+                    });
+                });
             } else {
                 const newId = generateId();
                 const newUsers = [{
@@ -690,6 +740,33 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                             {isUserComplete(user) && activelyEditingNewUser.has(user.id) && (
                                                 <button
                                                     onClick={() => {
+                                                        // Validate the user before allowing Done
+                                                        const validation = validateUser(user);
+                                                        if (validation.errors.length > 0) {
+                                                            // Update validation errors to show the errors for this user
+                                                            setValidationErrors(prev => ({
+                                                                ...prev,
+                                                                [user.id]: validation.errors
+                                                            }));
+                                                            setValidationMessages(prev => ({
+                                                                ...prev,
+                                                                [user.id]: validation.messages
+                                                            }));
+                                                            return; // Don't proceed if there are validation errors
+                                                        }
+
+                                                        // Clear any existing validation errors for this user
+                                                        setValidationErrors(prev => {
+                                                            const newErrors = { ...prev };
+                                                            delete newErrors[user.id];
+                                                            return newErrors;
+                                                        });
+                                                        setValidationMessages(prev => {
+                                                            const newMessages = { ...prev };
+                                                            delete newMessages[user.id];
+                                                            return newMessages;
+                                                        });
+
                                                         // Remove from actively editing when user is done
                                                         setActivelyEditingNewUser(prev => {
                                                             const newSet = new Set(prev);
@@ -739,7 +816,22 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                     </div>
                                     
                                     {/* User Form Fields - Always show for incomplete users, actively editing users, or when explicitly editing */}
-                                    {(!isUserComplete(user) || activelyEditingNewUser.has(user.id) || editingUserId === user.id) ? (
+                                    {(() => {
+                                        const isComplete = isUserComplete(user);
+                                        const isActivelyEditing = activelyEditingNewUser.has(user.id);
+                                        const isExplicitlyEditing = editingUserId === user.id;
+                                        const showEditForm = (!isComplete || isActivelyEditing || isExplicitlyEditing);
+                                        
+                                        console.log(`🎯 User ${user.id} view decision:`, {
+                                            isComplete,
+                                            isActivelyEditing,
+                                            isExplicitlyEditing,
+                                            showEditForm,
+                                            userData: user
+                                        });
+                                        
+                                        return showEditForm;
+                                    })() ? (
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-3 gap-4">
                                                 <div>
@@ -886,6 +978,11 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         placeholder=""
                                                         isError={validationErrors[user.id]?.includes('endDate') || validationErrors[user.id]?.includes('dateRange')}
                                                         compact={true}
+                                                        minDate={user.startDate ? (() => {
+                                                            const startDate = new Date(user.startDate);
+                                                            startDate.setDate(startDate.getDate() + 1);
+                                                            return startDate.toISOString().split('T')[0];
+                                                        })() : undefined}
                                                     />
                                                     {validationErrors[user.id]?.includes('endDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -904,17 +1001,48 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Password *
                                                 </label>
-                                                <input
-                                                    type="password"
-                                                    value={user.password || ''}
-                                                    onChange={(e) => updateUser(user.id, 'password', e.target.value)}
-                                                    onBlur={(e) => handlePasswordBlur(user.id, e.target.value)}
-                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                        validationErrors[user.id]?.includes('password')
-                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                    }`}
-                                                />
+                                                <div className="relative">
+                                                    <input
+                                                        type={passwordVisibility[user.id] ? "text" : "password"}
+                                                        value={user.password || ''}
+                                                        onChange={(e) => updateUser(user.id, 'password', e.target.value)}
+                                                        onBlur={(e) => handlePasswordBlur(user.id, e.target.value)}
+                                                        className={`w-full px-2 py-1 pr-8 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                            validationErrors[user.id]?.includes('password')
+                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                        }`}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePasswordVisibility(user.id)}
+                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                                    >
+                                                        {passwordVisibility[user.id] ? (
+                                                            <EyeOff className="h-4 w-4" />
+                                                        ) : (
+                                                            <Eye className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                
+                                                {/* Password Requirements */}
+                                                <div className="mt-2 p-3 bg-gray-50 rounded-lg border">
+                                                    <p className="text-xs font-medium text-gray-700 mb-2">Password Requirements:</p>
+                                                    <div className="space-y-1">
+                                                        {getPasswordRequirements(user.password || '').map((req, index) => (
+                                                            <div key={index} className="flex items-center text-xs">
+                                                                <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
+                                                                    req.met ? 'bg-green-500' : 'bg-gray-300'
+                                                                }`} />
+                                                                <span className={req.met ? 'text-green-700' : 'text-gray-600'}>
+                                                                    {req.text}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                
                                                 {validationErrors[user.id]?.includes('password') && (
                                                     <p className="text-red-500 text-xs mt-1">
                                                         {validationMessages[user.id]?.password || 'Password is required'}

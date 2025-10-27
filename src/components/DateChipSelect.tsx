@@ -24,7 +24,7 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
     maxDate
 }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+    const [position, setPosition] = useState<{ top: number; left: number; width: number; isAbove?: boolean } | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const containerRef = useRef<HTMLDivElement>(null);
@@ -39,19 +39,91 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
             }
         };
 
+        const handleScroll = () => {
+            if (isOpen && containerRef.current) {
+                // Recalculate position on scroll
+                const rect = containerRef.current.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const viewportWidth = window.innerWidth;
+                const calendarHeight = 380;
+                const calendarWidth = 320;
+                
+                const spaceBelow = viewportHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                const shouldPositionAbove = spaceBelow < calendarHeight && spaceAbove > calendarHeight;
+                
+                let top: number;
+                if (shouldPositionAbove) {
+                    top = rect.top + window.scrollY - calendarHeight - 8;
+                } else {
+                    top = rect.bottom + window.scrollY + 8;
+                }
+                
+                let left = rect.right + window.scrollX - calendarWidth;
+                if (left < 10) left = 10;
+                if (left + calendarWidth > viewportWidth - 10) {
+                    left = viewportWidth - calendarWidth - 10;
+                }
+                
+                setPosition({ top, left, width: calendarWidth, isAbove: shouldPositionAbove });
+            }
+        };
+
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
+            window.addEventListener('scroll', handleScroll, true);
+            window.addEventListener('resize', handleScroll);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+                window.removeEventListener('scroll', handleScroll, true);
+                window.removeEventListener('resize', handleScroll);
+            };
         }
     }, [isOpen]);
 
     const handleContainerClick = () => {
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+            const calendarHeight = 380; // Approximate height of calendar
+            const calendarWidth = 320;
+            
+            // Check if there's enough space below the input
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            
+            // Determine if we should position above or below
+            const shouldPositionAbove = spaceBelow < calendarHeight && spaceAbove > calendarHeight;
+            
+            console.log(`📅 DateChipSelect positioning: spaceBelow=${spaceBelow}, spaceAbove=${spaceAbove}, shouldPositionAbove=${shouldPositionAbove}`);
+            
+            // Calculate top position
+            let top: number;
+            if (shouldPositionAbove) {
+                top = rect.top + window.scrollY - calendarHeight - 8;
+            } else {
+                top = rect.bottom + window.scrollY + 8;
+            }
+            
+            // Calculate left position (try to align with right side, but stay in viewport)
+            let left = rect.right + window.scrollX - calendarWidth;
+            
+            // Ensure calendar doesn't go off the left edge
+            if (left < 10) {
+                left = 10;
+            }
+            
+            // Ensure calendar doesn't go off the right edge
+            if (left + calendarWidth > viewportWidth - 10) {
+                left = viewportWidth - calendarWidth - 10;
+            }
+            
             setPosition({
-                top: rect.bottom + window.scrollY + 8,
-                left: rect.right + window.scrollX - 320, // Position calendar to align with right side
-                width: 320
+                top,
+                left,
+                width: calendarWidth,
+                isAbove: shouldPositionAbove
             });
             setIsOpen(!isOpen);
         }
@@ -177,6 +249,7 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
                         top: `${position.top}px`,
                         left: `${position.left}px`,
                         width: `${position.width}px`,
+                        zIndex: 50000, // Very high z-index to appear above everything
                         animation: 'slideInFromTop 0.3s ease-out forwards'
                     }}
                 >
