@@ -3,6 +3,7 @@
 import {useEffect, useMemo, useRef, useState, useCallback} from 'react';
 import ConfirmModal from '@/components/ConfirmModal';
 import {motion} from 'framer-motion';
+import EmptyState from '@/components/EmptyState';
 // @ts-ignore
 import * as XLSX from 'xlsx';
 import ReusableTableComponent from '@/components/reusable/ReusableTableComponent';
@@ -371,29 +372,15 @@ export default function CredentialManager() {
                         </div>
                     </div>
                 ) : credentials.length === 0 ? (
-                    /* Empty State */
-                    <div className='flex items-center justify-center h-64'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <KeyIcon className='w-8 h-8 text-gray-400' />
-                            </div>
-                            <h3 className='text-lg font-medium text-gray-900 mb-2'>
-                                No credentials found
-                            </h3>
-                            <p className='text-gray-500 mb-4'>
-                                Get started by creating your first credential
-                            </p>
-                            <motion.button
-                                onClick={handleCreateCredential}
-                                className='inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200'
-                                whileHover={{scale: 1.02}}
-                                whileTap={{scale: 0.98}}
-                            >
-                                <PlusIcon className='w-4 h-4 mr-2' />
-                                New Credential
-                            </motion.button>
-                        </div>
-                    </div>
+                    <EmptyState
+                        title="No Credentials Yet"
+                        description="Add your first credential to securely store and manage API keys, tokens, and authentication information."
+                        imagePath="/images/Infographics/SG-no-credentials-yet.jpg"
+                        actionButton={{
+                            label: "Add Credential",
+                            onClick: handleCreateCredential
+                        }}
+                    />
                 ) : (
                     /* Reusable Table Component */
                     <div className='h-full w-full overflow-hidden px-4'>

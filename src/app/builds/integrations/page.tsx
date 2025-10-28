@@ -13,6 +13,7 @@ import {
 import BuildsTable, {BuildRow} from '@/components/BuildsTable';
 import BuildDetailPanel from '@/components/BuildDetailPanel';
 import PipelineCanvas from '@/components/PipelineCanvas';
+import BuildSlidingPanels from '@/components/BuildSlidingPanels';
 import {api} from '@/utils/api';
 
 export default function Integrations() {
@@ -77,6 +78,10 @@ export default function Integrations() {
         'status' | 'artifact' | 'build'
     >('status');
     const [selectedStage, setSelectedStage] = useState<string | null>(null);
+
+    // Panel mode state (column separator vs sliding panels)
+    const [panelMode, setPanelMode] = useState<'column' | 'sliding'>('column');
+    const [showSlidingPanel, setShowSlidingPanel] = useState(false);
 
     // Current build execution data
     const [currentExecution, setCurrentExecution] = useState<any>(null);
@@ -237,46 +242,49 @@ export default function Integrations() {
 
     // Load builds data
     useEffect(() => {
-        loadBuilds();
-    }, []);
+        if (selectedAccountId && selectedAccountName) {
+            loadBuilds();
+        }
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId]);
 
     const loadBuilds = async () => {
+        if (!selectedAccountId || !selectedAccountName) {
+            console.log('⚠️ Cannot load builds - missing account context');
+            return;
+        }
+
         setIsLoading(true);
         try {
-            // TODO: Replace with actual API call
-            // const data = await api.get('/api/builds/integrations');
-            // setBuilds(data);
+            console.log(
+                `🔍 Loading builds for account: ${selectedAccountName} (${selectedAccountId}), enterprise: ${selectedEnterpriseId}`,
+            );
 
-            // Sample data for testing
-            const sampleBuilds: BuildRow[] = [
-                {
-                    id: '1',
-                    buildName: 'FioriAppName',
-                    description: 'Main application build',
-                    entity: 'Private Cloud',
-                    pipeline: 'Production Pipeline',
-                    status: 'Active',
-                    artifact: 'v1.2.3',
-                    build: '',
-                    stages: [],
-                    isTemporary: false,
-                },
-                {
-                    id: '2',
-                    buildName: 'BackendAPI',
-                    description: 'Backend service',
-                    entity: 'Public Cloud',
-                    pipeline: 'Dev Pipeline',
-                    status: 'Active',
-                    artifact: 'v2.0.1',
-                    build: '',
-                    stages: [],
-                    isTemporary: false,
-                },
-            ];
-            setBuilds(sampleBuilds);
+            const params = new URLSearchParams({
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+            });
+
+            if (selectedEnterpriseId) {
+                params.append('enterpriseId', selectedEnterpriseId);
+            }
+
+            const data = await api.get<BuildRow[]>(
+                `/api/builds/integrations?${params.toString()}`,
+            );
+
+            console.log(`✅ Loaded ${data.length} build(s)`, data);
+
+            // Mark all loaded builds as non-temporary (saved)
+            const buildsWithFlags = data.map((build) => ({
+                ...build,
+                isTemporary: false,
+            }));
+
+            setBuilds(buildsWithFlags);
         } catch (error) {
-            console.error('Error loading builds:', error);
+            console.error('❌ Error loading builds:', error);
+            // If API call fails, show empty list instead of sample data
+            setBuilds([]);
         } finally {
             setIsLoading(false);
         }
@@ -359,14 +367,29 @@ export default function Integrations() {
     const handleBuildDetailClick = (rowId: string) => {
         setSelectedBuildRowId(rowId);
 
-        // Collapse sidebar and AI panel when opening build detail
-        const collapseSidebarEvent = new CustomEvent('collapseSidebar');
-        const collapseAIPanelEvent = new CustomEvent('collapseAIPanel');
-        window.dispatchEvent(collapseSidebarEvent);
-        window.dispatchEvent(collapseAIPanelEvent);
+        if (panelMode === 'sliding') {
+            // Use sliding panel mode
+            setShowSlidingPanel(true);
 
-        // Load build execution data
-        loadBuildExecution(rowId);
+            // Collapse sidebar and AI panel for sliding panel mode
+            const collapseSidebarEvent = new CustomEvent('collapseSidebar');
+            const collapseAIPanelEvent = new CustomEvent('collapseAIPanel');
+            window.dispatchEvent(collapseSidebarEvent);
+            window.dispatchEvent(collapseAIPanelEvent);
+        } else {
+            // Use column separator mode
+            setShowExecutionPanel(false);
+            setCurrentExecution(null);
+
+            // Collapse sidebar and AI panel when opening build detail
+            const collapseSidebarEvent = new CustomEvent('collapseSidebar');
+            const collapseAIPanelEvent = new CustomEvent('collapseAIPanel');
+            window.dispatchEvent(collapseSidebarEvent);
+            window.dispatchEvent(collapseAIPanelEvent);
+
+            // Load build execution data
+            loadBuildExecution(rowId);
+        }
     };
 
     const handleCloseBuildDetail = () => {
@@ -683,6 +706,15 @@ export default function Integrations() {
     const handleManualSave = async () => {
         console.log('💾 Save button clicked - saving all builds');
 
+        // Check if account context is available
+        if (!selectedAccountId || !selectedAccountName) {
+            console.error('⚠️ Cannot save - missing account context');
+            showBlueNotification(
+                'Cannot save - account context not available.',
+            );
+            return;
+        }
+
         // Clear auto-save timer since user is manually saving
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
@@ -708,25 +740,107 @@ export default function Integrations() {
                 return;
             }
 
+            // Debug: Log all temporary rows to see their structure
+            console.log('🔍 DEBUG: All temporary rows:', temporaryRows);
+            temporaryRows.forEach((row, index) => {
+                console.log(`Row ${index}:`, {
+                    id: row.id,
+                    buildName: row.buildName,
+                    allFields: Object.keys(row),
+                    fullRow: row,
+                });
+            });
+
+            // Validate required fields before saving
+            const invalidRows = temporaryRows.filter(
+                (row) => !row.buildName || row.buildName.trim() === '',
+            );
+
+            if (invalidRows.length > 0) {
+                console.error('⚠️ Invalid rows found:', invalidRows);
+                console.error(
+                    '⚠️ Invalid rows details:',
+                    JSON.stringify(invalidRows, null, 2),
+                );
+                showBlueNotification(
+                    `Cannot save: ${invalidRows.length} row(s) missing required "Build Name" field.`,
+                );
+                return;
+            }
+
             // Save each temporary row
             let savedCount = 0;
+            let failedCount = 0;
+            const savedBuilds: BuildRow[] = [];
+
             for (const row of temporaryRows) {
                 try {
                     console.log(`💾 Saving row ${row.id}`);
-                    // TODO: Implement actual API call to save build
-                    // await api.post('/api/builds/integrations', row);
+
+                    const buildData = {
+                        buildName: row.buildName,
+                        description: row.description || '',
+                        entity: row.entity || '',
+                        pipeline: row.pipeline || '',
+                        status: row.status || '',
+                        artifact: row.artifact || '',
+                        build: row.build || '',
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId || '',
+                        enterpriseName: selectedEnterpriseName || '',
+                        stages: row.stages || [],
+                    };
+
+                    const savedBuild = await api.post<BuildRow>(
+                        '/api/builds/integrations',
+                        buildData,
+                    );
+
+                    console.log(`✅ Saved build ${row.id} as ${savedBuild.id}`);
+
+                    savedBuilds.push({
+                        ...savedBuild,
+                        isTemporary: false,
+                    });
+
                     savedCount++;
-                } catch (error) {
+                } catch (error: any) {
                     console.error(`❌ Failed to save row ${row.id}:`, error);
+                    failedCount++;
+                    const errorMessage =
+                        error?.response?.data?.message ||
+                        error?.message ||
+                        'Unknown error';
+                    showBlueNotification(
+                        `Failed to save "${
+                            row.buildName || 'Unnamed'
+                        }": ${errorMessage}`,
+                    );
                 }
             }
 
             if (savedCount > 0) {
+                // Update the builds list: remove temporary rows and add saved ones
+                setBuilds((prevBuilds) => {
+                    const nonTemporaryBuilds = prevBuilds.filter(
+                        (build) =>
+                            !String(build.id).startsWith('temp-') &&
+                            !build.isTemporary,
+                    );
+                    return [...nonTemporaryBuilds, ...savedBuilds];
+                });
+
                 setShowAutoSaveSuccess(true);
                 setTimeout(() => setShowAutoSaveSuccess(false), 2000);
-                showBlueNotification(
-                    `Successfully saved ${savedCount} build(s).`,
-                );
+
+                const message =
+                    failedCount > 0
+                        ? `Saved ${savedCount} build(s), ${failedCount} failed.`
+                        : `Successfully saved ${savedCount} build(s).`;
+                showBlueNotification(message);
+            } else if (failedCount > 0) {
+                showBlueNotification(`Failed to save ${failedCount} build(s).`);
             }
         } catch (error) {
             console.error('❌ Save failed:', error);
@@ -832,6 +946,35 @@ export default function Integrations() {
                                 {isLoading ? 'Loading...' : 'Create Job'}
                             </span>
                         </button>
+
+                        {/* Panel Mode Toggle Button */}
+                        <div className='flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200'>
+                            <span className='text-xs text-slate-600 font-medium'>
+                                View Mode:
+                            </span>
+                            <div className='flex items-center gap-1'>
+                                <button
+                                    onClick={() => setPanelMode('column')}
+                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                        panelMode === 'column'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Column Separator
+                                </button>
+                                <button
+                                    onClick={() => setPanelMode('sliding')}
+                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                        panelMode === 'sliding'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Sliding Panel
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Search Input */}
                         <div ref={searchRef} className='flex items-center'>
@@ -1061,11 +1204,14 @@ export default function Integrations() {
                 <motion.div
                     className='h-full bg-card border border-light rounded-lg p-3 flex flex-col'
                     style={{
-                        width: selectedBuildRowId
-                            ? showExecutionPanel
-                                ? `${100 - panelWidth - executionPanelWidth}%`
-                                : `${100 - panelWidth}%`
-                            : '100%',
+                        width:
+                            panelMode === 'column' && selectedBuildRowId
+                                ? showExecutionPanel
+                                    ? `${
+                                          100 - panelWidth - executionPanelWidth
+                                      }%`
+                                    : `${100 - panelWidth}%`
+                                : '100%',
                     }}
                     initial={{width: '100%'}}
                     animate={
@@ -1144,13 +1290,20 @@ export default function Integrations() {
                                 });
 
                                 // Update local state immediately for responsiveness
-                                setBuilds((prev) =>
-                                    prev.map((b) =>
+                                setBuilds((prev) => {
+                                    const updated = prev.map((b) =>
                                         b.id === rowId
                                             ? {...b, [key]: value}
                                             : b,
-                                    ),
-                                );
+                                    );
+                                    // Also update the ref immediately to ensure it's in sync
+                                    buildsRef.current = updated;
+                                    console.log(
+                                        '✅ Updated buildsRef.current:',
+                                        buildsRef.current,
+                                    );
+                                    return updated;
+                                });
 
                                 // For temporary rows, check if we should trigger auto-save
                                 if (String(rowId).startsWith('temp-')) {
@@ -1225,7 +1378,7 @@ export default function Integrations() {
                 </motion.div>
 
                 {/* Animated Column Separator - Draggable */}
-                {selectedBuildRowId && (
+                {panelMode === 'column' && selectedBuildRowId && (
                     <motion.div
                         initial={{opacity: 0, scaleY: 0}}
                         animate={{opacity: 1, scaleY: 1}}
@@ -1310,772 +1463,789 @@ export default function Integrations() {
                 )}
 
                 {/* Build Detail Panel */}
-                {selectedBuildRowId && selectedBuildRow && (
-                    <motion.div
-                        initial={{x: '100%', opacity: 0}}
-                        animate={
-                            !isDragging && !isDraggingSeparator2
-                                ? {
-                                      x: 0,
-                                      opacity: 1,
-                                      width: `${panelWidth}%`,
-                                  }
-                                : {x: 0, opacity: 1}
-                        }
-                        exit={{x: '100%', opacity: 0}}
-                        transition={{
-                            duration: 0.4,
-                            ease: [0.4, 0, 0.2, 1],
-                        }}
-                        className='h-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden'
-                        style={{
-                            width: `${panelWidth}%`,
-                        }}
-                    >
-                        <BuildDetailPanel
-                            buildRow={selectedBuildRow}
-                            onClose={handleCloseBuildDetail}
-                            onRunBuild={() => setShowExecutionPanel(true)}
-                        />
-                    </motion.div>
-                )}
+                {panelMode === 'column' &&
+                    selectedBuildRowId &&
+                    selectedBuildRow && (
+                        <motion.div
+                            initial={{x: '100%', opacity: 0}}
+                            animate={
+                                !isDragging && !isDraggingSeparator2
+                                    ? {
+                                          x: 0,
+                                          opacity: 1,
+                                          width: `${panelWidth}%`,
+                                      }
+                                    : {x: 0, opacity: 1}
+                            }
+                            exit={{x: '100%', opacity: 0}}
+                            transition={{
+                                duration: 0.4,
+                                ease: [0.4, 0, 0.2, 1],
+                            }}
+                            className='h-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden'
+                            style={{
+                                width: `${panelWidth}%`,
+                            }}
+                        >
+                            <BuildDetailPanel
+                                buildRow={selectedBuildRow}
+                                onClose={handleCloseBuildDetail}
+                                onRunBuild={() => setShowExecutionPanel(true)}
+                            />
+                        </motion.div>
+                    )}
 
                 {/* Second Column Separator - Between Detail and Execution Panel */}
-                {selectedBuildRowId && showExecutionPanel && (
-                    <motion.div
-                        initial={{opacity: 0, scaleY: 0}}
-                        animate={{opacity: 1, scaleY: 1}}
-                        exit={{opacity: 0, scaleY: 0}}
-                        transition={{duration: 0.3, ease: 'easeOut'}}
-                        onMouseDown={handleSeparator2MouseDown}
-                        className={`relative group flex items-center justify-center ${
-                            isDraggingSeparator2
-                                ? 'cursor-col-resize'
-                                : 'cursor-col-resize hover:cursor-col-resize'
-                        }`}
-                        style={{
-                            minHeight: '100%',
-                            width: '20px',
-                        }}
-                    >
-                        {/* Left border line */}
-                        <div
-                            className={`absolute left-0 w-px h-full bg-green-500 transition-all ${
+                {panelMode === 'column' &&
+                    selectedBuildRowId &&
+                    showExecutionPanel && (
+                        <motion.div
+                            initial={{opacity: 0, scaleY: 0}}
+                            animate={{opacity: 1, scaleY: 1}}
+                            exit={{opacity: 0, scaleY: 0}}
+                            transition={{duration: 0.3, ease: 'easeOut'}}
+                            onMouseDown={handleSeparator2MouseDown}
+                            className={`relative group flex items-center justify-center ${
                                 isDraggingSeparator2
-                                    ? 'bg-green-600 shadow-lg'
-                                    : 'group-hover:bg-green-600'
+                                    ? 'cursor-col-resize'
+                                    : 'cursor-col-resize hover:cursor-col-resize'
                             }`}
-                        />
-
-                        {/* Right border line */}
-                        <div
-                            className={`absolute right-0 w-px h-full bg-green-500 transition-all ${
-                                isDraggingSeparator2
-                                    ? 'bg-green-600 shadow-lg'
-                                    : 'group-hover:bg-green-600'
-                            }`}
-                        />
-
-                        {/* Center grip handle with dots */}
-                        <div
-                            className={`relative z-10 flex flex-col items-center justify-center gap-1 px-1 py-3 rounded transition-all ${
-                                isDraggingSeparator2
-                                    ? 'bg-green-100 scale-110'
-                                    : 'bg-transparent group-hover:bg-green-50 group-hover:scale-105'
-                            }`}
+                            style={{
+                                minHeight: '100%',
+                                width: '20px',
+                            }}
                         >
+                            {/* Left border line */}
                             <div
-                                className={`w-1 h-1 rounded-full transition-colors ${
+                                className={`absolute left-0 w-px h-full bg-green-500 transition-all ${
                                     isDraggingSeparator2
-                                        ? 'bg-green-600'
-                                        : 'bg-green-400 group-hover:bg-green-600'
+                                        ? 'bg-green-600 shadow-lg'
+                                        : 'group-hover:bg-green-600'
                                 }`}
-                            ></div>
-                            <div
-                                className={`w-1 h-1 rounded-full transition-colors ${
-                                    isDraggingSeparator2
-                                        ? 'bg-green-600'
-                                        : 'bg-green-400 group-hover:bg-green-600'
-                                }`}
-                            ></div>
-                            <div
-                                className={`w-1 h-1 rounded-full transition-colors ${
-                                    isDraggingSeparator2
-                                        ? 'bg-green-600'
-                                        : 'bg-green-400 group-hover:bg-green-600'
-                                }`}
-                            ></div>
-                        </div>
+                            />
 
-                        {/* Hover hint text */}
-                        <div
-                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-8 pointer-events-none transition-opacity ${
-                                isDraggingSeparator2
-                                    ? 'opacity-0'
-                                    : 'opacity-0 group-hover:opacity-100'
-                            }`}
-                        >
-                            <div className='bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap'>
-                                Drag to resize
+                            {/* Right border line */}
+                            <div
+                                className={`absolute right-0 w-px h-full bg-green-500 transition-all ${
+                                    isDraggingSeparator2
+                                        ? 'bg-green-600 shadow-lg'
+                                        : 'group-hover:bg-green-600'
+                                }`}
+                            />
+
+                            {/* Center grip handle with dots */}
+                            <div
+                                className={`relative z-10 flex flex-col items-center justify-center gap-1 px-1 py-3 rounded transition-all ${
+                                    isDraggingSeparator2
+                                        ? 'bg-green-100 scale-110'
+                                        : 'bg-transparent group-hover:bg-green-50 group-hover:scale-105'
+                                }`}
+                            >
+                                <div
+                                    className={`w-1 h-1 rounded-full transition-colors ${
+                                        isDraggingSeparator2
+                                            ? 'bg-green-600'
+                                            : 'bg-green-400 group-hover:bg-green-600'
+                                    }`}
+                                ></div>
+                                <div
+                                    className={`w-1 h-1 rounded-full transition-colors ${
+                                        isDraggingSeparator2
+                                            ? 'bg-green-600'
+                                            : 'bg-green-400 group-hover:bg-green-600'
+                                    }`}
+                                ></div>
+                                <div
+                                    className={`w-1 h-1 rounded-full transition-colors ${
+                                        isDraggingSeparator2
+                                            ? 'bg-green-600'
+                                            : 'bg-green-400 group-hover:bg-green-600'
+                                    }`}
+                                ></div>
                             </div>
-                        </div>
 
-                        {/* Invisible wider hit area for easier grabbing */}
-                        <div className='absolute inset-0 -left-3 -right-3' />
-                    </motion.div>
-                )}
+                            {/* Hover hint text */}
+                            <div
+                                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-8 pointer-events-none transition-opacity ${
+                                    isDraggingSeparator2
+                                        ? 'opacity-0'
+                                        : 'opacity-0 group-hover:opacity-100'
+                                }`}
+                            >
+                                <div className='bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap'>
+                                    Drag to resize
+                                </div>
+                            </div>
+
+                            {/* Invisible wider hit area for easier grabbing */}
+                            <div className='absolute inset-0 -left-3 -right-3' />
+                        </motion.div>
+                    )}
 
                 {/* Build Execution Panel */}
-                {selectedBuildRowId && showExecutionPanel && (
-                    <motion.div
-                        initial={{x: '100%', opacity: 0}}
-                        animate={
-                            !isDraggingSeparator2
-                                ? {
-                                      x: 0,
-                                      opacity: 1,
-                                      width: `${executionPanelWidth}%`,
-                                  }
-                                : {x: 0, opacity: 1}
-                        }
-                        exit={{x: '100%', opacity: 0}}
-                        transition={{
-                            duration: 0.4,
-                            ease: [0.4, 0, 0.2, 1],
-                        }}
-                        className='h-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden'
-                        style={{
-                            width: `${executionPanelWidth}%`,
-                        }}
-                    >
-                        {/* Build Execution Content */}
-                        <div className='h-full flex flex-col bg-white'>
-                            <div className='flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50'>
-                                <h2 className='text-base font-semibold text-gray-900'>
-                                    Build #3 Stages
-                                </h2>
-                                <button
-                                    onClick={() => setShowExecutionPanel(false)}
-                                    className='p-1.5 text-gray-500 hover:bg-gray-200 rounded transition-colors'
-                                    title='Close'
-                                >
-                                    <svg
-                                        className='w-4 h-4'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        viewBox='0 0 24 24'
+                {panelMode === 'column' &&
+                    selectedBuildRowId &&
+                    showExecutionPanel && (
+                        <motion.div
+                            initial={{x: '100%', opacity: 0}}
+                            animate={
+                                !isDraggingSeparator2
+                                    ? {
+                                          x: 0,
+                                          opacity: 1,
+                                          width: `${executionPanelWidth}%`,
+                                      }
+                                    : {x: 0, opacity: 1}
+                            }
+                            exit={{x: '100%', opacity: 0}}
+                            transition={{
+                                duration: 0.4,
+                                ease: [0.4, 0, 0.2, 1],
+                            }}
+                            className='h-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden'
+                            style={{
+                                width: `${executionPanelWidth}%`,
+                            }}
+                        >
+                            {/* Build Execution Content */}
+                            <div className='h-full flex flex-col bg-white'>
+                                <div className='flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50'>
+                                    <h2 className='text-base font-semibold text-gray-900'>
+                                        Build #3 Stages
+                                    </h2>
+                                    <button
+                                        onClick={() =>
+                                            setShowExecutionPanel(false)
+                                        }
+                                        className='p-1.5 text-gray-500 hover:bg-gray-200 rounded transition-colors'
+                                        title='Close'
                                     >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M6 18L18 6M6 6l12 12'
-                                        />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {/* Tab Navigation */}
-                            <div className='flex border-b border-gray-200 bg-white'>
-                                <button
-                                    onClick={() =>
-                                        setActiveExecutionTab('status')
-                                    }
-                                    className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
-                                        activeExecutionTab === 'status'
-                                            ? 'text-blue-600 bg-blue-50/30'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {activeExecutionTab === 'status' && (
-                                        <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
-                                    )}
-                                    <svg
-                                        className='w-5 h-5 relative z-20'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        viewBox='0 0 24 24'
-                                    >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
-                                        />
-                                    </svg>
-                                    <span className='relative z-20'>
-                                        Status
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        setActiveExecutionTab('artifact')
-                                    }
-                                    className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
-                                        activeExecutionTab === 'artifact'
-                                            ? 'text-blue-600 bg-blue-50/30'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {activeExecutionTab === 'artifact' && (
-                                        <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
-                                    )}
-                                    <svg
-                                        className='w-5 h-5 relative z-20'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        viewBox='0 0 24 24'
-                                    >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'
-                                        />
-                                    </svg>
-                                    <span className='relative z-20'>
-                                        Artifact
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        setActiveExecutionTab('build')
-                                    }
-                                    className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
-                                        activeExecutionTab === 'build'
-                                            ? 'text-blue-600 bg-blue-50/30'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {activeExecutionTab === 'build' && (
-                                        <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
-                                    )}
-                                    <svg
-                                        className='w-5 h-5 relative z-20'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        viewBox='0 0 24 24'
-                                    >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
-                                        />
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-                                        />
-                                    </svg>
-                                    <span className='relative z-20'>Build</span>
-                                </button>
-                            </div>
-
-                            <div className='flex-1 overflow-y-auto flex flex-col'>
-                                {/* Status Tab Content */}
-                                {activeExecutionTab === 'status' && (
-                                    <>
-                                        {/* Action Buttons at Top */}
-                                        <div className='px-4 pt-4 pb-3 border-b border-gray-200 bg-white sticky top-0 z-10'>
-                                            <div className='flex flex-wrap gap-2 mb-3'>
-                                                <button className='flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors'>
-                                                    <svg
-                                                        className='w-3.5 h-3.5'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z'
-                                                        />
-                                                    </svg>
-                                                    Show Full Log
-                                                </button>
-                                                <button className='flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
-                                                    <svg
-                                                        className='w-3.5 h-3.5'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                                                        />
-                                                    </svg>
-                                                    Download
-                                                </button>
-                                                <button className='px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
-                                                    SonarQube
-                                                </button>
-                                                <button className='px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
-                                                    Tricentis Tosca
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Build Info Summary */}
-                                        <div className='px-4 py-3 bg-blue-50/30 border-b border-blue-100'>
-                                            {loadingExecution ? (
-                                                <div className='text-center py-4'>
-                                                    <div className='inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin'></div>
-                                                    <p className='text-xs text-gray-500 mt-2'>
-                                                        Loading execution
-                                                        data...
-                                                    </p>
-                                                </div>
-                                            ) : currentExecution ? (
-                                                <div className='grid grid-cols-2 gap-x-4 gap-y-2 text-xs'>
-                                                    <div>
-                                                        <span className='text-gray-500'>
-                                                            Build ID:
-                                                        </span>
-                                                        <p className='text-gray-900 font-mono text-[10px]'>
-                                                            {currentExecution.id ||
-                                                                'N/A'}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-gray-500'>
-                                                            Triggered by:
-                                                        </span>
-                                                        <p className='text-gray-900 font-medium'>
-                                                            {currentExecution.triggeredBy ||
-                                                                'System'}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-gray-500'>
-                                                            Total Duration:
-                                                        </span>
-                                                        <p className='text-gray-900 font-medium'>
-                                                            {currentExecution.duration ||
-                                                                'N/A'}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-gray-500'>
-                                                            Status:
-                                                        </span>
-                                                        <p className='flex items-center gap-1'>
-                                                            <span
-                                                                className={`inline-block w-2 h-2 rounded-full ${
-                                                                    currentExecution.status ===
-                                                                    'success'
-                                                                        ? 'bg-blue-500'
-                                                                        : currentExecution.status ===
-                                                                          'failed'
-                                                                        ? 'bg-red-500'
-                                                                        : currentExecution.status ===
-                                                                          'running'
-                                                                        ? 'bg-blue-400'
-                                                                        : 'bg-gray-400'
-                                                                }`}
-                                                            ></span>
-                                                            <span
-                                                                className={`font-semibold ${
-                                                                    currentExecution.status ===
-                                                                    'success'
-                                                                        ? 'text-blue-600'
-                                                                        : currentExecution.status ===
-                                                                          'failed'
-                                                                        ? 'text-red-600'
-                                                                        : currentExecution.status ===
-                                                                          'running'
-                                                                        ? 'text-blue-600'
-                                                                        : 'text-gray-600'
-                                                                }`}
-                                                            >
-                                                                {currentExecution.status
-                                                                    ?.charAt(0)
-                                                                    .toUpperCase() +
-                                                                    currentExecution.status?.slice(
-                                                                        1,
-                                                                    ) ||
-                                                                    'Unknown'}
-                                                            </span>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className='text-center py-4 text-xs text-gray-500'>
-                                                    No execution data available
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Interactive Pipeline Canvas */}
-                                        <div className='flex-1 overflow-y-auto'>
-                                            <PipelineCanvas
-                                                selectedStage={selectedStage}
-                                                onStageClick={setSelectedStage}
+                                        <svg
+                                            className='w-4 h-4'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M6 18L18 6M6 6l12 12'
                                             />
-                                        </div>
+                                        </svg>
+                                    </button>
+                                </div>
 
-                                        {/* Real-time Metrics */}
-                                        <div className='px-4 py-3 bg-blue-50/30 border-t border-blue-100'>
-                                            <h4 className='text-xs font-semibold text-gray-700 mb-2'>
-                                                Live Metrics
-                                            </h4>
-                                            <div className='grid grid-cols-3 gap-3 text-xs'>
-                                                <div className='bg-white p-2 rounded border border-gray-200'>
-                                                    <div className='text-gray-500 mb-1'>
-                                                        CPU Usage
+                                {/* Tab Navigation */}
+                                <div className='flex border-b border-gray-200 bg-white'>
+                                    <button
+                                        onClick={() =>
+                                            setActiveExecutionTab('status')
+                                        }
+                                        className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
+                                            activeExecutionTab === 'status'
+                                                ? 'text-blue-600 bg-blue-50/30'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {activeExecutionTab === 'status' && (
+                                            <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
+                                        )}
+                                        <svg
+                                            className='w-5 h-5 relative z-20'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+                                            />
+                                        </svg>
+                                        <span className='relative z-20'>
+                                            Status
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setActiveExecutionTab('artifact')
+                                        }
+                                        className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
+                                            activeExecutionTab === 'artifact'
+                                                ? 'text-blue-600 bg-blue-50/30'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {activeExecutionTab === 'artifact' && (
+                                            <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
+                                        )}
+                                        <svg
+                                            className='w-5 h-5 relative z-20'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'
+                                            />
+                                        </svg>
+                                        <span className='relative z-20'>
+                                            Artifact
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setActiveExecutionTab('build')
+                                        }
+                                        className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors overflow-hidden ${
+                                            activeExecutionTab === 'build'
+                                                ? 'text-blue-600 bg-blue-50/30'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {activeExecutionTab === 'build' && (
+                                            <div className='absolute left-0 top-0 bottom-0 w-1 bg-blue-600 z-10'></div>
+                                        )}
+                                        <svg
+                                            className='w-5 h-5 relative z-20'
+                                            fill='none'
+                                            stroke='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
+                                            />
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                                            />
+                                        </svg>
+                                        <span className='relative z-20'>
+                                            Build
+                                        </span>
+                                    </button>
+                                </div>
+
+                                <div className='flex-1 overflow-y-auto flex flex-col'>
+                                    {/* Status Tab Content */}
+                                    {activeExecutionTab === 'status' && (
+                                        <>
+                                            {/* Action Buttons at Top */}
+                                            <div className='px-4 pt-4 pb-3 border-b border-gray-200 bg-white sticky top-0 z-10'>
+                                                <div className='flex flex-wrap gap-2 mb-3'>
+                                                    <button className='flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors'>
+                                                        <svg
+                                                            className='w-3.5 h-3.5'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z'
+                                                            />
+                                                        </svg>
+                                                        Show Full Log
+                                                    </button>
+                                                    <button className='flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
+                                                        <svg
+                                                            className='w-3.5 h-3.5'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                                                            />
+                                                        </svg>
+                                                        Download
+                                                    </button>
+                                                    <button className='px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
+                                                        SonarQube
+                                                    </button>
+                                                    <button className='px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors'>
+                                                        Tricentis Tosca
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Build Info Summary */}
+                                            <div className='px-4 py-3 bg-blue-50/30 border-b border-blue-100'>
+                                                {loadingExecution ? (
+                                                    <div className='text-center py-4'>
+                                                        <div className='inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin'></div>
+                                                        <p className='text-xs text-gray-500 mt-2'>
+                                                            Loading execution
+                                                            data...
+                                                        </p>
                                                     </div>
-                                                    <div className='flex items-center gap-2'>
-                                                        <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
-                                                            <div
-                                                                className='bg-blue-600 h-1.5 rounded-full'
-                                                                style={{
-                                                                    width: '45%',
-                                                                }}
-                                                            ></div>
+                                                ) : currentExecution ? (
+                                                    <div className='grid grid-cols-2 gap-x-4 gap-y-2 text-xs'>
+                                                        <div>
+                                                            <span className='text-gray-500'>
+                                                                Build ID:
+                                                            </span>
+                                                            <p className='text-gray-900 font-mono text-[10px]'>
+                                                                {currentExecution.id ||
+                                                                    'N/A'}
+                                                            </p>
                                                         </div>
-                                                        <span className='text-gray-900 font-semibold text-[10px]'>
-                                                            45%
-                                                        </span>
+                                                        <div>
+                                                            <span className='text-gray-500'>
+                                                                Triggered by:
+                                                            </span>
+                                                            <p className='text-gray-900 font-medium'>
+                                                                {currentExecution.triggeredBy ||
+                                                                    'System'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className='text-gray-500'>
+                                                                Total Duration:
+                                                            </span>
+                                                            <p className='text-gray-900 font-medium'>
+                                                                {currentExecution.duration ||
+                                                                    'N/A'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className='text-gray-500'>
+                                                                Status:
+                                                            </span>
+                                                            <p className='flex items-center gap-1'>
+                                                                <span
+                                                                    className={`inline-block w-2 h-2 rounded-full ${
+                                                                        currentExecution.status ===
+                                                                        'success'
+                                                                            ? 'bg-blue-500'
+                                                                            : currentExecution.status ===
+                                                                              'failed'
+                                                                            ? 'bg-red-500'
+                                                                            : currentExecution.status ===
+                                                                              'running'
+                                                                            ? 'bg-blue-400'
+                                                                            : 'bg-gray-400'
+                                                                    }`}
+                                                                ></span>
+                                                                <span
+                                                                    className={`font-semibold ${
+                                                                        currentExecution.status ===
+                                                                        'success'
+                                                                            ? 'text-blue-600'
+                                                                            : currentExecution.status ===
+                                                                              'failed'
+                                                                            ? 'text-red-600'
+                                                                            : currentExecution.status ===
+                                                                              'running'
+                                                                            ? 'text-blue-600'
+                                                                            : 'text-gray-600'
+                                                                    }`}
+                                                                >
+                                                                    {currentExecution.status
+                                                                        ?.charAt(
+                                                                            0,
+                                                                        )
+                                                                        .toUpperCase() +
+                                                                        currentExecution.status?.slice(
+                                                                            1,
+                                                                        ) ||
+                                                                        'Unknown'}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className='text-center py-4 text-xs text-gray-500'>
+                                                        No execution data
+                                                        available
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Interactive Pipeline Canvas */}
+                                            <div className='flex-1 overflow-y-auto'>
+                                                <PipelineCanvas
+                                                    selectedStage={
+                                                        selectedStage
+                                                    }
+                                                    onStageClick={
+                                                        setSelectedStage
+                                                    }
+                                                />
+                                            </div>
+
+                                            {/* Real-time Metrics */}
+                                            <div className='px-4 py-3 bg-blue-50/30 border-t border-blue-100'>
+                                                <h4 className='text-xs font-semibold text-gray-700 mb-2'>
+                                                    Live Metrics
+                                                </h4>
+                                                <div className='grid grid-cols-3 gap-3 text-xs'>
+                                                    <div className='bg-white p-2 rounded border border-gray-200'>
+                                                        <div className='text-gray-500 mb-1'>
+                                                            CPU Usage
+                                                        </div>
+                                                        <div className='flex items-center gap-2'>
+                                                            <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
+                                                                <div
+                                                                    className='bg-blue-600 h-1.5 rounded-full'
+                                                                    style={{
+                                                                        width: '45%',
+                                                                    }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className='text-gray-900 font-semibold text-[10px]'>
+                                                                45%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className='bg-white p-2 rounded border border-gray-200'>
+                                                        <div className='text-gray-500 mb-1'>
+                                                            Memory
+                                                        </div>
+                                                        <div className='flex items-center gap-2'>
+                                                            <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
+                                                                <div
+                                                                    className='bg-blue-500 h-1.5 rounded-full'
+                                                                    style={{
+                                                                        width: '62%',
+                                                                    }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className='text-gray-900 font-semibold text-[10px]'>
+                                                                62%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className='bg-white p-2 rounded border border-gray-200'>
+                                                        <div className='text-gray-500 mb-1'>
+                                                            Network
+                                                        </div>
+                                                        <div className='flex items-center gap-2'>
+                                                            <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
+                                                                <div
+                                                                    className='bg-blue-400 h-1.5 rounded-full'
+                                                                    style={{
+                                                                        width: '28%',
+                                                                    }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className='text-gray-900 font-semibold text-[10px]'>
+                                                                28%
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className='bg-white p-2 rounded border border-gray-200'>
-                                                    <div className='text-gray-500 mb-1'>
-                                                        Memory
-                                                    </div>
-                                                    <div className='flex items-center gap-2'>
-                                                        <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
-                                                            <div
-                                                                className='bg-blue-500 h-1.5 rounded-full'
-                                                                style={{
-                                                                    width: '62%',
-                                                                }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className='text-gray-900 font-semibold text-[10px]'>
-                                                            62%
+                                            </div>
+
+                                            {/* Test Results Summary (if applicable) */}
+                                            <div className='px-4 py-3 border-t border-gray-200 bg-white d-none'>
+                                                <h4 className='text-xs font-semibold text-gray-700 mb-2'>
+                                                    Test Results
+                                                </h4>
+                                                <div className='flex items-center gap-4 text-xs'>
+                                                    <div className='flex items-center gap-1.5'>
+                                                        <span className='w-2 h-2 bg-blue-500 rounded-full'></span>
+                                                        <span className='text-gray-500'>
+                                                            Passed:
+                                                        </span>
+                                                        <span className='text-blue-700 font-semibold'>
+                                                            124
                                                         </span>
                                                     </div>
-                                                </div>
-                                                <div className='bg-white p-2 rounded border border-gray-200'>
-                                                    <div className='text-gray-500 mb-1'>
-                                                        Network
+                                                    <div className='flex items-center gap-1.5'>
+                                                        <span className='w-2 h-2 bg-red-500 rounded-full'></span>
+                                                        <span className='text-gray-500'>
+                                                            Failed:
+                                                        </span>
+                                                        <span className='text-gray-900 font-semibold'>
+                                                            3
+                                                        </span>
                                                     </div>
-                                                    <div className='flex items-center gap-2'>
-                                                        <div className='flex-1 bg-blue-100 rounded-full h-1.5'>
-                                                            <div
-                                                                className='bg-blue-400 h-1.5 rounded-full'
-                                                                style={{
-                                                                    width: '28%',
-                                                                }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className='text-gray-900 font-semibold text-[10px]'>
-                                                            28%
+                                                    <div className='flex items-center gap-1.5'>
+                                                        <span className='w-2 h-2 bg-blue-300 rounded-full'></span>
+                                                        <span className='text-gray-500'>
+                                                            Skipped:
+                                                        </span>
+                                                        <span className='text-gray-900 font-semibold'>
+                                                            8
+                                                        </span>
+                                                    </div>
+                                                    <div className='ml-auto'>
+                                                        <span className='text-gray-500'>
+                                                            Coverage:
+                                                        </span>
+                                                        <span className='text-gray-900 font-semibold ml-1'>
+                                                            87.5%
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </>
+                                    )}
 
-                                        {/* Test Results Summary (if applicable) */}
-                                        <div className='px-4 py-3 border-t border-gray-200 bg-white d-none'>
-                                            <h4 className='text-xs font-semibold text-gray-700 mb-2'>
-                                                Test Results
-                                            </h4>
-                                            <div className='flex items-center gap-4 text-xs'>
-                                                <div className='flex items-center gap-1.5'>
-                                                    <span className='w-2 h-2 bg-blue-500 rounded-full'></span>
-                                                    <span className='text-gray-500'>
-                                                        Passed:
-                                                    </span>
-                                                    <span className='text-blue-700 font-semibold'>
-                                                        124
-                                                    </span>
+                                    {/* Artifact Tab Content */}
+                                    {activeExecutionTab === 'artifact' && (
+                                        <div className='space-y-4'>
+                                            <div className='flex items-center justify-between'>
+                                                <h3 className='text-sm font-semibold text-gray-700'>
+                                                    Build Artifacts
+                                                </h3>
+                                                <span className='text-xs text-gray-500'>
+                                                    3 items
+                                                </span>
+                                            </div>
+
+                                            <div className='space-y-2'>
+                                                {/* Artifact 1 */}
+                                                <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
+                                                    <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
+                                                        <svg
+                                                            className='w-5 h-5 text-blue-600'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div className='flex-1 min-w-0'>
+                                                        <p className='text-sm font-medium text-gray-900 truncate'>
+                                                            build-artifact-v1.2.3.zip
+                                                        </p>
+                                                        <p className='text-xs text-gray-500'>
+                                                            2.4 MB • 5 mins ago
+                                                        </p>
+                                                    </div>
+                                                    <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
+                                                        <svg
+                                                            className='w-4 h-4'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                                                            />
+                                                        </svg>
+                                                    </button>
                                                 </div>
-                                                <div className='flex items-center gap-1.5'>
-                                                    <span className='w-2 h-2 bg-red-500 rounded-full'></span>
-                                                    <span className='text-gray-500'>
-                                                        Failed:
-                                                    </span>
-                                                    <span className='text-gray-900 font-semibold'>
-                                                        3
-                                                    </span>
+
+                                                {/* Artifact 2 */}
+                                                <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
+                                                    <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
+                                                        <svg
+                                                            className='w-5 h-5 text-blue-600'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z'
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div className='flex-1 min-w-0'>
+                                                        <p className='text-sm font-medium text-gray-900 truncate'>
+                                                            test-results.xml
+                                                        </p>
+                                                        <p className='text-xs text-gray-500'>
+                                                            124 KB • 5 mins ago
+                                                        </p>
+                                                    </div>
+                                                    <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
+                                                        <svg
+                                                            className='w-4 h-4'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                                                            />
+                                                        </svg>
+                                                    </button>
                                                 </div>
-                                                <div className='flex items-center gap-1.5'>
-                                                    <span className='w-2 h-2 bg-blue-300 rounded-full'></span>
-                                                    <span className='text-gray-500'>
-                                                        Skipped:
-                                                    </span>
-                                                    <span className='text-gray-900 font-semibold'>
-                                                        8
-                                                    </span>
-                                                </div>
-                                                <div className='ml-auto'>
-                                                    <span className='text-gray-500'>
-                                                        Coverage:
-                                                    </span>
-                                                    <span className='text-gray-900 font-semibold ml-1'>
-                                                        87.5%
-                                                    </span>
+
+                                                {/* Artifact 3 */}
+                                                <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
+                                                    <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
+                                                        <svg
+                                                            className='w-5 h-5 text-blue-600'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div className='flex-1 min-w-0'>
+                                                        <p className='text-sm font-medium text-gray-900 truncate'>
+                                                            deployment-manifest.yaml
+                                                        </p>
+                                                        <p className='text-xs text-gray-500'>
+                                                            8 KB • 5 mins ago
+                                                        </p>
+                                                    </div>
+                                                    <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
+                                                        <svg
+                                                            className='w-4 h-4'
+                                                            fill='none'
+                                                            stroke='currentColor'
+                                                            viewBox='0 0 24 24'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                                                            />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </>
-                                )}
 
-                                {/* Artifact Tab Content */}
-                                {activeExecutionTab === 'artifact' && (
-                                    <div className='space-y-4'>
-                                        <div className='flex items-center justify-between'>
-                                            <h3 className='text-sm font-semibold text-gray-700'>
-                                                Build Artifacts
-                                            </h3>
-                                            <span className='text-xs text-gray-500'>
-                                                3 items
-                                            </span>
-                                        </div>
-
-                                        <div className='space-y-2'>
-                                            {/* Artifact 1 */}
-                                            <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
-                                                <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
-                                                    <svg
-                                                        className='w-5 h-5 text-blue-600'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
-                                                        />
-                                                    </svg>
-                                                </div>
-                                                <div className='flex-1 min-w-0'>
-                                                    <p className='text-sm font-medium text-gray-900 truncate'>
-                                                        build-artifact-v1.2.3.zip
-                                                    </p>
-                                                    <p className='text-xs text-gray-500'>
-                                                        2.4 MB • 5 mins ago
-                                                    </p>
-                                                </div>
-                                                <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
-                                                    <svg
-                                                        className='w-4 h-4'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                                                        />
-                                                    </svg>
+                                            <div className='mt-6 pt-4 border-t border-gray-200'>
+                                                <button className='w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors'>
+                                                    Download All Artifacts
                                                 </button>
                                             </div>
-
-                                            {/* Artifact 2 */}
-                                            <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
-                                                <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
-                                                    <svg
-                                                        className='w-5 h-5 text-blue-600'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z'
-                                                        />
-                                                    </svg>
-                                                </div>
-                                                <div className='flex-1 min-w-0'>
-                                                    <p className='text-sm font-medium text-gray-900 truncate'>
-                                                        test-results.xml
-                                                    </p>
-                                                    <p className='text-xs text-gray-500'>
-                                                        124 KB • 5 mins ago
-                                                    </p>
-                                                </div>
-                                                <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
-                                                    <svg
-                                                        className='w-4 h-4'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            </div>
-
-                                            {/* Artifact 3 */}
-                                            <div className='flex items-center gap-3 p-3 bg-blue-50/30 rounded-lg hover:bg-blue-50 transition-colors'>
-                                                <div className='flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center'>
-                                                    <svg
-                                                        className='w-5 h-5 text-blue-600'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
-                                                        />
-                                                    </svg>
-                                                </div>
-                                                <div className='flex-1 min-w-0'>
-                                                    <p className='text-sm font-medium text-gray-900 truncate'>
-                                                        deployment-manifest.yaml
-                                                    </p>
-                                                    <p className='text-xs text-gray-500'>
-                                                        8 KB • 5 mins ago
-                                                    </p>
-                                                </div>
-                                                <button className='flex-shrink-0 p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors'>
-                                                    <svg
-                                                        className='w-4 h-4'
-                                                        fill='none'
-                                                        stroke='currentColor'
-                                                        viewBox='0 0 24 24'
-                                                    >
-                                                        <path
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth={2}
-                                                            d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            </div>
                                         </div>
+                                    )}
 
-                                        <div className='mt-6 pt-4 border-t border-gray-200'>
-                                            <button className='w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors'>
-                                                Download All Artifacts
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Build Tab Content */}
-                                {activeExecutionTab === 'build' && (
-                                    <div className='space-y-4'>
-                                        <div>
-                                            <h3 className='text-sm font-semibold text-gray-700 mb-3'>
-                                                Build Information
-                                            </h3>
-                                            <div className='bg-blue-50/30 rounded-lg p-4 space-y-3'>
-                                                <div className='grid grid-cols-2 gap-4'>
-                                                    <div>
-                                                        <span className='text-xs text-gray-500'>
-                                                            Build Number
-                                                        </span>
-                                                        <p className='text-sm font-semibold text-gray-900'>
-                                                            #3
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-xs text-gray-500'>
-                                                            Branch
-                                                        </span>
-                                                        <p className='text-sm font-semibold text-gray-900'>
-                                                            main
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-xs text-gray-500'>
-                                                            Commit
-                                                        </span>
-                                                        <p className='text-sm font-mono text-gray-900'>
-                                                            a1b2c3d
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className='text-xs text-gray-500'>
-                                                            Duration
-                                                        </span>
-                                                        <p className='text-sm font-semibold text-gray-900'>
-                                                            3 min 28s
-                                                        </p>
+                                    {/* Build Tab Content */}
+                                    {activeExecutionTab === 'build' && (
+                                        <div className='space-y-4'>
+                                            <div>
+                                                <h3 className='text-sm font-semibold text-gray-700 mb-3'>
+                                                    Build Information
+                                                </h3>
+                                                <div className='bg-blue-50/30 rounded-lg p-4 space-y-3'>
+                                                    <div className='grid grid-cols-2 gap-4'>
+                                                        <div>
+                                                            <span className='text-xs text-gray-500'>
+                                                                Build Number
+                                                            </span>
+                                                            <p className='text-sm font-semibold text-gray-900'>
+                                                                #3
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className='text-xs text-gray-500'>
+                                                                Branch
+                                                            </span>
+                                                            <p className='text-sm font-semibold text-gray-900'>
+                                                                main
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className='text-xs text-gray-500'>
+                                                                Commit
+                                                            </span>
+                                                            <p className='text-sm font-mono text-gray-900'>
+                                                                a1b2c3d
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className='text-xs text-gray-500'>
+                                                                Duration
+                                                            </span>
+                                                            <p className='text-sm font-semibold text-gray-900'>
+                                                                3 min 28s
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div>
-                                            <h3 className='text-sm font-semibold text-gray-700 mb-3'>
-                                                Environment Variables
-                                            </h3>
-                                            <div className='bg-blue-50/30 rounded-lg p-4'>
-                                                <div className='space-y-2 text-xs font-mono'>
-                                                    <div className='flex items-center justify-between'>
-                                                        <span className='text-gray-600'>
-                                                            NODE_ENV
-                                                        </span>
-                                                        <span className='text-blue-700 font-medium'>
-                                                            production
-                                                        </span>
-                                                    </div>
-                                                    <div className='flex items-center justify-between'>
-                                                        <span className='text-gray-600'>
-                                                            API_URL
-                                                        </span>
-                                                        <span className='text-blue-700 font-medium'>
-                                                            https://api.example.com
-                                                        </span>
-                                                    </div>
-                                                    <div className='flex items-center justify-between'>
-                                                        <span className='text-gray-600'>
-                                                            BUILD_ID
-                                                        </span>
-                                                        <span className='text-blue-700 font-medium'>
-                                                            cd36c104-5940
-                                                        </span>
+                                            <div>
+                                                <h3 className='text-sm font-semibold text-gray-700 mb-3'>
+                                                    Environment Variables
+                                                </h3>
+                                                <div className='bg-blue-50/30 rounded-lg p-4'>
+                                                    <div className='space-y-2 text-xs font-mono'>
+                                                        <div className='flex items-center justify-between'>
+                                                            <span className='text-gray-600'>
+                                                                NODE_ENV
+                                                            </span>
+                                                            <span className='text-blue-700 font-medium'>
+                                                                production
+                                                            </span>
+                                                        </div>
+                                                        <div className='flex items-center justify-between'>
+                                                            <span className='text-gray-600'>
+                                                                API_URL
+                                                            </span>
+                                                            <span className='text-blue-700 font-medium'>
+                                                                https://api.example.com
+                                                            </span>
+                                                        </div>
+                                                        <div className='flex items-center justify-between'>
+                                                            <span className='text-gray-600'>
+                                                                BUILD_ID
+                                                            </span>
+                                                            <span className='text-blue-700 font-medium'>
+                                                                cd36c104-5940
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <div>
-                                            <h3 className='text-sm font-semibold text-gray-700 mb-3'>
-                                                Build Configuration
-                                            </h3>
-                                            <div className='bg-blue-50/30 rounded-lg p-4'>
-                                                <pre className='text-xs font-mono text-blue-700 overflow-x-auto'>
-                                                    {`{
+                                            <div>
+                                                <h3 className='text-sm font-semibold text-gray-700 mb-3'>
+                                                    Build Configuration
+                                                </h3>
+                                                <div className='bg-blue-50/30 rounded-lg p-4'>
+                                                    <pre className='text-xs font-mono text-blue-700 overflow-x-auto'>
+                                                        {`{
   "name": "build-job",
   "version": "1.2.3",
   "environment": "production",
   "deployment": "automatic"
 }`}
-                                                </pre>
+                                                    </pre>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </motion.div>
-                )}
+                        </motion.div>
+                    )}
             </div>
 
             {/* Notification Component */}
@@ -2142,6 +2312,39 @@ export default function Integrations() {
                     </div>
                 </motion.div>
             )}
+
+            {/* Build Sliding Panels */}
+            {panelMode === 'sliding' &&
+                selectedBuildRowId &&
+                selectedBuildRow && (
+                    <BuildSlidingPanels
+                        isOpen={showSlidingPanel}
+                        onClose={() => {
+                            setShowSlidingPanel(false);
+                            setSelectedBuildRowId(null);
+
+                            // Reopen sidebar and AI panel when sliding panel closes
+                            const expandSidebarEvent = new CustomEvent(
+                                'expandSidebar',
+                            );
+                            const expandAIPanelEvent = new CustomEvent(
+                                'expandAIPanel',
+                            );
+                            window.dispatchEvent(expandSidebarEvent);
+                            window.dispatchEvent(expandAIPanelEvent);
+                        }}
+                        buildData={selectedBuildRow}
+                        onRunBuild={(buildId) => {
+                            console.log('Running build:', buildId);
+                            // Trigger build execution logic here
+                        }}
+                        initialPanel='details'
+                        selectedAccountId={selectedAccountId}
+                        selectedAccountName={selectedAccountName}
+                        selectedEnterpriseId={selectedEnterpriseId}
+                        selectedEnterpriseName={selectedEnterpriseName}
+                    />
+                )}
         </div>
     );
 }

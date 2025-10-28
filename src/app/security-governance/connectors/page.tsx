@@ -1478,17 +1478,20 @@ export default function Connectors() {
                         </div>
                     </div>
                 ) : connectors.length === 0 ? (
-                    /* Empty State */
-                    <div className='flex items-center justify-center h-64'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-                                <LinkIcon className='w-8 h-8 text-gray-400' />
-                            </div>
-                            <h3 className='text-lg font-medium text-gray-900 mb-2'>
-                                No connectors
+                    <div className='flex flex-col items-center justify-center flex-1 px-4 py-8'>
+                        <div className='w-96 h-auto mb-8'>
+                            <img
+                                src="/images/Infographics/SG-no-connectors-yet.jpg"
+                                alt="No connectors illustration"
+                                className='w-full h-full object-contain'
+                            />
+                        </div>
+                        <div className='text-center max-w-md'>
+                            <h3 className='text-xl font-semibold text-gray-900 mb-2'>
+                                No connectors yet
                             </h3>
-                            <p className='text-gray-500 mb-4'>
-                                Get started by creating your first connector
+                            <p className='text-gray-500 mb-6'>
+                                Add your first connector to start integrating with external tools and services
                             </p>
                             <motion.button
                                 onClick={handleCreateConnector}
@@ -1497,7 +1500,7 @@ export default function Connectors() {
                                 whileTap={{scale: 0.98}}
                             >
                                 <PlusIcon className='w-4 h-4 mr-2' />
-                                Create Connector
+                                Add Connector
                             </motion.button>
                         </div>
                     </div>

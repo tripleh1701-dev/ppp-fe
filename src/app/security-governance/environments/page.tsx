@@ -43,6 +43,8 @@ type ColumnType =
     | 'testConnectivity'
     | 'status';
 
+import EmptyState from '@/components/EmptyState';
+
 export default function EnvironmentsPage() {
     const router = useRouter();
     const [environments, setEnvironments] = useState<EnvironmentRecord[]>([]);
@@ -1102,40 +1104,15 @@ export default function EnvironmentsPage() {
                         <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600' />
                     </div>
                 ) : environments.length === 0 ? (
-                    <div className='flex items-start justify-center h-full pt-20'>
-                        <div className='text-center max-w-md'>
-                            <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 mb-4'>
-                                <GlobeAltIcon className='h-8 w-8 text-slate-400' />
-                            </div>
-                            <h3 className='text-lg font-semibold text-slate-900 mb-2'>
-                                No Environments
-                            </h3>
-                            <p className='text-sm text-slate-500 mb-6'>
-                                Get started by creating your first deployment
-                                environment. Environments help you manage and
-                                monitor your integration and extension systems.
-                            </p>
-                            <button
-                                onClick={() => setShowCreatePanel(true)}
-                                className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors'
-                            >
-                                <svg
-                                    className='w-5 h-5'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M12 4v16m8-8H4'
-                                    />
-                                </svg>
-                                Create New Environment
-                            </button>
-                        </div>
-                    </div>
+                    <EmptyState
+                        title="No Environments Yet"
+                        description="Get started by creating your first deployment environment. Environments help you manage and monitor your integration and extension systems."
+                        imagePath="/images/Infographics/SG-no-environments-yet.jpg"
+                        actionButton={{
+                            label: "Create Environment",
+                            onClick: () => setShowCreatePanel(true)
+                        }}
+                    />
                 ) : (
                     <EnvironmentsTable
                         rows={tableRows}

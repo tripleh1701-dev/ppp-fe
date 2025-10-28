@@ -3949,46 +3949,18 @@ function SortableBuildRow({
                         data-col='buildName'
                         style={{width: '100%'}}
                     >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='buildName'
-                                value={(row as any).buildName || ''}
-                                onChange={(v) => {
-                                    onUpdateField(
-                                        row.id,
-                                        'buildName' as any,
-                                        v || '',
-                                    );
-                                }}
-                                placeholder=''
-                                isError={isCellMissing(row.id, 'buildName')}
-                                onDropdownOptionUpdate={
-                                    onDropdownOptionUpdate as any
-                                }
-                                onNewItemCreated={onNewItemCreated as any}
-                                builds={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={row.buildName || ''}
-                                currentRowProduct={row.description || ''}
-                                {...createTabNavigation('buildName')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.buildName || ''}
-                                onCommit={(v) => {
-                                    onUpdateField(
-                                        row.id,
-                                        'buildName' as any,
-                                        v,
-                                    );
-                                }}
-                                className='text-[12px]'
-                                placeholder=''
-                                isError={isCellMissing(row.id, 'buildName')}
-                                dataAttr={`${row.id}-accountName`}
-                                {...createTabNavigation('buildName')}
-                            />
-                        )}
+                        {/* Always use plain text input for Job Name (not dropdown) */}
+                        <InlineEditableText
+                            value={row.buildName || ''}
+                            onCommit={(v) => {
+                                onUpdateField(row.id, 'buildName' as any, v);
+                            }}
+                            className='text-[12px]'
+                            placeholder=''
+                            isError={isCellMissing(row.id, 'buildName')}
+                            dataAttr={`${row.id}-accountName`}
+                            {...createTabNavigation('buildName')}
+                        />
                     </div>
                 </div>
             )}
@@ -4005,42 +3977,18 @@ function SortableBuildRow({
                     data-col='description'
                     style={{width: '100%'}}
                 >
-                    {enableDropdownChips ? (
-                        <AsyncChipSelect
-                            type='description'
-                            value={(row as any).description || ''}
-                            onChange={(v) =>
-                                onUpdateField(
-                                    row.id,
-                                    'description' as any,
-                                    v || '',
-                                )
-                            }
-                            placeholder='Enter description'
-                            isError={isCellMissing(row.id, 'description')}
-                            onDropdownOptionUpdate={
-                                onDropdownOptionUpdate as any
-                            }
-                            onNewItemCreated={onNewItemCreated as any}
-                            builds={allRows}
-                            currentRowId={row.id}
-                            currentRowEnterprise={row.buildName || ''}
-                            currentRowProduct={(row as any).description || ''}
-                            {...createTabNavigation('description')}
-                        />
-                    ) : (
-                        <InlineEditableText
-                            value={(row as any).description || ''}
-                            onCommit={(v) =>
-                                onUpdateField(row.id, 'description' as any, v)
-                            }
-                            className='text-[12px]'
-                            dataAttr={`masterAccount-${row.id}`}
-                            isError={isCellMissing(row.id, 'description')}
-                            placeholder='Enter description'
-                            {...createTabNavigation('description')}
-                        />
-                    )}
+                    {/* Always use plain text input for Description (not dropdown) */}
+                    <InlineEditableText
+                        value={(row as any).description || ''}
+                        onCommit={(v) =>
+                            onUpdateField(row.id, 'description' as any, v)
+                        }
+                        className='text-[12px]'
+                        dataAttr={`masterAccount-${row.id}`}
+                        isError={isCellMissing(row.id, 'description')}
+                        placeholder='Enter description'
+                        {...createTabNavigation('description')}
+                    />
                 </div>
             )}
             {cols.includes('entity') && (
@@ -4077,7 +4025,7 @@ function SortableBuildRow({
                             dropdownOptions={{
                                 buildNames: dropdownOptions?.buildNames || [],
                                 entities: dropdownOptions?.entities || [],
-                                pipelines: dropdownOptions?.pipelines || []
+                                pipelines: dropdownOptions?.pipelines || [],
                             }}
                             {...createTabNavigation('entity')}
                         />
@@ -4134,7 +4082,7 @@ function SortableBuildRow({
                             dropdownOptions={{
                                 buildNames: dropdownOptions?.buildNames || [],
                                 entities: dropdownOptions?.entities || [],
-                                pipelines: dropdownOptions?.pipelines || []
+                                pipelines: dropdownOptions?.pipelines || [],
                             }}
                             {...createTabNavigation('pipeline')}
                         />
