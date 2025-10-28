@@ -53,16 +53,16 @@ import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
 import DateChipSelect from './DateChipSelect';
 
-// Utility function to generate consistent colors for account data across the application
-const getAccountColor = (accountName: string) => {
-    const key = accountName.toLowerCase();
+// Utility function to generate consistent colors for user group data across the application
+const getUserGroupColor = (userGroupName: string) => {
+    const key = userGroupName.toLowerCase();
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
     
-    // Blueish account color palette - consistent across all components
-    const accountColors = [
+    // Blueish user group color palette - consistent across all components
+    const userGroupColors = [
         {
             bg: 'bg-blue-50',
             text: 'text-blue-800',
@@ -95,7 +95,7 @@ const getAccountColor = (accountName: string) => {
         },
     ];
     
-    return accountColors[hash % accountColors.length];
+    return userGroupColors[hash % userGroupColors.length];
 };
 
 // Simple dropdown component for predefined values (like cloudType)
@@ -1711,7 +1711,7 @@ function UserGroupMultiSelect({
                     .slice(0, visibleCount)
                     .map((service: string, index: number) => {
                         // Use consistent color function
-                        const colorTheme = getAccountColor(service);
+                        const colorTheme = getUserGroupColor(service);
                         
                         return (
                             <motion.span
@@ -1776,7 +1776,7 @@ function UserGroupMultiSelect({
                                         </div>
                                         <div className='space-y-1 max-h-32 overflow-y-auto'>
                                             {selectedUserGroups.slice(visibleCount).map((userGroup, idx) => {
-                                                const colorTheme = getAccountColor(userGroup);
+                                                const colorTheme = getUserGroupColor(userGroup);
                                                 return (
                                                     <div 
                                                         key={`additional-${idx}`}
@@ -3117,13 +3117,13 @@ interface AccountsTableProps {
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'userGroups',
+        type: 'emails' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'userGroups',
+        type: 'emails' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -3142,6 +3142,7 @@ interface AccountsTableProps {
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
     onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
+    onOpenUserGroupModal?: (row: AccountRow) => void; // Callback to open user group modal
     onShowStartDateProtectionModal?: (message: string) => void; // Callback to show start date protection modal
 }
 
@@ -3175,6 +3176,7 @@ function SortableAccountRow({
     allRows = [],
     onDeleteClick,
     onOpenAddressModal,
+    onOpenUserGroupModal,
     onShowStartDateProtectionModal,
     onShowGlobalValidationModal,
 }: {
@@ -3200,13 +3202,13 @@ function SortableAccountRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'accountNames' | 'emails' | 'userGroups',
+        type: 'emails' | 'userGroups',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'accountNames' | 'emails' | 'userGroups',
+        type: 'emails' | 'userGroups',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
@@ -3215,6 +3217,7 @@ function SortableAccountRow({
     allRows?: AccountRow[];
     onDeleteClick?: (rowId: string) => void;
     onOpenAddressModal?: (row: AccountRow) => void;
+    onOpenUserGroupModal?: (row: AccountRow) => void;
     onShowStartDateProtectionModal?: (message: string) => void;
     onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
 }) {
@@ -4199,38 +4202,50 @@ function SortableAccountRow({
                         data-col='assignedUserGroups'
                         style={{width: '100%'}}
                     >
-                        <div className="flex flex-wrap gap-1">
-                            {(row.assignedUserGroups || []).map((group, index) => (
-                                <span
-                                    key={index}
-                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                >
-                                    {group}
-                                    <button
-                                        onClick={() => {
-                                            const updatedGroups = (row.assignedUserGroups || []).filter((_, i) => i !== index);
-                                            onUpdateField(row.id, 'assignedUserGroups' as any, updatedGroups);
-                                        }}
-                                        className="ml-1 text-blue-600 hover:text-blue-800"
+                        <div className="flex items-center gap-2 w-full">
+                            {/* User Groups Icon */}
+                            <button
+                                onClick={() => onOpenUserGroupModal?.(row)}
+                                className="flex-shrink-0 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors duration-200"
+                                title="Assign User Groups"
+                            >
+                                <Users className="w-4 h-4" />
+                            </button>
+                            
+                            {/* User Groups Display */}
+                            <div className="flex flex-wrap gap-1 flex-1">
+                                {(row.assignedUserGroups || []).map((group, index) => (
+                                    <span
+                                        key={index}
+                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                                     >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </span>
-                            ))}
-                            <input
-                                type="text"
-                                placeholder="Add group..."
-                                className="min-w-0 flex-1 text-xs border-none outline-none bg-transparent"
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                        const currentGroups = row.assignedUserGroups || [];
-                                        const newGroups = [...currentGroups, e.currentTarget.value.trim()];
-                                        onUpdateField(row.id, 'assignedUserGroups' as any, newGroups);
-                                        e.currentTarget.value = '';
-                                    }
-                                }}
-                                {...createTabNavigation('assignedUserGroups')}
-                            />
+                                        {group}
+                                        <button
+                                            onClick={() => {
+                                                const updatedGroups = (row.assignedUserGroups || []).filter((_, i) => i !== index);
+                                                onUpdateField(row.id, 'assignedUserGroups' as any, updatedGroups);
+                                            }}
+                                            className="ml-1 text-blue-600 hover:text-blue-800"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                                <input
+                                    type="text"
+                                    placeholder="Add group..."
+                                    className="min-w-0 flex-1 text-xs border-none outline-none bg-transparent"
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                            const currentGroups = row.assignedUserGroups || [];
+                                            const newGroups = [...currentGroups, e.currentTarget.value.trim()];
+                                            onUpdateField(row.id, 'assignedUserGroups' as any, newGroups);
+                                            e.currentTarget.value = '';
+                                        }
+                                    }}
+                                    {...createTabNavigation('assignedUserGroups')}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4279,6 +4294,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     onLicenseDelete,
     onCompleteLicenseDeletion,
     onOpenAddressModal,
+    onOpenUserGroupModal,
     onShowStartDateProtectionModal,
 }, ref) => {
     // Local validation state to track rows with errors
@@ -4776,16 +4792,16 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
-        firstName: '150px', // First Name column
-        middleName: '150px', // Middle Name column
-        lastName: '150px', // Last Name column
-        emailAddress: '220px', // Email Address column - wider for email addresses
-        status: '70px', // Status column - compact width for full-cell button
-        startDate: '140px', // Start Date column
-        endDate: '140px', // End Date column
-        password: '120px', // Password column
-        technicalUser: '120px', // Technical User column
-        assignedUserGroups: '200px', // Assigned User Groups column
+        firstName: '180px', // First Name column - increased for sort arrows
+        middleName: '200px', // Middle Name column - increased more for sort arrows
+        lastName: '180px', // Last Name column - increased for sort arrows
+        emailAddress: '220px', // Email Address column - adequate for sort arrows
+        status: '140px', // Status column - increased for sort arrows
+        startDate: '140px', // Start Date column - no sort arrows
+        endDate: '140px', // End Date column - no sort arrows
+        password: '120px', // Password column - no sort arrows
+        technicalUser: '120px', // Technical User column - no sort arrows
+        assignedUserGroups: '300px', // Assigned User Groups column - fixed width instead of flexible
     } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -4803,18 +4819,23 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             
             // Define minimum and maximum widths per column
             const constraints = {
-                accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
-                masterAccount: { min: 190, max: 310 }, // Master Account column constraints
-                cloudType: { min: 160, max: 280 }, // Cloud Type column constraints
-                address: { min: 120, max: 200 }, // Address column constraints - increased for icon + text
-                firstName: { min: 140, max: 220 }, // First Name column constraints - increased for icon + text
+                firstName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
+                middleName: { min: 160, max: 250 }, // Increased even more for Middle Name - prevents arrow overlap  
+                lastName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
+                emailAddress: { min: 180, max: 300 }, // Email needs more space - prevents arrow overlap
+                status: { min: 140, max: 200 }, // Increased to match Enterprise Config - prevents arrow overlap
+                startDate: { min: 120, max: 180 }, // No sort arrows, can be smaller
+                endDate: { min: 120, max: 180 }, // No sort arrows, can be smaller
+                password: { min: 100, max: 150 }, // No sort arrows, can be smaller
+                technicalUser: { min: 120, max: 180 }, // No sort arrows, can be smaller
+                assignedUserGroups: { min: 300, max: 400 } // User Groups - fixed range instead of flexible
             };
             
-            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
+            const columnConstraints = constraints[c as keyof typeof constraints] || { min: 140, max: 250 };
             
             if (dynamicWidth && dynamicWidth > 0) {
-                // For Services column, use minmax to fill remaining space
-                if (c === 'services') {
+                // For assignedUserGroups column, use minmax to fill remaining space
+                if (c === 'assignedUserGroups') {
                     return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
                 }
                 // Clamp the dynamic width within constraints for other columns
@@ -4828,8 +4849,8 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
-                // For Services column, use flexible sizing to fill remaining space
-                if (c === 'services' && defaultSize === '1fr') {
+                // For assignedUserGroups column, use flexible sizing to fill remaining space
+                if (c === 'assignedUserGroups' && defaultSize === '1fr') {
                     return `minmax(${columnConstraints.min}px, 1fr)`;
                 }
                 const numericSize = parseInt(defaultSize.replace('px', ''));
@@ -5532,11 +5553,6 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     }
                 `
             }} />
-            <div className='flex items-center justify-between mb-2'>
-                <h3 className='text-sm font-semibold text-slate-800'>
-                    {title ?? 'User Management Details'}
-                </h3>
-            </div>
             {cols.length === 0 ? (
                 <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
                     <div className='flex flex-col items-center space-y-4'>
@@ -5692,7 +5708,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                             } ${
                                                 c === 'assignedUserGroups' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'assignedUserGroups' ? { minWidth: '400px' } : undefined} // Match last column minimum width
+                                            style={c === 'assignedUserGroups' ? { minWidth: '600px' } : undefined} // Match last column minimum width
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
@@ -5795,6 +5811,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                         onDeleteClick={handleDeleteClick}
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
+                                        onOpenUserGroupModal={onOpenUserGroupModal}
                                         onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                         onShowGlobalValidationModal={showGlobalValidationModal}
                                     />
@@ -5880,6 +5897,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                                     onDeleteClick={handleDeleteClick}
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
+                                                    onOpenUserGroupModal={onOpenUserGroupModal}
                                                     onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                                     onShowGlobalValidationModal={showGlobalValidationModal}
                                                 />

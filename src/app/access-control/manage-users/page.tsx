@@ -21,6 +21,7 @@ import {
 import ConfirmModal from '@/components/ConfirmModal';
 import ManageUsersTable, {AccountRow} from '@/components/ManageUsersTable';
 import AddressModal from '@/components/AddressModal';
+import AssignedUserGroupModal, { UserGroup } from '@/components/AssignedUserGroupModal';
 import TechnicalUserModal, { TechnicalUser } from '@/components/TechnicalUserModal';
 import {api} from '@/utils/api';
 
@@ -75,6 +76,11 @@ export default function ManageUsers() {
     // Start date protection modal state
     const [showStartDateProtectionModal, setShowStartDateProtectionModal] = useState(false);
     const [startDateProtectionMessage, setStartDateProtectionMessage] = useState('');
+    
+    // User Group modal state
+    const [showUserGroupModal, setShowUserGroupModal] = useState(false);
+    const [selectedUserForGroups, setSelectedUserForGroups] = useState<AccountRow | null>(null);
+    
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(
         null,
     );
@@ -125,7 +131,6 @@ export default function ManageUsers() {
         enterprises: [] as Array<{id: string; name: string}>,
         products: [] as Array<{id: string; name: string}>,
         services: [] as Array<{id: string; name: string}>,
-        accountNames: [] as Array<{id: string; name: string}>,
         cloudTypes: [
             { id: 'private-cloud', name: 'Private Cloud' },
             { id: 'public-cloud', name: 'Public Cloud' }
@@ -195,20 +200,10 @@ export default function ManageUsers() {
                     api.get<Array<{id: string; name: string}>>('/api/services'),
                 ]);
 
-            // Extract unique account names from existing accounts
-            const uniqueAccountNames = Array.from(new Set(accounts
-                .map(account => account.accountName)
-                .filter(Boolean)
-            )).map((name, index) => ({
-                id: `account-${index}`,
-                name: name
-            }));
-
             setDropdownOptions({
                 enterprises: enterprisesRes || [],
                 products: productsRes || [],
                 services: servicesRes || [],
-                accountNames: uniqueAccountNames,
                 cloudTypes: [
                     { id: 'private-cloud', name: 'Private Cloud' },
                     { id: 'public-cloud', name: 'Public Cloud' }
@@ -325,16 +320,6 @@ export default function ManageUsers() {
         }
 
         // Apply filters
-        if (activeFilters.accountName) {
-            filtered = filtered.filter(
-                (config) => config.accountName === activeFilters.accountName,
-            );
-        }
-        if (activeFilters.masterAccount) {
-            filtered = filtered.filter(
-                (config) => config.masterAccount === activeFilters.masterAccount,
-            );
-        }
         if (activeFilters.cloudType) {
             filtered = filtered.filter(
                 (config) => config.cloudType === activeFilters.cloudType,
@@ -353,14 +338,6 @@ export default function ManageUsers() {
                 let valueB = '';
 
                 switch (sortColumn) {
-                    case 'accountName':
-                        valueA = (a.accountName || '').toString().toLowerCase();
-                        valueB = (b.accountName || '').toString().toLowerCase();
-                        break;
-                    case 'masterAccount':
-                        valueA = (a.masterAccount || '').toString().toLowerCase();
-                        valueB = (b.masterAccount || '').toString().toLowerCase();
-                        break;
                     case 'cloudType':
                         valueA = (a.cloudType || '').toString().toLowerCase();
                         valueB = (b.cloudType || '').toString().toLowerCase();
@@ -399,8 +376,6 @@ export default function ManageUsers() {
     // Column label mapping
     const columnLabels: Record<string, string> = {
         firstName: 'First Name',
-        accountName: 'Account',
-        masterAccount: 'Master Account',
         cloudType: 'Cloud Type',
         address: 'Address'
     };
@@ -434,8 +409,6 @@ export default function ManageUsers() {
 
     // Filter form state
     const [filterForm, setFilterForm] = useState({
-        accountName: '',
-        masterAccount: '',
         cloudType: '',
         address: '',
     });
@@ -443,12 +416,6 @@ export default function ManageUsers() {
     const handleApplyFilters = () => {
         const newFilters: Record<string, any> = {};
 
-        if (filterForm.accountName.trim()) {
-            newFilters.accountName = filterForm.accountName.trim();
-        }
-        if (filterForm.masterAccount.trim()) {
-            newFilters.masterAccount = filterForm.masterAccount.trim();
-        }
         if (filterForm.cloudType.trim()) {
             newFilters.cloudType = filterForm.cloudType.trim();
         }
@@ -461,7 +428,7 @@ export default function ManageUsers() {
     };
 
     const handleClearFilters = () => {
-        setFilterForm({accountName: '', masterAccount: '', cloudType: '', address: ''});
+        setFilterForm({cloudType: '', address: ''});
         setActiveFilters({});
         closeAllDialogs();
     };
@@ -714,10 +681,9 @@ export default function ManageUsers() {
         return accounts.some((config) => {
             const isTemporary = String(config.id).startsWith('tmp-');
             const isEmpty =
-                !config.accountName &&
-                !config.masterAccount &&
-                !config.cloudType &&
-                !config.address;
+                !config.firstName &&
+                !config.lastName &&
+                !config.emailAddress;
             return isTemporary && isEmpty;
         });
     };
@@ -2089,6 +2055,46 @@ export default function ManageUsers() {
         setStartDateProtectionMessage('');
     };
 
+    // User Group modal handlers
+    const handleOpenUserGroupModal = (row: AccountRow) => {
+        setSelectedUserForGroups(row);
+        setShowUserGroupModal(true);
+    };
+
+    const handleCloseUserGroupModal = () => {
+        setShowUserGroupModal(false);
+        setSelectedUserForGroups(null);
+    };
+
+    const handleSaveUserGroups = (selectedUserGroups: UserGroup[]) => {
+        if (selectedUserForGroups) {
+            // Convert UserGroup objects to string array for the table
+            const groupNames = selectedUserGroups.map(group => group.groupName);
+            
+            // Update the user's assigned groups
+            setAccounts(prevAccounts => {
+                const updated = prevAccounts.map(account => 
+                    account.id === selectedUserForGroups.id 
+                        ? { ...account, assignedUserGroups: groupNames }
+                        : account
+                );
+                return sortConfigsByDisplayOrder(updated);
+            });
+            
+            // Mark as modified for auto-save
+            if (selectedUserForGroups.id !== 'new') {
+                setModifiedExistingRecords(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(selectedUserForGroups.id);
+                    return newSet;
+                });
+                modifiedExistingRecordsRef.current.add(selectedUserForGroups.id);
+            }
+            
+            handleCloseUserGroupModal();
+        }
+    };
+
     // Reusable function to add new row (used by both toolbar button and table add row button)
     const handleAddNewRow = () => {
         console.log('➕ Add new row requested');
@@ -2332,48 +2338,6 @@ export default function ManageUsers() {
                                     </div>
                                     <div className='p-2'>
                                         <div className='space-y-2'>
-                                            {/* Account Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Account
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={filterForm.accountName}
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                accountName:
-                                                                    e.target.value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Master Account Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Master Account
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={filterForm.masterAccount}
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                masterAccount:
-                                                                    e.target.value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-
                                             {/* Cloud Type Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
@@ -2939,9 +2903,6 @@ export default function ManageUsers() {
                                     onAddNewRow={handleAddNewRow}
                                     hideRowExpansion={false}
                                     customColumnLabels={{
-                                        accountName: 'Account',
-                                        email: 'Master Account',
-                                        phone: 'Country',
                                         technicalUser: 'Technical User',
                                     }}
                                     enableDropdownChips={true}
@@ -3206,6 +3167,7 @@ export default function ManageUsers() {
                                     incompleteRowIds={getIncompleteRows()}
                                     showValidationErrors={showValidationErrors}
                                     hasBlankRow={hasBlankRow()}
+                                    onOpenUserGroupModal={handleOpenUserGroupModal}
                                 />
                             </div>
                         )}
@@ -3400,6 +3362,18 @@ export default function ManageUsers() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Assigned User Group Modal */}
+            {showUserGroupModal && selectedUserForGroups && (
+                <AssignedUserGroupModal
+                    isOpen={showUserGroupModal}
+                    onClose={handleCloseUserGroupModal}
+                    onSave={handleSaveUserGroups}
+                    firstName={selectedUserForGroups.firstName || ''}
+                    lastName={selectedUserForGroups.lastName || ''}
+                    initialUserGroups={[]}
+                />
             )}
         </div>
     );
