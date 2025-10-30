@@ -52,6 +52,12 @@ export default function ManageAccounts() {
                 displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
             const orderB =
                 displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            
+            // If both have the same order (especially MAX_SAFE_INTEGER), use ID for stable sort
+            if (orderA === orderB) {
+                return a.id.localeCompare(b.id);
+            }
+            
             return orderA - orderB;
         });
     }, []);
@@ -98,6 +104,7 @@ export default function ManageAccounts() {
     const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
         null,
     );
+    const [tableRefreshKey, setTableRefreshKey] = useState(0);
     const [modifiedExistingRecords, setModifiedExistingRecords] = useState<
         Set<string>
     >(new Set());
@@ -387,10 +394,6 @@ export default function ManageAccounts() {
 
     // Process account data with filtering, sorting, and search
     const processedConfigs = React.useMemo(() => {
-        console.log('🔍 Processing processedConfigs, accounts.length:', accounts.length);
-        if (accounts.length > 0) {
-            console.log('📊 First account in processedConfigs:', accounts[0]);
-        }
         let filtered = [...accounts];
 
         // Apply search filter
@@ -479,29 +482,13 @@ export default function ManageAccounts() {
 
     // Memoize the rows to avoid creating new objects on every render
     const accountTableRows = React.useMemo(() => {
-        console.log('🔍 Processing accountTableRows, processedConfigs:', processedConfigs);
         return processedConfigs.map<AccountRow>((a: any, index: number) => {
-            console.log(`🔍 Processing account ${index + 1} (${a.accountName}):`, {
-                id: a.id,
-                accountName: a.accountName,
-                addresses: a.addresses,
-                addressData: a.addressData,
-                technicalUsers: a.technicalUsers,
-                allKeys: Object.keys(a)
-            });
-            
             // Use the actual data from processedConfigs first
             let actualAddresses = a.addresses || [];
             let actualTechnicalUsers = a.technicalUsers || [];
             let actualAddressData = a.addressData;
-            
-            console.log(`📊 Account ${a.accountName} actual data:`, {
-                addresses: actualAddresses,
-                addressData: actualAddressData,
-                technicalUsers: actualTechnicalUsers
-            });
-            
-            return {
+
+            const rowData = {
                 id: a.id || '',
                 accountName: a.accountName || '',
                 masterAccount: a.masterAccount || '',
@@ -514,6 +501,8 @@ export default function ManageAccounts() {
                 technicalUsers: actualTechnicalUsers,
                 licenses: a.licenses || [],
             };
+
+            return rowData;
         });
     }, [processedConfigs]);
 
@@ -619,10 +608,22 @@ export default function ManageAccounts() {
     // Helper function to save accounts via API (replaced localStorage)
     const saveAccountsToStorage = async (accountsData: any[]) => {
         try {
-            // For now, this is a no-op since accounts are saved individually via API
-            // This function is kept for backward compatibility but does nothing
+            // Filter out temporary rows before saving to localStorage
+            const persistentAccountsData = accountsData.filter((account: any) => {
+                const isTemporary = String(account.id).startsWith('tmp-');
+                if (isTemporary) {
+                    console.log('🧹 Not saving temporary row to localStorage:', account.id);
+                }
+                return !isTemporary;
+            });
+            
+            // Save to localStorage for now (until proper API implementation)
+            localStorage.setItem('accountsData', JSON.stringify(persistentAccountsData));
             console.log(
-                '💾 saveAccountsToStorage called (now using individual API saves)',
+                '💾 Saved accounts to localStorage:',
+                persistentAccountsData.length,
+                'persistent accounts',
+                `(filtered out ${accountsData.length - persistentAccountsData.length} temporary rows)`
             );
         } catch (error) {
             console.error('Error in saveAccountsToStorage:', error);
@@ -863,7 +864,13 @@ export default function ManageAccounts() {
                         : acc,
                 );
                 // Apply stable sorting to maintain display order
-                return sortConfigsByDisplayOrder(updated);
+                const sortedUpdated = sortConfigsByDisplayOrder(updated);
+                
+                // Save to localStorage to persist the converted account
+                saveAccountsToStorage(sortedUpdated);
+                console.log('💾 Saved converted account to localStorage');
+                
+                return sortedUpdated;
             });
 
             // Update display order reference with the new ID
@@ -988,10 +995,6 @@ export default function ManageAccounts() {
         return accounts.map((config) => {
             const pendingChanges = pendingLocalChanges[config.id];
             if (pendingChanges) {
-                console.log(
-                    `🔄 Applying pending changes to record ${config.id}:`,
-                    pendingChanges,
-                );
                 // Apply pending changes, ensuring field names match the config structure
                 const mergedConfig = {...config};
                 Object.keys(pendingChanges).forEach((key) => {
@@ -1007,11 +1010,6 @@ export default function ManageAccounts() {
                     } else if (key === 'services') {
                         mergedConfig.serviceName = value;
                     }
-                });
-                console.log(`✅ Merged config for ${config.id}:`, {
-                    original: config,
-                    pending: pendingChanges,
-                    merged: mergedConfig,
                 });
                 return mergedConfig;
             }
@@ -1690,6 +1688,19 @@ export default function ManageAccounts() {
 
     // Handle save all entries with validation
     const handleSaveAll = async () => {
+        console.log('🚀 ========================================');
+        console.log('🚀 SAVE BUTTON CLICKED - handleSaveAll');
+        console.log('🚀 ========================================');
+        
+        console.log('📊 Current state before save:', {
+            accountsCount: accounts.length,
+            modifiedExistingRecordsSize: modifiedExistingRecordsRef.current.size,
+            modifiedExistingRecordsArray: Array.from(modifiedExistingRecordsRef.current),
+            pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
+            pendingLocalChangesValues: pendingLocalChanges,
+            hasUnsavedChanges,
+            preventNavigation
+        });
         const effectiveConfigs = getEffectiveAccounts();
 
         // Get current license state from AccountsTable to ensure we have the latest data
@@ -2114,24 +2125,76 @@ export default function ManageAccounts() {
                 savedCount++;
             }
 
+            // IMPORTANT: Clean up phantom modified records before processing
+            console.log('🧹 Cleaning up phantom modified records before save...');
+            console.log('🔍 Current modifiedExistingRecords:', Array.from(modifiedExistingRecordsRef.current));
+            console.log('🔍 Current pendingLocalChanges:', Object.keys(pendingLocalChanges));
+            console.log('🔍 Detailed pendingLocalChanges:', pendingLocalChanges);
+            
+            // Filter out records that don't actually have pending changes
+            const actuallyModifiedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => {
+                const hasPendingChanges = pendingLocalChanges[recordId] && Object.keys(pendingLocalChanges[recordId]).length > 0;
+                console.log(`🔍 Checking record ${recordId}:`, {
+                    hasPendingChanges,
+                    pendingChanges: pendingLocalChanges[recordId]
+                });
+                if (!hasPendingChanges) {
+                    console.log(`❌ Removing phantom modified record: ${recordId} (no pending changes)`);
+                }
+                return hasPendingChanges;
+            });
+            
+            // Update the sets to only contain actually modified records
+            if (actuallyModifiedRecords.length !== modifiedExistingRecordsRef.current.size) {
+                const cleanedSet = new Set(actuallyModifiedRecords);
+                setModifiedExistingRecords(cleanedSet);
+                modifiedExistingRecordsRef.current = cleanedSet;
+                console.log('🧹 Cleaned up phantom records, new count:', cleanedSet.size);
+            }
+
+            // Re-check hasModifiedExistingRecords after cleanup
+            const hasActualModifiedRecords = actuallyModifiedRecords.length > 0;
+
             // Handle pending changes from modified existing records
-            if (hasActiveAutoSave || hasModifiedExistingRecords) {
+            if (hasActiveAutoSave || hasActualModifiedRecords) {
                 console.log(
                     '💾 Manual save triggered - processing pending changes immediately',
+                    {
+                        hasActiveAutoSave,
+                        hasActualModifiedRecords,
+                        actuallyModifiedRecordsCount: actuallyModifiedRecords.length
+                    }
                 );
 
-                // Trigger the auto-save process immediately instead of waiting for timer
-                const pendingSavedCount = await executeAutoSave();
+                // Only proceed if there are actual changes
+                if (hasActiveAutoSave || actuallyModifiedRecords.length > 0 || Object.keys(pendingLocalChanges).length > 0) {
+                    // Trigger the auto-save process immediately instead of waiting for timer
+                    const pendingSavedCount = await executeAutoSave();
 
-                if (pendingSavedCount > 0) {
-                    savedCount += pendingSavedCount;
+                    if (pendingSavedCount > 0) {
+                        savedCount += pendingSavedCount;
+                    }
+                } else {
+                    console.log('❌ No actual changes found after cleanup');
                 }
             }
 
             if (savedCount > 0) {
-                showBlueNotification(
-                    `Successfully saved ${savedCount} entries.`,
-                );
+                console.log('🎉 About to show success notification for savedCount:', savedCount);
+                console.log('🎉 Breaking down savedCount:', {
+                    completeTemporaryRowsCount: completeTemporaryRows.length,
+                    actualPendingSavedCount: savedCount - completeTemporaryRows.length
+                });
+                
+                // Only show notification if we actually saved something meaningful
+                if (completeTemporaryRows.length > 0 || actuallyModifiedRecords.length > 0) {
+                    showBlueNotification(
+                        `Successfully saved ${savedCount} entries.`,
+                    );
+                } else {
+                    console.log('❌ Not showing notification - no actual changes were saved');
+                }
+                
                 setShowValidationErrors(false); // Clear validation errors on successful save
                 
                 // Clear all unsaved changes state after successful save
@@ -2524,6 +2587,17 @@ export default function ManageAccounts() {
                 setIsLoading(true);
                 console.log('🔄 Loading enterprise linkages...');
 
+                // Clear any existing unsaved changes state on component mount
+                console.log('🧹 Clearing unsaved changes state on component mount');
+                setPendingLocalChanges({});
+                setModifiedExistingRecords(new Set());
+                setHasUnsavedChanges(false);
+                setPreventNavigation(false);
+                
+                // Also clear the refs
+                modifiedExistingRecordsRef.current = new Set();
+                console.log('🧹 Cleared all refs and state on mount');
+
                 // Load accounts data from API (DynamoDB)
                 console.log('🔄 Loading accounts from API (DynamoDB)...');
 
@@ -2550,11 +2624,38 @@ export default function ManageAccounts() {
                         data?.[0],
                     );
 
+                    // Deduplicate accounts by ID to handle API returning duplicates
+                    const uniqueAccountsMap = new Map();
+                    const rawAccounts = data || [];
+                    
+                    for (const account of rawAccounts) {
+                        if (!uniqueAccountsMap.has(account.id)) {
+                            uniqueAccountsMap.set(account.id, account);
+                        } else {
+                            console.log(`🔄 Skipping duplicate account: ${account.accountName} (${account.id})`);
+                        }
+                    }
+                    
+                    const uniqueAccounts = Array.from(uniqueAccountsMap.values());
+                    console.log(`📊 After deduplication: ${rawAccounts.length} → ${uniqueAccounts.length} accounts`);
+
                     // Ensure all accounts have required fields
-                    accountsData = (data || []).map((account: any) => {
+                    accountsData = uniqueAccounts.map((account: any) => {
                         console.log(
                             `📊 Account ${account.accountName} addresses:`,
                             account.addresses,
+                        );
+                        console.log(
+                            `📊 Account ${account.accountName} technicalUsers:`,
+                            account.technicalUsers,
+                        );
+                        console.log(
+                            `🔍 Account ${account.accountName} technicalUsers details:`,
+                            {
+                                count: (account.technicalUsers || []).length,
+                                users: account.technicalUsers || [],
+                                allFields: Object.keys(account)
+                            }
                         );
                         return {
                             ...account,
@@ -2562,6 +2663,7 @@ export default function ManageAccounts() {
                             cloudType: account.cloudType || '',
                             country: account.country || '',
                             addresses: account.addresses || [],
+                            technicalUsers: account.technicalUsers || [],
                             // Transform license field names from backend to frontend format
                             licenses: (account.licenses || []).map(
                                 (license: any) => ({
@@ -2609,6 +2711,87 @@ export default function ManageAccounts() {
                     accountsData = [];
                 }
 
+                // Check localStorage for more recent data
+                let localStorageAccountsData = [];
+                try {
+                    const localStorageData = localStorage.getItem('accountsData');
+                    if (localStorageData) {
+                        const parsedLocalData = JSON.parse(localStorageData);
+                        console.log('📊 Found localStorage accounts:', parsedLocalData?.length || 0);
+                        
+                        // Get localStorage data for merging with API data
+                        if (parsedLocalData && parsedLocalData.length > 0) {
+                            console.log('📊 Found localStorage data for merging');
+                            
+                            // Filter out temporary rows from localStorage - they should not persist across sessions
+                            localStorageAccountsData = parsedLocalData.filter((account: any) => {
+                                const isTemporary = String(account.id).startsWith('tmp-');
+                                if (isTemporary) {
+                                    console.log('🧹 Filtering out temporary row from localStorage:', account.id);
+                                }
+                                return !isTemporary;
+                            });
+                            
+                            console.log('📊 After filtering temp rows:', {
+                                originalCount: parsedLocalData.length,
+                                filteredCount: localStorageAccountsData.length,
+                                removedTempRows: parsedLocalData.length - localStorageAccountsData.length
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading from localStorage:', error);
+                }
+
+                // Merge API data with localStorage data (localStorage takes priority for individual saves)
+                if (localStorageAccountsData.length > 0) {
+                    console.log('📊 Merging API data with localStorage data');
+                    const mergedData = [...accountsData];
+                    
+                    // Update accounts that exist in localStorage with localStorage data
+                    localStorageAccountsData.forEach((localAccount: any) => {
+                        const apiAccountIndex = mergedData.findIndex(acc => acc.id === localAccount.id);
+                        if (apiAccountIndex >= 0) {
+                            // Merge localStorage data with API data, keeping localStorage priority for addresses and technical users
+                            mergedData[apiAccountIndex] = {
+                                ...mergedData[apiAccountIndex], // API data as base
+                                ...localAccount, // localStorage data takes priority
+                                // Ensure critical fields from API are preserved
+                                createdAt: mergedData[apiAccountIndex].createdAt || localAccount.createdAt,
+                                updatedAt: localAccount.updatedAt || mergedData[apiAccountIndex].updatedAt,
+                            };
+                            console.log(`📊 Merged localStorage data for account: ${localAccount.accountName}`);
+                        } else {
+                            // Account exists in localStorage but not in API - this means it was deleted from database
+                            // Do NOT re-add it to prevent deleted accounts from reappearing
+                            console.log(`�️ Account "${localAccount.accountName}" exists in localStorage but not in API - it was likely deleted. Not re-adding.`);
+                        }
+                    });
+                    
+                    // Clean up localStorage by removing accounts that no longer exist in the database
+                    const accountsToRemoveFromLocalStorage = localStorageAccountsData
+                        .filter((localAccount: any) => !mergedData.find(acc => acc.id === localAccount.id))
+                        .map((localAccount: any) => localAccount.id);
+                    
+                    if (accountsToRemoveFromLocalStorage.length > 0) {
+                        console.log(`🧹 Cleaning up ${accountsToRemoveFromLocalStorage.length} deleted accounts from localStorage`);
+                        const cleanedLocalStorageData = localStorageAccountsData.filter(
+                            (localAccount: any) => !accountsToRemoveFromLocalStorage.includes(localAccount.id)
+                        );
+                        
+                        // Update localStorage with cleaned data
+                        try {
+                            localStorage.setItem('accountsData', JSON.stringify(cleanedLocalStorageData));
+                            console.log(`✅ Updated localStorage: removed ${accountsToRemoveFromLocalStorage.length} deleted accounts`);
+                        } catch (error) {
+                            console.error('❌ Error updating localStorage during cleanup:', error);
+                        }
+                    }
+                    
+                    accountsData = mergedData;
+                    console.log('📊 Using merged data (API + localStorage)');
+                }
+
                 // Only update state if component is still mounted
                 if (!mounted) {
                     console.log(
@@ -2626,11 +2809,36 @@ export default function ManageAccounts() {
                     return;
                 }
 
-                // Fetch technical users for each account with delay to avoid rate limiting
+                // Fetch technical users for each account from /api/users endpoint
+                // This ensures technical users are always up-to-date from the API
+                // Skip fetching if localStorage has recent technical user data
+                console.log('🔄 Fetching technical users for all accounts...');
+                console.log(`📊 Processing ${accountsData.length} unique accounts for technical users`);
                 const accountsWithTechnicalUsers: any[] = [];
+                let skipCount = 0;
+                let fetchCount = 0;
+                
                 for (let i = 0; i < accountsData.length; i++) {
                     const account = accountsData[i];
+                    
+                    // Check if localStorage already has technical users for this account
+                    const localStorageData = localStorageAccountsData.find(
+                        (localAccount: any) => localAccount.id === account.id
+                    );
+                    
+                    if (localStorageData && localStorageData.technicalUsers && localStorageData.technicalUsers.length > 0) {
+                        console.log(`👤 Using localStorage technical users for ${account.accountName} (${localStorageData.technicalUsers.length} users)`);
+                        accountsWithTechnicalUsers.push({
+                            ...account,
+                            technicalUsers: localStorageData.technicalUsers,
+                        });
+                        skipCount++;
+                        continue;
+                    }
+                    
                     try {
+                        fetchCount++;
+                        console.log(`👤 Fetching technical users for account: ${account.accountName} (${account.id})`);
                         const techUsersResponse = await fetch(
                             `${apiBase}/api/users?accountId=${
                                 account.id
@@ -2645,20 +2853,26 @@ export default function ManageAccounts() {
                             technicalUsers = allUsers.filter(
                                 (u: any) => u.technicalUser === true,
                             );
+                            console.log(`👤 Found ${technicalUsers.length} technical users for ${account.accountName}`);
+                        } else {
+                            console.warn(`⚠️ Technical users API response not OK for ${account.accountName}:`, techUsersResponse.status);
                         }
 
+                        // Merge technical users from API with account data
+                        // If account has localStorage technical users, prioritize API data for consistency
                         accountsWithTechnicalUsers.push({
                             ...account,
-                            technicalUsers,
+                            technicalUsers, // Always use API data for technical users
                         });
                     } catch (error) {
                         console.warn(
                             `⚠️ Could not fetch technical users for account ${account.accountName}:`,
                             error,
                         );
+                        // If API fails, fall back to localStorage technical users if available
                         accountsWithTechnicalUsers.push({
                             ...account,
-                            technicalUsers: [],
+                            technicalUsers: account.technicalUsers || [],
                         });
                     }
 
@@ -2669,6 +2883,8 @@ export default function ManageAccounts() {
                         );
                     }
                 }
+
+                console.log(`📊 Technical user fetching summary: skipped ${skipCount}, fetched ${fetchCount}, total ${accountsData.length}`);
 
                 // Transform account data to AccountRow format
                 const transformedAccounts = accountsWithTechnicalUsers
@@ -2788,21 +3004,7 @@ export default function ManageAccounts() {
 
     // Force table re-render when accounts data changes
     useEffect(() => {
-        console.log(
-            '📋 Accounts data changed, current count:',
-            accounts.length,
-        );
-        console.log(
-            '📋 Current accounts state:',
-            accounts.map((c) => ({
-                id: c.id,
-                accountName: c.accountName || c.name,
-                email: c.email,
-                phone: c.phone,
-                hasAccountName: !!(c.accountName || c.name)?.trim(),
-                displayOrder: displayOrderRef.current.get(c.id),
-            })),
-        );
+        // Data change effect - update logic as needed
         
         // Update dropdown options when accounts change
         if (accounts.length > 0) {
@@ -2954,7 +3156,12 @@ export default function ManageAccounts() {
                         (config) => config.id !== pendingDeleteRowId,
                     );
                     // Apply stable sorting to maintain display order
-                    return sortConfigsByDisplayOrder(updated);
+                    const sortedUpdated = sortConfigsByDisplayOrder(updated);
+                    
+                    // Update localStorage to persist the deletion
+                    saveAccountsToStorage(sortedUpdated);
+                    
+                    return sortedUpdated;
                 });
 
                 console.log('✅ Account deleted successfully');
@@ -2980,6 +3187,19 @@ export default function ManageAccounts() {
 
                 console.log('✅ License deletion confirmed');
             }
+
+            // Show success notification
+            const deletedItemName = deleteType === 'account' ? 'account' : 'license';
+            showBlueNotification(
+                `Successfully deleted 1 ${deletedItemName}.`,
+            );
+
+            // Clear all unsaved changes state after successful deletion
+            setPendingLocalChanges({});
+            setModifiedExistingRecords(new Set());
+            setHasUnsavedChanges(false);
+            setPreventNavigation(false);
+            console.log('🧹 Cleared all unsaved changes state after successful deletion');
 
             // Close modal and reset state
             setShowDeleteConfirmation(false);
@@ -3126,18 +3346,29 @@ export default function ManageAccounts() {
         
         setSelectedAccountForAddress({
             id: row.id,
-            accountName: row.accountName || '',
-            masterAccount: row.masterAccount || '',
-            address: row.address || '',
+            accountName: currentAccount?.accountName || row.accountName || '',
+            masterAccount: currentAccount?.masterAccount || row.masterAccount || '',
+            address: currentAccount?.address || row.address || '',
             addressData: currentAccount?.addressData || (row as any).addressData,
             addresses: currentAccount?.addresses || (row as any).addresses,
         } as any);
+        
+        // Debug: Log what we're setting as selectedAccountForAddress
+        console.log('📍 Setting selectedAccountForAddress with:', {
+            id: row.id,
+            addresses: currentAccount?.addresses || (row as any).addresses,
+            addressData: currentAccount?.addressData || (row as any).addressData,
+        });
         setIsAddressModalOpen(true);
     };
 
     const handleCloseAddressModal = () => {
         setIsAddressModalOpen(false);
         setSelectedAccountForAddress(null);
+        
+        // 🔄 Force table re-render to ensure address icons update immediately
+        console.log('🔄 Forcing table re-render after modal close');
+        setAccounts(prevAccounts => [...prevAccounts]);
     };
 
     const handleSaveAddresses = async (addresses: any[]) => {
@@ -3153,10 +3384,68 @@ export default function ManageAccounts() {
             addresses,
         );
 
-        // Persist to DynamoDB via API
+        // Format address string
+        const formattedAddressString = addresses.length > 0 
+            ? `${addresses[0].addressLine1 || ''}, ${addresses[0].city || ''}, ${addresses[0].state || ''} ${addresses[0].zipCode || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^\s*,\s*/, '')
+            : '';
+
+        // Update local state
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === accountId
+                    ? {
+                          ...account,
+                          addresses: addresses,
+                          address: formattedAddressString,
+                          addressData: addresses.length > 0 ? addresses[0] : null,
+                          updatedAt: new Date().toISOString(),
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            return sorted;
+        });
+
+        handleCloseAddressModal();
+    };
+
+    const handleSaveIndividualAddress = async (addresses: any[]) => {
+        if (!selectedAccountForAddress) return;
+
+        const accountId = selectedAccountForAddress.id;
+        const addressData = addresses.length > 0 ? addresses[0] : null;
+
+        console.log(
+            '💾 Saving individual address for account:',
+            accountId,
+            'Addresses:',
+            addresses,
+        );
+
+        // Format address string - use primary address if available, otherwise first address
+        const primaryAddress = addresses.find(addr => addr.isPrimary) || addresses[0];
+        const formattedAddressString = primaryAddress
+            ? `${primaryAddress.addressLine1 || ''}, ${primaryAddress.city || ''}, ${primaryAddress.state || ''} ${primaryAddress.zipCode || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^\s*,\s*/, '')
+            : '';
+
+        console.log('📍 Individual save - Address formatting:', {
+            addressesLength: addresses.length,
+            primaryAddress: primaryAddress,
+            formattedAddressString: formattedAddressString
+        });
+
         try {
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            // Save to backend API first
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            
+            // Get the current account data to preserve other fields
+            const currentAccount = accounts.find(acc => acc.id === accountId);
+            if (!currentAccount) {
+                console.error('❌ Current account not found for individual save');
+                return;
+            }
+
             const response = await fetch(`${apiBase}/api/accounts`, {
                 method: 'PUT',
                 headers: {
@@ -3164,95 +3453,83 @@ export default function ManageAccounts() {
                 },
                 body: JSON.stringify({
                     id: accountId,
+                    accountName: currentAccount.accountName || '',
+                    masterAccount: currentAccount.masterAccount || '',
+                    cloudType: currentAccount.cloudType || '',
+                    address: formattedAddressString,
+                    country: currentAccount.country || '',
                     addresses: addresses,
-                    address: addressData
-                        ? `${addressData.addressLine1}, ${addressData.city}, ${addressData.state} ${addressData.zipCode}`
-                              .trim()
-                              .replace(/,\s*,/g, ',')
-                              .replace(/,\s*$/, '')
-                        : '',
-                    addressLine1: addressData?.addressLine1 || '',
+                    licenses: currentAccount.licenses || [],
                 }),
             });
 
             if (!response.ok) {
-                throw new Error(
-                    'Failed to update account addresses in DynamoDB',
-                );
+                throw new Error(`Failed to save address to API: ${response.statusText}`);
             }
 
-            console.log(
-                `✅ Address saved to DynamoDB for account ${accountId}`,
-            );
+            console.log('✅ Individual address saved to API successfully');
 
-            // Update local state immediately with the saved data
-            console.log(`🔄 Updating local state with saved address data...`);
-            const formattedAddressString = addresses.length > 0 
-                ? `${addresses[0].addressLine1 || ''}, ${addresses[0].city || ''}, ${addresses[0].state || ''} ${addresses[0].zipCode || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^\s*,\s*/, '')
-                : '';
-
-            setAccounts((prev) => {
-                const updated = prev.map((account) =>
-                    account.id === accountId
-                        ? {
-                              ...account,
-                              addresses: addresses,
-                              address: formattedAddressString,
-                              addressData: addresses.length > 0 ? addresses[0] : null,
-                              updatedAt: new Date().toISOString(),
-                          }
-                        : account,
-                );
-                const sorted = sortConfigsByDisplayOrder(updated);
-                saveAccountsToStorage(sorted);
-                console.log(`✅ Local state updated with saved address data`);
-                return sorted;
-            });
-
-            // Try to reload fresh data from database (but don't fail if this doesn't work)
-            try {
-                console.log(`🔄 Attempting to sync with database...`);
-                const accountResponse = await fetch(
-                    `${apiBase}/api/accounts/${accountId}`,
-                );
-
-                if (accountResponse.ok) {
-                    const freshAccount = await accountResponse.json();
-                    console.log(`✅ Successfully synced with database`);
-                    
-                    // Update again with fresh database data if available
-                    setAccounts((prev) => {
-                        const updated = prev.map((account) =>
-                            account.id === accountId
-                                ? {
-                                      ...account,
-                                      addresses: freshAccount.addresses || addresses,
-                                      address: freshAccount.address || formattedAddressString,
-                                      addressData: (freshAccount.addresses && freshAccount.addresses.length > 0)
-                                          ? freshAccount.addresses[0]
-                                          : (addresses.length > 0 ? addresses[0] : null),
-                                      updatedAt: new Date().toISOString(),
-                                  }
-                                : account,
-                        );
-                        const sorted = sortConfigsByDisplayOrder(updated);
-                        saveAccountsToStorage(sorted);
-                        return sorted;
-                    });
-                } else {
-                    console.warn(`⚠️ Database sync failed, but local data is still saved`);
-                }
-            } catch (syncError) {
-                console.warn(`⚠️ Database sync failed, but local data is still saved:`, syncError);
-            }
-
-            // Wait a moment for React to process the state update, then close the modal
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            handleCloseAddressModal();
         } catch (error) {
-            console.error('Error saving address to DynamoDB:', error);
-            // You might want to show a toast notification here to inform the user
+            console.error('❌ Error saving individual address to API:', error);
+            // Continue with local save even if API fails
         }
+
+        // Update local state (same logic as handleSaveAddresses but without closing modal)
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === accountId
+                    ? {
+                          ...account,
+                          addresses: addresses,
+                          address: formattedAddressString || (primaryAddress?.addressLine1 ? 'Address Configured' : ''),
+                          addressData: primaryAddress || null,
+                          updatedAt: new Date().toISOString(),
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            
+            // Debug: Log the updated account data
+            const updatedAccount = updated.find(acc => acc.id === accountId);
+            console.log('📍 Individual save - Updated account in state:', {
+                id: updatedAccount?.id,
+                addresses: updatedAccount?.addresses,
+                addressData: updatedAccount?.addressData,
+                address: updatedAccount?.address,
+                formattedAddressString: formattedAddressString
+            });
+            
+            return sorted;
+        });
+
+        // CRITICAL: Update selectedAccountForAddress to reflect the new address data
+        // This ensures the modal displays the saved addresses correctly
+        setSelectedAccountForAddress(prev => {
+            if (!prev) return prev;
+            
+            const updatedSelected = {
+                ...prev,
+                addresses: addresses,
+                address: formattedAddressString || (primaryAddress?.addressLine1 ? 'Address Configured' : ''),
+                addressData: primaryAddress || null,
+            };
+            
+            console.log('📍 Individual save - Updated selectedAccountForAddress:', {
+                id: updatedSelected.id,
+                addresses: updatedSelected.addresses,
+                addressData: updatedSelected.addressData,
+                address: updatedSelected.address
+            });
+            
+            return updatedSelected;
+        });
+
+        // Force table re-render by incrementing refresh key
+        // This ensures the table component re-renders with updated address data
+        setTableRefreshKey(prev => prev + 1);
+
+        // Note: Do NOT call handleCloseAddressModal() here - keep modal open
     };
 
     // Technical User modal functions
@@ -3286,6 +3563,10 @@ export default function ManageAccounts() {
     const handleCloseTechnicalUserModal = () => {
         setIsTechnicalUserModalOpen(false);
         setSelectedAccountForTechnicalUser(null);
+        
+        // 🔄 Force table re-render to ensure technical user icons update immediately
+        console.log('🔄 Forcing table re-render after technical user modal close');
+        setAccounts(prevAccounts => [...prevAccounts]);
     };
 
     const handleSaveTechnicalUsers = async (users: TechnicalUser[]) => {
@@ -3298,188 +3579,210 @@ export default function ManageAccounts() {
             users,
         );
 
-        // Persist technical users to DynamoDB via User Management API
         try {
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-            const accountId = selectedAccountForTechnicalUser.id;
-            const accountName = selectedAccountForTechnicalUser.accountName;
-
-            // Get existing technical users for this account
-            const existingResponse = await fetch(
-                `${apiBase}/api/users?accountId=${accountId}&accountName=${encodeURIComponent(
-                    accountName,
-                )}`,
-            );
-
-            let existingTechnicalUsers: any[] = [];
-            if (existingResponse.ok) {
-                const allUsers = await existingResponse.json();
-                existingTechnicalUsers = allUsers.filter(
-                    (u: any) => u.technicalUser === true,
-                );
-            }
-
-            // Delete removed technical users
-            const existingIds = existingTechnicalUsers.map((u) => u.id);
-            const newIds = users.map((u) => u.id);
-            const removedIds = existingIds.filter((id) => !newIds.includes(id));
-
-            console.log(
-                `🗑️ Deleting ${removedIds.length} removed technical user(s)`,
-            );
-            for (const userId of removedIds) {
-                try {
-                    // Backend expects accountId and accountName as query parameters
-                    const deleteUrl = `${apiBase}/api/users/${userId}?accountId=${accountId}&accountName=${encodeURIComponent(
-                        accountName,
-                    )}`;
-                    const deleteResponse = await fetch(deleteUrl, {
-                        method: 'DELETE',
-                        headers: {'Content-Type': 'application/json'},
-                    });
-
-                    if (!deleteResponse.ok) {
-                        console.error(
-                            `❌ Failed to delete technical user ${userId}:`,
-                            await deleteResponse.text(),
-                        );
-                    } else {
-                        console.log(
-                            `✅ Successfully deleted technical user ${userId} from database`,
-                        );
-                    }
-                } catch (error) {
-                    console.error(
-                        `❌ Error deleting technical user ${userId}:`,
-                        error,
-                    );
+            // Skip API call for temporary accounts (not yet in database)
+            if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
+                // Save to backend API first
+                const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                
+                // Get the current account data to preserve other fields
+                const currentAccount = accounts.find(acc => acc.id === selectedAccountForTechnicalUser.id);
+                if (!currentAccount) {
+                    console.error('❌ Current account not found for technical user save');
+                    return;
                 }
-            }
 
-            // Create or update technical users
-            for (const user of users) {
-                const userData = {
-                    firstName: user.firstName,
-                    middleName: user.middleName || '',
-                    lastName: user.lastName,
-                    emailAddress: user.emailAddress,
-                    status: user.status ? 'Active' : 'Inactive',
-                    startDate: user.startDate,
-                    endDate: user.endDate,
-                    password: user.password,
-                    technicalUser: true,
-                    assignedUserGroups: user.assignedUserGroup
-                        ? [user.assignedUserGroup]
-                        : [],
-                    selectedAccountId: accountId,
-                    selectedAccountName: accountName,
+                const requestData = {
+                    id: selectedAccountForTechnicalUser.id,
+                    accountName: currentAccount.accountName || '',
+                    masterAccount: currentAccount.masterAccount || '',
+                    cloudType: currentAccount.cloudType || '',
+                    address: currentAccount.address || '',
+                    country: currentAccount.country || '',
+                    addresses: currentAccount.addresses || [],
+                    licenses: currentAccount.licenses || [],
+                    technicalUsers: users,
                 };
 
-                if (existingIds.includes(user.id)) {
-                    // Update existing user
-                    const response = await fetch(
-                        `${apiBase}/api/users/${user.id}`,
-                        {
-                            method: 'PUT',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(userData),
-                        },
-                    );
+                console.log('🔍 Bulk Technical User API Request Data:', {
+                    url: `${apiBase}/api/accounts`,
+                    method: 'PUT',
+                    data: requestData,
+                    technicalUsers: users,
+                    userCount: users.length,
+                });
 
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to update technical user ${user.id}`,
-                        );
-                    }
-                    console.log(`✅ Updated technical user ${user.id}`);
-                } else {
-                    // Create new user
-                    const response = await fetch(`${apiBase}/api/users`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(userData),
+                const response = await fetch(`${apiBase}/api/accounts`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ API Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorText: errorText
                     });
-
-                    if (!response.ok) {
-                        throw new Error('Failed to create technical user');
-                    }
-                    console.log(`✅ Created technical user`);
+                    throw new Error(`Failed to save technical users to API: ${response.statusText} - ${errorText}`);
                 }
+
+                const responseData = await response.json();
+                console.log('✅ Technical users saved to API successfully', {
+                    response: responseData,
+                    technicalUsersInResponse: responseData?.technicalUsers || 'Not present',
+                    willRefetchFromUsersAPI: 'Technical users will be refreshed from /api/users on next page load'
+                });
+            } else {
+                console.log('⏭️ Skipping API save for temporary account:', selectedAccountForTechnicalUser.id);
             }
 
-            console.log(
-                `✅ Technical users saved to DynamoDB for account ${accountId}`,
-            );
-
-            // Update local state immediately with the saved data
-            console.log(`🔄 Updating local state with saved technical user data...`);
-
-            setAccounts((prev) => {
-                const updated = prev.map((account) =>
-                    account.id === accountId
-                        ? {
-                              ...account,
-                              technicalUsers: users,
-                              updatedAt: new Date().toISOString(),
-                          }
-                        : account,
-                );
-                const sorted = sortConfigsByDisplayOrder(updated);
-                saveAccountsToStorage(sorted);
-                console.log(`✅ Local state updated with saved technical user data`);
-                return sorted;
-            });
-
-            // Try to reload fresh data from database (but don't fail if this doesn't work)
-            try {
-                console.log(`🔄 Attempting to sync with database...`);
-                const reloadResponse = await fetch(
-                    `${apiBase}/api/users?accountId=${accountId}&accountName=${encodeURIComponent(
-                        accountName,
-                    )}`,
-                );
-
-                if (reloadResponse.ok) {
-                    const reloadedUsers = await reloadResponse.json();
-                    const freshTechnicalUsers = reloadedUsers.filter(
-                        (u: any) => u.technicalUser === true,
-                    );
-                    console.log(`✅ Successfully synced with database`);
-                    
-                    // Update again with fresh database data if available
-                    setAccounts((prev) => {
-                        const updated = prev.map((account) =>
-                            account.id === accountId
-                                ? {
-                                      ...account,
-                                      technicalUsers: freshTechnicalUsers.length > 0 ? freshTechnicalUsers : users,
-                                      updatedAt: new Date().toISOString(),
-                                  }
-                                : account,
-                        );
-                        const sorted = sortConfigsByDisplayOrder(updated);
-                        saveAccountsToStorage(sorted);
-                        return sorted;
-                    });
-                } else {
-                    console.warn(`⚠️ Database reload response not ok, keeping local data`);
-                }
-            } catch (error) {
-                console.warn(`⚠️ Database sync failed, but local data is still saved:`, error);
-            }
-
-            console.log(
-                `✅ All technical users saved successfully for account ${accountId}`,
-            );
-
-            // Wait a moment for React to process the state update, then close the modal
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            handleCloseTechnicalUserModal();
         } catch (error) {
-            console.error('Error saving technical users:', error);
-            // You might want to show a toast notification here to inform the user
+            console.error('❌ Error saving technical users to API:', error);
+            // Continue with local save even if API fails
         }
+
+        // Update local state
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === selectedAccountForTechnicalUser.id
+                    ? {
+                          ...account,
+                          technicalUsers: users,
+                          updatedAt: new Date().toISOString(),
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            return sorted;
+        });
+
+        // Force table refresh for blue dot visibility
+        setTableRefreshKey(prev => prev + 1);
+
+        handleCloseTechnicalUserModal();
+    };
+
+    const handleSaveIndividualTechnicalUser = async (users: TechnicalUser[]) => {
+        if (!selectedAccountForTechnicalUser) return;
+
+        console.log(
+            '💾 Saving individual technical user for account:',
+            selectedAccountForTechnicalUser.id,
+            'Users:',
+            users,
+        );
+
+        // Helper function to check if a user should be inactive based on end date
+        const shouldBeInactive = (endDate: string | null | undefined): boolean => {
+            if (!endDate) return false;
+            const currentDate = new Date();
+            const userEndDate = new Date(endDate);
+            return userEndDate < currentDate;
+        };
+
+        // Validate and update user status based on end date before saving
+        const validatedUsers = users.map(user => {
+            if (shouldBeInactive(user.endDate) && user.status === 'Active') {
+                console.log(`🔄 Auto-setting user ${user.name} to Inactive due to expired end date: ${user.endDate}`);
+                return {
+                    ...user,
+                    status: 'Inactive' as const
+                };
+            }
+            return user;
+        });
+
+        try {
+            // Skip API call for temporary accounts (not yet in database)
+            if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
+                // Save to backend API first
+                const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                
+                // Get the current account data to preserve other fields
+                const currentAccount = accounts.find(acc => acc.id === selectedAccountForTechnicalUser.id);
+                if (!currentAccount) {
+                    console.error('❌ Current account not found for individual technical user save');
+                    return;
+                }
+
+                const requestData = {
+                    id: selectedAccountForTechnicalUser.id,
+                    accountName: currentAccount.accountName || '',
+                    masterAccount: currentAccount.masterAccount || '',
+                    cloudType: currentAccount.cloudType || '',
+                    address: currentAccount.address || '',
+                    country: currentAccount.country || '',
+                    addresses: currentAccount.addresses || [],
+                    licenses: currentAccount.licenses || [],
+                    technicalUsers: validatedUsers, // Use validated users with corrected status
+                };
+
+                console.log('🔍 Individual Technical User API Request Data:', {
+                    url: `${apiBase}/api/accounts`,
+                    method: 'PUT',
+                    data: requestData,
+                    technicalUsers: validatedUsers, // Show validated users in log
+                    userCount: validatedUsers.length,
+                });
+
+                const response = await fetch(`${apiBase}/api/accounts`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Individual API Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorText: errorText
+                    });
+                    throw new Error(`Failed to save technical user to API: ${response.statusText} - ${errorText}`);
+                }
+
+                const responseData = await response.json();
+                console.log('✅ Individual technical user saved to API successfully', {
+                    response: responseData,
+                    technicalUsersInResponse: responseData?.technicalUsers || 'Not present',
+                    willRefetchFromUsersAPI: 'Technical users will be refreshed from /api/users on next page load'
+                });
+            } else {
+                console.log('⏭️ Skipping API save for temporary account:', selectedAccountForTechnicalUser.id);
+            }
+
+        } catch (error) {
+            console.error('❌ Error saving individual technical user to API:', error);
+            // Continue with local save even if API fails
+        }
+
+        // Update local state
+        setAccounts((prev) => {
+            const updated = prev.map((account) =>
+                account.id === selectedAccountForTechnicalUser.id
+                    ? {
+                          ...account,
+                          technicalUsers: validatedUsers, // Use validated users in local state
+                          updatedAt: new Date().toISOString(),
+                      }
+                    : account,
+            );
+            const sorted = sortConfigsByDisplayOrder(updated);
+            saveAccountsToStorage(sorted);
+            return sorted;
+        });
+
+        // Force table refresh for immediate blue dot visibility
+        setTableRefreshKey(prev => prev + 1);
+
+        showBlueNotification('Technical user saved successfully');
     };
 
     return (
@@ -4496,6 +4799,7 @@ export default function ManageAccounts() {
                         ) : (
                             <div className='flex-1 overflow-auto'>
                                 <AccountsTable
+                                    key={tableRefreshKey}
                                     ref={accountsTableRef}
                                     isAIInsightsPanelOpen={!isAIPanelCollapsed}
                                     rows={accountTableRows}
@@ -4572,9 +4876,9 @@ export default function ManageAccounts() {
                                                               }
                                                             : account,
                                                 );
-                                                return sortConfigsByDisplayOrder(
-                                                    updated,
-                                                );
+                                                // Don't sort during license updates to prevent phantom changes
+                                                // Sorting will happen during save operations instead
+                                                return updated;
                                             });
 
                                             // For existing rows, trigger auto-save timer for license changes
@@ -4610,18 +4914,36 @@ export default function ManageAccounts() {
                                                         rowId,
                                                     );
 
-                                                    // Add to modified records set
-                                                    setModifiedExistingRecords(
-                                                        (prev) => {
-                                                            const newSet =
-                                                                new Set(prev);
-                                                            newSet.add(rowId);
-                                                            return newSet;
-                                                        },
-                                                    );
+                                                    // Check if licenses actually changed before marking as modified
+                                                    const currentAccount = accounts.find(a => a.id === rowId);
+                                                    const oldLicenses = JSON.stringify(currentAccount?.licenses || []);
+                                                    const newLicenses = JSON.stringify(value);
+                                                    const hasLicenseChanged = oldLicenses !== newLicenses;
+                                                    
+                                                    console.log('🔍 License change check:', {
+                                                        rowId,
+                                                        hasLicenseChanged,
+                                                        oldCount: currentAccount?.licenses?.length || 0,
+                                                        newCount: Array.isArray(value) ? value.length : 0
+                                                    });
 
-                                                    // Trigger auto-save timer for visual feedback
-                                                    debouncedAutoSave();
+                                                    if (hasLicenseChanged) {
+                                                        // Add to modified records set
+                                                        setModifiedExistingRecords(
+                                                            (prev) => {
+                                                                const newSet =
+                                                                    new Set(prev);
+                                                                newSet.add(rowId);
+                                                                console.log('✅ Added to modified records (license changed):', rowId);
+                                                                return newSet;
+                                                            },
+                                                        );
+
+                                                        // Trigger auto-save timer for visual feedback
+                                                        debouncedAutoSave();
+                                                    } else {
+                                                        console.log('❌ Not adding to modified records (license unchanged):', rowId);
+                                                    }
                                                 } else {
                                                     console.log(
                                                         '❌ Not triggering auto-save for incomplete license data:',
@@ -4709,10 +5031,9 @@ export default function ManageAccounts() {
                                                           }
                                                         : account,
                                             );
-                                            // Maintain display order during updates
-                                            return sortConfigsByDisplayOrder(
-                                                updated,
-                                            );
+                                            // Don't sort during individual field updates to prevent phantom changes
+                                            // Sorting will happen during save operations instead
+                                            return updated;
                                         });
 
                                         // For new rows (temporary IDs), check if we can auto-save
@@ -4912,17 +5233,33 @@ export default function ManageAccounts() {
                                                         }
                                                     }
 
-                                                    // Add to modified records set
-                                                    setModifiedExistingRecords(
-                                                        (prev) => {
-                                                            const newSet =
-                                                                new Set(prev);
-                                                            newSet.add(rowId);
-                                                            return newSet;
-                                                        },
-                                                    );
-                                                    // Trigger auto-save timer for visual feedback
-                                                    debouncedAutoSave();
+                                                    // Add to modified records set ONLY if value actually changed
+                                                    const oldValue = account[field as keyof typeof account];
+                                                    const hasValueChanged = oldValue !== value;
+                                                    
+                                                    console.log('🔍 Value change check:', {
+                                                        rowId,
+                                                        field,
+                                                        oldValue,
+                                                        newValue: value,
+                                                        hasValueChanged
+                                                    });
+                                                    
+                                                    if (hasValueChanged) {
+                                                        setModifiedExistingRecords(
+                                                            (prev) => {
+                                                                const newSet =
+                                                                    new Set(prev);
+                                                                newSet.add(rowId);
+                                                                console.log('✅ Added to modified records (value changed):', rowId);
+                                                                return newSet;
+                                                            },
+                                                        );
+                                                        // Trigger auto-save timer for visual feedback
+                                                        debouncedAutoSave();
+                                                    } else {
+                                                        console.log('❌ Not adding to modified records (value unchanged):', rowId);
+                                                    }
                                                 } else {
                                                     console.log(
                                                         '❌ Not triggering auto-save for incomplete existing account:',
@@ -5327,6 +5664,7 @@ export default function ManageAccounts() {
                             isOpen={isAddressModalOpen}
                             onClose={handleCloseAddressModal}
                             onSave={handleSaveAddresses}
+                            onSaveIndividual={handleSaveIndividualAddress}
                             accountName={selectedAccountForAddress.accountName}
                             masterAccount={
                                 selectedAccountForAddress.masterAccount
@@ -5342,6 +5680,7 @@ export default function ManageAccounts() {
                     isOpen={isTechnicalUserModalOpen}
                     onClose={handleCloseTechnicalUserModal}
                     onSave={handleSaveTechnicalUsers}
+                    onSaveIndividual={handleSaveIndividualTechnicalUser}
                     accountName={selectedAccountForTechnicalUser.accountName}
                     masterAccount={
                         selectedAccountForTechnicalUser.masterAccount

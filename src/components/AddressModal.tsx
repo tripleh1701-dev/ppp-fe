@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Plus, MapPin, Save, Edit2, XCircle } from 'lucide-react';
+import { X, Plus, MapPin, Save, Edit2, XCircle, Trash2 } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateId } from '@/utils/id-generator';
@@ -12,12 +12,14 @@ interface Address {
     state: string;
     zipCode: string;
     country: string;
+    isPrimary?: boolean;
 }
 
 interface AddressModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (addresses: Address[]) => void;
+    onSaveIndividual?: (addresses: Address[]) => void; // New prop for individual saves
     accountName: string;
     masterAccount: string;
     initialAddresses?: Address[];
@@ -27,6 +29,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
     isOpen,
     onClose,
     onSave,
+    onSaveIndividual,
     accountName,
     masterAccount,
     initialAddresses = []
@@ -38,7 +41,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
         city: '',
         state: '',
         zipCode: '',
-        country: ''
+        country: '',
+        isPrimary: true
     }]);
     const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
     const [activelyEditingNewAddress, setActivelyEditingNewAddress] = useState<Set<string>>(new Set());
@@ -46,6 +50,40 @@ const AddressModal: React.FC<AddressModalProps> = ({
     const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
     const [originalAddresses, setOriginalAddresses] = useState<Address[]>([]);
     const [validationErrors, setValidationErrors] = useState<{[key: string]: string[]}>({});
+    const [savedPrimaryAddressIds, setSavedPrimaryAddressIds] = useState<Set<string>>(new Set());
+
+    // Helper function to check if an address can be deleted
+    const canDeleteAddress = (address: Address): boolean => {
+        // Never delete if it's currently primary
+        if (address.isPrimary) {
+            return false;
+        }
+        
+        // Always ensure there's at least one primary address in the UI
+        const hasPrimaryAddress = addresses.some(addr => addr.isPrimary);
+        if (!hasPrimaryAddress) {
+            return false; // Don't allow deletion if it would leave no primary
+        }
+        
+        // If this address was previously primary in DB, be more careful
+        if (savedPrimaryAddressIds.has(address.id)) {
+            // This was primary in DB. Allow deletion if:
+            // 1. Another address is currently marked as primary (even if not saved yet)
+            // 2. OR another address has been saved as primary
+            const hasCurrentPrimary = addresses.some(addr => 
+                addr.id !== address.id && addr.isPrimary
+            );
+            const hasNewSavedPrimary = addresses.some(addr => 
+                addr.id !== address.id && 
+                addr.isPrimary && 
+                savedPrimaryAddressIds.has(addr.id)
+            );
+            return hasCurrentPrimary || hasNewSavedPrimary;
+        }
+        
+        // Not currently primary and was never primary in DB - can delete
+        return true;
+    };
 
     // Helper function to check if an address is complete
     const isAddressComplete = (address: Address): boolean => {
@@ -98,16 +136,35 @@ const AddressModal: React.FC<AddressModalProps> = ({
             console.log('🔍 AddressModal opened with initialAddresses:', initialAddresses);
             if (initialAddresses.length > 0) {
                 console.log('📦 Loading initial addresses:', initialAddresses);
-                setAddresses(initialAddresses);
-                setOriginalAddresses(JSON.parse(JSON.stringify(initialAddresses))); // Deep copy
+                // Ensure at least one address is marked as primary if none are set
+                const addressesWithPrimary = initialAddresses.map((addr, index) => ({
+                    ...addr,
+                    isPrimary: addr.isPrimary !== undefined ? addr.isPrimary : index === 0
+                }));
+                
+                // Ensure only one address is primary
+                const hasPrimary = addressesWithPrimary.some(addr => addr.isPrimary);
+                if (!hasPrimary && addressesWithPrimary.length > 0) {
+                    addressesWithPrimary[0].isPrimary = true;
+                }
+                
+                setAddresses(addressesWithPrimary);
+                setOriginalAddresses(JSON.parse(JSON.stringify(addressesWithPrimary))); // Deep copy
                 setActivelyEditingNewAddress(new Set());
                 
+                // Track which addresses are initially primary (saved in DB)
+                const initialPrimaryIds = new Set(
+                    addressesWithPrimary.filter(addr => addr.isPrimary).map(addr => addr.id)
+                );
+                setSavedPrimaryAddressIds(initialPrimaryIds);
+                
                 // Debug: Check completion status of each address
-                initialAddresses.forEach((addr, index) => {
+                addressesWithPrimary.forEach((addr, index) => {
                     const isComplete = !!(addr.addressLine1?.trim());
                     console.log(`🏠 Address ${index + 1} completion check:`, {
                         addressLine1: addr.addressLine1,
                         isComplete,
+                        isPrimary: addr.isPrimary,
                         fullAddress: addr
                     });
                 });
@@ -120,7 +177,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
                     city: '',
                     state: '',
                     zipCode: '',
-                    country: ''
+                    country: '',
+                    isPrimary: true
                 }];
                 setAddresses(newAddresses);
                 setOriginalAddresses(JSON.parse(JSON.stringify(newAddresses))); // Deep copy
@@ -150,7 +208,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 city: '',
                 state: '',
                 zipCode: '',
-                country: ''
+                country: '',
+                isPrimary: false // New addresses are not primary by default
             }
         ]);
         // Mark this new address as actively being edited
@@ -239,7 +298,15 @@ const AddressModal: React.FC<AddressModalProps> = ({
 
     const removeAddress = (id: string) => {
         if (addresses.length > 1) {
-            setAddresses(prev => prev.filter(addr => addr.id !== id));
+            setAddresses(prev => {
+                const filtered = prev.filter(addr => addr.id !== id);
+                // If we're removing the primary address, make the first remaining address primary
+                const removedAddress = prev.find(addr => addr.id === id);
+                if (removedAddress?.isPrimary && filtered.length > 0) {
+                    filtered[0].isPrimary = true;
+                }
+                return filtered;
+            });
         }
     };
 
@@ -258,15 +325,101 @@ const AddressModal: React.FC<AddressModalProps> = ({
         onClose();
     };
 
+    const handleSaveIndividualAddress = (address: Address) => {
+        // Validate the specific address before saving
+        const addressErrors = validateAddress(address);
+        if (addressErrors.length > 0) {
+            // Update validation errors to show the errors for this address
+            setValidationErrors(prev => ({
+                ...prev,
+                [address.id]: addressErrors
+            }));
+            return; // Don't proceed if there are validation errors
+        }
+
+        // Clear any existing validation errors for this address
+        setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[address.id];
+            return newErrors;
+        });
+
+        // Remove from actively editing when user saves
+        setActivelyEditingNewAddress(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(address.id);
+            return newSet;
+        });
+        
+        // Update originalAddresses to reflect that this address is now saved
+        setOriginalAddresses(prev => {
+            const updatedOriginal = [...prev];
+            const existingIndex = updatedOriginal.findIndex(addr => addr.id === address.id);
+            if (existingIndex >= 0) {
+                // Update existing address
+                updatedOriginal[existingIndex] = { ...address };
+            } else {
+                // Add new address
+                updatedOriginal.push({ ...address });
+            }
+            return updatedOriginal;
+        });
+        
+        // Update saved primary address tracking
+        if (address.isPrimary) {
+            setSavedPrimaryAddressIds(prev => {
+                const newSet = new Set(prev);
+                newSet.add(address.id);
+                return newSet;
+            });
+        } else {
+            setSavedPrimaryAddressIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(address.id);
+                return newSet;
+            });
+        }
+        
+        // Save individual address to database immediately
+        if (onSaveIndividual) {
+            const validAddresses = addresses.filter(addr => 
+                addr.addressLine1.trim() || addr.city.trim() || addr.state.trim() || addr.zipCode.trim()
+            );
+            onSaveIndividual(validAddresses);
+        }
+        
+        // Also clear the editingAddressId if this address was being edited
+        if (editingAddressId === address.id) {
+            setEditingAddressId(null);
+        }
+    };
+
+    const setPrimaryAddress = (primaryAddressId: string) => {
+        setAddresses(prev => prev.map(addr => ({
+            ...addr,
+            isPrimary: addr.id === primaryAddressId
+        })));
+    };
+
     const handleClose = () => {
         if (hasUnsavedChanges) {
             setShowUnsavedChangesDialog(true);
         } else {
+            // Save current addresses before closing (includes individually saved addresses)
+            const validAddresses = addresses.filter(addr => 
+                addr.addressLine1.trim() || addr.city.trim() || addr.state.trim() || addr.zipCode.trim()
+            );
+            onSave(validAddresses);
             onClose();
         }
     };
 
     const handleDiscardChanges = () => {
+        // Even when discarding changes, save any individually saved addresses
+        const validAddresses = originalAddresses.filter(addr => 
+            addr.addressLine1.trim() || addr.city.trim() || addr.state.trim() || addr.zipCode.trim()
+        );
+        onSave(validAddresses);
         setHasUnsavedChanges(false);
         setShowUnsavedChangesDialog(false);
         onClose();
@@ -324,21 +477,12 @@ const AddressModal: React.FC<AddressModalProps> = ({
                             <div>
                                 <p className="text-blue-100 text-base">Configure Account Address</p>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={handleSave}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                                >
-                                    <BookmarkIcon className="h-4 w-4" />
-                                    <span>Save</span>
-                                </button>
-                                <button
-                                    onClick={handleClose}
-                                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
-                                >
-                                    <X className="h-5 w-5" />
-                                </button>
-                            </div>
+                            <button
+                                onClick={handleClose}
+                                className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
                         </div>
                         
                         {/* Account Info */}
@@ -378,44 +522,16 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                             </h3>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            {isAddressComplete(address) && activelyEditingNewAddress.has(address.id) && (
+                                            {(editingAddressId === address.id || activelyEditingNewAddress.has(address.id)) && (
                                                 <button
-                                                    onClick={() => {
-                                                        // Validate the address before allowing Done
-                                                        const addressErrors = validateAddress(address);
-                                                        if (addressErrors.length > 0) {
-                                                            // Update validation errors to show the errors for this address
-                                                            setValidationErrors(prev => ({
-                                                                ...prev,
-                                                                [address.id]: addressErrors
-                                                            }));
-                                                            return; // Don't proceed if there are validation errors
-                                                        }
-
-                                                        // Clear any existing validation errors for this address
-                                                        setValidationErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors[address.id];
-                                                            return newErrors;
-                                                        });
-
-                                                        // Remove from actively editing when user is done
-                                                        setActivelyEditingNewAddress(prev => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.delete(address.id);
-                                                            return newSet;
-                                                        });
-                                                        // Also clear the editingAddressId if this address was being edited
-                                                        if (editingAddressId === address.id) {
-                                                            setEditingAddressId(null);
-                                                        }
-                                                    }}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                                    onClick={() => handleSaveIndividualAddress(address)}
+                                                    className="flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50"
                                                 >
-                                                    <span>✓ Done</span>
+                                                    <Save className="h-4 w-4" />
+                                                    <span>Save</span>
                                                 </button>
                                             )}
-                                            {isAddressComplete(address) && !activelyEditingNewAddress.has(address.id) && (
+                                            {isAddressComplete(address) && editingAddressId !== address.id && !activelyEditingNewAddress.has(address.id) && (
                                                 <button
                                                     onClick={() => {
                                                         if (editingAddressId === address.id) {
@@ -436,7 +552,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                     <span>{editingAddressId === address.id ? 'Cancel' : 'Edit'}</span>
                                                 </button>
                                             )}
-                                            {addresses.length > 1 && (
+                                            {addresses.length > 1 && canDeleteAddress(address) && (
                                                 <button
                                                     onClick={() => removeAddress(address.id)}
                                                     className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors"
@@ -465,6 +581,31 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                         return showEditForm;
                                     })() ? (
                                         <div className="space-y-4">
+                                            {/* Primary Address Flag - Only show if there are multiple addresses */}
+                                            {addresses.length > 1 && (
+                                                <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                    <input
+                                                        id={`primary-${address.id}`}
+                                                        type="checkbox"
+                                                        checked={address.isPrimary || false}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setPrimaryAddress(address.id);
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                    />
+                                                    <label htmlFor={`primary-${address.id}`} className="text-sm font-medium text-blue-800">
+                                                        Set as Primary Address
+                                                    </label>
+                                                    {address.isPrimary && (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                            Primary
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Address Line 1 *
@@ -601,9 +742,16 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                     ) : (
                                         /* Show address summary when not editing */
                                         <div className="bg-white border border-slate-300 rounded-lg p-5 shadow-sm">
-                                            <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-200">
-                                                <MapPin className="h-4 w-4 text-slate-600" />
-                                                <span className="text-sm font-semibold text-slate-800">Address Information</span>
+                                            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+                                                <div className="flex items-center space-x-2">
+                                                    <MapPin className="h-4 w-4 text-slate-600" />
+                                                    <span className="text-sm font-semibold text-slate-800">Address Information</span>
+                                                    {address.isPrimary && (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                            Primary
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                             
                                             <div className="space-y-4">
@@ -649,6 +797,28 @@ const AddressModal: React.FC<AddressModalProps> = ({
                                                     <div>
                                                         <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Country</div>
                                                         <div className="text-sm font-normal text-slate-600">{address.country}</div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Primary Address Selection - Only show if there are multiple addresses */}
+                                                {addresses.length > 1 && (
+                                                    <div className="pt-4 border-t border-slate-200">
+                                                        <div className="flex items-center space-x-2">
+                                                            <input
+                                                                id={`primary-summary-${address.id}`}
+                                                                type="checkbox"
+                                                                checked={address.isPrimary || false}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setPrimaryAddress(address.id);
+                                                                    }
+                                                                }}
+                                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                            />
+                                                            <label htmlFor={`primary-summary-${address.id}`} className="text-sm font-medium text-slate-700">
+                                                                Set as Primary Address
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

@@ -2008,6 +2008,7 @@ function AsyncChipSelect({
     dropdownOptions,
     onTabNext,
     onTabPrev,
+    disabled = false,
 }: {
     type: CatalogType;
     value?: string;
@@ -2015,6 +2016,7 @@ function AsyncChipSelect({
     placeholder?: string;
     isError?: boolean;
     compact?: boolean;
+    disabled?: boolean;
     onDropdownOptionUpdate?: (
         type: 'accountNames' | 'masterAccounts' | 'cloudTypes' | 'addresses' | 'emails' | 'phones',
         action: 'update' | 'delete',
@@ -2038,6 +2040,8 @@ function AsyncChipSelect({
     onTabPrev?: () => void;
 }) {
     const [open, setOpen] = React.useState(false);
+    
+    // Debug wrapper for setOpen to track all state changes
     const [current, setCurrent] = React.useState<string | undefined>(value);
     const [query, setQuery] = React.useState('');
     const [options, setOptions] = React.useState<{id: string; name: string}[]>(
@@ -2049,7 +2053,27 @@ function AsyncChipSelect({
     const [loading, setLoading] = React.useState(false);
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
+    const [reopening, setReopening] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement>(null);
+    const blurTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const preventBlurRef = React.useRef(false);
+    const documentClickHandlerRef = React.useRef(false); // Prevent rapid successive document clicks
+
+    // Cleanup blur timeout on unmount
+    React.useEffect(() => {
+        return () => {
+            if (blurTimeoutRef.current) {
+                clearTimeout(blurTimeoutRef.current);
+            }
+            // Also cleanup reopening state
+            setReopening(false);
+        };
+    }, []);
+
+    // Debug: Log all state changes
+    React.useEffect(() => {
+        console.log(`🐛 [${type}] State changed - open: ${open}, reopening: ${reopening}, current: "${current}", query: "${query}"`);
+    }, [open, reopening, current, query, type]);
 
     // Check if this is a static enterprise field (should use the selected enterprise from top-right)
     const displayValue = React.useMemo(() => (current || value), [current, value]);
@@ -2088,49 +2112,54 @@ function AsyncChipSelect({
 
     const containerRef = React.useRef<HTMLDivElement>(null);
     const dropdownRef = React.useRef<HTMLDivElement>(null);
+    // Simple dropdown positioning - let browser handle it naturally
     const [dropdownPosition, setDropdownPosition] = React.useState<'below' | 'above'>('below');
     const [dropdownPortalPos, setDropdownPortalPos] = React.useState<{
         top: number;
         left: number;
         width: number;
+        height?: number;
+        arrowOffset?: number;
     } | null>(null);
-    // Portal-based dropdown to avoid table clipping
 
-    // Function to calculate optimal dropdown position
+    // Simple positioning function - just set basic position below field
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
         
         const containerRect = containerRef.current.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
         
-        // Always position below the field
+        // Always position below field - let browser handle viewport constraints
         setDropdownPosition('below');
         
-        // Calculate width to match container
-        const width = Math.max(140, Math.min(200, containerRect.width));
-        
-        // Position directly below the field
-        let top = containerRect.bottom + 2;
+        // Simple positioning - just below the field
+        const top = containerRect.bottom + 2;
         const left = containerRect.left;
+        const width = Math.max(200, containerRect.width);
+        const arrowOffset = 20;
         
-        // Ensure dropdown stays within viewport
-        const viewportHeight = window.innerHeight;
-        top = Math.min(top, viewportHeight - 200); // Leave space for dropdown
-        
-        setDropdownPortalPos({ top, left, width });
+        setDropdownPortalPos({ top, left, width, arrowOffset });
     }, [type]);
 
     // Calculate position when dropdown opens
     React.useEffect(() => {
         if (open) {
             calculateDropdownPosition();
-            // Recalculate on scroll or resize
-            const handleReposition = () => calculateDropdownPosition();
-            window.addEventListener('scroll', handleReposition, true);
-            window.addEventListener('resize', handleReposition);
+            
+            // Debounced reposition handler to prevent flickering
+            let repositionTimeout: NodeJS.Timeout;
+            const debouncedReposition = () => {
+                clearTimeout(repositionTimeout);
+                repositionTimeout = setTimeout(() => {
+                    calculateDropdownPosition();
+                }, 50); // 50ms debounce
+            };
+            
+            window.addEventListener('scroll', debouncedReposition, true);
+            window.addEventListener('resize', debouncedReposition);
             return () => {
-                window.removeEventListener('scroll', handleReposition, true);
-                window.removeEventListener('resize', handleReposition);
+                clearTimeout(repositionTimeout);
+                window.removeEventListener('scroll', debouncedReposition, true);
+                window.removeEventListener('resize', debouncedReposition);
             };
         }
     }, [open, calculateDropdownPosition]);
@@ -2178,13 +2207,90 @@ function AsyncChipSelect({
                     '/api/enterprises',
                 ) || [];
             } else if (type === 'product') {
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/products',
-                ) || [];
+                // Filter products based on selected enterprise
+                if (currentRowEnterprise) {
+                    console.log(`🔍 Filtering products for enterprise: ${currentRowEnterprise}`);
+                    
+                    // Get enterprise configuration data to find products for this enterprise
+                    try {
+                        const enterpriseConfigs = await api.get<Array<{
+                            enterprise: { name: string };
+                            product: { name: string };
+                            services: Array<{ name: string }>;
+                        }>>('/api/enterprise-products-services') || [];
+                        
+                        // Extract unique product names for the selected enterprise
+                        const uniqueProducts = Array.from(new Set(
+                            enterpriseConfigs
+                                .filter(config => config.enterprise.name === currentRowEnterprise)
+                                .map(config => config.product.name)
+                                .filter(product => product && product.trim() !== '')
+                        ));
+                        
+                        // Convert to the expected format
+                        allData = uniqueProducts.map((product, index) => ({
+                            id: `product-${index}`,
+                            name: product
+                        }));
+                        
+                        console.log(`📊 Found ${allData.length} products for enterprise "${currentRowEnterprise}":`, allData.map(p => p.name));
+                    } catch (error) {
+                        console.error('Failed to load enterprise configs:', error);
+                        // Fallback to all products if API fails
+                        allData = await api.get<Array<{id: string; name: string}>>(
+                            '/api/products',
+                        ) || [];
+                    }
+                } else {
+                    // No enterprise selected, show all products
+                    allData = await api.get<Array<{id: string; name: string}>>(
+                        '/api/products',
+                    ) || [];
+                }
             } else if (type === 'service') {
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/services',
-                ) || [];
+                // Filter services based on selected enterprise and product
+                if (currentRowEnterprise && currentRowProduct) {
+                    console.log(`🔍 Filtering services for enterprise: ${currentRowEnterprise}, product: ${currentRowProduct}`);
+                    
+                    // Get enterprise configuration data to find services for this enterprise+product combination
+                    try {
+                        const enterpriseConfigs = await api.get<Array<{
+                            enterprise: { name: string };
+                            product: { name: string };
+                            services: Array<{ name: string }>;
+                        }>>('/api/enterprise-products-services') || [];
+                        
+                        // Extract unique service names for the selected enterprise+product combination
+                        const uniqueServices = Array.from(new Set(
+                            enterpriseConfigs
+                                .filter(config => 
+                                    config.enterprise.name === currentRowEnterprise && 
+                                    config.product.name === currentRowProduct
+                                )
+                                .flatMap(config => config.services.map(service => service.name))
+                                .filter(service => service && service.trim() !== '')
+                        ));
+                        
+                        // Convert to the expected format
+                        allData = uniqueServices.map((service, index) => ({
+                            id: `service-${index}`,
+                            name: service
+                        }));
+                        
+                        console.log(`📊 Found ${allData.length} services for enterprise "${currentRowEnterprise}" + product "${currentRowProduct}":`, allData.map(s => s.name));
+                    } catch (error) {
+                        console.error('Failed to load enterprise configs:', error);
+                        // Fallback to all services if API fails
+                        allData = await api.get<Array<{id: string; name: string}>>(
+                            '/api/services',
+                        ) || [];
+                    }
+                } else {
+                    // No enterprise+product selected, show all services
+                    allData = await api.get<Array<{id: string; name: string}>>(
+                        '/api/services',
+                    ) || [];
+                }
             } else {
                 allData = await api.get<Array<{id: string; name: string}>>(
                     '/api/accountNames',
@@ -2197,7 +2303,7 @@ function AsyncChipSelect({
         } finally {
             setLoading(false);
         }
-    }, [type, dropdownOptions]);
+    }, [type, dropdownOptions, currentRowEnterprise, currentRowProduct]);
 
     // Function to filter options based on current query and other criteria
     const filterOptions = React.useCallback(() => {
@@ -2251,23 +2357,54 @@ function AsyncChipSelect({
         }
     }, [type, allOptions.length, loadAllOptions]);
 
+    // Handle cascading dropdown validation - clear field if current value is no longer valid
+    React.useEffect(() => {
+        if (allOptions.length > 0 && current) {
+            const isCurrentValueValid = allOptions.some(option => option.name === current);
+            if (!isCurrentValueValid) {
+                console.log(`🚫 Current value "${current}" is no longer valid for ${type}, clearing field`);
+                setCurrent(undefined);
+                onChange(undefined);
+            }
+        }
+    }, [allOptions, current, type, onChange]);
+
+    // Reload options when enterprise or product selection changes for cascading dropdowns
+    React.useEffect(() => {
+        if (type === 'product' || type === 'service') {
+            // Reset options to trigger reload
+            setAllOptions([]);
+        }
+    }, [currentRowEnterprise, currentRowProduct, type]);
+
     // Remove unused effect for email filtering
     // React.useEffect was here for email/account filtering - no longer needed
 
     React.useEffect(() => {
         const onDoc = (e: MouseEvent) => {
+            // Prevent rapid successive calls
+            if (documentClickHandlerRef.current) return;
+            documentClickHandlerRef.current = true;
+            
+            // Reset the guard after a brief delay
+            setTimeout(() => {
+                documentClickHandlerRef.current = false;
+            }, 10);
+            
             const target = e.target as Node;
             const withinAnchor = !!containerRef.current?.contains(target);
             const withinDropdown = !!dropdownRef.current?.contains(target);
             if (!withinAnchor && !withinDropdown) {
-                setOpen(false);
+                setOpen(prev => {
+                    return prev ? false : prev;
+                });
                 setShowAdder(false);
                 setAdding('');
             }
         };
         document.addEventListener('click', onDoc, true);
         return () => document.removeEventListener('click', onDoc, true);
-    }, []);
+    }, []); // No dependencies to prevent re-attachment
 
     const addNew = async () => {
         const name = (adding || query || '').trim();
@@ -2411,6 +2548,7 @@ function AsyncChipSelect({
                 {/* Show selected value as chip when there's a non-empty value and not actively typing */}
                 {shouldShowChip && !open && (
                     <motion.span
+                        ref={inputRef} // Use the same ref so our focus logic works (like EnterpriseConfigTable)
                         initial={{scale: 0.95, opacity: 0}}
                         animate={{scale: 1, opacity: 1}}
                         whileHover={{
@@ -2422,9 +2560,106 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
+                        className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative focus:outline-none ${
+                            disabled 
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                : 'bg-white text-black focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
+                        }`}
                         style={{width: '100%', minWidth: '100%'}}
-                        title={`Double-click to edit: ${current || value}`}
+                        title={disabled ? 'Field disabled' : `Double-click to edit: ${current || value}`}
+                        tabIndex={disabled ? -1 : 0}
+                        onFocus={(e) => {
+                            console.log('🎯 Chip focused:', type, current || value);
+                        }}
+                        onBlur={(e) => {
+                            console.log('🎯 Chip blurred:', type, current || value);
+                        }}
+                        onKeyDown={(e: any) => {
+                            console.log('🎯 Chip keydown:', e.key, type, current || value);
+                            // Handle Tab navigation from the chip
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.stopImmediatePropagation) {
+                                    e.stopImmediatePropagation();
+                                }
+                                
+                                // Navigate to next field directly (like EnterpriseConfigTable)
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-license-col]');
+                                const currentLicenseId = currentColDiv?.getAttribute('data-license-id');
+                                
+                                console.log('🎯 Tab from license chip:', {
+                                    currentLicenseId,
+                                    currentCol: currentColDiv?.getAttribute('data-license-col'),
+                                    type
+                                });
+                                
+                                if (currentLicenseId && currentColDiv) {
+                                    const currentCol = currentColDiv.getAttribute('data-license-col');
+                                    let targetCol = '';
+                                    
+                                    if (e.shiftKey) {
+                                        // Shift+Tab: go to previous column
+                                        if (currentCol === 'product') {
+                                            targetCol = 'enterprise';
+                                        } else if (currentCol === 'service') {
+                                            targetCol = 'product';
+                                        } else if (currentCol === 'licenseStartDate') {
+                                            targetCol = 'service';
+                                        } else if (currentCol === 'licenseEndDate') {
+                                            targetCol = 'licenseStartDate';
+                                        } else if (currentCol === 'numberOfUsers') {
+                                            targetCol = 'licenseEndDate';
+                                        } else if (currentCol === 'noticePeriodDays') {
+                                            targetCol = 'numberOfUsers';
+                                        }
+                                    } else {
+                                        // Tab: go to next column
+                                        if (currentCol === 'enterprise') {
+                                            targetCol = 'product';
+                                        } else if (currentCol === 'product') {
+                                            targetCol = 'service';
+                                        } else if (currentCol === 'service') {
+                                            targetCol = 'licenseStartDate';
+                                        } else if (currentCol === 'licenseStartDate') {
+                                            targetCol = 'licenseEndDate';
+                                        } else if (currentCol === 'licenseEndDate') {
+                                            targetCol = 'numberOfUsers';
+                                        } else if (currentCol === 'numberOfUsers') {
+                                            targetCol = 'noticePeriodDays';
+                                        }
+                                    }
+                                    
+                                    console.log('🎯 Navigating from license chip to:', targetCol);
+                                    
+                                    if (targetCol) {
+                                        // Find the target column in the same license row
+                                        const targetColDiv = document.querySelector(`[data-license-id="${currentLicenseId}"][data-license-col="${targetCol}"]`);
+                                        const targetInput = targetColDiv?.querySelector('input') as HTMLInputElement;
+                                        
+                                        console.log('🎯 Target input found:', !!targetInput);
+                                        
+                                        if (targetInput) {
+                                            targetInput.focus();
+                                            targetInput.select();
+                                            console.log(`🎯 ${targetCol} input focused from license chip`);
+                                        }
+                                    }
+                                }
+                            } else if (e.key === 'Enter' || e.key === ' ') {
+                                // Enter or Space opens the dropdown for editing
+                                e.preventDefault();
+                                setQuery(current || value || '');
+                                setOpen(true);
+                                setTimeout(() => {
+                                    if (inputRef.current) {
+                                        inputRef.current.focus();
+                                        inputRef.current.select();
+                                    }
+                                }, 100);
+                            }
+                        }}
                         onDoubleClick={(e: any) => {
                             console.log(`🖱️🖱️ Double-click on field: type=${type}, value=${current || value}`);
                             const target = e.target as HTMLElement;
@@ -2441,18 +2676,52 @@ function AsyncChipSelect({
                                 }, 10);
                             }
                         }}
+                        onMouseDown={(e: any) => {
+                            console.log(`🖱️ [${type}] CHIP MOUSEDOWN - disabled: ${disabled}`);
+                            if (disabled) return;
+                            // Prevent blur by preventing the mousedown default behavior
+                            e.preventDefault();
+                            console.log(`🖱️ [${type}] Chip mousedown - preventDefault called`);
+                        }}
                         onClick={(e: any) => {
-                            console.log(`🖱️ License field clicked: type=${type}`);
+                            console.log(`🖱️ [${type}] CHIP CLICK - disabled: ${disabled}, open: ${open}, allOptions.length: ${allOptions.length}`);
+                            if (disabled) return; // Don't handle clicks when disabled
+                            
+                            // Set reopening state to prevent blur from closing dropdown
+                            setReopening(true);
+                            console.log(`🔄 [${type}] Setting reopening state to TRUE`);
+                            
+                            // Prevent any pending or immediate blur events
+                            preventBlurRef.current = true;
+                            console.log(`🔄 [${type}] Setting preventBlurRef to TRUE`);
+                            
+                            // Cancel any pending blur timeout
+                            if (blurTimeoutRef.current) {
+                                clearTimeout(blurTimeoutRef.current);
+                                blurTimeoutRef.current = null;
+                                console.log(`🚫 [${type}] Cancelled pending blur timeout`);
+                            }
+                            
+                            console.log(`🖱️ [${type}] Processing chip click...`);
                             // For clickable fields (cloudType, enterprise, product, service), allow single click to open dropdown
                             if ((type === 'cloudType' || type === 'enterprise' || type === 'product' || type === 'service') && (allOptions.length > 0 || ['enterprise', 'product', 'service'].includes(type))) {
                                 const target = e.target as HTMLElement;
                                 if (!target.closest('button')) {
-                                    console.log(`🎯 Opening dropdown for type: ${type}`);
+                                    console.log(`🎯 [${type}] Opening dropdown from chip click`);
                                     setQuery('');
                                     setOpen(true);
+                                    console.log(`🎯 [${type}] setOpen(true) called from chip click`);
+                                    
+                                    // Clear reopening state after dropdown is opened
+                                    setTimeout(() => {
+                                        setReopening(false);
+                                        console.log(`✅ [${type}] Cleared reopening state (set to FALSE)`);
+                                    }, 200);
+                                    
                                     setTimeout(() => {
                                         if (inputRef.current) {
                                             inputRef.current.focus();
+                                            console.log(`🎯 [${type}] Input focused from chip click`);
                                         }
                                     }, 10);
                                 }
@@ -2467,20 +2736,22 @@ function AsyncChipSelect({
                                 className="text-slate-400 flex-shrink-0 ml-1" 
                             />
                         )}
-                        <button
-                            onClick={(e: any) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                setCurrent('');
-                                setQuery('');
-                                onChange('');
-                            }}
-                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
-                            aria-label='Remove'
-                            style={{minWidth: '20px', minHeight: '20px'}}
-                        >
-                            <X size={12} />
-                        </button>
+                        {!disabled && (
+                            <button
+                                onClick={(e: any) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setCurrent('');
+                                    setQuery('');
+                                    onChange('');
+                                }}
+                                className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                                aria-label='Remove'
+                                style={{minWidth: '20px', minHeight: '20px'}}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
                     </motion.span>
                 )}
                 
@@ -2490,16 +2761,18 @@ function AsyncChipSelect({
                         <input
                             ref={inputRef}
                             value={query}
+                            disabled={disabled}
                             onChange={(e: any) => {
+                                if (disabled) return; // Don't handle changes when disabled
+                                
                                 const newValue = e.target.value;
                                 setQuery(newValue);
                                 
-                                // Only open dropdown when typing if there are options to show
-                                if (allOptions.length > 0) {
-                                    setOpen(true);
-                                }
-                                
-                                // Don't load options if dropdown is disabled (empty options array)
+                // Only open dropdown when typing if there are options to show
+                if (allOptions.length > 0) {
+                    setOpen(true);
+                    console.log(`📝 [${type}] Opening dropdown from onChange - allOptions: ${allOptions.length}`);
+                }                                // Don't load options if dropdown is disabled (empty options array)
                                 
                                 // Clear current selection if user clears the input completely
                                 if (newValue === '') {
@@ -2508,26 +2781,79 @@ function AsyncChipSelect({
                                 }
                             }}
                             onBlur={(e: any) => {
-                                // Create chip from entered text when focus is lost
-                                const newValue = query.trim();
-                                if (newValue) {
-                                    setCurrent(newValue);
-                                    onChange(newValue);
-                                    setQuery('');
+                                console.log(`🔴 [${type}] BLUR EVENT - disabled: ${disabled}, preventBlur: ${preventBlurRef.current}, reopening: ${reopening}`);
+                                
+                                if (disabled) {
+                                    console.log(`🔴 [${type}] Blur ignored - field disabled`);
+                                    return; // Don't handle blur when disabled
                                 }
-                                setOpen(false);
+                                
+                                // Check if we're preventing blur (when intentionally opening dropdown)
+                                if (preventBlurRef.current || reopening) {
+                                    console.log(`🚫 [${type}] Preventing blur - dropdown being opened intentionally (reopening: ${reopening})`);
+                                    preventBlurRef.current = false;
+                                    return;
+                                }
+                                
+                                console.log(`🔵 [${type}] Blur proceeding - setting 150ms timeout`);
+                                // Add small delay to prevent dropdown from closing immediately when clicking options
+                                blurTimeoutRef.current = setTimeout(() => {
+                                    // Double check reopening state before actually closing
+                                    if (reopening) {
+                                        console.log(`🚫 [${type}] Cancelling blur timeout - reopening in progress`);
+                                        return;
+                                    }
+                                    
+                                    console.log(`🔵 [${type}] Blur timeout executing - query: "${query.trim()}"`);
+                                    
+                                    // Create chip from entered text when focus is lost
+                                    const newValue = query.trim();
+                                    if (newValue) {
+                                        console.log(`🔵 [${type}] Creating chip from query: "${newValue}"`);
+                                        setCurrent(newValue);
+                                        onChange(newValue);
+                                        setQuery('');
+                                    }
+                                    setOpen(false);
+                                    console.log(`🔵 [${type}] Blur timeout executed - dropdown closed`);
+                                }, 150);
                             }}
                             onFocus={() => {
+                                console.log(`🟢 [${type}] FOCUS EVENT - disabled: ${disabled}, reopening: ${reopening}, open: ${open}, allOptions.length: ${allOptions.length}`);
+                                
+                                // Cancel any pending blur timeout
+                                if (blurTimeoutRef.current) {
+                                    clearTimeout(blurTimeoutRef.current);
+                                    blurTimeoutRef.current = null;
+                                    console.log(`🚫 [${type}] Cancelled pending blur timeout`);
+                                }
+                                
+                                // Reset prevent blur flag for clean state
+                                preventBlurRef.current = false;
+                                console.log(`🟢 [${type}] Reset preventBlurRef to false`);
+                                
+                                if (disabled) {
+                                    console.log(`🚫 [${type}] Skipping focus - field is disabled`);
+                                    return; // Don't open dropdown when disabled
+                                }
+                                
                                 // For license fields (enterprise, product, service), open dropdown to trigger API loading
                                 // For other fields, only open if there are already options to show
                                 if (allOptions.length > 0 || (['enterprise', 'product', 'service'].includes(type))) {
+                                    console.log(`🟢 [${type}] Condition met for opening dropdown - allOptions: ${allOptions.length}, isLicenseField: ${['enterprise', 'product', 'service'].includes(type)}`);
                                     setOpen(true);
+                                    console.log(`🟢 [${type}] setOpen(true) called`);
+                                } else {
+                                    console.log(`🔍 [${type}] No options available, not opening dropdown - allOptions: ${allOptions.length}`);
                                 }
                             }}
                             onKeyDown={async (e: any) => {
                                 if (e.key === 'Enter' || e.key === 'Tab') {
                                     e.preventDefault();
                                     e.stopPropagation();
+                                    if (e.stopImmediatePropagation) {
+                                        e.stopImmediatePropagation();
+                                    }
                                     
                                     // Save current value immediately
                                     const newValue = query.trim();
@@ -2538,20 +2864,95 @@ function AsyncChipSelect({
                                         setOpen(false);
                                     }
                                     
-                                    // Use provided tab navigation functions
-                                    setTimeout(() => {
-                                        if (e.key === 'Tab' && e.shiftKey && onTabPrev) {
-                                            onTabPrev(); // Previous field (Shift+Tab)
-                                        } else if (onTabNext) {
-                                            onTabNext(); // Next field (Tab or Enter)
+                                    // Direct navigation like EnterpriseConfigTable
+                                    if (e.key === 'Tab') {
+                                        const currentElement = e.target as HTMLElement;
+                                        const currentColDiv = currentElement.closest('[data-license-col]');
+                                        const currentLicenseId = currentColDiv?.getAttribute('data-license-id');
+                                        
+                                        if (currentLicenseId && currentColDiv) {
+                                            // License field navigation
+                                            const currentCol = currentColDiv.getAttribute('data-license-col');
+                                            let targetCol = '';
+                                            
+                                            if (e.shiftKey) {
+                                                // Shift+Tab: go to previous column
+                                                if (currentCol === 'product') {
+                                                    targetCol = 'enterprise';
+                                                } else if (currentCol === 'service') {
+                                                    targetCol = 'product';
+                                                } else if (currentCol === 'licenseStartDate') {
+                                                    targetCol = 'service';
+                                                } else if (currentCol === 'licenseEndDate') {
+                                                    targetCol = 'licenseStartDate';
+                                                } else if (currentCol === 'numberOfUsers') {
+                                                    targetCol = 'licenseEndDate';
+                                                } else if (currentCol === 'noticePeriodDays') {
+                                                    targetCol = 'numberOfUsers';
+                                                }
+                                            } else {
+                                                // Tab: go to next column
+                                                if (currentCol === 'enterprise') {
+                                                    targetCol = 'product';
+                                                } else if (currentCol === 'product') {
+                                                    targetCol = 'service';
+                                                } else if (currentCol === 'service') {
+                                                    targetCol = 'licenseStartDate';
+                                                } else if (currentCol === 'licenseStartDate') {
+                                                    targetCol = 'licenseEndDate';
+                                                } else if (currentCol === 'licenseEndDate') {
+                                                    targetCol = 'numberOfUsers';
+                                                } else if (currentCol === 'numberOfUsers') {
+                                                    targetCol = 'noticePeriodDays';
+                                                }
+                                            }
+                                            
+                                            if (targetCol) {
+                                                // Find the target column in the same license row
+                                                const targetColDiv = document.querySelector(`[data-license-id="${currentLicenseId}"][data-license-col="${targetCol}"]`);
+                                                const targetInput = targetColDiv?.querySelector('input') as HTMLInputElement;
+                                                
+                                                if (targetInput) {
+                                                    targetInput.focus();
+                                                    targetInput.select();
+                                                }
+                                            }
+                                        } else {
+                                            // Main account row navigation - use provided navigation functions
+                                            if (e.shiftKey && onTabPrev) {
+                                                setTimeout(() => {
+                                                    onTabPrev();
+                                                }, 100);
+                                            } else if (!e.shiftKey && onTabNext) {
+                                                setTimeout(() => {
+                                                    onTabNext();
+                                                }, 100);
+                                            }
                                         }
-                                    }, 10);
+                                    } else if (e.key === 'Enter' && onTabNext) {
+                                        // Enter still uses the provided navigation function
+                                        setTimeout(() => {
+                                            onTabNext();
+                                        }, 100);
+                                    }
                                 } else if (e.key === 'Escape') {
                                     setOpen(false);
                                     setQuery('');
                                 }
                             }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${
+                                disabled 
+                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                    : isError 
+                                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                                        : open 
+                                            ? 'border-blue-500 bg-white ring-2 ring-blue-200' 
+                                            : 'border-blue-300 bg-white hover:bg-slate-50'
+                            } text-slate-700 placeholder:text-slate-300 focus:outline-none ${
+                                disabled 
+                                    ? '' 
+                                    : 'focus:ring-2 ' + (isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500')
+                            }`}
                             placeholder=''
                         />
                         {/* Dropdown arrow for cloudType */}
@@ -2583,30 +2984,52 @@ function AsyncChipSelect({
             {/* Full Autocomplete Dropdown - Portal Based */}
             {open && dropdownPortalPos && (allOptions.length > 0 || loading || ['enterprise', 'product', 'service'].includes(type)) && (() => {
                 console.log(`🔍 DROPDOWN RENDER: ${type} - options:${allOptions.length}, loading:${loading}, portalPos:`, dropdownPortalPos);
+                
+                // Use fixed height for simplicity
+                const maxHeight = 240;
+                
                 return createPortal(
                 <div 
                     ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl max-h-60'
-                    onMouseDown={(e: any) => {
-                        // Allow button clicks but prevent closing the dropdown
-                        const target = e.target as HTMLElement;
-                        if (!target.closest('button')) {
-                            e.stopPropagation();
-                        }
-                    }}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
                     style={{
                         position: 'fixed',
                         top: `${dropdownPortalPos.top}px`,
                         left: `${dropdownPortalPos.left}px`,
                         width: 'max-content',
                         minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px'
+                        maxWidth: '500px',
+                        maxHeight: `${maxHeight}px`,
+                        zIndex: 9999
+                    }}
+                    onMouseDown={(e: any) => {
+                        // Prevent blur when clicking in dropdown area
+                        preventBlurRef.current = true;
+                        console.log(`🖱️ Dropdown mousedown - preventing blur for ${type}`);
+                        
+                        // Allow button clicks but prevent closing the dropdown
+                        const target = e.target as HTMLElement;
+                        if (!target.closest('button')) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        
+                        // Reset prevent blur after a short delay
+                        setTimeout(() => {
+                            preventBlurRef.current = false;
+                        }, 100);
                     }}
                 >
-                    {/* Integrated pointer as part of the panel - positioned to align with input field */}
-                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    {/* Simple pointer - always points up into field */}
+                    <div 
+                        className="absolute -top-2 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"
+                        style={{ left: `${dropdownPortalPos.arrowOffset || 20}px` }}
+                    ></div>
                         <div className='relative z-10'>
-                            <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto max-h-44'>
+                            <div 
+                                className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
+                                style={{ maxHeight: `${maxHeight - 40}px` }} // Subtract padding/borders
+                            >
                             {loading ? (
                                 <div className='px-3 py-2 text-slate-500'>
                                     Loading…
@@ -2684,6 +3107,38 @@ function AsyncChipSelect({
                                                                         try {
                                                                             const success = onChange(opt.name);
                                                                             console.log(`✅ SELECTION SUCCESS: onChange called for ${type}, result:`, success);
+                                                                            
+                                                                            // After selection, focus the chip so Tab navigation works
+                                                                            setTimeout(() => {
+                                                                                try {
+                                                                                    // Use currentRowId and type to find the specific chip that was just created
+                                                                                    let licenseId = '';
+                                                                                    if (currentRowId) {
+                                                                                        licenseId = currentRowId;
+                                                                                    }
+                                                                                    
+                                                                                    const chipSelector = `[data-license-id="${licenseId}"][data-license-col="${type}"] span[tabindex="0"]`;
+                                                                                    const chipElement = document.querySelector(chipSelector) as HTMLElement;
+                                                                                    if (chipElement) {
+                                                                                        console.log(`🎯 Auto-focusing chip after selection: ${type} for license ${licenseId}`);
+                                                                                        chipElement.focus();
+                                                                                    } else {
+                                                                                        console.log(`🔍 Chip not found with selector: ${chipSelector}`);
+                                                                                        // Fallback: try to find any chip in the license container
+                                                                                        const containerSelector = `[data-license-id="${licenseId}"][data-license-col="${type}"]`;
+                                                                                        const container = document.querySelector(containerSelector);
+                                                                                        if (container) {
+                                                                                            const fallbackChip = container.querySelector('span[tabindex="0"]') as HTMLElement;
+                                                                                            if (fallbackChip) {
+                                                                                                console.log(`🎯 Fallback focus successful for ${type}`);
+                                                                                                fallbackChip.focus();
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                } catch (error) {
+                                                                                    console.log('🔍 Chip focus failed:', error);
+                                                                                }
+                                                                            }, 150);
                                                                         } catch (error) {
                                                                             console.error(`❌ SELECTION ERROR: onChange failed for ${type}:`, error);
                                                                         }
@@ -2928,6 +3383,7 @@ function LicenseSubRow({
     onDelete,
     showValidationErrors,
     isLicenseFieldMissing,
+    isLicenseDuplicate,
     compressingLicenseId,
     foldingLicenseId,
     onDeleteClick,
@@ -2937,6 +3393,7 @@ function LicenseSubRow({
     accounts = [],
     isTableRow = false,
     isLastRow = false,
+    dropdownOptions = { enterprises: [], products: [], services: [] },
 }: {
     license: License;
     rowId: string;
@@ -2944,6 +3401,7 @@ function LicenseSubRow({
     onDelete: (licenseId: string) => void;
     showValidationErrors: boolean;
     isLicenseFieldMissing: (license: License, field: keyof License) => boolean;
+    isLicenseDuplicate: (license: License, rowId: string) => boolean;
     compressingLicenseId?: string | null;
     foldingLicenseId?: string | null;
     onDeleteClick?: (licenseId: string) => void;
@@ -2961,8 +3419,37 @@ function LicenseSubRow({
     accounts?: AccountRow[];
     isTableRow?: boolean;
     isLastRow?: boolean;
+    dropdownOptions?: {
+        enterprises: Array<{id: string; name: string}>;
+        products: Array<{id: string; name: string}>;
+        services: Array<{id: string; name: string}>;
+    };
 }) {
     const [isRowHovered, setIsRowHovered] = useState(false);
+
+    // Helper function to validate numeric input
+    const validateNumericInput = (value: string): string => {
+        if (!value) return '';
+        // Remove any non-numeric characters
+        const numericValue = value.replace(/[^0-9]/g, '');
+        return numericValue;
+    };
+
+    // Helper functions to check if selected values are valid from dropdown options
+    const isValidEnterprise = (enterpriseName: string | undefined): boolean => {
+        if (!enterpriseName || !enterpriseName.trim()) return false;
+        return dropdownOptions.enterprises.some(e => e.name === enterpriseName.trim());
+    };
+
+    const isValidProduct = (productName: string | undefined): boolean => {
+        if (!productName || !productName.trim()) return false;
+        return dropdownOptions.products.some(p => p.name === productName.trim());
+    };
+
+    const isValidService = (serviceName: string | undefined): boolean => {
+        if (!serviceName || !serviceName.trim()) return false;
+        return dropdownOptions.services.some(s => s.name === serviceName.trim());
+    };
 
     // Tab navigation for license fields
     const createLicenseTabNavigation = (currentCol: string) => {
@@ -2981,7 +3468,7 @@ function LicenseSubRow({
                         nextInput.focus();
                         nextInput.select();
                     }
-                }, 10);
+                }, 100);
             }
         };
 
@@ -2997,7 +3484,7 @@ function LicenseSubRow({
                         prevInput.focus();
                         prevInput.select();
                     }
-                }, 10);
+                }, 100);
             }
         };
 
@@ -3040,9 +3527,7 @@ function LicenseSubRow({
                         : 'bg-blue-50/50 border border-blue-200 rounded-lg hover:bg-blue-100/50 hover:border-blue-300 hover:border-2 hover:shadow-md'
                 }`}
                 style={{
-                    gridTemplateColumns: license.renewalNotice 
-                        ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px" 
-                        : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
+                    gridTemplateColumns: "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
                 }}
             >
                 {/* Delete Button Column - First in grid */}
@@ -3078,6 +3563,26 @@ function LicenseSubRow({
                             </svg>
                         </motion.button>
                     )}
+                    
+                    {/* Duplicate License Warning */}
+                    {showValidationErrors && isLicenseDuplicate(license, rowId) && (
+                        <div 
+                            className="flex items-center justify-center w-4 h-4 bg-red-100 border border-red-300 rounded-full ml-1"
+                            title="Duplicate license entry detected. Please modify at least one field to make this entry unique."
+                        >
+                            <svg
+                                className="w-2.5 h-2.5 text-red-600"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        </div>
+                    )}
                 </div>
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="enterprise">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Enterprise</label>}
@@ -3086,7 +3591,7 @@ function LicenseSubRow({
                         value={license.enterprise}
                         onChange={(value) => onUpdate(license.id, 'enterprise', value || '')}
                         placeholder="Enter enterprise"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'enterprise')}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'enterprise') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
@@ -3104,8 +3609,8 @@ function LicenseSubRow({
                         type='product'
                         value={license.product}
                         onChange={(value) => onUpdate(license.id, 'product', value || '')}
-                        placeholder="Enter product"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'product')}
+                        placeholder={!isValidEnterprise(license.enterprise) ? "Select valid Enterprise first" : "Enter product"}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'product') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
@@ -3113,6 +3618,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        disabled={!isValidEnterprise(license.enterprise)}
                         {...createLicenseTabNavigation('product')}
                     />
                 </div>
@@ -3123,8 +3629,8 @@ function LicenseSubRow({
                         type='service'
                         value={license.service}
                         onChange={(value) => onUpdate(license.id, 'service', value || '')}
-                        placeholder="Enter service"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'service')}
+                        placeholder={!isValidEnterprise(license.enterprise) ? "Select valid Enterprise first" : !isValidProduct(license.product) ? "Select valid Product first" : "Enter service"}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'service') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
@@ -3132,6 +3638,7 @@ function LicenseSubRow({
                         currentRowId={license.id}
                         currentRowEnterprise={license.enterprise}
                         currentRowProduct={license.product}
+                        disabled={!isValidEnterprise(license.enterprise) || !isValidProduct(license.product)}
                         {...createLicenseTabNavigation('service')}
                     />
                 </div>
@@ -3148,9 +3655,19 @@ function LicenseSubRow({
                             }
                         }}
                         placeholder=""
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseStartDate')}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'licenseStartDate') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         className="text-xs min-h-[20px] py-0.5"
+                        minDate={(() => {
+                            // Get current date in YYYY-MM-DD format, ensuring we use the current system date
+                            const today = new Date();
+                            const year = today.getFullYear();
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const day = String(today.getDate()).padStart(2, '0');
+                            const currentDateString = `${year}-${month}-${day}`;
+                            console.log('🗓️ License Start Date minDate set to:', currentDateString);
+                            return currentDateString;
+                        })()}
                     />
                 </div>
                 
@@ -3160,7 +3677,7 @@ function LicenseSubRow({
                         value={license.licenseEndDate}
                         onChange={(value) => onUpdate(license.id, 'licenseEndDate', value || '')}
                         placeholder=""
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'licenseEndDate')}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'licenseEndDate') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         className="text-xs min-h-[20px] py-0.5"
                         minDate={license.licenseStartDate || undefined}
@@ -3172,9 +3689,9 @@ function LicenseSubRow({
                     <AsyncChipSelect
                         type='template'
                         value={license.numberOfUsers}
-                        onChange={(value) => onUpdate(license.id, 'numberOfUsers', value || '')}
+                        onChange={(value) => onUpdate(license.id, 'numberOfUsers', validateNumericInput(value || ''))}
                         placeholder="Count"
-                        isError={showValidationErrors && isLicenseFieldMissing(license, 'numberOfUsers')}
+                        isError={showValidationErrors && (isLicenseFieldMissing(license, 'numberOfUsers') || isLicenseDuplicate(license, rowId))}
                         compact={true}
                         onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                         onNewItemCreated={onNewItemCreated as any}
@@ -3224,26 +3741,26 @@ function LicenseSubRow({
                     </div>
                 </div>
                 
-                {license.renewalNotice && (
-                    <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
-                        {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>}
-                        <AsyncChipSelect
-                            type='template'
-                            value={license.noticePeriodDays || ''}
-                            onChange={(value) => onUpdate(license.id, 'noticePeriodDays', value || '')}
-                            placeholder="Days"
-                            isError={showValidationErrors && license.renewalNotice && !license.noticePeriodDays}
-                            compact={true}
-                            onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                            onNewItemCreated={onNewItemCreated as any}
-                            accounts={accounts}
-                            currentRowId={license.id}
-                            currentRowEnterprise={license.enterprise}
-                            currentRowProduct={license.product}
-                            {...createLicenseTabNavigation('noticePeriodDays')}
+                
+                <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
+                    {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>}
+                    <AsyncChipSelect
+                        type='template'
+                        value={license.noticePeriodDays || ''}
+                        onChange={(value) => onUpdate(license.id, 'noticePeriodDays', validateNumericInput(value || ''))}
+                        placeholder="Days"
+                        isError={showValidationErrors && license.renewalNotice && !license.noticePeriodDays}
+                        compact={true}
+                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                        onNewItemCreated={onNewItemCreated as any}
+                        accounts={accounts}
+                        currentRowId={license.id}
+                        currentRowEnterprise={license.enterprise}
+                        currentRowProduct={license.product}
+                        disabled={!license.renewalNotice}
+                        {...createLicenseTabNavigation('noticePeriodDays')}
                         />
                     </div>
-                )}
             </div>
         </div>
     );
@@ -3383,7 +3900,7 @@ function SortableAccountRow({
                             }
                         }
                     }
-                }, 10);
+                }, 100);
             }
         };
 
@@ -3428,7 +3945,7 @@ function SortableAccountRow({
                             }
                         }
                     }
-                }, 10);
+                }, 100);
             }
         };
 
@@ -3811,8 +4328,8 @@ function SortableAccountRow({
                         tabIndex={-1}
                     >
                         <MapPin className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
-                        {(row as any).address && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                        {!!(row as any).address && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full border border-white"></div>
                         )}
                     </button>
                 </div>
@@ -3836,7 +4353,7 @@ function SortableAccountRow({
                     >
                         <User className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
                         {row.technicalUsers && row.technicalUsers.length > 0 && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-800 rounded-full flex items-center justify-center">
                                 <span className="text-[8px] text-white font-bold">
                                     {row.technicalUsers.length}
                                 </span>
@@ -4416,11 +4933,24 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         setRowLicenses(prev => {
             const updatedLicenses = {
                 ...prev,
-                [rowId]: (prev[rowId] || []).map(license => 
-                    license.id === licenseId 
-                        ? {...license, [field]: value}
-                        : license
-                )
+                [rowId]: (prev[rowId] || []).map(license => {
+                    if (license.id === licenseId) {
+                        const updatedLicense = {...license, [field]: value};
+                        
+                        // Clear dependent fields when parent fields change
+                        if (field === 'enterprise') {
+                            // When Enterprise changes, clear Product and Service
+                            updatedLicense.product = '';
+                            updatedLicense.service = '';
+                        } else if (field === 'product') {
+                            // When Product changes, clear Service
+                            updatedLicense.service = '';
+                        }
+                        
+                        return updatedLicense;
+                    }
+                    return license;
+                })
             };
 
             // Check if the license is now complete using the updated state
@@ -4458,6 +4988,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             return updatedLicenses;
         });
 
+
+
         // Only trigger auto-save for license updates if ALL mandatory fields are complete
         // This prevents auto-save from triggering on partial license completion
         const isValueEmpty = typeof value === 'boolean' ? false : (!value || value.trim() === '');
@@ -4481,23 +5013,41 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 updatedLicense.numberOfUsers?.trim() &&
                 (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays?.trim());
             
-            if (hasAllFields) {
+            // Check if this license is a duplicate (using the temporarily updated license data)
+            const isDuplicate = hasAllFields && updatedRowLicenses.filter(otherLicense => {
+                if (otherLicense.id === updatedLicense.id) return false; // Don't compare with self
+                
+                return (
+                    otherLicense.enterprise === updatedLicense.enterprise &&
+                    otherLicense.product === updatedLicense.product &&
+                    otherLicense.service === updatedLicense.service &&
+                    otherLicense.licenseStartDate === updatedLicense.licenseStartDate &&
+                    otherLicense.licenseEndDate === updatedLicense.licenseEndDate &&
+                    otherLicense.numberOfUsers === updatedLicense.numberOfUsers &&
+                    otherLicense.renewalNotice === updatedLicense.renewalNotice &&
+                    otherLicense.noticePeriodDays === updatedLicense.noticePeriodDays
+                );
+            }).length > 0;
+            
+            if (hasAllFields && !isDuplicate) {
                 console.log('🔄 Triggering auto-save for complete license:', {
                     rowId,
                     licenseId,
                     field,
                     value,
                     hasAllFields,
+                    isDuplicate,
                     licenseData: updatedLicense
                 });
                 onUpdateField(rowId, 'licenses', updatedRowLicenses);
             } else {
-                console.log('⏳ License incomplete, not triggering auto-save yet:', {
+                console.log('⏳ License incomplete or duplicate, not triggering auto-save yet:', {
                     rowId,
                     licenseId,
                     field,
                     value,
                     hasAllFields,
+                    isDuplicate,
                     licenseData: updatedLicense,
                     missing: {
                         enterprise: !updatedLicense?.enterprise?.trim(),
@@ -4620,6 +5170,52 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         return isMissing;
     };
 
+    // Check if a license entry is a duplicate within the same account row
+    const isLicenseDuplicate = React.useCallback((license: License, rowId: string): boolean => {
+        const rowLicenseArray = rowLicenses[rowId] || [];
+        
+        // Only check for duplicates if all required fields are filled
+        if (!license.enterprise || !license.product || !license.service || 
+            !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers) {
+            return false;
+        }
+
+        // Count how many licenses have the exact same values
+        const duplicateCount = rowLicenseArray.filter(otherLicense => {
+            if (otherLicense.id === license.id) return false; // Don't compare with self
+            
+            return (
+                otherLicense.enterprise === license.enterprise &&
+                otherLicense.product === license.product &&
+                otherLicense.service === license.service &&
+                otherLicense.licenseStartDate === license.licenseStartDate &&
+                otherLicense.licenseEndDate === license.licenseEndDate &&
+                otherLicense.numberOfUsers === license.numberOfUsers &&
+                otherLicense.renewalNotice === license.renewalNotice &&
+                otherLicense.noticePeriodDays === license.noticePeriodDays
+            );
+        }).length;
+
+        const isDuplicate = duplicateCount > 0;
+        
+        // Debug logging for duplicate detection
+        if (isDuplicate && showValidationErrors) {
+            console.log(`🔴 Duplicate license detected - License ID: ${license.id}, Row ID: ${rowId}`);
+            console.log(`🔴 Duplicate details:`, {
+                enterprise: license.enterprise,
+                product: license.product,
+                service: license.service,
+                startDate: license.licenseStartDate,
+                endDate: license.licenseEndDate,
+                numberOfUsers: license.numberOfUsers,
+                renewalNotice: license.renewalNotice,
+                noticePeriodDays: license.noticePeriodDays
+            });
+        }
+
+        return isDuplicate;
+    }, [rowLicenses, showValidationErrors]);
+
     // License validation effect - notify parent when license validation state changes
     React.useEffect(() => {
         if (onLicenseValidationChange) {
@@ -4627,11 +5223,18 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             let hasIncompleteLicenses = false;
 
             Object.entries(rowLicenses).forEach(([rowId, licenses]) => {
-                const hasIncomplete = licenses.some(license => 
-                    !license.enterprise || !license.product || !license.service || 
-                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                    (license.renewalNotice && !license.noticePeriodDays)
-                );
+                const hasIncomplete = licenses.some(license => {
+                    // Check for missing required fields
+                    const hasMissingFields = !license.enterprise || !license.product || !license.service || 
+                        !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                        (license.renewalNotice && !license.noticePeriodDays);
+                    
+                    // Check for duplicates
+                    const isDuplicate = isLicenseDuplicate(license, rowId);
+                    
+                    return hasMissingFields || isDuplicate;
+                });
+                
                 if (hasIncomplete) {
                     incompleteLicenseRows.push(rowId);
                     hasIncompleteLicenses = true;
@@ -4640,16 +5243,22 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             onLicenseValidationChange(hasIncompleteLicenses, incompleteLicenseRows);
         }
-    }, [rowLicenses, onLicenseValidationChange]);
+    }, [rowLicenses, onLicenseValidationChange, isLicenseDuplicate]);
 
     // Function to check if there are any incomplete licenses
     const hasIncompleteLicenses = () => {
         return Object.entries(rowLicenses).some(([rowId, licenses]) => 
-            licenses.some(license => 
-                !license.enterprise || !license.product || !license.service || 
-                !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
-                (license.renewalNotice && !license.noticePeriodDays)
-            )
+            licenses.some(license => {
+                // Check for missing required fields
+                const hasMissingFields = !license.enterprise || !license.product || !license.service || 
+                    !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
+                    (license.renewalNotice && !license.noticePeriodDays);
+                
+                // Check for duplicates
+                const isDuplicate = isLicenseDuplicate(license, rowId);
+                
+                return hasMissingFields || isDuplicate;
+            })
         );
     };
 
@@ -5573,10 +6182,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 'email',
                                                 'phone',
                                             ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'phone' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                <div className={`inline-flex items-center -space-x-1 ml-4 ${c === 'phone' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
                                                     <button
                                                         onClick={() => toggleSort(c as any, 'asc')}
-                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-green-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
                                                     >
                                                         <ArrowUp
                                                             size={sortCol === c && sortDir === 'asc' ? 14 : 12}
@@ -5584,7 +6193,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     </button>
                                                     <button
                                                         onClick={() => toggleSort(c as any, 'desc')}
-                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
+                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-green-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
                                                     >
                                                         <ArrowDown
                                                             size={sortCol === c && sortDir === 'desc' ? 14 : 12}
@@ -5666,7 +6275,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         onOpenTechnicalUserModal={onOpenTechnicalUserModal}
                                     />
                                     {expandedRows.has(r.id) && (
-                                        <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-2 mt-1 mb-2'>
+                                        <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-20 mt-1 mb-2'>
                                             {/* Vertical connection line from chevron */}
                                             <div className="absolute -left-2 top-0 bottom-0 w-px bg-blue-400"></div>
                                             
@@ -5678,14 +6287,12 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                 </h4>
                                                 
                                                 {/* License Table Container */}
-                                                <div className="ml-6">
+                                                <div className="ml-6 relative">
                                                     {/* Table Header */}
                                                     <div 
                                                         className="grid gap-3 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black"
                                                         style={{
-                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
-                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
-                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px"
+                                                            gridTemplateColumns: "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
                                                         }}
                                                     >
                                                         <div></div>
@@ -5697,16 +6304,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         <div>Users</div>
                                                         <div>Contact</div>
                                                         <div>Renewal</div>
-                                                        {(rowLicenses[r.id] || []).some(license => license.renewalNotice) && (
-                                                            <div>Notice (days)</div>
-                                                        )}
+                                                        <div>Notice (days)</div>
                                                     </div>
                                                     
 
                                                     
                                                     {/* Existing License Rows */}
                                                     {(rowLicenses[r.id] || []).map((license, index) => (
-                                                        <div key={license.id} className={`${index === (rowLicenses[r.id] || []).length - 1 ? 'rounded-b-lg' : ''}`}>
+                                                        <div key={license.id} className={`relative ${index === (rowLicenses[r.id] || []).length - 1 ? 'rounded-b-lg' : ''}`}>
+                                                            {/* Connection line from license row to left blue panel */}
+                                                            <div className="absolute -left-6 top-1/2 w-6 h-px bg-blue-300"></div>
+                                                            <div className="absolute -left-6 top-1/2 w-px h-4 -mt-2 bg-blue-300"></div>
                                                             <LicenseSubRow
                                                                 license={license}
                                                                 rowId={r.id}
@@ -5714,6 +6322,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                                 onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
                                                                 showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
                                                                 isLicenseFieldMissing={isLicenseFieldMissing}
+                                                                isLicenseDuplicate={isLicenseDuplicate}
                                                                 compressingLicenseId={compressingLicenseId}
                                                                 foldingLicenseId={foldingLicenseId}
                                                                 onDeleteClick={onLicenseDelete}
@@ -5723,6 +6332,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                                 accounts={rows}
                                                                 isTableRow={true}
                                                                 isLastRow={index === (rowLicenses[r.id] || []).length - 1}
+                                                                dropdownOptions={dropdownOptions as any}
                                                             />
                                                         </div>
                                                     ))}
@@ -5731,9 +6341,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     <div 
                                                         className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                                         style={{
-                                                            gridTemplateColumns: (rowLicenses[r.id] || []).some(license => license.renewalNotice)
-                                                                ? "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
-                                                                : "30px minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) 80px 50px 90px",
+                                                            gridTemplateColumns: "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px",
                                                             minWidth: 'max-content',
                                                             width: '100%'
                                                         }}

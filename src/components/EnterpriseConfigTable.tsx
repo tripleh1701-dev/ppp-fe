@@ -641,6 +641,30 @@ function ServicesMultiSelect({
         width: number;
     } | null>(null);
     const moreServicesRef = React.useRef<HTMLButtonElement>(null);
+    
+    // State to track if user has entered a new value that requires creation
+    const [hasPendingNewValue, setHasPendingNewValue] = React.useState(false);
+    
+    // Store all available options for new value detection
+    const [allOptions, setAllOptions] = React.useState<{id: string; name: string}[]>(
+        [],
+    );
+
+    // Helper function to check if current query is a new value that doesn't exist in all options
+    const isNewValuePending = React.useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        
+        return !exactMatch; // Return true if no exact match found (i.e., it's a new value)
+    }, [allOptions]);
+
+    // Update hasPendingNewValue whenever query changes
+    React.useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
 
     // Helper function to check if a service is in use
     const isServiceInUse = React.useCallback(
@@ -702,6 +726,16 @@ function ServicesMultiSelect({
                     query ? `?search=${encodeURIComponent(query)}` : ''
                 }`,
             );
+            
+            // Store all available options for new value detection
+            if (!query) {
+                setAllOptions(data || []);
+            } else if (allOptions.length === 0) {
+                // If this is a search but we don't have all options yet, load them separately
+                const allData = await api.get<Array<{id: string; name: string}>>('/api/services');
+                setAllOptions(allData || []);
+            }
+            
             // Filter out already selected services
             const filteredData = (data || []).filter(
                 (option) => !selectedServices.includes(option.name),
@@ -712,7 +746,7 @@ function ServicesMultiSelect({
         } finally {
             setLoading(false);
         }
-    }, [query, selectedServices]);
+    }, [query, selectedServices, allOptions.length]);
 
     React.useEffect(() => {
         if (!open) return;
@@ -811,6 +845,7 @@ function ServicesMultiSelect({
             setShowAdder(false);
             setAdding('');
             setQuery('');
+            setHasPendingNewValue(false);
             
             // Focus next row's first field (Enterprise) after selecting existing service
             const currentElement = inputRef?.current;
@@ -855,6 +890,7 @@ function ServicesMultiSelect({
                 setShowAdder(false);
                 setAdding('');
                 setQuery('');
+                setHasPendingNewValue(false);
 
                 // Focus next row's first field (Enterprise) after adding new service
                 const currentElement = inputRef?.current;
@@ -899,6 +935,7 @@ function ServicesMultiSelect({
                 );
                 if (existingItem) {
                     toggleService(existingItem.name);
+                    setHasPendingNewValue(false);
                     
                     // Focus next row's first field (Enterprise) after selecting existing service
                     const currentElement = inputRef?.current;
@@ -1117,6 +1154,7 @@ function ServicesMultiSelect({
                                     toggleService(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
+                                    setHasPendingNewValue(false);
                                     navigateToNextRow(e.target as HTMLInputElement);
                                 } else {
                                     // Create new service (same logic as addNew function)
@@ -1130,10 +1168,15 @@ function ServicesMultiSelect({
                                                 const exists = prev.some((o) => o.id === created!.id);
                                                 return exists ? prev : [...prev, created!];
                                             });
+                                            setAllOptions((prev) => {
+                                                const exists = prev.some((o) => o.id === created!.id);
+                                                return exists ? prev : [...prev, created!];
+                                            });
                                             // Add the new service to selection
                                             toggleService(created.name);
                                             setQuery('');
                                             setOpen(false);
+                                            setHasPendingNewValue(false);
                                             
                                             // Navigate to next row
                                             navigateToNextRow(e.target as HTMLInputElement);
@@ -1154,6 +1197,7 @@ function ServicesMultiSelect({
                                                 toggleService(existingItem.name);
                                                 setQuery('');
                                                 setOpen(false);
+                                                setHasPendingNewValue(false);
                                                 navigateToNextRow(e.target as HTMLInputElement);
                                             }
                                         } else {
@@ -1161,32 +1205,77 @@ function ServicesMultiSelect({
                                         }
                                     }
                                 }
-                            } else if (e.key === 'Tab' && query.trim()) {
-                                // Check for exact match in all options when Tab is pressed
-                                const exactMatch = options.find(opt => 
-                                    opt.name.toLowerCase() === query.toLowerCase().trim()
-                                );
-                                if (exactMatch) {
-                                    e.preventDefault(); // Prevent default Tab behavior
-                                    e.stopPropagation(); // Stop event bubbling
+                            } else if (e.key === 'Tab') {
+                                // Check if user has entered a new value that doesn't exist
+                                if (query.trim() && hasPendingNewValue) {
+                                    // Prevent Tab navigation - user must click + button first
+                                    e.preventDefault();
+                                    e.stopPropagation();
                                     
-                                    // Add the service first
-                                    toggleService(exactMatch.name);
-                                    setQuery('');
-                                    setOpen(false);
+                                    // Show visual feedback to indicate they need to click the + button
+                                    console.log('Tab blocked: User must click + button to create new service');
                                     
-                                    // Navigate to next row
-                                    navigateToNextRow(e.target as HTMLInputElement);
+                                    // Focus back on the input and ensure dropdown is open
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    return;
+                                }
+                                
+                                if (query.trim()) {
+                                    // Check for exact match in all options when Tab is pressed
+                                    const exactMatch = options.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        e.preventDefault(); // Prevent default Tab behavior
+                                        e.stopPropagation(); // Stop event bubbling
+                                        
+                                        // Add the service first
+                                        toggleService(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+                                        setHasPendingNewValue(false);
+                                        
+                                        // Navigate to next row
+                                        navigateToNextRow(e.target as HTMLInputElement);
+                                    } else {
+                                        // No exact match found - this should be handled above, but keeping as fallback
+                                        console.log('Tab: No exact match and hasPendingNewValue should have blocked this');
+                                        return;
+                                    }
                                 } else {
-                                    // No exact match found - prevent Tab and show message to use Enter or Add button
-                                    e.preventDefault(); // Prevent default Tab behavior
-                                    e.stopPropagation(); // Stop event bubbling
-                                    console.log('Tab blocked: Please press Enter or click Add button to create new service, or change the value');
-                                    // Keep focus on current field
+                                    // Empty field - just navigate to next row
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                    navigateToNextRow(e.target as HTMLInputElement);
                                 }
                             } else if (e.key === 'Escape') {
                                 setOpen(false);
                                 setQuery('');
+                            }
+                        }}
+                        onBlur={(e) => {
+                            // Check if the blur is due to clicking within the dropdown
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            
+                            // If user has a pending new value and they're not clicking in dropdown, prevent blur
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                // Prevent the field from losing focus if there's a pending new value
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Refocus the input after a short delay
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    // Ensure dropdown stays open to show the + button
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
                             }
                         }}
                         className={`w-32 text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} text-slate-700 placeholder:text-slate-300 transition-colors min-h-[28px]`}
@@ -1292,10 +1381,17 @@ function ServicesMultiSelect({
                                                                         created,
                                                                     ],
                                                                 );
+                                                                setAllOptions(
+                                                                    (prev) => [
+                                                                        ...prev,
+                                                                        created,
+                                                                    ],
+                                                                );
                                                                 toggleService(
                                                                     created.name,
                                                                 );
                                                                 setQuery('');
+                                                                setHasPendingNewValue(false);
                                                                 // Don't close dropdown for services to allow multiple selections
                                                                 
                                                                 // Notify parent component about the new item
@@ -1364,7 +1460,10 @@ function ServicesMultiSelect({
                                                 className='relative group'
                                             >
                                                 <button
-                                                    onClick={() => toggleService(opt.name)}
+                                                    onClick={() => {
+                                                        toggleService(opt.name);
+                                                        setHasPendingNewValue(false);
+                                                    }}
                                                     className={`w-full rounded-lg px-3 py-2.5 ${
                                                         isSelected
                                                             ? 'bg-blue-500 text-white border-2 border-blue-600'
@@ -1475,6 +1574,28 @@ function AsyncChipSelect({
     const [adding, setAdding] = React.useState('');
     const [showAdder, setShowAdder] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement>(null);
+    
+    // State to track if user has entered a new value that requires creation
+    const [hasPendingNewValue, setHasPendingNewValue] = React.useState(false);
+    
+    // State to track if we just created a value and shouldn't auto-open dropdown on focus
+    const [justCreatedValue, setJustCreatedValue] = React.useState(false);
+
+    // Helper function to check if current query is a new value that doesn't exist in options
+    const isNewValuePending = React.useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        
+        return !exactMatch; // Return true if no exact match found (i.e., it's a new value)
+    }, [allOptions]);
+
+    // Update hasPendingNewValue whenever query changes
+    React.useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
 
     // Helper function to check if an option is in use (with composite key constraint)
     const isOptionInUse = React.useCallback(
@@ -1688,6 +1809,20 @@ function AsyncChipSelect({
             setAdding('');
             setQuery('');
             setOpen(false);
+            setHasPendingNewValue(false);
+            setJustCreatedValue(true); // Prevent auto-opening on focus
+            
+            // Focus the chip after selection so Tab navigation works
+            setTimeout(() => {
+                if (inputRef.current) {
+                    try {
+                        inputRef.current.focus();
+                        console.log('🎯 Focused chip after selecting existing match in addNew');
+                    } catch (e) {
+                        console.log('🎯 Could not focus chip after existing match selection');
+                    }
+                }
+            }, 100);
             return;
         }
 
@@ -1730,6 +1865,70 @@ function AsyncChipSelect({
                 setAdding('');
                 setQuery('');
                 setOpen(false);
+                setHasPendingNewValue(false);
+                setJustCreatedValue(true); // Prevent auto-opening on focus
+
+                // Navigate to next field after creating new value
+                setTimeout(() => {
+                    if (inputRef.current) {
+                        // Find the closest div with data-col attribute (current column)
+                        const currentColDiv = inputRef.current.closest('[data-col]');
+                        const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                        
+                        if (currentRowId && currentColDiv) {
+                            const currentCol = currentColDiv.getAttribute('data-col');
+                            let nextCol = '';
+                            
+                            // Determine next column based on current column
+                            if (currentCol === 'enterprise') {
+                                nextCol = 'product';
+                            } else if (currentCol === 'product') {
+                                nextCol = 'services';
+                            }
+                            
+                            if (nextCol) {
+                                // Find the next column in the same row
+                                const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="${nextCol}"]`);
+                                
+                                if (nextCol === 'services') {
+                                    // For Services column, we need to handle both input and button cases
+                                    let nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                    const addMoreButton = nextColDiv?.querySelector('button') as HTMLButtonElement;
+                                    
+                                    if (!nextInput && addMoreButton) {
+                                        // If no input visible, click the "Add more" button to show input
+                                        addMoreButton.click();
+                                        // Wait for the input to appear and then focus it
+                                        setTimeout(() => {
+                                            nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            if (nextInput) {
+                                                nextInput.focus();
+                                                nextInput.click();
+                                            }
+                                        }, 100);
+                                    } else if (nextInput) {
+                                        // Input is already visible, focus it
+                                        requestAnimationFrame(() => {
+                                            nextInput.focus();
+                                            nextInput.click();
+                                        });
+                                    }
+                                } else {
+                                    // For other columns, just find the input
+                                    const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                    
+                                    if (nextInput) {
+                                        // Use requestAnimationFrame to ensure DOM is updated
+                                        requestAnimationFrame(() => {
+                                            nextInput.focus();
+                                            nextInput.click();
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }, 100); // Small delay to ensure dropdown closes and DOM updates
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
@@ -1756,6 +1955,7 @@ function AsyncChipSelect({
                 if (existingItem) {
                     onChange(existingItem.name);
                     setOpen(false);
+                    setHasPendingNewValue(false);
                 }
             }
         } finally {
@@ -1780,6 +1980,7 @@ function AsyncChipSelect({
                 {/* Show selected value as chip when there's a value and not actively typing */}
                 {(current || value) && !open && (
                     <motion.span
+                        ref={inputRef} // Use the same ref so our focus logic works
                         initial={{scale: 0.95, opacity: 0}}
                         animate={{scale: 1, opacity: 1}}
                         whileHover={{
@@ -1791,12 +1992,91 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm'
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
                         style={{width: '100%', minWidth: '100%'}}
                         title={current || value}
+                        tabIndex={0} // Make it focusable
                         onClick={(e: any) => {
                             const target = e.target as HTMLElement;
                             if (!target.closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                        onKeyDown={(e: any) => {
+                            // Handle Tab navigation from the chip
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Navigate to next field
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                console.log('🎯 Tab from chip:', {
+                                    currentRowId,
+                                    currentCol: currentColDiv?.getAttribute('data-col'),
+                                    type
+                                });
+                                
+                                if (currentRowId && currentColDiv) {
+                                    const currentCol = currentColDiv.getAttribute('data-col');
+                                    let nextCol = '';
+                                    
+                                    // Determine next column based on current column
+                                    if (currentCol === 'enterprise') {
+                                        nextCol = 'product';
+                                    } else if (currentCol === 'product') {
+                                        nextCol = 'services';
+                                    }
+                                    
+                                    console.log('🎯 Navigating from chip to:', nextCol);
+                                    
+                                    if (nextCol) {
+                                        // Find the next column in the same row
+                                        const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="${nextCol}"]`);
+                                        
+                                        if (nextCol === 'services') {
+                                            // For Services column, we need to handle both input and button cases
+                                            let nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            const addMoreButton = nextColDiv?.querySelector('button') as HTMLButtonElement;
+                                            
+                                            console.log('🎯 Services navigation from chip:', {
+                                                nextInput: !!nextInput,
+                                                addMoreButton: !!addMoreButton
+                                            });
+                                            
+                                            if (!nextInput && addMoreButton) {
+                                                console.log('🎯 Clicking Add more button for services');
+                                                addMoreButton.click();
+                                                setTimeout(() => {
+                                                    nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                                    if (nextInput) {
+                                                        nextInput.focus();
+                                                        console.log('🎯 Services input focused after button click');
+                                                    }
+                                                }, 100);
+                                            } else if (nextInput) {
+                                                nextInput.focus();
+                                                console.log('🎯 Services input focused directly');
+                                            }
+                                        } else {
+                                            // For other columns, just find the input
+                                            const nextInput = nextColDiv?.querySelector('input') as HTMLInputElement;
+                                            
+                                            console.log('🎯 Next input found:', !!nextInput);
+                                            
+                                            if (nextInput) {
+                                                nextInput.focus();
+                                                console.log(`🎯 ${nextCol} input focused from chip`);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (e.key === 'Enter' || e.key === ' ') {
+                                // Allow Enter or Space to edit the value
+                                e.preventDefault();
                                 setQuery(current || value || '');
                                 setOpen(true);
                             }
@@ -1844,6 +2124,12 @@ function AsyncChipSelect({
                             }
                         }}
                         onFocus={() => {
+                            // Don't auto-open dropdown if we just created a value
+                            if (justCreatedValue) {
+                                setJustCreatedValue(false); // Reset the flag
+                                return;
+                            }
+                            
                             // Open dropdown on focus to show available options immediately
                             setOpen(true);
                             
@@ -1942,6 +2228,7 @@ function AsyncChipSelect({
                                     setCurrent(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
+                                    setHasPendingNewValue(false);
                                     navigateToNextField(e.target as HTMLInputElement);
                                 } else {
                                     // Create new entry (same logic as Add button)
@@ -1969,6 +2256,7 @@ function AsyncChipSelect({
                                             setCurrent(created.name);
                                             setQuery('');
                                             setOpen(false);
+                                            setHasPendingNewValue(false);
                                             
                                             // Navigate to next field
                                             navigateToNextField(e.target as HTMLInputElement);
@@ -1984,7 +2272,27 @@ function AsyncChipSelect({
                                     }
                                 }
                             } else if (e.key === 'Tab') {
-                                // Always handle Tab with our custom navigation
+                                // Check if user has entered a new value that doesn't exist
+                                if (query.trim() && hasPendingNewValue) {
+                                    // Prevent Tab navigation - user must click + button first
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    // Show visual feedback to indicate they need to click the + button
+                                    console.log('Tab blocked: User must click + button to create new value');
+                                    
+                                    // Focus back on the input and show dropdown if not already open
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    
+                                    // Optional: Could show a brief visual indicator here
+                                    // For now, just prevent the navigation
+                                    return;
+                                }
+                                
+                                // Always handle Tab with our custom navigation for existing values
                                 e.preventDefault(); // Always prevent default Tab behavior
                                 e.stopPropagation(); // Stop event bubbling
                                 
@@ -2000,24 +2308,19 @@ function AsyncChipSelect({
                                         setCurrent(exactMatch.name);
                                         setQuery('');
                                         setOpen(false);
+                                        setHasPendingNewValue(false);
                                         
                                         // Navigate to next field
                                         navigateToNextField(e.target as HTMLInputElement);
                                     } else {
-                                        // No exact match found - commit the current query value and move to next field
-                                        console.log('Tab: Moving to next field and committing current query value:', query.trim());
-                                        
-                                        // Commit the current query value (even if it doesn't match existing options)
-                                        onChange(query.trim());
-                                        setCurrent(query.trim());
-                                        setQuery('');
-                                        setOpen(false);
-                                        
-                                        navigateToNextField(e.target as HTMLInputElement);
+                                        // This case should be handled above, but keeping as fallback
+                                        console.log('Tab: No exact match and hasPendingNewValue should have blocked this');
+                                        return;
                                     }
                                 } else {
                                     // Empty field - just navigate to next field
                                     setOpen(false);
+                                    setHasPendingNewValue(false);
                                     navigateToNextField(e.target as HTMLInputElement);
                                 }
                             } else if (e.key === 'Escape') {
@@ -2025,7 +2328,28 @@ function AsyncChipSelect({
                                 setQuery('');
                             }
                         }}
-                        onBlur={() => {
+                        onBlur={(e) => {
+                            // Check if the blur is due to clicking within the dropdown
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            
+                            // If user has a pending new value and they're not clicking in dropdown, prevent blur
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                // Prevent the field from losing focus if there's a pending new value
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Refocus the input after a short delay
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    // Ensure dropdown stays open to show the + button
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
+                            }
+                            
                             setTimeout(() => {
                                 if (!open) {
                                     const exactMatch = allOptions.find(opt => 
@@ -2034,10 +2358,12 @@ function AsyncChipSelect({
                                     if (exactMatch) {
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
+                                        setHasPendingNewValue(false);
                                     } else if (query && query !== (current || value)) {
                                         // Keep the typed value for potential creation
                                     } else if (!query) {
                                         setQuery('');
+                                        setHasPendingNewValue(false);
                                     }
                                     setQuery('');
                                 }
@@ -2133,15 +2459,29 @@ function AsyncChipSelect({
                                                 transition={{type: 'spring', stiffness: 400, damping: 25}}
                                                 className='relative group'
                                             >
-                                                <button
+                                                <div
+                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                    style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
                                                     onClick={() => {
                                                         onChange(opt.name);
                                                         setCurrent(opt.name);
                                                         setQuery('');
                                                         setOpen(false);
+                                                        setHasPendingNewValue(false);
+                                                        setJustCreatedValue(true); // Prevent auto-opening on focus
+                                                        
+                                                        // Focus the chip after selection so Tab navigation works
+                                                        setTimeout(() => {
+                                                            if (inputRef.current) {
+                                                                try {
+                                                                    inputRef.current.focus();
+                                                                    console.log('🎯 Focused chip after selecting existing option');
+                                                                } catch (e) {
+                                                                    console.log('🎯 Could not focus chip after option selection');
+                                                                }
+                                                            }
+                                                        }, 100);
                                                     }}
-                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 text-left font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between`}
-                                                    style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
                                                 >
                                                     <span className='relative z-10 flex-1'>{opt.name}</span>
                                                     {/* Show minus icon for enterprise and product types */}
@@ -2174,7 +2514,7 @@ function AsyncChipSelect({
                                                         </button>
                                                     )}
                                                     <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                </button>
+                                                </div>
                                             </motion.div>
                                         );
                                     })}
@@ -2188,6 +2528,19 @@ function AsyncChipSelect({
                                         >
                                             <button
                                                 onClick={async () => {
+                                                    // Capture the row context BEFORE any async operations
+                                                    const capturedContext = (() => {
+                                                        if (inputRef.current) {
+                                                            const colDiv = inputRef.current.closest('[data-col]');
+                                                            const rowId = colDiv?.getAttribute('data-row-id');
+                                                            const colType = colDiv?.getAttribute('data-col');
+                                                            return { rowId, colType, inputElement: inputRef.current };
+                                                        }
+                                                        return null;
+                                                    })();
+                                                    
+                                                    console.log('🎯 Captured context before API call:', capturedContext);
+                                                    
                                                     try {
                                                         let created: { id: string; name: string; } | null = null;
                                                         
@@ -2214,11 +2567,39 @@ function AsyncChipSelect({
                                                             setOptions((prev) => [...prev, created!]);
                                                             setAllOptions((prev) => [...prev, created!]);
                                                             
-                                                            // Set the new value
+                                                            // Set the new value and close dropdown
                                                             onChange(created.name);
                                                             setCurrent(created.name);
                                                             setQuery('');
                                                             setOpen(false);
+                                                            setHasPendingNewValue(false); // Reset pending state
+                                                            setJustCreatedValue(true); // Set flag to prevent auto-opening dropdown on focus
+                                                            
+                                                            // Wait for React to update the state and DOM before focusing
+                                                            // This ensures the chip is displayed instead of the input/dropdown
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    // Find the chip element (which now has tabIndex=0 and is focusable)
+                                                                    if (capturedContext && capturedContext.rowId) {
+                                                                        const chipSelector = `[data-row-id="${capturedContext.rowId}"][data-col="${capturedContext.colType}"] span[tabindex="0"]`;
+                                                                        const targetChip = document.querySelector(chipSelector) as HTMLElement;
+                                                                        
+                                                                        if (targetChip) {
+                                                                            targetChip.focus();
+                                                                            console.log('🎯 Focused chip after creation:', chipSelector);
+                                                                        } else {
+                                                                            console.log('🎯 Could not find chip to focus:', chipSelector);
+                                                                            // Fallback: try the inputRef which should now point to the chip
+                                                                            if (inputRef.current) {
+                                                                                inputRef.current.focus();
+                                                                                console.log('🎯 Focused inputRef as fallback');
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (e) {
+                                                                    console.log('🎯 Error focusing after creation:', e);
+                                                                }
+                                                            }, 100); // Small delay to ensure React state updates are complete
                                                             
                                                             // Notify parent component
                                                             if (onNewItemCreated) {

@@ -316,6 +316,11 @@ const DateChipSelect: React.FC<DateChipSelectProps> = ({
                                 // Allow selection of dates from adjacent months if they're within the valid range
                                 const isDisabled = Boolean(isDisabledByRange);
 
+                                // Debug logging for minDate validation
+                                if (minDate && index < 10) { // Only log first few dates to avoid spam
+                                    console.log(`🗓️ Date ${dateString}: minDate=${minDate}, isDisabled=${isDisabled}, comparison=${dateString < minDate}`);
+                                }
+
                                 return (
                                     <button
                                         key={index}
