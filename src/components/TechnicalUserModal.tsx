@@ -1112,7 +1112,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                 {shouldBeInactive(user) && user.status && (
                                                     <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-md">
                                                         <p className="text-xs text-orange-700">
-                                                            <strong>Note:</strong> This user's end date has passed. Status will be automatically set to Inactive when saved.
+                                                            <strong>Note:</strong> This user&apos;s end date has passed. Status will be automatically set to Inactive when saved.
                                                         </p>
                                                     </div>
                                                 )}

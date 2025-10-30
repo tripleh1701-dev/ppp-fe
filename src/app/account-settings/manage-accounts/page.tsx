@@ -3687,11 +3687,11 @@ export default function ManageAccounts() {
 
         // Validate and update user status based on end date before saving
         const validatedUsers = users.map(user => {
-            if (shouldBeInactive(user.endDate) && user.status === 'Active') {
-                console.log(`🔄 Auto-setting user ${user.name} to Inactive due to expired end date: ${user.endDate}`);
+            if (shouldBeInactive(user.endDate) && user.status === true) {
+                console.log(`🔄 Auto-setting user ${user.firstName} ${user.lastName} to Inactive due to expired end date: ${user.endDate}`);
                 return {
                     ...user,
-                    status: 'Inactive' as const
+                    status: false // false = Inactive
                 };
             }
             return user;
