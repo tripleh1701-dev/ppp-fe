@@ -22,7 +22,8 @@ export interface TechnicalUser {
 interface TechnicalUserModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (users: TechnicalUser[]) => void;
+    onSave?: (users: TechnicalUser[]) => void; // Bulk save functionality
+    onSaveIndividual?: (users: TechnicalUser[]) => void; // Individual save functionality
     accountName: string;
     masterAccount: string;
     initialUsers?: TechnicalUser[];
@@ -32,6 +33,7 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     isOpen,
     onClose,
     onSave,
+    onSaveIndividual,
     accountName,
     masterAccount,
     initialUsers = []
@@ -65,6 +67,33 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         return !!(user.firstName?.trim() && 
                  user.lastName?.trim() && 
                  user.emailAddress?.trim());
+    };
+
+    // Helper function to check if user should be automatically set to inactive based on end date
+    const shouldBeInactive = (user: TechnicalUser): boolean => {
+        if (!user.endDate) return false;
+        
+        const today = new Date();
+        const endDate = new Date(user.endDate);
+        
+        // Set time to start of day for accurate comparison
+        today.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
+        
+        // If end date is in the past or today, user should be inactive
+        return endDate <= today;
+    };
+
+    // Helper function to automatically update user status based on end date
+    const updateUserStatusBasedOnEndDate = (user: TechnicalUser): TechnicalUser => {
+        const shouldInactivate = shouldBeInactive(user);
+        
+        if (shouldInactivate && user.status === true) {
+            console.log(`⏰ Auto-setting user ${user.firstName} ${user.lastName} to Inactive (end date: ${user.endDate})`);
+            return { ...user, status: false };
+        }
+        
+        return user;
     };
 
     // Enhanced validation functions
@@ -213,11 +242,16 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         const errors: string[] = [];
         const messages: Record<string, string> = {};
         
-        // Validate First Name
-        const firstNameValidation = validateName(user.firstName || '', 'First name');
-        if (!firstNameValidation.isValid) {
+        // Validate First Name - required, min/max length only
+        if (!user.firstName || !user.firstName.trim()) {
             errors.push('firstName');
-            messages.firstName = firstNameValidation.error || 'First name is invalid';
+            messages.firstName = 'First name is required';
+        } else if (user.firstName.trim().length < 2) {
+            errors.push('firstName');
+            messages.firstName = 'First name must be at least 2 characters long';
+        } else if (user.firstName.trim().length > 50) {
+            errors.push('firstName');
+            messages.firstName = 'First name must not exceed 50 characters';
         }
         
         // Validate Middle Name (optional, but if provided should be valid)
@@ -229,11 +263,16 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             }
         }
         
-        // Validate Last Name
-        const lastNameValidation = validateName(user.lastName || '', 'Last name');
-        if (!lastNameValidation.isValid) {
+        // Validate Last Name - required, min/max length only
+        if (!user.lastName || !user.lastName.trim()) {
             errors.push('lastName');
-            messages.lastName = lastNameValidation.error || 'Last name is invalid';
+            messages.lastName = 'Last name is required';
+        } else if (user.lastName.trim().length < 2) {
+            errors.push('lastName');
+            messages.lastName = 'Last name must be at least 2 characters long';
+        } else if (user.lastName.trim().length > 50) {
+            errors.push('lastName');
+            messages.lastName = 'Last name must not exceed 50 characters';
         }
         
         // Validate Email Address
@@ -257,6 +296,14 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         } else if (!validateDate(user.startDate)) {
             errors.push('startDate');
             messages.startDate = 'Please enter a valid start date';
+        } else {
+            // Check if start date is in the past
+            const today = new Date();
+            const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            if (user.startDate < todayString) {
+                errors.push('startDate');
+                messages.startDate = 'Start date cannot be in the past';
+            }
         }
         
         // Validate End Date
@@ -306,18 +353,26 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             console.log('🔍 TechnicalUserModal opened with initialUsers:', initialUsers);
             if (initialUsers.length > 0) {
                 console.log('👥 Loading initial users:', initialUsers);
-                setUsers(initialUsers);
-                setOriginalUsers(JSON.parse(JSON.stringify(initialUsers))); // Deep copy
+                
+                // Check and update status for users whose end date has passed
+                const usersWithUpdatedStatus = initialUsers.map(user => updateUserStatusBasedOnEndDate(user));
+                
+                setUsers(usersWithUpdatedStatus);
+                setOriginalUsers(JSON.parse(JSON.stringify(usersWithUpdatedStatus))); // Deep copy
                 setActivelyEditingNewUser(new Set());
                 
                 // Debug: Check completion status of each user
-                initialUsers.forEach((user, index) => {
+                usersWithUpdatedStatus.forEach((user, index) => {
                     const isComplete = !!(user.firstName?.trim() && user.lastName?.trim() && user.emailAddress?.trim());
+                    const statusChanged = initialUsers[index].status !== user.status;
                     console.log(`👤 User ${index + 1} completion check:`, {
                         firstName: user.firstName,
                         lastName: user.lastName,
                         emailAddress: user.emailAddress,
                         isComplete,
+                        statusChanged,
+                        currentStatus: user.status ? 'Active' : 'Inactive',
+                        endDate: user.endDate,
                         fullUser: user
                     });
                 });
@@ -344,6 +399,27 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
             setHasUnsavedChanges(false);
         }
     }, [isOpen, initialUsers]);
+
+    // Automatically check and update user status based on end dates at regular intervals
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const checkUserStatusInterval = setInterval(() => {
+            setUsers(prevUsers => {
+                const updatedUsers = prevUsers.map(user => updateUserStatusBasedOnEndDate(user));
+                
+                // Only update if there are actual changes
+                const hasChanges = updatedUsers.some((user, index) => user.status !== prevUsers[index].status);
+                if (hasChanges) {
+                    console.log('⏰ Periodic status check: Updated user statuses based on end dates');
+                }
+                
+                return hasChanges ? updatedUsers : prevUsers;
+            });
+        }, 60000); // Check every minute
+
+        return () => clearInterval(checkUserStatusInterval);
+    }, [isOpen]);
 
     // Track changes to detect unsaved changes
     useEffect(() => {
@@ -417,11 +493,19 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
         });
         
         setUsers(prev => {
-            const updated = prev.map(user => 
-                user.id === id 
-                    ? { ...user, [field]: value }
-                    : user
-            );
+            const updated = prev.map(user => {
+                if (user.id === id) {
+                    let updatedUser = { ...user, [field]: value };
+                    
+                    // If end date is being updated, check if status should be automatically set to inactive
+                    if (field === 'endDate' && typeof value === 'string') {
+                        updatedUser = updateUserStatusBasedOnEndDate(updatedUser);
+                    }
+                    
+                    return updatedUser;
+                }
+                return user;
+            });
             console.log('Updated users:', updated); // Debug log
             return updated;
         });
@@ -602,30 +686,139 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
     };
 
     const handleSave = () => {
-        // Validate all users before saving
-        if (!validateAllUsers()) {
+        // Update all users' status based on end date before validation
+        const usersWithUpdatedStatus = users.map(user => updateUserStatusBasedOnEndDate(user));
+        
+        // Update the users state to reflect the corrected statuses
+        setUsers(usersWithUpdatedStatus);
+        
+        // Use updated users for validation
+        const allUsersValid = usersWithUpdatedStatus.every(user => {
+            const validation = validateUser(user);
+            if (validation.errors.length > 0) {
+                setValidationErrors(prev => ({
+                    ...prev,
+                    [user.id]: validation.errors
+                }));
+                setValidationMessages(prev => ({
+                    ...prev,
+                    [user.id]: validation.messages
+                }));
+                return false;
+            }
+            return true;
+        });
+
+        if (!allUsersValid) {
             return; // Don't save if validation fails
         }
 
-        const validUsers = users.filter(user => 
+        const validUsers = usersWithUpdatedStatus.filter(user => 
             user.firstName.trim() || user.lastName.trim() || user.emailAddress.trim()
         );
-        onSave(validUsers);
+        
+        if (onSave) {
+            onSave(validUsers);
+        }
         setHasUnsavedChanges(false);
         setValidationErrors({}); // Clear validation errors on successful save
         setValidationMessages({}); // Clear validation messages on successful save
         onClose();
     };
 
+    const handleSaveIndividualUser = (user: TechnicalUser) => {
+        // First, check and update status based on end date before validation
+        const userWithUpdatedStatus = updateUserStatusBasedOnEndDate(user);
+        
+        // Validate the user with updated status
+        const userValidation = validateUser(userWithUpdatedStatus);
+        if (userValidation.errors.length > 0) {
+            // Update validation errors to show the errors for this user
+            setValidationErrors(prev => ({
+                ...prev,
+                [user.id]: userValidation.errors
+            }));
+            setValidationMessages(prev => ({
+                ...prev,
+                [user.id]: userValidation.messages
+            }));
+            return; // Don't proceed if there are validation errors
+        }
+
+        // Clear any existing validation errors for this user
+        setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[user.id];
+            return newErrors;
+        });
+
+        setValidationMessages(prev => {
+            const newMessages = { ...prev };
+            delete newMessages[user.id];
+            return newMessages;
+        });
+
+        // Remove from actively editing when user saves
+        setActivelyEditingNewUser(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(user.id);
+            return newSet;
+        });
+        
+        // Update the user in the current state with the corrected status
+        setUsers(prev => prev.map(u => u.id === user.id ? userWithUpdatedStatus : u));
+        
+        // Update originalUsers to reflect that this user is now saved
+        setOriginalUsers(prev => {
+            const updatedOriginal = [...prev];
+            const existingIndex = updatedOriginal.findIndex(u => u.id === user.id);
+            if (existingIndex >= 0) {
+                // Update existing user
+                updatedOriginal[existingIndex] = { ...userWithUpdatedStatus };
+            } else {
+                // Add new user
+                updatedOriginal.push({ ...userWithUpdatedStatus });
+            }
+            return updatedOriginal;
+        });
+        
+        // Save individual user to database immediately with updated status
+        if (onSaveIndividual) {
+            const validUsers = users.map(u => u.id === user.id ? userWithUpdatedStatus : u).filter(user => 
+                user.firstName.trim() || user.lastName.trim() || user.emailAddress.trim()
+            );
+            onSaveIndividual(validUsers);
+        }
+        
+        // Also clear the editingUserId if this user was being edited
+        if (editingUserId === user.id) {
+            setEditingUserId(null);
+        }
+    };
+
     const handleClose = () => {
         if (hasUnsavedChanges) {
             setShowUnsavedChangesDialog(true);
         } else {
+            // Save current users before closing (includes individually saved users)
+            const validUsers = users.filter(user => 
+                user.firstName.trim() || user.lastName.trim() || user.emailAddress.trim()
+            );
+            if (onSave) {
+                onSave(validUsers);
+            }
             onClose();
         }
     };
 
     const handleDiscardChanges = () => {
+        // Even when discarding changes, save any individually saved users
+        const validUsers = originalUsers.filter(user => 
+            user.firstName.trim() || user.lastName.trim() || user.emailAddress.trim()
+        );
+        if (onSave) {
+            onSave(validUsers);
+        }
         setHasUnsavedChanges(false);
         setShowUnsavedChangesDialog(false);
         onClose();
@@ -685,13 +878,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button
-                                    onClick={handleSave}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                                >
-                                    <BookmarkIcon className="h-4 w-4" />
-                                    <span>Save</span>
-                                </button>
-                                <button
                                     onClick={handleClose}
                                     className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
                                 >
@@ -737,53 +923,17 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                             </h3>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            {isUserComplete(user) && activelyEditingNewUser.has(user.id) && (
+                                            {/* Show Save button when actively editing (either incomplete user or explicitly editing) */}
+                                            {(activelyEditingNewUser.has(user.id) || editingUserId === user.id || !isUserComplete(user)) && (
                                                 <button
-                                                    onClick={() => {
-                                                        // Validate the user before allowing Done
-                                                        const validation = validateUser(user);
-                                                        if (validation.errors.length > 0) {
-                                                            // Update validation errors to show the errors for this user
-                                                            setValidationErrors(prev => ({
-                                                                ...prev,
-                                                                [user.id]: validation.errors
-                                                            }));
-                                                            setValidationMessages(prev => ({
-                                                                ...prev,
-                                                                [user.id]: validation.messages
-                                                            }));
-                                                            return; // Don't proceed if there are validation errors
-                                                        }
-
-                                                        // Clear any existing validation errors for this user
-                                                        setValidationErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors[user.id];
-                                                            return newErrors;
-                                                        });
-                                                        setValidationMessages(prev => {
-                                                            const newMessages = { ...prev };
-                                                            delete newMessages[user.id];
-                                                            return newMessages;
-                                                        });
-
-                                                        // Remove from actively editing when user is done
-                                                        setActivelyEditingNewUser(prev => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.delete(user.id);
-                                                            return newSet;
-                                                        });
-                                                        // Also clear the editingUserId if this user was being edited
-                                                        if (editingUserId === user.id) {
-                                                            setEditingUserId(null);
-                                                        }
-                                                    }}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                                    onClick={() => handleSaveIndividualUser(user)}
+                                                    className="flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50"
                                                 >
-                                                    <span>✓ Done</span>
+                                                    <BookmarkIcon className="h-4 w-4" />
+                                                    <span>Save</span>
                                                 </button>
                                             )}
-                                            {isUserComplete(user) && !activelyEditingNewUser.has(user.id) && (
+                                            {isUserComplete(user) && !activelyEditingNewUser.has(user.id) && editingUserId !== user.id && (
                                                 <button
                                                     onClick={() => {
                                                         if (editingUserId === user.id) {
@@ -842,7 +992,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.firstName || ''}
                                                         onChange={(e) => updateUser(user.id, 'firstName', e.target.value)}
-                                                        onBlur={(e) => handleNameBlur(user.id, 'firstName', e.target.value)}
                                                         className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('firstName')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -864,7 +1013,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.middleName || ''}
                                                         onChange={(e) => updateUser(user.id, 'middleName', e.target.value)}
-                                                        onBlur={(e) => handleNameBlur(user.id, 'middleName', e.target.value)}
                                                         className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('middleName')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -886,7 +1034,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type="text"
                                                         value={user.lastName || ''}
                                                         onChange={(e) => updateUser(user.id, 'lastName', e.target.value)}
-                                                        onBlur={(e) => handleNameBlur(user.id, 'lastName', e.target.value)}
                                                         className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('lastName')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -909,7 +1056,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     type="email"
                                                     value={user.emailAddress || ''}
                                                     onChange={(e) => updateUser(user.id, 'emailAddress', e.target.value)}
-                                                    onBlur={(e) => handleEmailBlur(user.id, e.target.value)}
                                                     className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                         validationErrors[user.id]?.includes('emailAddress')
                                                             ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -930,10 +1076,19 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                 <div className="flex items-center space-x-3">
                                                     <button
                                                         type="button"
-                                                        onClick={() => updateUser(user.id, 'status', !user.status)}
+                                                        onClick={() => {
+                                                            // Check if user should be inactive due to end date
+                                                            if (shouldBeInactive(user) && !user.status) {
+                                                                // If user is trying to activate but end date has passed, show warning
+                                                                console.log('⚠️ Cannot activate user - end date has passed');
+                                                                return;
+                                                            }
+                                                            updateUser(user.id, 'status', !user.status);
+                                                        }}
+                                                        disabled={shouldBeInactive(user) && !user.status}
                                                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                                                             user.status ? 'bg-green-600' : 'bg-gray-300'
-                                                        }`}
+                                                        } ${shouldBeInactive(user) && !user.status ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                     >
                                                         <span
                                                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -941,12 +1096,26 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                             }`}
                                                         />
                                                     </button>
-                                                    <span className={`text-sm font-medium ${
-                                                        user.status ? 'text-green-700' : 'text-gray-500'
-                                                    }`}>
-                                                        {user.status ? 'Active' : 'Inactive'}
-                                                    </span>
+                                                    <div className="flex flex-col">
+                                                        <span className={`text-sm font-medium ${
+                                                            user.status ? 'text-green-700' : 'text-gray-500'
+                                                        }`}>
+                                                            {user.status ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                        {shouldBeInactive(user) && (
+                                                            <span className="text-xs text-orange-600 font-medium">
+                                                                Auto-set due to end date
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                {shouldBeInactive(user) && user.status && (
+                                                    <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-md">
+                                                        <p className="text-xs text-orange-700">
+                                                            <strong>Note:</strong> This user&apos;s end date has passed. Status will be automatically set to Inactive when saved.
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             <div className="grid grid-cols-2 gap-4">
@@ -960,6 +1129,10 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         placeholder=""
                                                         isError={validationErrors[user.id]?.includes('startDate')}
                                                         compact={true}
+                                                        minDate={(() => {
+                                                            const today = new Date();
+                                                            return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                                        })()}
                                                     />
                                                     {validationErrors[user.id]?.includes('startDate') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -1006,7 +1179,6 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                         type={passwordVisibility[user.id] ? "text" : "password"}
                                                         value={user.password || ''}
                                                         onChange={(e) => updateUser(user.id, 'password', e.target.value)}
-                                                        onBlur={(e) => handlePasswordBlur(user.id, e.target.value)}
                                                         className={`w-full px-2 py-1 pr-8 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
                                                             validationErrors[user.id]?.includes('password')
                                                                 ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
@@ -1106,11 +1278,18 @@ const TechnicalUserModal: React.FC<TechnicalUserModalProps> = ({
                                                     
                                                     <div>
                                                         <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Status</div>
-                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                                            user.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                            {user.status ? 'Active' : 'Inactive'}
-                                                        </span>
+                                                        <div className="flex flex-col space-y-1">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full w-fit ${
+                                                                user.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                                {user.status ? 'Active' : 'Inactive'}
+                                                            </span>
+                                                            {shouldBeInactive(user) && (
+                                                                <span className="text-xs text-orange-600 font-medium">
+                                                                    Auto-set due to end date
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
 
