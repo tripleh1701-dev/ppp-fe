@@ -441,6 +441,7 @@ export interface AccountRow {
     masterAccount: string;
     cloudType: string;
     address: string;
+    country?: string; // Add country field
     technicalUsers?: any[]; // Add technical users field
     // Add licenses array for expandable sub-rows
     licenses?: License[];
@@ -454,7 +455,6 @@ interface Contact {
     phone: string;
     department: string;
     designation: string;
-    company: string;
 }
 
 export interface License {
@@ -468,6 +468,7 @@ export interface License {
     contactDetails: Contact;
     renewalNotice: boolean;
     noticePeriodDays?: string;
+    stableId?: string; // Add stableId field
 }
 
 function InlineEditableText({
@@ -3707,7 +3708,14 @@ function LicenseSubRow({
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Contact</label>}
                     <div className={`flex items-start justify-center pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
                         <button
-                            onClick={() => onOpenContactModal(rowId, license.id, license.contactDetails)}
+                            onClick={() => {
+                                console.log('📞 Contact icon clicked for license:', license);
+                                console.log('📞 License ID being passed:', license.id);
+                                console.log('📞 License contactDetails from render:', license.contactDetails);
+                                // Pass the license contact details as initialData
+                                // handleOpenContactModal will always prioritize ref data over this
+                                onOpenContactModal(rowId, license.id, license.contactDetails);
+                            }}
                             className="flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 hover:border-blue-400 transition-all duration-200 group shadow-sm hover:shadow-md"
                             title="Edit contact details"
                         >
@@ -3798,6 +3806,8 @@ function SortableAccountRow({
     onOpenAddressModal,
     onOpenTechnicalUserModal,
     selectedEnterpriseName = '',
+    showValidationErrors = false,
+    incompleteRowIds = [],
 }: {
     row: AccountRow;
     index: number;
@@ -3838,6 +3848,8 @@ function SortableAccountRow({
     onOpenAddressModal?: (row: AccountRow) => void;
     onOpenTechnicalUserModal?: (row: AccountRow) => void;
     selectedEnterpriseName?: string;
+    showValidationErrors?: boolean;
+    incompleteRowIds?: string[];
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -4052,19 +4064,29 @@ function SortableAccountRow({
         );
     };
 
+    // Check if this row has validation errors (incomplete licenses or other fields)
+    const hasRowValidationError = showValidationErrors && (
+        incompleteRowIds.includes(row.id) || 
+        isCellMissing(row.id, 'accountName') ||
+        isCellMissing(row.id, 'masterAccount') ||
+        isCellMissing(row.id, 'cloudType')
+    );
+
     return (
         <div
             id={row.id}
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
-                isSelected 
-                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
-                    : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
-            } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
-                isSelected ? 'border-blue-300' : 'border-slate-200'
-            } ${inFillRange ? 'bg-primary-50/40' : ''} ${
+            className={`w-full grid items-center gap-0 border rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+                hasRowValidationError
+                    ? 'border-red-500 bg-red-50 shadow-md ring-2 ring-red-200'
+                    : isSelected 
+                        ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200' 
+                        : 'border-slate-200 hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
+            } ${index % 2 === 0 ? (isSelected || hasRowValidationError ? '' : 'bg-white') : (isSelected || hasRowValidationError ? '' : 'bg-slate-50/70')} ${
+                inFillRange ? 'bg-primary-50/40' : ''
+            } ${
                 isExpanded
                     ? 'bg-primary-50'
                     : ''
@@ -4427,6 +4449,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     // State for expanded rows and licenses
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
+    const rowLicensesRef = useRef<Record<string, License[]>>({});
     const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
     const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
     
@@ -4440,6 +4463,21 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const [contactModalLicenseId, setContactModalLicenseId] = useState<string | null>(null);
     const [contactModalAccountName, setContactModalAccountName] = useState<string>('');
     const [contactModalMasterAccount, setContactModalMasterAccount] = useState<string>('');
+
+    // Monitor rowLicenses state changes for debugging
+    useEffect(() => {
+        console.log('🔄 rowLicenses state changed:', rowLicenses);
+        // Keep ref in sync with state for latest access
+        rowLicensesRef.current = rowLicenses;
+        // Log contact details for the license that was just updated
+        Object.entries(rowLicenses).forEach(([accountId, licenses]) => {
+            licenses.forEach(license => {
+                if (license.contactDetails && (license.contactDetails.name || license.contactDetails.email)) {
+                    console.log(`🔄 Account ${accountId} License ${license.id} contact:`, license.contactDetails);
+                }
+            });
+        });
+    }, [rowLicenses]);
 
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
@@ -4585,11 +4623,31 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             const initialLicenses: Record<string, License[]> = {};
             rows.forEach(row => {
                 if (row.licenses && row.licenses.length > 0) {
+                    console.log(`🔍 Initializing licenses for account ${row.accountName}:`, {
+                        accountId: row.id,
+                        licensesCount: row.licenses.length,
+                        licenses: row.licenses,
+                        licenseIds: row.licenses.map(l => l.id),
+                        actualLicenseIdsWithDetails: row.licenses.map(l => ({ id: l.id, enterprise: l.enterprise, product: l.product, service: l.service }))
+                    });
+                    
+                    // Check for duplicate license IDs within the same account
+                    const licenseIds = row.licenses.map(l => l.id);
+                    const uniqueLicenseIds = Array.from(new Set(licenseIds));
+                    if (licenseIds.length !== uniqueLicenseIds.length) {
+                        console.error(`❌ Duplicate license IDs found in account ${row.accountName}:`, {
+                            total: licenseIds.length,
+                            unique: uniqueLicenseIds.length,
+                            duplicates: licenseIds.filter((id: string, index: number) => licenseIds.indexOf(id) !== index)
+                        });
+                    }
+                    
                     initialLicenses[row.id] = row.licenses;
                 }
             });
             
             if (Object.keys(initialLicenses).length > 0) {
+                console.log('🔍 Setting initial rowLicenses:', initialLicenses);
                 setRowLicenses(initialLicenses);
             }
             setHasInitializedLicenses(true);
@@ -4879,8 +4937,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 email: '',
                 phone: '',
                 department: '',
-                designation: '',
-                company: ''
+                designation: ''
             },
             renewalNotice: false,
             noticePeriodDays: ''
@@ -5224,15 +5281,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             Object.entries(rowLicenses).forEach(([rowId, licenses]) => {
                 const hasIncomplete = licenses.some(license => {
-                    // Check for missing required fields
+                    // Only check for missing required fields (not duplicates)
+                    // Duplicates should be visually indicated but shouldn't prevent adding new rows
                     const hasMissingFields = !license.enterprise || !license.product || !license.service || 
                         !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                         (license.renewalNotice && !license.noticePeriodDays);
                     
-                    // Check for duplicates
-                    const isDuplicate = isLicenseDuplicate(license, rowId);
-                    
-                    return hasMissingFields || isDuplicate;
+                    return hasMissingFields;
                 });
                 
                 if (hasIncomplete) {
@@ -5243,7 +5298,20 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             onLicenseValidationChange(hasIncompleteLicenses, incompleteLicenseRows);
         }
-    }, [rowLicenses, onLicenseValidationChange, isLicenseDuplicate]);
+    }, [rowLicenses, onLicenseValidationChange]);
+
+    // Auto-expand rows with incomplete licenses when validation errors are shown
+    React.useEffect(() => {
+        if (showValidationErrors && incompleteRowIds && incompleteRowIds.length > 0) {
+            setExpandedRows(prev => {
+                const newExpanded = new Set(prev);
+                incompleteRowIds.forEach(rowId => {
+                    newExpanded.add(rowId);
+                });
+                return newExpanded;
+            });
+        }
+    }, [showValidationErrors, incompleteRowIds]);
 
     // Function to check if there are any incomplete licenses
     const hasIncompleteLicenses = () => {
@@ -5377,15 +5445,84 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     };
 
     // ContactModal handlers for license contact details
-    const handleOpenContactModal = (rowId: string, licenseId: string, initialData?: Contact) => {
+    const handleOpenContactModal = useCallback((rowId: string, licenseId: string, initialData?: Contact) => {
+        console.log('📞 Opening ContactModal:', { rowId, licenseId, initialData });
+        console.log('📞 Contact data in initialData:', initialData);
+        
+        // Use a function to get the current state at the time of execution
+        // This ensures we get the most up-to-date state each time the function is called
+        const getCurrentLicenseData = () => {
+            const currentRowLicenses = rowLicensesRef.current[rowId] || [];
+            const currentLicense = currentRowLicenses.find(license => license.id === licenseId);
+            return {
+                currentRowLicenses,
+                currentLicense,
+                mostCurrentContactData: currentLicense?.contactDetails
+            };
+        };
+        
+        const { currentRowLicenses, currentLicense, mostCurrentContactData } = getCurrentLicenseData();
+        
+        console.log('🔍 Current rowLicenses state snapshot (from ref):', JSON.stringify(rowLicensesRef.current, null, 2));
+        console.log('🔍 Current license from rowLicenses state (immediate):', currentLicense);
+        console.log('🔍 Most current contact data (immediate):', mostCurrentContactData);
+        console.log('🔍 Passed initialData (immediate):', initialData);
+        
+        // CRITICAL FIX: Always prioritize ref data first, then fall back to initialData
+        // This ensures we use the most up-to-date saved state, not stale render data
+        let contactDataToUse: Contact;
+        
+        if (mostCurrentContactData && (
+            mostCurrentContactData.name || 
+            mostCurrentContactData.email || 
+            mostCurrentContactData.phone ||
+            mostCurrentContactData.department ||
+            mostCurrentContactData.designation
+        )) {
+            contactDataToUse = mostCurrentContactData;
+            console.log('🔍 Using most current contact data from ref state (priority #1)');
+        } else if (initialData && (
+            initialData.name || 
+            initialData.email || 
+            initialData.phone ||
+            initialData.department ||
+            initialData.designation
+        )) {
+            contactDataToUse = initialData;
+            console.log('🔍 Using initialData from render (fallback #2)');
+        } else {
+            contactDataToUse = {
+                id: '',
+                name: '',
+                email: '',
+                phone: '',
+                department: '',
+                designation: '',
+            };
+            console.log('🔍 Using empty defaults (fallback #3)');
+        }
+        
+        console.log('🔍 Final contact data being used (immediate):', contactDataToUse);
+        
         const row = localRows.find(r => r.id === rowId);
+        
+        // Set all modal state including data before opening the modal
+        // Use React 18's batching to ensure all updates happen together
         setContactModalRowId(rowId);
         setContactModalLicenseId(licenseId);
         setContactModalAccountName(row?.accountName || '');
         setContactModalMasterAccount(row?.masterAccount || '');
-        setContactModalData(initialData ? [initialData] : []);
-        setShowContactModal(true);
-    };
+        
+        // CRITICAL FIX: Ensure modal data is set with the most current contact data
+        // before opening the modal to prevent stale data from being displayed
+        setContactModalData([contactDataToUse]);
+        
+        // Small delay to ensure state updates are processed before opening modal
+        setTimeout(() => {
+            console.log('🔍 Opening modal with contactDataToUse:', contactDataToUse);
+            setShowContactModal(true);
+        }, 1);
+    }, [localRows]); // Remove rowLicensesRef dependency since we're using ref directly
 
     const handleCloseContactModal = () => {
         setShowContactModal(false);
@@ -5406,8 +5543,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             email: '',
             phone: '',
             department: '',
-            designation: '',
-            company: ''
+            designation: ''
         };
 
         setRowLicenses(prev => {
@@ -5429,6 +5565,214 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         });
 
         handleCloseContactModal();
+    };
+
+    const handleContactModalSaveIndividual = async (contacts: Contact[]) => {
+        console.log('🔍 AccountsTable: handleContactModalSaveIndividual called');
+        console.log('🔍 AccountsTable: contacts received:', contacts);
+        console.log('🔍 AccountsTable: contactModalRowId:', contactModalRowId);
+        console.log('🔍 AccountsTable: contactModalLicenseId:', contactModalLicenseId);
+        
+        if (!contactModalRowId || !contactModalLicenseId || contacts.length === 0) {
+            console.error('❌ AccountsTable: Missing required data for individual save');
+            return;
+        }
+
+        let contact = contacts[0]; // Individual save only handles one contact
+        console.log('💾 Saving individual contact for license:', contactModalLicenseId, 'Contact:', contact);
+
+        try {
+            // Find the current row data to preserve other fields
+            const currentRow = localRows.find(r => r.id === contactModalRowId);
+            if (!currentRow) {
+                console.error('❌ Current row not found for individual contact save');
+                return;
+            }
+
+            // Skip API call for temporary rows (not yet in database)
+            if (!contactModalRowId.startsWith('tmp-')) {
+                // Get all licenses for this row to construct the full update
+                const currentRowLicenses = rowLicenses[contactModalRowId] || [];
+                const updatedLicenses = currentRowLicenses.map(license => {
+                    if (license.id === contactModalLicenseId) {
+                        return {
+                            ...license,
+                            contactDetails: contact
+                        };
+                    }
+                    return license;
+                });
+
+                // CRITICAL FIX: Update ref immediately with the saved contact data BEFORE API call
+                // This ensures the ref has the latest data if user clicks contact icon immediately after save
+                const licenseIndex = rowLicensesRef.current[contactModalRowId]?.findIndex(l => l.id === contactModalLicenseId) ?? -1;
+                if (licenseIndex !== -1) {
+                    const currentRefLicenses = [...rowLicensesRef.current[contactModalRowId]];
+                    currentRefLicenses[licenseIndex] = {
+                        ...currentRefLicenses[licenseIndex],
+                        contactDetails: contact
+                    };
+                    
+                    console.log('🔄 Pre-emptively updating ref with contact data for immediate access:', contact);
+                    rowLicensesRef.current = {
+                        ...rowLicensesRef.current,
+                        [contactModalRowId]: currentRefLicenses
+                    };
+                }
+
+                // Prepare the full account data for API
+                const requestData = {
+                    id: contactModalRowId,
+                    accountName: currentRow.accountName || '',
+                    masterAccount: currentRow.masterAccount || '',
+                    cloudType: currentRow.cloudType || '',
+                    address: currentRow.address || '',
+                    licenses: updatedLicenses,
+                    technicalUsers: currentRow.technicalUsers || [],
+                };
+
+                console.log('🔍 Individual Contact API Request Data:', {
+                    url: '/api/accounts',
+                    method: 'PUT',
+                    data: requestData,
+                    updatedContact: contact,
+                });
+
+                const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                const response = await fetch(`${apiBase}/api/accounts`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Individual Contact API Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorText: errorText
+                    });
+                    throw new Error(`Failed to save contact to API: ${response.statusText} - ${errorText}`);
+                }
+
+                const responseData = await response.json();
+                console.log('✅ Individual contact saved to API successfully', {
+                    response: responseData,
+                    contactInResponse: responseData?.licenses?.find((l: any) => l.id === contactModalLicenseId)?.contactDetails || 'Not present'
+                });
+
+                // Check if API response contains updated contact data
+                const apiUpdatedContact = responseData?.licenses?.find((l: any) => l.id === contactModalLicenseId)?.contactDetails;
+                if (apiUpdatedContact) {
+                    console.log('✅ Using API response contact data as source of truth:', apiUpdatedContact);
+                    contact = apiUpdatedContact; // Use API response as the authoritative data
+                }
+
+                // Clear localStorage backup since API now has the latest data
+                const currentLicense = currentRowLicenses.find(l => l.id === contactModalLicenseId);
+                if (currentLicense?.stableId) {
+                    const stableKey = `contact-${currentLicense.stableId}`;
+                    localStorage.removeItem(stableKey);
+                    console.log('🧹 Cleared localStorage backup for stable key:', stableKey);
+                }
+            } else {
+                console.log('⏭️ Skipping API save for temporary row:', contactModalRowId);
+            }
+
+        } catch (error) {
+            console.error('❌ Error saving individual contact to API:', error);
+            // Continue with local save even if API fails
+        }
+
+        // Update local state (this is the same as the existing handleContactModalSave)
+        const updatePromise = new Promise<Contact>((resolve) => {
+            setRowLicenses(prev => {
+                const rowLicenses = prev[contactModalRowId] || [];
+                const updatedLicenses = rowLicenses.map(license => {
+                    if (license.id === contactModalLicenseId) {
+                        return {
+                            ...license,
+                            contactDetails: contact
+                        };
+                    }
+                    return license;
+                });
+                
+                const newState = {
+                    ...prev,
+                    [contactModalRowId]: updatedLicenses
+                };
+                
+                // IMMEDIATELY update the ref with the new state - don't wait for useEffect
+                rowLicensesRef.current = newState;
+                
+                console.log('🔄 setRowLicenses called, returning new state:', newState);
+                console.log('🔄 Updated license with contact:', updatedLicenses.find(l => l.id === contactModalLicenseId));
+                console.log('🔄 Ref immediately updated with new state');
+                
+                // Save to localStorage only as backup for temporary rows or if API save might have failed
+                try {
+                    const licenseToUpdate = updatedLicenses.find(l => l.id === contactModalLicenseId);
+                    if (licenseToUpdate && licenseToUpdate.stableId && contactModalRowId?.startsWith('temp-')) {
+                        const contactKey = `contact-${licenseToUpdate.stableId}`;
+                        localStorage.setItem(contactKey, JSON.stringify(contact));
+                        console.log('💾 Saved contact to localStorage as backup for temp row:', { key: contactKey, contact });
+                    } else {
+                        console.log('⏭️ Skipped localStorage backup - API is source of truth for permanent rows');
+                    }
+                } catch (error) {
+                    console.error('❌ Error saving contact to localStorage:', error);
+                }
+                
+                // Resolve the promise with the updated contact data
+                resolve(contact);
+                
+                return newState;
+            });
+        });
+        
+        // Wait for the state update to complete, then update the ref with the exact contact data
+        updatePromise.then((updatedContact) => {
+            console.log('🔄 Promise resolved with updated contact:', updatedContact);
+            // Force the ref to have the updated data immediately
+            if (rowLicensesRef.current[contactModalRowId]) {
+                const licenseIndex = rowLicensesRef.current[contactModalRowId].findIndex(l => l.id === contactModalLicenseId);
+                if (licenseIndex >= 0) {
+                    rowLicensesRef.current[contactModalRowId][licenseIndex].contactDetails = updatedContact;
+                    console.log('🔄 Force-updated ref with contact data:', updatedContact);
+                }
+            }
+            
+            // Force a re-render by updating state again to ensure UI reflects the changes
+            setTimeout(() => {
+                setRowLicenses(prev => ({...prev}));
+                console.log('🔄 Forced re-render after contact save');
+            }, 10);
+        });
+
+        // Use setTimeout to log when the state should be available and force a re-render
+        setTimeout(() => {
+            console.log('🔄 State should be updated now, checking rowLicenses...');
+            const currentLicenses = rowLicenses[contactModalRowId] || [];
+            const updatedLicense = currentLicenses.find(l => l.id === contactModalLicenseId);
+            console.log('🔄 License after state update:', updatedLicense);
+            
+            // Force a state update to ensure React knows about the change
+            setRowLicenses(prev => ({ ...prev }));
+            
+            // Additional force update to ensure all components re-render with latest data
+            setTimeout(() => {
+                console.log('🔄 Second state verification after forced update...');
+                const finalCurrentLicenses = rowLicenses[contactModalRowId] || [];
+                const finalUpdatedLicense = finalCurrentLicenses.find(l => l.id === contactModalLicenseId);
+                console.log('🔄 Final license state after all updates:', finalUpdatedLicense);
+            }, 100);
+        }, 50); // Increased timeout to ensure state is committed
+
+        // Don't close the modal for individual saves - user might want to continue editing
+        console.log('✅ Individual contact saved locally');
     };
 
     // removed fill down state
@@ -6273,6 +6617,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
                                         onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                        showValidationErrors={showValidationErrors}
+                                        incompleteRowIds={incompleteRowIds}
                                     />
                                     {expandedRows.has(r.id) && (
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-20 mt-1 mb-2'>
@@ -6310,32 +6656,54 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
                                                     
                                                     {/* Existing License Rows */}
-                                                    {(rowLicenses[r.id] || []).map((license, index) => (
-                                                        <div key={license.id} className={`relative ${index === (rowLicenses[r.id] || []).length - 1 ? 'rounded-b-lg' : ''}`}>
-                                                            {/* Connection line from license row to left blue panel */}
-                                                            <div className="absolute -left-6 top-1/2 w-6 h-px bg-blue-300"></div>
-                                                            <div className="absolute -left-6 top-1/2 w-px h-4 -mt-2 bg-blue-300"></div>
-                                                            <LicenseSubRow
-                                                                license={license}
-                                                                rowId={r.id}
-                                                                onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
-                                                                onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
-                                                                showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
-                                                                isLicenseFieldMissing={isLicenseFieldMissing}
-                                                                isLicenseDuplicate={isLicenseDuplicate}
-                                                                compressingLicenseId={compressingLicenseId}
-                                                                foldingLicenseId={foldingLicenseId}
-                                                                onDeleteClick={onLicenseDelete}
-                                                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                                                onNewItemCreated={onNewItemCreated as any}
-                                                                onOpenContactModal={handleOpenContactModal}
-                                                                accounts={rows}
-                                                                isTableRow={true}
-                                                                isLastRow={index === (rowLicenses[r.id] || []).length - 1}
-                                                                dropdownOptions={dropdownOptions as any}
-                                                            />
-                                                        </div>
-                                                    ))}
+                                                    {(() => {
+                                                        // Deduplicate licenses to prevent duplicate rendering
+                                                        const allLicenses = rowLicenses[r.id] || [];
+                                                        const uniqueLicenses = allLicenses.filter((license, index, array) => 
+                                                            array.findIndex(l => l.id === license.id) === index
+                                                        );
+                                                        
+                                                        console.log(`🔍 License rendering for ${r.accountName}:`, {
+                                                            originalCount: allLicenses.length,
+                                                            uniqueCount: uniqueLicenses.length,
+                                                            licenseIds: uniqueLicenses.map(l => l.id)
+                                                        });
+                                                        
+                                                        return uniqueLicenses.map((license, index) => {
+                                                            console.log(`🔍 Rendering license ${index} for account ${r.accountName}:`, {
+                                                                licenseId: license.id,
+                                                                enterprise: license.enterprise,
+                                                                product: license.product,
+                                                                service: license.service
+                                                            });
+                                                            return (
+                                                                <div key={license.id} className={`relative ${index === uniqueLicenses.length - 1 ? 'rounded-b-lg' : ''}`}>
+                                                                    {/* Connection line from license row to left blue panel */}
+                                                                    <div className="absolute -left-6 top-1/2 w-6 h-px bg-blue-300"></div>
+                                                                    <div className="absolute -left-6 top-1/2 w-px h-4 -mt-2 bg-blue-300"></div>
+                                                                    <LicenseSubRow
+                                                                        license={license}
+                                                                        rowId={r.id}
+                                                                        onUpdate={(licenseId, field, value) => updateLicense(r.id, licenseId, field, value)}
+                                                                        onDelete={(licenseId) => deleteLicense(r.id, licenseId)}
+                                                                        showValidationErrors={showValidationErrors && licenseValidationTriggered.has(r.id)}
+                                                                        isLicenseFieldMissing={isLicenseFieldMissing}
+                                                                        isLicenseDuplicate={isLicenseDuplicate}
+                                                                        compressingLicenseId={compressingLicenseId}
+                                                                        foldingLicenseId={foldingLicenseId}
+                                                                        onDeleteClick={onLicenseDelete}
+                                                                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                                                        onNewItemCreated={onNewItemCreated as any}
+                                                                        onOpenContactModal={handleOpenContactModal}
+                                                                        accounts={rows}
+                                                                        isTableRow={true}
+                                                                        isLastRow={index === uniqueLicenses.length - 1}
+                                                                        dropdownOptions={dropdownOptions as any}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        });
+                                                    })()}
                                                     
                                                     {/* Add New License Button */}
                                                     <div 
@@ -6478,6 +6846,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
                                                     onOpenTechnicalUserModal={onOpenTechnicalUserModal}
+                                                    showValidationErrors={showValidationErrors}
+                                                    incompleteRowIds={incompleteRowIds}
                                                 />
                                             </div>
                                         ))}
@@ -6524,6 +6894,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 isOpen={showContactModal}
                 onClose={handleCloseContactModal}
                 onSave={handleContactModalSave}
+                onSaveIndividual={handleContactModalSaveIndividual}
                 accountName={contactModalAccountName}
                 masterAccount={contactModalMasterAccount}
                 initialContacts={contactModalData}
