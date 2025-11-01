@@ -243,7 +243,7 @@ export const deviceRender = {
 };
 
 // Export all utilities as a single object for easy importing
-export default {
+const responsiveUtils = {
     // Device detection
     isMobile,
     isTablet,
@@ -290,3 +290,5 @@ export default {
     // CSS helpers
     responsiveStyles,
 };
+
+export default responsiveUtils;

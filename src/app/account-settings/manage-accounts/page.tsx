@@ -1706,14 +1706,23 @@ export default function ManageAccounts() {
         // Get current license state from AccountsTable to ensure we have the latest data
         const currentLicenseState =
             accountsTableRef.current?.getCurrentLicenseState?.() || {};
+        
+        console.log('📋 Current license state from AccountsTable:', currentLicenseState);
+        console.log('📋 License state breakdown:', Object.keys(currentLicenseState).map(rowId => ({
+            rowId,
+            licenseCount: currentLicenseState[rowId]?.length || 0,
+            licenses: currentLicenseState[rowId]
+        })));
 
         // Update effectiveConfigs with current license state
         const configsWithCurrentLicenses = effectiveConfigs.map(
             (config: any) => {
                 const currentLicenses = currentLicenseState[config.id];
                 if (currentLicenses) {
+                    console.log(`📋 Updating config ${config.id} with ${currentLicenses.length} licenses`);
                     return {...config, licenses: currentLicenses};
                 }
+                console.log(`📋 No licenses found for config ${config.id}`);
                 return config;
             },
         );
@@ -2121,7 +2130,11 @@ export default function ManageAccounts() {
 
             // Save temporary rows
             for (const tempRow of completeTemporaryRows) {
-                await autoSaveNewAccount(tempRow.id);
+                // Find the corresponding row with current license data
+                const tempRowWithLicenses = configsWithCurrentLicenses.find(config => config.id === tempRow.id) || tempRow;
+                console.log(`💾 Saving temporary row ${tempRow.id} with current license data:`, tempRowWithLicenses.licenses?.length || 0, 'licenses');
+                
+                await autoSaveNewAccount(tempRow.id, tempRowWithLicenses);
                 savedCount++;
             }
 
@@ -2134,14 +2147,33 @@ export default function ManageAccounts() {
             // Filter out records that don't actually have pending changes
             const actuallyModifiedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => {
                 const hasPendingChanges = pendingLocalChanges[recordId] && Object.keys(pendingLocalChanges[recordId]).length > 0;
+                
+                // CRITICAL FIX: Also check if this record has license changes
+                const currentLicenseState = accountsTableRef.current?.getCurrentLicenseState?.() || {};
+                const hasLicenseChanges = currentLicenseState[recordId] && currentLicenseState[recordId].length > 0;
+                
+                // Find the original account to compare license counts
+                const originalAccount = configsWithCurrentLicenses.find(config => config.id === recordId);
+                const originalLicenseCount = originalAccount?.licenses?.length || 0;
+                const currentLicenseCount = currentLicenseState[recordId]?.length || 0;
+                const hasLicenseCountChanged = currentLicenseCount !== originalLicenseCount;
+                
                 console.log(`🔍 Checking record ${recordId}:`, {
                     hasPendingChanges,
-                    pendingChanges: pendingLocalChanges[recordId]
+                    pendingChanges: pendingLocalChanges[recordId],
+                    hasLicenseChanges,
+                    hasLicenseCountChanged,
+                    originalLicenseCount,
+                    currentLicenseCount
                 });
-                if (!hasPendingChanges) {
-                    console.log(`❌ Removing phantom modified record: ${recordId} (no pending changes)`);
+                
+                const shouldKeep = hasPendingChanges || hasLicenseChanges || hasLicenseCountChanged;
+                if (!shouldKeep) {
+                    console.log(`❌ Removing phantom modified record: ${recordId} (no pending changes or license changes)`);
+                } else if (hasLicenseChanges || hasLicenseCountChanged) {
+                    console.log(`✅ Keeping record ${recordId} due to license changes`);
                 }
-                return hasPendingChanges;
+                return shouldKeep;
             });
             
             // Update the sets to only contain actually modified records
@@ -2168,6 +2200,15 @@ export default function ManageAccounts() {
 
                 // Only proceed if there are actual changes
                 if (hasActiveAutoSave || actuallyModifiedRecords.length > 0 || Object.keys(pendingLocalChanges).length > 0) {
+                    // CRITICAL FIX: Update accountsRef with current license state before calling executeAutoSave
+                    console.log('🔄 Updating accountsRef with current license state before save...');
+                    accountsRef.current = configsWithCurrentLicenses;
+                    console.log('✅ Updated accountsRef with current license data');
+                    
+                    // Also update the main accounts state to ensure consistency
+                    setAccounts(configsWithCurrentLicenses);
+                    console.log('✅ Updated main accounts state with current license data');
+                    
                     // Trigger the auto-save process immediately instead of waiting for timer
                     const pendingSavedCount = await executeAutoSave();
 
@@ -2202,6 +2243,11 @@ export default function ManageAccounts() {
                 setModifiedExistingRecords(new Set());
                 setHasUnsavedChanges(false);
                 setPreventNavigation(false);
+                
+                // Update localStorage with the current state including license data
+                await saveAccountsToStorage(configsWithCurrentLicenses);
+                console.log('💾 Updated localStorage with current license data after manual save');
+                
                 console.log('🧹 Cleared all unsaved changes state after successful save');
                 
             } else if (hasPendingChanges) {
@@ -2213,6 +2259,11 @@ export default function ManageAccounts() {
                 setModifiedExistingRecords(new Set());
                 setHasUnsavedChanges(false);
                 setPreventNavigation(false);
+                
+                // Update localStorage with the current state including license data
+                await saveAccountsToStorage(configsWithCurrentLicenses);
+                console.log('💾 Updated localStorage with current license data after pending changes save');
+                
                 console.log('🧹 Cleared all unsaved changes state after saving pending changes');
                 
             } else {
@@ -2666,8 +2717,16 @@ export default function ManageAccounts() {
                             technicalUsers: account.technicalUsers || [],
                             // Transform license field names from backend to frontend format
                             licenses: (account.licenses || []).map(
-                                (license: any) => ({
-                                    id: license.id,
+                                (license: any) => {
+                                    console.log(`📋 Processing license ${license.id} for account ${account.accountName}`);
+                                    
+                                    // Create a stable license identifier based on business properties
+                                    // instead of relying on potentially unstable API-generated IDs
+                                    const stableLicenseKey = `${account.id}-${license.enterprise || ''}-${license.product || ''}-${license.service || ''}`;
+                                    
+                                    return {
+                                    id: license.id, // Keep original ID for API operations
+                                    stableId: stableLicenseKey, // Add stable identifier for localStorage
                                     enterprise: license.enterprise || '',
                                     product: license.product || '',
                                     service: license.service || '',
@@ -2683,23 +2742,74 @@ export default function ManageAccounts() {
                                         license.users ||
                                         license.numberOfUsers ||
                                         '',
-                                    contactDetails: license.contactDetails ||
-                                        license.contacts || {
-                                            id: '',
-                                            name: '',
-                                            email: '',
-                                            phone: '',
-                                            department: '',
-                                            designation: '',
-                                            company: '',
-                                        },
+                                    contactDetails: (() => {
+                                        // Handle different contact data structures from API
+                                        let contactDetails;
+                                        
+                                        if (license.contactDetails) {
+                                            // Direct contactDetails object
+                                            contactDetails = license.contactDetails;
+                                        } else if (license.contacts) {
+                                            // contacts might be an array, take first item
+                                            if (Array.isArray(license.contacts) && license.contacts.length > 0) {
+                                                contactDetails = license.contacts[0];
+                                            } else if (typeof license.contacts === 'object') {
+                                                // contacts is an object
+                                                contactDetails = license.contacts;
+                                            } else {
+                                                contactDetails = {
+                                                    id: '',
+                                                    name: '',
+                                                    email: '',
+                                                    phone: '',
+                                                    department: '',
+                                                    designation: '',
+                                                };
+                                            }
+                                        } else {
+                                            // No contact data, create empty structure
+                                            contactDetails = {
+                                                id: '',
+                                                name: '',
+                                                email: '',
+                                                phone: '',
+                                                department: '',
+                                                designation: '',
+                                            };
+                                        }
+                                        
+                                        // Check localStorage for contact data using stable ID
+                                        const contactKey = `contact-${stableLicenseKey}`;
+                                        try {
+                                            const savedContact = localStorage.getItem(contactKey);
+                                            if (savedContact) {
+                                                const parsedContact = JSON.parse(savedContact);
+                                                console.log(`📞 Found saved contact data for stable key ${contactKey}:`, parsedContact);
+                                                contactDetails = { ...contactDetails, ...parsedContact };
+                                            }
+                                        } catch (error) {
+                                            console.warn(`⚠️ Error loading saved contact for ${contactKey}:`, error);
+                                        }
+                                        
+                                        // Debug log for contact details
+                                        console.log(`📞 Contact details processing for license ${license.id}:`, {
+                                            rawContactDetails: license.contactDetails,
+                                            rawContacts: license.contacts,
+                                            processedContactDetails: contactDetails,
+                                            hasContactData: !!(contactDetails.name || contactDetails.email),
+                                            stableLicenseKey: stableLicenseKey
+                                        });
+                                        
+                                        return contactDetails;
+                                    })(),
                                     renewalNotice:
                                         license.renewalNotice || false,
                                     noticePeriodDays:
                                         license.noticePeriod?.toString() ||
                                         license.noticePeriodDays ||
                                         '',
-                                }),
+                                    };
+                                }
                             ),
                         };
                     });
@@ -2743,7 +2853,7 @@ export default function ManageAccounts() {
                     console.error('❌ Error loading from localStorage:', error);
                 }
 
-                // Merge API data with localStorage data (localStorage takes priority for individual saves)
+                // Merge API data with localStorage data (API takes priority for license data)
                 if (localStorageAccountsData.length > 0) {
                     console.log('📊 Merging API data with localStorage data');
                     const mergedData = [...accountsData];
@@ -2752,10 +2862,124 @@ export default function ManageAccounts() {
                     localStorageAccountsData.forEach((localAccount: any) => {
                         const apiAccountIndex = mergedData.findIndex(acc => acc.id === localAccount.id);
                         if (apiAccountIndex >= 0) {
-                            // Merge localStorage data with API data, keeping localStorage priority for addresses and technical users
+                            // Smart merge: use API licenses as primary (to preserve deletions), but merge with localStorage for edits
+                            const apiAccount = mergedData[apiAccountIndex];
+                            const localLicenses = localAccount.licenses || [];
+                            const apiLicenses = apiAccount.licenses || [];
+                            
+                            console.log(`🔍 Merging licenses for ${localAccount.accountName}:`, {
+                                apiLicenseIds: apiLicenses.map((l: any) => l.id),
+                                localLicenseIds: localLicenses.map((l: any) => l.id),
+                                apiLicensesCount: apiLicenses.length,
+                                localLicensesCount: localLicenses.length
+                            });
+                            
+                            // IMPORTANT: Use API licenses as the base to ensure deletions are respected
+                            // Only merge in localStorage changes for licenses that still exist in the API
+                            const mergedLicenses = apiLicenses.map((apiLicense: any) => {
+                                // Find matching local license using stable identifier first, then fallback to other methods
+                                const matchingLocalLicense = localLicenses.find((localLicense: any) => {
+                                    // Try stable ID first (if both have it)
+                                    if (apiLicense.stableId && localLicense.stableId) {
+                                        return apiLicense.stableId === localLicense.stableId;
+                                    }
+                                    // Try to match by API ID
+                                    if (apiLicense.id === localLicense.id) {
+                                        return true;
+                                    }
+                                    // Fallback to content similarity
+                                    return (apiLicense.enterprise === localLicense.enterprise &&
+                                            apiLicense.product === localLicense.product &&
+                                            apiLicense.service === localLicense.service);
+                                });
+                                
+                                if (matchingLocalLicense) {
+                                    // Merge localStorage edits into API data (but preserve API structure)
+                                    return {
+                                        ...apiLicense, // API data as base
+                                        // Only merge specific fields that might have been edited locally
+                                        enterprise: matchingLocalLicense.enterprise || apiLicense.enterprise,
+                                        product: matchingLocalLicense.product || apiLicense.product,
+                                        service: matchingLocalLicense.service || apiLicense.service,
+                                        licenseStartDate: matchingLocalLicense.licenseStartDate || apiLicense.licenseStartDate || apiLicense.licenseStart,
+                                        licenseEndDate: matchingLocalLicense.licenseEndDate || apiLicense.licenseEndDate || apiLicense.licenseEnd,
+                                        numberOfUsers: matchingLocalLicense.numberOfUsers || apiLicense.numberOfUsers || apiLicense.users,
+                                        renewalNotice: matchingLocalLicense.renewalNotice !== undefined ? matchingLocalLicense.renewalNotice : apiLicense.renewalNotice,
+                                        noticePeriodDays: matchingLocalLicense.noticePeriodDays || apiLicense.noticePeriodDays || apiLicense.noticePeriod,
+                                        // Handle contact details with preference for API data (database) as source of truth
+                                        contactDetails: (() => {
+                                            const apiContactDetails = apiLicense.contactDetails || (Array.isArray(apiLicense.contacts) && apiLicense.contacts.length > 0 ? apiLicense.contacts[0] : apiLicense.contacts);
+                                            
+                                            // Always prefer API data if it has meaningful contact information
+                                            if (apiContactDetails && (apiContactDetails.name || apiContactDetails.email)) {
+                                                console.log(`📞 Using API contact data for license ${apiLicense.id} (database source of truth):`, apiContactDetails);
+                                                return apiContactDetails;
+                                            }
+                                            
+                                            // Only use stable localStorage as fallback when API has no meaningful contact data
+                                            if (apiLicense.stableId) {
+                                                const stableKey = `contact-${apiLicense.stableId}`;
+                                                const savedContactData = localStorage.getItem(stableKey);
+                                                
+                                                if (savedContactData) {
+                                                    try {
+                                                        const parsedContactData = JSON.parse(savedContactData);
+                                                        console.log(`📞 Using stable localStorage contact data as fallback for license ${apiLicense.id} (key: ${stableKey}):`, parsedContactData);
+                                                        return parsedContactData;
+                                                    } catch (error) {
+                                                        console.error(`❌ Error parsing stable contact data for ${stableKey}:`, error);
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Legacy localStorage fallback
+                                            const localContactDetails = matchingLocalLicense?.contactDetails;
+                                            if (localContactDetails && (localContactDetails.name || localContactDetails.email)) {
+                                                console.log(`📞 Using legacy localStorage contact data as fallback for license ${apiLicense.id}:`, localContactDetails);
+                                                return localContactDetails;
+                                            }
+                                            
+                                            // Return empty contact structure if no data available
+                                            if (apiContactDetails && (apiContactDetails.name || apiContactDetails.email)) {
+                                                console.log(`📞 Using API contact data for license ${apiLicense.id}:`, apiContactDetails);
+                                                return apiContactDetails;
+                                            }
+                                            
+                                            // Default empty structure
+                                            return {
+                                                id: '',
+                                                name: '',
+                                                email: '',
+                                                phone: '',
+                                                department: '',
+                                                designation: '',
+                                            };
+                                        })()
+                                    };
+                                }
+                                
+                                // No localStorage counterpart - use API data as-is
+                                return apiLicense;
+                            });
+                            
+                            console.log(`📊 License merge for ${localAccount.accountName}: API(${apiLicenses.length}) → Merged(${mergedLicenses.length})`);
+                            console.log(`🔍 Merged license IDs:`, mergedLicenses.map((l: any) => l.id));
+                            
+                            // Check for duplicate IDs in merged licenses
+                            const mergedLicenseIds = mergedLicenses.map((l: any) => l.id);
+                            const uniqueMergedIds = Array.from(new Set(mergedLicenseIds));
+                            if (mergedLicenseIds.length !== uniqueMergedIds.length) {
+                                console.error(`❌ Duplicate license IDs after merge for ${localAccount.accountName}:`, {
+                                    total: mergedLicenseIds.length,
+                                    unique: uniqueMergedIds.length,
+                                    duplicates: mergedLicenseIds.filter((id: any, index: number) => mergedLicenseIds.indexOf(id) !== index)
+                                });
+                            }
+                            
                             mergedData[apiAccountIndex] = {
                                 ...mergedData[apiAccountIndex], // API data as base
-                                ...localAccount, // localStorage data takes priority
+                                ...localAccount, // localStorage data for account-level fields
+                                licenses: mergedLicenses, // Use API-primary merged licenses
                                 // Ensure critical fields from API are preserved
                                 createdAt: mergedData[apiAccountIndex].createdAt || localAccount.createdAt,
                                 updatedAt: localAccount.updatedAt || mergedData[apiAccountIndex].updatedAt,
@@ -2764,7 +2988,7 @@ export default function ManageAccounts() {
                         } else {
                             // Account exists in localStorage but not in API - this means it was deleted from database
                             // Do NOT re-add it to prevent deleted accounts from reappearing
-                            console.log(`�️ Account "${localAccount.accountName}" exists in localStorage but not in API - it was likely deleted. Not re-adding.`);
+                            console.log(`🗑️ Account "${localAccount.accountName}" exists in localStorage but not in API - it was likely deleted. Not re-adding.`);
                         }
                     });
                     
@@ -3033,7 +3257,76 @@ export default function ManageAccounts() {
     const deleteLicenseFromTable = async (licenseId: string) => {
         console.log('🗑️ Deleting license from all accounts:', licenseId);
 
-        // Find and remove the license from accounts state and localStorage
+        let accountIdToUpdate: string | null = null;
+
+        // Find which account contains this license
+        const targetAccount = accounts.find((account) => 
+            account.licenses && account.licenses.some((license: any) => license.id === licenseId)
+        );
+
+        if (!targetAccount) {
+            console.error(`❌ License ${licenseId} not found in any account`);
+            throw new Error(`License ${licenseId} not found in any account`);
+        }
+
+        accountIdToUpdate = targetAccount.id;
+        console.log(`🎯 Found license ${licenseId} in account ${accountIdToUpdate}`);
+        console.log(`📊 Account ${targetAccount.accountName} has ${targetAccount.licenses.length} licenses before deletion`);
+
+        // Delete from database first
+        try {
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            
+            // Get the updated account data with license removed
+            const updatedLicenses = targetAccount.licenses.filter((license: any) => license.id !== licenseId);
+            console.log(`📊 After filtering: ${updatedLicenses.length} licenses remaining`);
+            
+            // Transform licenses to backend format
+            const transformedLicenses = updatedLicenses.map((license: any) => ({
+                id: license.id,
+                enterprise: license.enterprise || '',
+                product: license.product || '',
+                service: license.service || '',
+                licenseStart: license.licenseStartDate || license.licenseStart || '',
+                licenseEnd: license.licenseEndDate || license.licenseEnd || '',
+                users: license.numberOfUsers || license.users || '',
+                renewalNotice: license.renewalNotice || false,
+                noticePeriod: parseInt(license.noticePeriodDays || license.noticePeriod || '0', 10),
+                contacts: license.contactDetails || license.contacts || [],
+            }));
+
+            console.log(`🔄 Making API call to update account ${targetAccount.id}...`);
+            const response = await fetch(`${apiBase}/api/accounts`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: targetAccount.id,
+                    accountName: targetAccount.accountName || '',
+                    masterAccount: targetAccount.masterAccount || '',
+                    cloudType: targetAccount.cloudType || '',
+                    address: targetAccount.address || '',
+                    country: targetAccount.country || '',
+                    addresses: targetAccount.addresses || [],
+                    licenses: transformedLicenses, // Updated licenses without the deleted one
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`❌ API response error:`, { status: response.status, statusText: response.statusText, errorText });
+                throw new Error(`Failed to delete license from database: ${response.statusText} - ${errorText}`);
+            }
+
+            const responseData = await response.json();
+            console.log(`✅ License ${licenseId} deleted from database via API:`, responseData);
+        } catch (error) {
+            console.error('❌ Error deleting license from database:', error);
+            throw new Error(`Failed to delete license from database: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        // Update local state after successful database deletion
         setAccounts((prevAccounts) => {
             const updatedAccounts = prevAccounts.map((account) => {
                 if (account.licenses && account.licenses.length > 0) {
@@ -3043,7 +3336,7 @@ export default function ManageAccounts() {
                     );
                     if (updatedLicenses.length !== account.licenses.length) {
                         console.log(
-                            `� Removing license ${licenseId} from account ${account.id}`,
+                            `🗑️ Removing license ${licenseId} from account ${account.id} (local state)`,
                         );
                         return {...account, licenses: updatedLicenses};
                     }
@@ -3051,12 +3344,21 @@ export default function ManageAccounts() {
                 return account;
             });
 
-            // Update localStorage with the modified accounts
-            localStorage.setItem(
-                'accounts-data',
-                JSON.stringify(updatedAccounts),
-            );
-            console.log('✅ License deleted from accounts and localStorage');
+            // Update localStorage with the modified accounts immediately
+            try {
+                const filteredAccounts = updatedAccounts.filter((account: any) => {
+                    const isTemporary = String(account.id).startsWith('tmp-');
+                    return !isTemporary;
+                });
+                
+                localStorage.setItem(
+                    'accountsData',
+                    JSON.stringify(filteredAccounts),
+                );
+                console.log(`✅ License ${licenseId} deleted from accounts and localStorage (${filteredAccounts.length} accounts saved)`);
+            } catch (error) {
+                console.error('❌ Error updating localStorage after license deletion:', error);
+            }
 
             return updatedAccounts;
         });
@@ -3173,19 +3475,24 @@ export default function ManageAccounts() {
                     // Add a small delay to show the loading state
                     await new Promise((resolve) => setTimeout(resolve, 1200));
 
-                    // Call the completion function directly via ref
-                    if (
-                        accountsTableRef.current &&
-                        accountsTableRef.current.completeLicenseDeletion
-                    ) {
-                        accountsTableRef.current.completeLicenseDeletion();
+                    try {
+                        // Delete license from database and local state
+                        await deleteLicenseFromTable(pendingDeleteLicenseId);
+                        
+                        // Call the completion function directly via ref for UI cleanup
+                        if (
+                            accountsTableRef.current &&
+                            accountsTableRef.current.completeLicenseDeletion
+                        ) {
+                            accountsTableRef.current.completeLicenseDeletion();
+                        }
+                        
+                        console.log('✅ License deletion confirmed');
+                    } catch (error) {
+                        console.error('Error deleting license:', error);
+                        throw new Error('Failed to delete license from database');
                     }
-
-                    // Also call the table function for any additional cleanup
-                    await deleteLicenseFromTable(pendingDeleteLicenseId);
                 }
-
-                console.log('✅ License deletion confirmed');
             }
 
             // Show success notification

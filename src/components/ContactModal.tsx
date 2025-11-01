@@ -11,13 +11,13 @@ interface Contact {
     phone: string;
     department: string;
     designation: string;
-    company: string;
 }
 
 interface ContactModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (contacts: Contact[]) => void;
+    onSave?: (contacts: Contact[]) => void; // Bulk save functionality
+    onSaveIndividual?: (contacts: Contact[]) => void; // Individual save functionality
     accountName: string;
     masterAccount: string;
     initialContacts?: Contact[];
@@ -27,6 +27,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
     isOpen,
     onClose,
     onSave,
+    onSaveIndividual,
     accountName,
     masterAccount,
     initialContacts = []
@@ -37,8 +38,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
         email: '',
         phone: '',
         department: '',
-        designation: '',
-        company: ''
+        designation: ''
     }]);
     const [editingContactId, setEditingContactId] = useState<string | null>(null);
     const [activelyEditingNewContact, setActivelyEditingNewContact] = useState<Set<string>>(new Set());
@@ -50,11 +50,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
     // Helper function to check if a contact is complete
     const isContactComplete = (contact: Contact): boolean => {
         return !!(contact.name?.trim() && 
-                 contact.email?.trim() && 
-                 contact.phone?.trim() && 
-                 contact.department?.trim() && 
-                 contact.designation?.trim() && 
-                 contact.company?.trim());
+                 contact.email?.trim());
     };
 
     // Validation functions
@@ -77,19 +73,9 @@ const ContactModal: React.FC<ContactModalProps> = ({
         } else if (!validateEmail(contact.email)) {
             errors.push('email');
         }
-        if (!contact.phone?.trim()) {
+        // Phone, department, and designation are now optional
+        if (contact.phone?.trim() && !validatePhone(contact.phone)) {
             errors.push('phone');
-        } else if (!validatePhone(contact.phone)) {
-            errors.push('phone');
-        }
-        if (!contact.department?.trim()) {
-            errors.push('department');
-        }
-        if (!contact.designation?.trim()) {
-            errors.push('designation');
-        }
-        if (!contact.company?.trim()) {
-            errors.push('company');
         }
         
         return errors;
@@ -114,9 +100,31 @@ const ContactModal: React.FC<ContactModalProps> = ({
     // Reset contacts when modal opens/closes
     useEffect(() => {
         if (isOpen) {
-            if (initialContacts.length > 0) {
-                setContacts(initialContacts);
-                setOriginalContacts(JSON.parse(JSON.stringify(initialContacts))); // Deep copy
+            // Always reset editing state when modal opens - start in summary view
+            setEditingContactId(null);
+            setValidationErrors({});
+            setShowUnsavedChangesDialog(false);
+            
+            // First check localStorage for stored contacts
+            const contactStorageKey = `contacts-${accountName}-${masterAccount}`;
+            let storedContacts = null;
+            try {
+                const stored = localStorage.getItem(contactStorageKey);
+                if (stored) {
+                    storedContacts = JSON.parse(stored);
+                    console.log('💾 ContactModal: Found stored contacts in localStorage:', storedContacts);
+                }
+            } catch (error) {
+                console.error('❌ ContactModal: Failed to load contacts from localStorage:', error);
+            }
+            
+            // Use stored contacts if available, otherwise use initialContacts
+            const contactsToUse = storedContacts && storedContacts.length > 0 ? storedContacts : initialContacts;
+            
+            if (contactsToUse.length > 0) {
+                console.log('✅ ContactModal: Setting contacts to:', contactsToUse);
+                setContacts(contactsToUse);
+                setOriginalContacts(JSON.parse(JSON.stringify(contactsToUse))); // Deep copy
                 setActivelyEditingNewContact(new Set());
             } else {
                 const newId = generateId();
@@ -126,8 +134,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                     email: '',
                     phone: '',
                     department: '',
-                    designation: '',
-                    company: ''
+                    designation: ''
                 }];
                 setContacts(newContacts);
                 setOriginalContacts(JSON.parse(JSON.stringify(newContacts))); // Deep copy
@@ -136,7 +143,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
             }
             setHasUnsavedChanges(false);
         }
-    }, [isOpen, initialContacts]);
+    }, [isOpen, initialContacts, accountName, masterAccount]);
 
     // Track changes to detect unsaved changes
     useEffect(() => {
@@ -156,8 +163,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                 email: '',
                 phone: '',
                 department: '',
-                designation: '',
-                company: ''
+                designation: ''
             }
         ]);
         // Mark this new contact as actively being edited
@@ -254,12 +260,96 @@ const ContactModal: React.FC<ContactModalProps> = ({
         }
 
         const validContacts = contacts.filter(contact => 
-            contact.name.trim() || contact.email.trim() || contact.phone.trim() || contact.department.trim()
+            contact.name.trim() || contact.email.trim()
         );
-        onSave(validContacts);
+        if (onSave) {
+            onSave(validContacts);
+        }
+        
+        // Clear localStorage contacts when saving all - they're now in the database
+        const contactStorageKey = `contacts-${accountName}-${masterAccount}`;
+        try {
+            localStorage.removeItem(contactStorageKey);
+            console.log('🗑️ ContactModal: Cleared stored contacts from localStorage after save all');
+        } catch (error) {
+            console.error('❌ ContactModal: Failed to clear contacts from localStorage:', error);
+        }
+        
         setHasUnsavedChanges(false);
         setValidationErrors({}); // Clear validation errors on successful save
         onClose();
+    };
+
+    const handleSaveIndividualContact = (contact: Contact) => {
+        console.log('🔍 ContactModal: handleSaveIndividualContact called with:', contact);
+        console.log('🔍 ContactModal: onSaveIndividual prop exists?', !!onSaveIndividual);
+        
+        // Validate the contact
+        const contactErrors = validateContact(contact);
+        if (contactErrors.length > 0) {
+            console.log('❌ ContactModal: Validation errors found:', contactErrors);
+            setValidationErrors(prev => ({
+                ...prev,
+                [contact.id]: contactErrors
+            }));
+            return;
+        }
+
+        console.log('✅ ContactModal: Contact validation passed');
+
+        // Clear any existing validation errors for this contact
+        setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[contact.id];
+            return newErrors;
+        });
+
+        // Remove from actively editing when contact saves
+        setActivelyEditingNewContact(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(contact.id);
+            return newSet;
+        });
+        
+        // Also clear editing state when contact is saved
+        if (editingContactId === contact.id) {
+            setEditingContactId(null);
+        }
+        
+        // Update originalContacts to reflect that this contact is now saved
+        setOriginalContacts(prev => {
+            const existingIndex = prev.findIndex(c => c.id === contact.id);
+            if (existingIndex >= 0) {
+                // Update existing contact
+                return prev.map(c => c.id === contact.id ? contact : c);
+            } else {
+                // Add new contact
+                return [...prev, contact];
+            }
+        });
+        
+        // Store all contacts in localStorage to preserve multiple contacts
+        // Since backend only supports one contact per license, we store additional contacts locally
+        const contactStorageKey = `contacts-${accountName}-${masterAccount}`;
+        try {
+            localStorage.setItem(contactStorageKey, JSON.stringify(contacts));
+            console.log('💾 ContactModal: Stored all contacts to localStorage:', contacts);
+        } catch (error) {
+            console.error('❌ ContactModal: Failed to store contacts to localStorage:', error);
+        }
+        
+        // Save individual contact to database immediately
+        if (onSaveIndividual) {
+            console.log('🚀 ContactModal: Calling onSaveIndividual with contact:', contact);
+            onSaveIndividual([contact]);
+        } else {
+            console.log('⚠️ ContactModal: onSaveIndividual prop not provided - skipping API save');
+        }
+        
+        // Also clear the editingContactId if this contact was being edited
+        if (editingContactId === contact.id) {
+            setEditingContactId(null);
+        }
     };
 
     const handleClose = () => {
@@ -271,6 +361,13 @@ const ContactModal: React.FC<ContactModalProps> = ({
     };
 
     const handleDiscardChanges = () => {
+        // Even when discarding changes, save any individually saved contacts
+        const validContacts = originalContacts.filter(contact => 
+            contact.name.trim() || contact.email.trim()
+        );
+        if (onSave) {
+            onSave(validContacts);
+        }
         setHasUnsavedChanges(false);
         setShowUnsavedChangesDialog(false);
         onClose();
@@ -330,13 +427,6 @@ const ContactModal: React.FC<ContactModalProps> = ({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button
-                                    onClick={handleSave}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-white text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                                >
-                                    <BookmarkIcon className="h-4 w-4" />
-                                    <span>Save</span>
-                                </button>
-                                <button
                                     onClick={handleClose}
                                     className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
                                 >
@@ -382,23 +472,14 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                             </h3>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            {isContactComplete(contact) && activelyEditingNewContact.has(contact.id) && (
+                                            {/* Show Save button when actively editing (either incomplete contact or explicitly editing) */}
+                                            {(activelyEditingNewContact.has(contact.id) || editingContactId === contact.id || !isContactComplete(contact)) && (
                                                 <button
-                                                    onClick={() => {
-                                                        // Remove from actively editing when user is done
-                                                        setActivelyEditingNewContact(prev => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.delete(contact.id);
-                                                            return newSet;
-                                                        });
-                                                        // Also clear the editingContactId if this contact was being edited
-                                                        if (editingContactId === contact.id) {
-                                                            setEditingContactId(null);
-                                                        }
-                                                    }}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                                    onClick={() => handleSaveIndividualContact(contact)}
+                                                    className="flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50"
                                                 >
-                                                    <span>✓ Done</span>
+                                                    <BookmarkIcon className="h-4 w-4" />
+                                                    <span>Save</span>
                                                 </button>
                                             )}
                                             {isContactComplete(contact) && !activelyEditingNewContact.has(contact.id) && (
@@ -486,7 +567,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                             
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Phone Number *
+                                                    Phone Number
                                                 </label>
                                                 <input
                                                     id={`phone-${contact.id}`}
@@ -509,8 +590,8 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                                 ...prev,
                                                                 [contact.id]: [...(prev[contact.id] || []).filter(err => err !== 'phone'), 'phone']
                                                             }));
-                                                        } else if (value && /^\d+$/.test(value)) {
-                                                            // Valid phone number, clear validation error
+                                                        } else {
+                                                            // Valid phone number or empty (optional), clear validation error
                                                             setValidationErrors(prev => ({
                                                                 ...prev,
                                                                 [contact.id]: (prev[contact.id] || []).filter(err => err !== 'phone')
@@ -543,7 +624,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                 />
                                                 {validationErrors[contact.id]?.includes('phone') && (
                                                     <p className="text-red-500 text-xs mt-1">
-                                                        {!contact.phone?.trim() ? 'Phone Number is required' : 'Please enter numbers only in this field'}
+                                                        Please enter numbers only in this field
                                                     </p>
                                                 )}
                                             </div>
@@ -551,7 +632,7 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Department *
+                                                        Department
                                                     </label>
                                                     <input
                                                         id={`department-${contact.id}`}
@@ -559,21 +640,14 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                         type="text"
                                                         value={contact.department || ''}
                                                         onChange={(e) => updateContact(contact.id, 'department', e.target.value)}
-                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                            validationErrors[contact.id]?.includes('department')
-                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                        }`}
+                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-colors bg-white min-h-[28px]"
                                                         autoComplete="organization-title"
                                                     />
-                                                    {validationErrors[contact.id]?.includes('department') && (
-                                                        <p className="text-red-500 text-xs mt-1">Department is required</p>
-                                                    )}
                                                 </div>
                                                 
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Designation *
+                                                        Designation
                                                     </label>
                                                     <input
                                                         id={`designation-${contact.id}`}
@@ -581,39 +655,10 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                         type="text"
                                                         value={contact.designation || ''}
                                                         onChange={(e) => updateContact(contact.id, 'designation', e.target.value)}
-                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                            validationErrors[contact.id]?.includes('designation')
-                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                        }`}
+                                                        className="w-full px-2 py-1 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-colors bg-white min-h-[28px]"
                                                         autoComplete="organization-title"
                                                     />
-                                                    {validationErrors[contact.id]?.includes('designation') && (
-                                                        <p className="text-red-500 text-xs mt-1">Designation is required</p>
-                                                    )}
                                                 </div>
-                                            </div>
-                                            
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Company *
-                                                </label>
-                                                <input
-                                                    id={`company-${contact.id}`}
-                                                    name={`company-${contact.id}`}
-                                                    type="text"
-                                                    value={contact.company || ''}
-                                                    onChange={(e) => updateContact(contact.id, 'company', e.target.value)}
-                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                        validationErrors[contact.id]?.includes('company')
-                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                    }`}
-                                                    autoComplete="organization"
-                                                />
-                                                {validationErrors[contact.id]?.includes('company') && (
-                                                    <p className="text-red-500 text-xs mt-1">Company is required</p>
-                                                )}
                                             </div>
                                         </div>
                                     ) : (
@@ -642,8 +687,8 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                     )}
                                                 </div>
 
-                                                {/* Phone and Company */}
-                                                <div className="grid grid-cols-2 gap-4">
+                                                {/* Phone, Department and Designation */}
+                                                <div className="grid grid-cols-3 gap-4">
                                                     {contact.phone && (
                                                         <div>
                                                             <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Phone</div>
@@ -651,16 +696,6 @@ const ContactModal: React.FC<ContactModalProps> = ({
                                                         </div>
                                                     )}
 
-                                                    {contact.company && (
-                                                        <div>
-                                                            <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Company</div>
-                                                            <div className="text-sm text-slate-600">{contact.company}</div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Department and Designation */}
-                                                <div className="grid grid-cols-2 gap-4">
                                                     {contact.department && (
                                                         <div>
                                                             <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Department</div>
