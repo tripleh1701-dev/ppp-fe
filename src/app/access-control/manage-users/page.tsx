@@ -9,6 +9,7 @@ declare global {
 
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {motion} from 'framer-motion';
+import {useRouter} from 'next/navigation';
 import {
     PlusIcon,
     MagnifyingGlassIcon,
@@ -24,10 +25,14 @@ import AddressModal from '@/components/AddressModal';
 import AssignedUserGroupModal, { UserGroup } from '@/components/AssignedUserGroupModal';
 import TechnicalUserModal, { TechnicalUser } from '@/components/TechnicalUserModal';
 import {api} from '@/utils/api';
+import {generateId} from '@/utils/id-generator';
 
 
 
 export default function ManageUsers() {
+    // Router for navigation interception
+    const router = useRouter();
+    
     // Component mounting debug (temporarily disabled)
     // console.log('🏗️ ManageUsers component mounting...');
     
@@ -62,6 +67,10 @@ export default function ManageUsers() {
     const [pendingNavigation, setPendingNavigation] = useState<
         (() => void) | null
     >(null);
+    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [preventNavigation, setPreventNavigation] = useState(false);
+    const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
 
     // Notification state
     const [notificationMessage, setNotificationMessage] = useState<string>('');
@@ -72,6 +81,7 @@ export default function ManageUsers() {
     const [showValidationModal, setShowValidationModal] = useState(false);
     const [showValidationErrors, setShowValidationErrors] = useState(false);
     const [validationMessage, setValidationMessage] = useState('');
+    const [externalFieldErrors, setExternalFieldErrors] = useState<{[key:string]: Record<string,string>}>({});
     
     // Start date protection modal state
     const [showStartDateProtectionModal, setShowStartDateProtectionModal] = useState(false);
@@ -80,6 +90,40 @@ export default function ManageUsers() {
     // User Group modal state
     const [showUserGroupModal, setShowUserGroupModal] = useState(false);
     const [selectedUserForGroups, setSelectedUserForGroups] = useState<AccountRow | null>(null);
+    
+    // Selected Enterprise from top right corner
+    const [selectedEnterprise, setSelectedEnterprise] = useState<string>('');
+    
+    // Load selected enterprise from localStorage and listen for changes
+    useEffect(() => {
+        const loadSelectedEnterprise = () => {
+            try {
+                const savedName = window.localStorage.getItem('selectedEnterpriseName');
+                if (savedName) {
+                    setSelectedEnterprise(savedName);
+                    console.log(`🏢 [ManageUsers] Loaded selected enterprise: ${savedName}`);
+                }
+            } catch (error) {
+                console.warn('Failed to load selected enterprise:', error);
+            }
+        };
+
+        // Load on mount
+        loadSelectedEnterprise();
+
+        // Listen for enterprise changes
+        const handleEnterpriseChange = () => {
+            loadSelectedEnterprise();
+        };
+
+        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
+        window.addEventListener('storage', handleEnterpriseChange);
+
+        return () => {
+            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
+            window.removeEventListener('storage', handleEnterpriseChange);
+        };
+    }, []);
     
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(
         null,
@@ -92,6 +136,7 @@ export default function ManageUsers() {
     const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
     const accountsRef = useRef<any[]>([]);
     const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
+    const originalRouterRef = useRef<{ push: any; replace: any } | null>(null);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
     const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
@@ -126,7 +171,7 @@ export default function ManageUsers() {
     const [compressingLicenseId, setCompressingLicenseId] = useState<string | null>(null);
     const [foldingLicenseId, setFoldingLicenseId] = useState<string | null>(null);
 
-    // Dropdown options for chips
+    // Dropdown options for chips and filters
     const [dropdownOptions, setDropdownOptions] = useState({
         enterprises: [] as Array<{id: string; name: string}>,
         products: [] as Array<{id: string; name: string}>,
@@ -136,6 +181,9 @@ export default function ManageUsers() {
             { id: 'public-cloud', name: 'Public Cloud' }
         ] as Array<{id: string; name: string}>,
         addresses: [] as Array<{id: string; name: string}>,
+        firstNames: [] as Array<{id: string; name: string}>,
+        lastNames: [] as Array<{id: string; name: string}>,
+        emails: [] as Array<{id: string; name: string}>,
     });
 
     // Toolbar controls state
@@ -189,8 +237,10 @@ export default function ManageUsers() {
     };
 
     // Load dropdown options from API
-    const loadDropdownOptions = async () => {
+    const loadDropdownOptions = useCallback(async () => {
         try {
+            console.log('🔄 Loading dropdown options from accounts:', accounts.length);
+            
             const [enterprisesRes, productsRes, servicesRes] =
                 await Promise.all([
                     api.get<Array<{id: string; name: string}>>(
@@ -200,10 +250,46 @@ export default function ManageUsers() {
                     api.get<Array<{id: string; name: string}>>('/api/services'),
                 ]);
 
+            // Extract unique first names from existing accounts
+            const uniqueFirstNames = Array.from(new Set(accounts
+                .map(account => account.firstName)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `firstname-${name}-${index}`,
+                name: name
+            }));
+            
+            // Extract unique last names from existing accounts
+            const uniqueLastNames = Array.from(new Set(accounts
+                .map(account => account.lastName)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `lastname-${name}-${index}`,
+                name: name
+            }));
+            
+            // Extract unique emails from existing accounts
+            const uniqueEmails = Array.from(new Set(accounts
+                .map(account => account.emailAddress)
+                .filter(Boolean)
+            )).map((email, index) => ({
+                id: `email-${email}-${index}`,
+                name: email
+            }));
+
+            console.log('✅ Extracted dropdown options:', {
+                firstNames: uniqueFirstNames.map(f => f.name),
+                lastNames: uniqueLastNames.map(l => l.name),
+                emails: uniqueEmails.map(e => e.name)
+            });
+
             setDropdownOptions({
                 enterprises: enterprisesRes || [],
                 products: productsRes || [],
                 services: servicesRes || [],
+                firstNames: uniqueFirstNames,
+                lastNames: uniqueLastNames,
+                emails: uniqueEmails,
                 cloudTypes: [
                     { id: 'private-cloud', name: 'Private Cloud' },
                     { id: 'public-cloud', name: 'Public Cloud' }
@@ -213,7 +299,7 @@ export default function ManageUsers() {
         } catch (error) {
             console.error('Failed to load dropdown options:', error);
         }
-    };
+    }, [accounts]);
 
     // Helper function to close all dialogs
     const closeAllDialogs = () => {
@@ -295,6 +381,9 @@ export default function ManageUsers() {
     // All available columns
     type ColumnType = 'firstName' | 'middleName' | 'lastName' | 'emailAddress' | 'status' | 'startDate' | 'endDate' | 'password' | 'technicalUser' | 'assignedUserGroups' | 'actions';
     const allCols: ColumnType[] = ['firstName', 'middleName', 'lastName', 'emailAddress', 'status', 'startDate', 'endDate', 'password', 'technicalUser', 'assignedUserGroups'];
+    
+    // Columns available for sorting - only the requested user fields
+    const sortableCols: ColumnType[] = ['firstName', 'middleName', 'lastName', 'emailAddress', 'status'];
 
     // Process account data with filtering, sorting, and search
     const processedConfigs = React.useMemo(() => {
@@ -305,29 +394,35 @@ export default function ManageUsers() {
             filtered = filtered.filter((config) => {
                 const searchLower = appliedSearchTerm.toLowerCase();
                 return (
-                    config.accountName
-                        ?.toLowerCase()
-                        .includes(searchLower) ||
-                    config.address
-                        ?.toLowerCase()
-                        .includes(searchLower) ||
                     config.firstName?.toLowerCase().includes(searchLower) ||
-                    config.lastName
-                        ?.toLowerCase()
-                        .includes(searchLower)
+                    config.lastName?.toLowerCase().includes(searchLower) ||
+                    config.emailAddress?.toLowerCase().includes(searchLower) ||
+                    config.status?.toLowerCase().includes(searchLower) ||
+                    (config.technicalUser && 'technical'.includes(searchLower)) ||
+                    (!config.technicalUser && 'regular'.includes(searchLower))
                 );
             });
         }
 
         // Apply filters
-        if (activeFilters.cloudType) {
+        if (activeFilters.firstName) {
             filtered = filtered.filter(
-                (config) => config.cloudType === activeFilters.cloudType,
+                (config) => config.firstName?.toLowerCase().includes(activeFilters.firstName.toLowerCase()),
             );
         }
-        if (activeFilters.address) {
+        if (activeFilters.lastName) {
             filtered = filtered.filter(
-                (config) => config.address === activeFilters.address,
+                (config) => config.lastName?.toLowerCase().includes(activeFilters.lastName.toLowerCase()),
+            );
+        }
+        if (activeFilters.emailAddress) {
+            filtered = filtered.filter(
+                (config) => config.emailAddress?.toLowerCase().includes(activeFilters.emailAddress.toLowerCase()),
+            );
+        }
+        if (activeFilters.status) {
+            filtered = filtered.filter(
+                (config) => config.status === activeFilters.status,
             );
         }
 
@@ -338,13 +433,41 @@ export default function ManageUsers() {
                 let valueB = '';
 
                 switch (sortColumn) {
-                    case 'cloudType':
-                        valueA = (a.cloudType || '').toString().toLowerCase();
-                        valueB = (b.cloudType || '').toString().toLowerCase();
+                    case 'firstName':
+                        valueA = (a.firstName || '').toString().toLowerCase();
+                        valueB = (b.firstName || '').toString().toLowerCase();
                         break;
-                    case 'address':
-                        valueA = (a.address || '').toString().toLowerCase();
-                        valueB = (b.address || '').toString().toLowerCase();
+                    case 'middleName':
+                        valueA = (a.middleName || '').toString().toLowerCase();
+                        valueB = (b.middleName || '').toString().toLowerCase();
+                        break;
+                    case 'lastName':
+                        valueA = (a.lastName || '').toString().toLowerCase();
+                        valueB = (b.lastName || '').toString().toLowerCase();
+                        break;
+                    case 'emailAddress':
+                        valueA = (a.emailAddress || '').toString().toLowerCase();
+                        valueB = (b.emailAddress || '').toString().toLowerCase();
+                        break;
+                    case 'status':
+                        valueA = (a.status || '').toString().toLowerCase();
+                        valueB = (b.status || '').toString().toLowerCase();
+                        break;
+                    case 'startDate':
+                        valueA = (a.startDate || '').toString();
+                        valueB = (b.startDate || '').toString();
+                        break;
+                    case 'endDate':
+                        valueA = (a.endDate || '').toString();
+                        valueB = (b.endDate || '').toString();
+                        break;
+                    case 'technicalUser':
+                        valueA = a.technicalUser ? 'true' : 'false';
+                        valueB = b.technicalUser ? 'true' : 'false';
+                        break;
+                    default:
+                        valueA = '';
+                        valueB = '';
                         break;
                 }
 
@@ -376,8 +499,15 @@ export default function ManageUsers() {
     // Column label mapping
     const columnLabels: Record<string, string> = {
         firstName: 'First Name',
-        cloudType: 'Cloud Type',
-        address: 'Address'
+        middleName: 'Middle Name',
+        lastName: 'Last Name',
+        emailAddress: 'Email Address',
+        status: 'Status',
+        startDate: 'Start Date',
+        endDate: 'End Date',
+        password: 'Password',
+        technicalUser: 'Technical User',
+        assignedUserGroups: 'Assigned User Groups'
     };
 
     // Sort functions
@@ -402,6 +532,11 @@ export default function ManageUsers() {
         window.dispatchEvent(clearEvent);
     };
 
+    const clearGroupBy = () => {
+        setActiveGroupLabel('None');
+        closeAllDialogs();
+    };
+
     const clearAllFilters = () => {
         setActiveFilters({});
         closeAllDialogs();
@@ -409,18 +544,37 @@ export default function ManageUsers() {
 
     // Filter form state
     const [filterForm, setFilterForm] = useState({
-        cloudType: '',
-        address: '',
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
+        status: '',
     });
+    
+    // Autocomplete states for filter fields
+    const [showFirstNameSuggestions, setShowFirstNameSuggestions] = useState(false);
+    const [showLastNameSuggestions, setShowLastNameSuggestions] = useState(false);
+    const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+    const [filteredFirstNames, setFilteredFirstNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredLastNames, setFilteredLastNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEmails, setFilteredEmails] = useState<Array<{id: string; name: string}>>([]);
+    const [selectedFirstNameIndex, setSelectedFirstNameIndex] = useState(-1);
+    const [selectedLastNameIndex, setSelectedLastNameIndex] = useState(-1);
+    const [selectedEmailIndex, setSelectedEmailIndex] = useState(-1);
 
     const handleApplyFilters = () => {
         const newFilters: Record<string, any> = {};
 
-        if (filterForm.cloudType.trim()) {
-            newFilters.cloudType = filterForm.cloudType.trim();
+        if (filterForm.firstName.trim()) {
+            newFilters.firstName = filterForm.firstName.trim();
         }
-        if (filterForm.address.trim()) {
-            newFilters.address = filterForm.address.trim();
+        if (filterForm.lastName.trim()) {
+            newFilters.lastName = filterForm.lastName.trim();
+        }
+        if (filterForm.emailAddress.trim()) {
+            newFilters.emailAddress = filterForm.emailAddress.trim();
+        }
+        if (filterForm.status.trim()) {
+            newFilters.status = filterForm.status.trim();
         }
 
         setActiveFilters(newFilters);
@@ -428,7 +582,7 @@ export default function ManageUsers() {
     };
 
     const handleClearFilters = () => {
-        setFilterForm({cloudType: '', address: ''});
+        setFilterForm({firstName: '', lastName: '', emailAddress: '', status: ''});
         setActiveFilters({});
         closeAllDialogs();
     };
@@ -452,8 +606,31 @@ export default function ManageUsers() {
     // Helper function to save accounts to localStorage
     const saveAccountsToStorage = (accountsData: any[]) => {
         try {
-            localStorage.setItem('accounts-data', JSON.stringify(accountsData));
-            console.log('💾 Accounts saved to localStorage');
+            // Filter out completely blank temporary rows before saving
+            const accountsToSave = accountsData.filter(account => {
+                // Keep all non-temporary rows (already saved to database)
+                if (!String(account.id).startsWith('tmp-')) {
+                    return true;
+                }
+                
+                // For temporary rows, only save if they have at least one user field filled
+                const hasAnyData = !!(
+                    account.firstName?.trim() ||
+                    account.lastName?.trim() ||
+                    account.emailAddress?.trim() ||
+                    account.password?.trim() ||
+                    account.middleName?.trim()
+                );
+                
+                return hasAnyData;
+            });
+            
+            localStorage.setItem('accounts-data', JSON.stringify(accountsToSave));
+            console.log('💾 Accounts saved to localStorage (filtered out blank temporary rows):', {
+                total: accountsData.length,
+                saved: accountsToSave.length,
+                filtered: accountsData.length - accountsToSave.length
+            });
         } catch (error) {
             console.error('Error saving accounts to localStorage:', error);
         }
@@ -604,39 +781,32 @@ export default function ManageUsers() {
                 return;
             }
 
-            console.log('💾 Auto-saving new account:', account);
+            console.log('💾 Auto-saving new user:', account);
 
-            // For accounts, we just need to save to localStorage and convert temp ID to permanent ID
-            const newId = `acc-${Date.now()}`;
-            const accountData = {
-                id: newId,
-                accountName: account.accountName || '',
-                address: account.address || '',
-                licenses: account.licenses || [],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+            // For users, save to database via API
+            const newId = `user-${Date.now()}`;
+            const userData = {
+                firstName: account.firstName || '',
+                lastName: account.lastName || '',
+                middleName: account.middleName || '',
+                emailAddress: account.emailAddress || '',
+                status: account.status || 'ACTIVE',
+                startDate: account.startDate || '',
+                endDate: account.endDate || '',
+                password: account.password || '',
+                technicalUser: account.technicalUser || false,
+                assignedUserGroups: account.assignedUserGroups || [],
             };
 
-            console.log('💾 Creating new account with data:', accountData);
+            console.log('💾 Creating new user with data:', userData);
 
-            // Get current accounts from localStorage
-            const storedAccounts = localStorage.getItem('accounts-data');
-            let accountsData = [];
-            if (storedAccounts) {
-                try {
-                    accountsData = JSON.parse(storedAccounts);
-                } catch (error) {
-                    console.error('Error parsing stored accounts:', error);
-                    accountsData = [];
-                }
-            }
-
-            // Add the new account
-            accountsData.push(accountData);
-            
-            // Save back to localStorage
-            localStorage.setItem('accounts-data', JSON.stringify(accountsData));
-            console.log('✅ Account saved to localStorage');
+            try {
+                // Save user to database via API
+                const response = await api.post<{id?: string}>('/api/user-management/users', userData);
+                console.log('✅ User saved to database via API:', response);
+                
+                // Update the account with the real ID from the API response
+                const savedUserId = response?.id || newId;
 
             // Preserve display order for the new ID
             const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
@@ -645,7 +815,7 @@ export default function ManageUsers() {
             setAccounts((prev) => {
                 const updated = prev.map((acc) =>
                     acc.id === tempRowId
-                        ? {...acc, id: newId, createdAt: accountData.createdAt, updatedAt: accountData.updatedAt}
+                            ? {...acc, id: savedUserId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
                         : acc,
                 );
                 // Apply stable sorting to maintain display order
@@ -655,11 +825,15 @@ export default function ManageUsers() {
             // Update display order reference with the new ID
             if (oldDisplayOrder !== undefined) {
                 displayOrderRef.current.delete(tempRowId); // Remove old reference
-                displayOrderRef.current.set(newId, oldDisplayOrder); // Add new reference
-                console.log(`📍 Preserved display order ${oldDisplayOrder} for new account ID ${newId}`);
-            }
+                    displayOrderRef.current.set(savedUserId, oldDisplayOrder); // Add new reference
+                    console.log(`📍 Preserved display order ${oldDisplayOrder} for new user ID ${savedUserId}`);
+                }
 
-            console.log('🎉 New account saved automatically!');
+                console.log('🎉 New user saved successfully to database!');
+            } catch (apiError) {
+                console.error('❌ Failed to save user to database:', apiError);
+                throw apiError; // Re-throw to trigger catch block
+            }
             
             
         } catch (error) {
@@ -758,15 +932,32 @@ export default function ManageUsers() {
         };
     };
 
+    // Helper function for email validation
+    const isValidEmail = useCallback((email: string): boolean => {
+        if (!email || !email.trim()) return false;
+        
+        const trimmed = email.trim();
+        
+        // Length validation
+        if (trimmed.length < 5 || trimmed.length > 254) return false;
+        
+        // RFC 5322 compliant email regex
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        return emailRegex.test(trimmed);
+    }, []);
+
     // Debounced auto-save function with countdown
     // Function to merge server data with pending local changes
     const getEffectiveAccounts = useCallback(() => {
         return accounts.map(config => {
             const pendingChanges = pendingLocalChanges[config.id];
+            
             if (pendingChanges) {
                 console.log(`🔄 Applying pending changes to record ${config.id}:`, pendingChanges);
                 // Apply pending changes, ensuring field names match the config structure
                 const mergedConfig = { ...config };
+                
                 Object.keys(pendingChanges).forEach(key => {
                     const value = pendingChanges[key];
                     // Apply the change directly to the config
@@ -781,6 +972,7 @@ export default function ManageUsers() {
                         mergedConfig.serviceName = value;
                     }
                 });
+                
                 console.log(`✅ Merged config for ${config.id}:`, {
                     original: config,
                     pending: pendingChanges,
@@ -788,6 +980,7 @@ export default function ManageUsers() {
                 });
                 return mergedConfig;
             }
+            
             return config;
         });
     }, [accounts, pendingLocalChanges]);
@@ -804,29 +997,29 @@ export default function ManageUsers() {
         
         const incompleteRows = effectiveConfigs
             .filter((config: any) => {
-                const hasAccountName = config.accountName?.trim();
-                const hasMasterAccount = config.masterAccount?.trim();
-                const hasCloudType = config.cloudType?.trim();
+                const hasFirstName = config.firstName?.trim();
+                const hasLastName = config.lastName?.trim();
+                const hasEmail = config.emailAddress?.trim();
+                const hasStartDate = config.startDate?.trim();
+                const hasPassword = config.password?.trim();
 
-                // Check if this account has incomplete licenses
-                const hasIncompleteLicenses = config.licenses && config.licenses.length > 0 && 
-                    config.licenses.some((license: any) => {
-                        const hasName = license.name?.trim();
-                        const hasType = license.type?.trim();
-                        const hasStatus = license.status?.trim();
-                        return !hasName || !hasType || !hasStatus;
-                    });
+                // Include completely blank rows only when validation is explicitly shown
+                const isCompletelyBlank = !hasFirstName && !hasLastName && !hasEmail && !hasStartDate && !hasPassword;
+                if (isCompletelyBlank && !showValidationErrors) return false;
 
-                // When validation errors are being shown, include completely blank rows for highlighting
-                // Otherwise, don't include completely blank rows (new rows that haven't been touched)
-                const isCompletelyBlank = !hasAccountName && !hasMasterAccount && !hasCloudType;
-                if (isCompletelyBlank && !showValidationErrors && !hasIncompleteLicenses) return false;
-
-                // Row is incomplete if:
-                // 1. It has some data but not all required main fields (Account Name, Master Account, Cloud Type), OR
-                // 2. It's completely blank and validation is active, OR  
-                // 3. It has incomplete license data
-                const isIncomplete = !hasAccountName || !hasMasterAccount || !hasCloudType || hasIncompleteLicenses;
+                // Row is incomplete if any required user field is missing
+                const isIncomplete = !hasFirstName || !hasLastName || !hasEmail || !hasStartDate || !hasPassword;
+                
+                console.log('🔍 Row validation check:', {
+                    id: config.id,
+                    hasFirstName,
+                    hasLastName,
+                    hasEmail,
+                    hasStartDate,
+                    hasPassword,
+                    technicalUser: config.technicalUser,
+                    isIncomplete
+                });
                 
                 return isIncomplete;
             })
@@ -852,6 +1045,13 @@ export default function ManageUsers() {
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             clearInterval(countdownIntervalRef.current!);
+        }
+
+        // Clear validation errors when auto-save timer starts (user is actively editing)
+        if (showValidationErrors) {
+            console.log('🧹 Clearing validation errors as user is actively editing');
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
         }
 
         // Start countdown
@@ -882,18 +1082,26 @@ export default function ManageUsers() {
                     const isTemp = String(config.id).startsWith('tmp-');
                     if (!isTemp) return false;
                     
-                    // Be more strict about what constitutes a complete account row
-                    const hasAccountName = config.accountName?.trim() && config.accountName.trim().length > 0;
-                    const hasAddress = config.address?.trim() && config.address.trim().length > 0;
+                    // Be more strict about what constitutes a complete user row
+                    const hasFirstName = config.firstName?.trim() && config.firstName.trim().length > 0;
+                    const hasLastName = config.lastName?.trim() && config.lastName.trim().length > 0;
+                    const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
+                    const hasStartDate = config.startDate?.trim() && config.startDate.trim().length > 0;
+                    const hasPassword = config.password?.trim() && config.password.trim().length > 0;
                     
-                    const isComplete = hasAccountName && hasAddress;
+                    const isComplete = hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword;
                     
                     if (isTemp && !isComplete) {
-                        console.log(`🚫 Skipping incomplete temporary account ${config.id}:`, {
-                            hasAccountName: !!hasAccountName,
-                            hasAddress: !!hasAddress,
-                            accountNameValue: config.accountName,
-                            addressValue: config.address
+                        console.log(`🚫 Skipping incomplete temporary user ${config.id}:`, {
+                            hasFirstName: !!hasFirstName,
+                            hasLastName: !!hasLastName,
+                            hasValidEmail: !!hasValidEmail,
+                            hasStartDate: !!hasStartDate,
+                            hasPassword: !!hasPassword,
+                            firstNameValue: config.firstName,
+                            lastNameValue: config.lastName,
+                            emailValue: config.emailAddress,
+                            startDateValue: config.startDate
                         });
                     }
                     
@@ -906,43 +1114,47 @@ export default function ManageUsers() {
                     const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
                     
                     if (isExisting && isModified) {
-                        // Double-check that the record still has all required fields
-                        const hasAccountName = config.accountName?.trim();
-                        const hasMasterAccount = config.masterAccount?.trim();
-                        const hasCloudType = config.cloudType?.trim();
-                        const hasAddress = config.address?.trim();
+                        // Double-check that the record still has all required user fields
+                        const hasFirstName = config.firstName?.trim();
+                        const hasLastName = config.lastName?.trim();
+                        const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
+                        const hasStartDate = config.startDate?.trim();
+                        const hasPassword = config.password?.trim();
                         
-                        const isComplete = hasAccountName && hasMasterAccount && hasCloudType && hasAddress;
+                        const isComplete = hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword;
                         
-                        console.log(`🔍 Checking modified account ${config.id}: isComplete=${isComplete}`, {
-                            hasAccountName: !!hasAccountName,
-                            hasMasterAccount: !!hasMasterAccount,
-                            hasCloudType: !!hasCloudType,
-                            hasAddress: !!hasAddress,
-                            accountNameValue: config.accountName,
-                            masterAccountValue: config.masterAccount,
-                            cloudTypeValue: config.cloudType,
-                            addressValue: config.address
+                        console.log(`🔍 Checking modified user ${config.id}: isComplete=${isComplete}`, {
+                            hasFirstName: !!hasFirstName,
+                            hasLastName: !!hasLastName,
+                            hasValidEmail: !!hasValidEmail,
+                            hasStartDate: !!hasStartDate,
+                            hasPassword: !!hasPassword,
+                            firstNameValue: config.firstName,
+                            lastNameValue: config.lastName,
+                            emailValue: config.emailAddress,
+                            startDateValue: config.startDate
                         });
                         
                         return isComplete;
                     }
                     
-                    console.log(`🔍 Checking account ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                    console.log(`🔍 Checking user ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
                     return false;
                 });
                 
-            console.log(`📊 Found ${temporaryRows.length} complete temporary accounts to auto-save`);
-            console.log(`📊 Found ${modifiedRows.length} modified existing accounts to auto-save`);
+            console.log(`📊 Found ${temporaryRows.length} complete temporary users to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing users to auto-save`);
             console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
-            console.log('🔍 All current accounts:', accountsRef.current.map(c => ({
+            console.log('🔍 All current users:', accountsRef.current.map(c => ({
                 id: c.id,
                 isTemp: String(c.id).startsWith('tmp-'),
                 isModified: modifiedExistingRecordsRef.current.has(String(c.id)),
-                accountName: c.accountName,
-                address: c.address,
-                hasAccountName: !!c.accountName?.trim(),
-                hasAddress: !!c.address?.trim()
+                firstName: c.firstName,
+                lastName: c.lastName,
+                emailAddress: c.emailAddress,
+                hasFirstName: !!c.firstName?.trim(),
+                hasLastName: !!c.lastName?.trim(),
+                hasValidEmail: !!c.emailAddress?.trim() && isValidEmail(c.emailAddress)
             })));
             
             // Check for orphaned records in modifiedExistingRecords
@@ -968,28 +1180,32 @@ export default function ManageUsers() {
                 console.log('💾 Auto-saving accounts after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
                 
                 for (const tempRow of temporaryRows) {
-                    console.log(`💾 Auto-saving account: ${tempRow.id}`);
+                    console.log(`💾 Auto-saving user: ${tempRow.id}`);
                     await autoSaveNewAccount(tempRow.id);
                 }
                 
-                // Save modified existing accounts to localStorage
+                // Save modified existing users to database via API
                 for (const modifiedRow of modifiedRows) {
-                    console.log(`💾 Saving modified existing account: ${modifiedRow.id}`);
-                    // Update localStorage with the modified account
-                    const storedAccounts = localStorage.getItem('accounts-data');
-                    if (storedAccounts) {
-                        try {
-                            const accountsData = JSON.parse(storedAccounts);
-                            const updatedAccountsData = accountsData.map((acc: any) =>
-                                acc.id === modifiedRow.id
-                                    ? { ...acc, ...modifiedRow, updatedAt: new Date().toISOString() }
-                                    : acc
-                            );
-                            localStorage.setItem('accounts-data', JSON.stringify(updatedAccountsData));
-                            console.log(`✅ Modified account ${modifiedRow.id} saved to localStorage`);
+                    console.log(`💾 Saving modified existing user: ${modifiedRow.id}`);
+                    try {
+                        // Update user in database via API
+                        const userData = {
+                            firstName: modifiedRow.firstName || '',
+                            lastName: modifiedRow.lastName || '',
+                            middleName: modifiedRow.middleName || '',
+                            emailAddress: modifiedRow.emailAddress || '',
+                            status: modifiedRow.status || 'ACTIVE',
+                            startDate: modifiedRow.startDate || '',
+                            endDate: modifiedRow.endDate || '',
+                            password: modifiedRow.password || '',
+                            technicalUser: modifiedRow.technicalUser || false,
+                            assignedUserGroups: modifiedRow.assignedUserGroups || [],
+                        };
+                        
+                        await api.put(`/api/user-management/users/${modifiedRow.id}`, userData);
+                        console.log(`✅ Modified user ${modifiedRow.id} saved to database`);
                         } catch (error) {
-                            console.error('Error updating localStorage for modified account:', error);
-                        }
+                        console.error(`❌ Error updating user ${modifiedRow.id}:`, error);
                     }
                 }
                     
@@ -997,6 +1213,10 @@ export default function ManageUsers() {
                     const modifiedRecordIds = modifiedRows.map(row => String(row.id));
                     console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
                     setModifiedExistingRecords(new Set());
+                    
+                    // Clear pending local changes for auto-saved records
+                    setPendingLocalChanges({});
+                    console.log('🧹 Cleared pendingLocalChanges after successful autosave');
                     
                     // Show success animation for all auto-saved entries
                     console.log('✨ Showing auto-save success animation for all entries');
@@ -1017,8 +1237,114 @@ export default function ManageUsers() {
                     }, 3000); // Show for 3 seconds
                     
                     console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+                    
+                    // Clear navigation warning flags on successful auto-save
+                    setHasUnsavedChanges(false);
+                    setPreventNavigation(false);
+                    setUserConfirmedLeave(false);
                 } else {
                     console.log('ℹ️ No rows found to auto-save');
+                }
+                
+                // After auto-save completes, validate all remaining rows and highlight issues
+                console.log('🔍 Running validation check after auto-save completion');
+                const remainingRows = accountsRef.current.filter(config => {
+                    // Check both temporary rows and existing rows for validation issues
+                    return true; // Check all rows
+                });
+                
+                const validationIssueRows: any[] = [];
+                const allMissingFields = new Set<string>();
+                const allInvalidFields = new Set<string>();
+                
+                remainingRows.forEach((config) => {
+                    // Skip completely blank rows (no fields have been touched)
+                    const isCompletelyBlank = (
+                        !config.firstName?.trim() &&
+                        !config.lastName?.trim() &&
+                        !config.emailAddress?.trim() &&
+                        !config.startDate?.trim() &&
+                        !config.password?.trim()
+                    );
+                    
+                    if (isCompletelyBlank) {
+                        console.log(`⚪ Skipping completely blank row ${config.id} from validation`);
+                        return; // Skip this row
+                    }
+                    
+                    let hasIssues = false;
+                    const rowIssues = {
+                        id: config.id,
+                        missingFields: [] as string[],
+                        invalidFields: [] as string[]
+                    };
+                    
+                    // Check for missing fields
+                    if (!config.firstName?.trim()) {
+                        allMissingFields.add('First Name');
+                        rowIssues.missingFields.push('firstName');
+                        hasIssues = true;
+                    }
+                    if (!config.lastName?.trim()) {
+                        allMissingFields.add('Last Name');
+                        rowIssues.missingFields.push('lastName');
+                        hasIssues = true;
+                    }
+                    if (!config.emailAddress?.trim()) {
+                        allMissingFields.add('Email Address');
+                        rowIssues.missingFields.push('emailAddress');
+                        hasIssues = true;
+                    }
+                    if (!config.startDate?.trim()) {
+                        allMissingFields.add('Start Date');
+                        rowIssues.missingFields.push('startDate');
+                        hasIssues = true;
+                    }
+                    if (!config.password?.trim()) {
+                        allMissingFields.add('Password');
+                        rowIssues.missingFields.push('password');
+                        hasIssues = true;
+                    }
+                    
+                    // Check for invalid fields (present but invalid format)
+                    if (config.emailAddress?.trim() && !isValidEmail(config.emailAddress)) {
+                        allInvalidFields.add('Email Address');
+                        rowIssues.invalidFields.push('emailAddress');
+                        hasIssues = true;
+                    }
+                    
+                    if (hasIssues) {
+                        validationIssueRows.push(config);
+                    }
+                });
+                
+                // Enable validation highlighting if there are any validation issues
+                if (validationIssueRows.length > 0) {
+                    console.log(`🚨 Found ${validationIssueRows.length} rows with validation issues after auto-save:`, {
+                        affectedRowIds: validationIssueRows.map(r => r.id),
+                        missingFields: Array.from(allMissingFields),
+                        invalidFields: Array.from(allInvalidFields)
+                    });
+                    
+                    setShowValidationErrors(true);
+                    
+                    // Set incomplete row IDs for highlighting
+                    const incompleteRowIds = validationIssueRows.map(r => r.id);
+                    console.log('🎯 Enabling validation highlighting for rows after auto-save:', incompleteRowIds);
+                    // Build per-row field errors (e.g. invalid email)
+                    const fieldErrorsAfterAuto: {[key:string]: Record<string,string>} = {};
+                    validationIssueRows.forEach((r) => {
+                        if (r.emailAddress?.trim() && !isValidEmail(r.emailAddress)) {
+                            fieldErrorsAfterAuto[r.id] = {
+                                ...(fieldErrorsAfterAuto[r.id] || {}),
+                                emailAddress: 'Please enter a valid email address'
+                            };
+                        }
+                    });
+                    setExternalFieldErrors(fieldErrorsAfterAuto);
+                } else {
+                    console.log('✅ No validation issues found after auto-save - all remaining rows are valid');
+                    setShowValidationErrors(false);
                 }
             } catch (error) {
                 console.error('❌ Auto-save failed:', error);
@@ -1088,28 +1414,32 @@ export default function ManageUsers() {
                 console.log('💾 Auto-saving accounts...', temporaryRows.map(r => r.id));
                 
                 for (const tempRow of temporaryRows) {
-                    console.log(`💾 Auto-saving account: ${tempRow.id}`);
+                    console.log(`💾 Auto-saving user: ${tempRow.id}`);
                     await autoSaveNewAccount(tempRow.id);
                 }
                 
-                // Save modified existing accounts to localStorage
+                // Save modified existing users to database via API
                 for (const modifiedRow of modifiedRows) {
-                    console.log(`💾 Saving modified existing account: ${modifiedRow.id}`);
-                    // Update localStorage with the modified account
-                    const storedAccounts = localStorage.getItem('accounts-data');
-                    if (storedAccounts) {
-                        try {
-                            const accountsData = JSON.parse(storedAccounts);
-                            const updatedAccountsData = accountsData.map((acc: any) =>
-                                acc.id === modifiedRow.id
-                                    ? { ...acc, ...modifiedRow, updatedAt: new Date().toISOString() }
-                                    : acc
-                            );
-                            localStorage.setItem('accounts-data', JSON.stringify(updatedAccountsData));
-                            console.log(`✅ Modified account ${modifiedRow.id} saved to localStorage`);
+                    console.log(`💾 Saving modified existing user: ${modifiedRow.id}`);
+                    try {
+                        // Update user in database via API
+                        const userData = {
+                            firstName: modifiedRow.firstName || '',
+                            lastName: modifiedRow.lastName || '',
+                            middleName: modifiedRow.middleName || '',
+                            emailAddress: modifiedRow.emailAddress || '',
+                            status: modifiedRow.status || 'ACTIVE',
+                            startDate: modifiedRow.startDate || '',
+                            endDate: modifiedRow.endDate || '',
+                            password: modifiedRow.password || '',
+                            technicalUser: modifiedRow.technicalUser || false,
+                            assignedUserGroups: modifiedRow.assignedUserGroups || [],
+                        };
+                        
+                        await api.put(`/api/user-management/users/${modifiedRow.id}`, userData);
+                        console.log(`✅ Modified user ${modifiedRow.id} saved to database`);
                         } catch (error) {
-                            console.error('Error updating localStorage for modified account:', error);
-                        }
+                        console.error(`❌ Error updating user ${modifiedRow.id}:`, error);
                     }
                 }
                 
@@ -1128,6 +1458,12 @@ export default function ManageUsers() {
                 }, 3000); // Show for 3 seconds
                 
                 console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+                
+                // Clear navigation warning flags on successful auto-save
+                setHasUnsavedChanges(false);
+                setPreventNavigation(false);
+                setUserConfirmedLeave(false);
+                
                 return totalRowsToSave;
             } else {
                 console.log('ℹ️ No rows found to auto-save');
@@ -1217,20 +1553,24 @@ export default function ManageUsers() {
 
         // Check for incomplete temporary rows (including completely blank ones)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
-            const hasAccountName = config.accountName?.trim();
-            const hasMasterAccount = config.masterAccount?.trim();
-            const hasCloudType = config.cloudType?.trim();
+            const hasFirstName = config.firstName?.trim();
+            const hasLastName = config.lastName?.trim();
+            const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
+            const hasStartDate = config.startDate?.trim();
+            const hasPassword = config.password?.trim();
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            return !hasFirstName || !hasLastName || !hasValidEmail || !hasStartDate || !hasPassword;
         });
 
         // Check for incomplete existing rows (including completely blank ones)
         const incompleteExistingRows = existingRows.filter((config: any) => {
-            const hasAccountName = config.accountName?.trim();
-            const hasMasterAccount = config.masterAccount?.trim();
-            const hasCloudType = config.cloudType?.trim();
+            const hasFirstName = config.firstName?.trim();
+            const hasLastName = config.lastName?.trim();
+            const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
+            const hasStartDate = config.startDate?.trim();
+            const hasPassword = config.password?.trim();
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            return !hasFirstName || !hasLastName || !hasValidEmail || !hasStartDate || !hasPassword;
         });
 
         // Combine all incomplete rows
@@ -1393,20 +1733,48 @@ export default function ManageUsers() {
 
         if (temporaryRows.length === 0 && incompleteExistingRows.length === 0 && !hasPendingChanges && !currentHasIncompleteLicenses) {
             showBlueNotification('No unsaved entries to save.', 3000, false);
+            
+            // Clear all pending changes when there's nothing to save
+            setPendingLocalChanges({});
+            setHasUnsavedChanges(false);
+            setPreventNavigation(false);
+            setUserConfirmedLeave(false);
+            setIncompleteRows([]);
             return;
         }
 
         if (incompleteRows.length > 0 || currentHasIncompleteLicenses) {
             const allMissingFields = new Set<string>();
+            const allInvalidFields = new Set<string>();
             let totalIncompleteCount = 0;
             
-            // Check main row field issues
+            // Check main row field issues (user fields)
             if (incompleteRows.length > 0) {
+                console.log('🔍 Checking missing and invalid fields for incomplete rows:', incompleteRows);
                 incompleteRows.forEach((config) => {
-                    if (!config.accountName?.trim()) allMissingFields.add('Account');
-                    if (!config.masterAccount?.trim()) allMissingFields.add('Master Account');
-                    if (!config.cloudType?.trim()) allMissingFields.add('Cloud Type');
+                    console.log('📋 Checking config:', {
+                        id: config.id,
+                        firstName: config.firstName || '(empty)',
+                        lastName: config.lastName || '(empty)',
+                        emailAddress: config.emailAddress || '(empty)',
+                        startDate: config.startDate || '(empty)',
+                        password: config.password || '(empty)'
+                    });
+                    
+                    // Check for missing fields
+                    if (!config.firstName?.trim()) allMissingFields.add('First Name');
+                    if (!config.lastName?.trim()) allMissingFields.add('Last Name');
+                    if (!config.emailAddress?.trim()) allMissingFields.add('Email Address');
+                    if (!config.startDate?.trim()) allMissingFields.add('Start Date');
+                    if (!config.password?.trim()) allMissingFields.add('Password');
+                    
+                    // Check for invalid fields (present but invalid format)
+                    if (config.emailAddress?.trim() && !isValidEmail(config.emailAddress)) {
+                        allInvalidFields.add('Email Address');
+                    }
                 });
+                console.log('📝 All missing fields:', Array.from(allMissingFields));
+                console.log('📝 All invalid fields:', Array.from(allInvalidFields));
                 totalIncompleteCount += incompleteRows.length;
             }
             
@@ -1424,14 +1792,26 @@ export default function ManageUsers() {
             
             // Create comprehensive validation message
             let message = '';
+            const hasMissingFields = allMissingFields.size > 0;
+            const hasInvalidFields = allInvalidFields.size > 0;
+            
+            // Build validation message based on field issues
+            let validationIssues: string[] = [];
+            if (hasMissingFields) {
+                validationIssues.push(`Missing required fields: ${Array.from(allMissingFields).join(', ')}`);
+            }
+            if (hasInvalidFields) {
+                validationIssues.push(`Invalid field format: ${Array.from(allInvalidFields).join(', ')}`);
+            }
+            
             if (incompleteRows.length > 0 && currentHasIncompleteLicenses) {
                 if (hasSingleIncompleteAccount) {
-                    message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''} and incomplete licenses in ${currentIncompleteLicenseData.length} account${currentIncompleteLicenseData.length > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
+                    message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''} and incomplete licenses in ${currentIncompleteLicenseData.length} account${currentIncompleteLicenseData.length > 1 ? 's' : ''}.\n${validationIssues.join('\n')}`;
                 } else {
-                    message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''} and incomplete licenses in ${currentIncompleteLicenseData.length} account${currentIncompleteLicenseData.length > 1 ? 's' : ''}.\nSome required fields are missing.`;
+                    message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''} and incomplete licenses in ${currentIncompleteLicenseData.length} account${currentIncompleteLicenseData.length > 1 ? 's' : ''}.\nSome required fields have issues.`;
                 }
             } else if (incompleteRows.length > 0) {
-                message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
+                message = `Found ${incompleteRows.length} incomplete record${incompleteRows.length > 1 ? 's' : ''}.\n${validationIssues.join('\n')}`;
             } else if (currentHasIncompleteLicenses) {
                 if (hasSingleIncompleteAccount) {
                     message = `Found incomplete licenses in ${currentIncompleteLicenseData.length} account${currentIncompleteLicenseData.length > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
@@ -1443,13 +1823,32 @@ export default function ManageUsers() {
             setValidationMessage(message);
             setShowValidationErrors(true); // Enable red border highlighting for validation errors
             
+            // Set incomplete row IDs for highlighting
+            const incompleteRowIds = incompleteRows.map(r => r.id);
+            console.log('🎯 Setting incomplete row IDs for highlighting:', incompleteRowIds);
+            setIncompleteRows(incompleteRowIds); // Store incomplete row IDs for highlighting
+
+            // Build per-row field error map (e.g. invalid email format) to pass to table
+            const fieldErrors: {[key:string]: Record<string,string>} = {};
+            incompleteRows.forEach((cfg) => {
+                if (cfg.emailAddress?.trim() && !isValidEmail(cfg.emailAddress)) {
+                    fieldErrors[cfg.id] = {
+                        ...(fieldErrors[cfg.id] || {}),
+                        emailAddress: 'Please enter a valid email address'
+                    };
+                }
+                // Add other format checks here in future (e.g. password strength)
+            });
+            setExternalFieldErrors(fieldErrors);
+            
             console.log('📝 Final validation message and counts:', {
                 message,
                 incompleteMainRows: incompleteRows.length,
                 incompleteLicenseAccounts: currentIncompleteLicenseData.length,
                 hasSingleIncompleteAccount,
                 totalIncompleteCount,
-                allMissingFieldsArray: Array.from(allMissingFields)
+                allMissingFieldsArray: Array.from(allMissingFields),
+                incompleteRowIds
             });
             setShowValidationModal(true);
             return;
@@ -1459,11 +1858,15 @@ export default function ManageUsers() {
         try {
             let savedCount = 0;
             const completeTemporaryRows = temporaryRows.filter((config: any) => {
-                const hasAccountName = config.accountName?.trim();
-                const hasMasterAccount = config.masterAccount?.trim();
-                const hasCloudType = config.cloudType?.trim();
-                return hasAccountName && hasMasterAccount && hasCloudType;
+                const hasFirstName = config.firstName?.trim();
+                const hasLastName = config.lastName?.trim();
+                const hasEmail = config.emailAddress?.trim();
+                const hasStartDate = config.startDate?.trim();
+                const hasPassword = config.password?.trim();
+                return hasFirstName && hasLastName && hasEmail && hasStartDate && hasPassword;
             });
+            
+            console.log('✅ Complete temporary rows to save:', completeTemporaryRows.length, completeTemporaryRows);
             
             // Save temporary rows
             for (const tempRow of completeTemporaryRows) {
@@ -1471,13 +1874,46 @@ export default function ManageUsers() {
                 savedCount++;
             }
             
-            // Handle pending changes from modified existing records
-            if (hasActiveAutoSave || hasModifiedExistingRecords) {
-                console.log('💾 Manual save triggered - processing pending changes immediately');
+            // Save modified existing users to database
+            const modifiedExistingUserIds = Array.from(modifiedExistingRecordsRef.current);
+            if (modifiedExistingUserIds.length > 0) {
+                console.log('💾 Saving modified existing users:', modifiedExistingUserIds);
                 
-                // Trigger the auto-save process immediately instead of waiting for timer
+                for (const userId of modifiedExistingUserIds) {
+                    const user = accounts.find(acc => acc.id === userId);
+                    if (user && !String(user.id).startsWith('tmp-')) {
+                        try {
+                            const userData = {
+                                firstName: user.firstName || '',
+                                lastName: user.lastName || '',
+                                middleName: user.middleName || '',
+                                emailAddress: user.emailAddress || '',
+                                status: user.status || 'ACTIVE',
+                                startDate: user.startDate || '',
+                                endDate: user.endDate || '',
+                                password: user.password || '',
+                                technicalUser: user.technicalUser || false,
+                                assignedUserGroups: user.assignedUserGroups || [],
+                            };
+                            
+                            await api.put(`/api/user-management/users/${user.id}`, userData);
+                            console.log(`✅ Modified user ${user.id} saved to database`);
+                            savedCount++;
+                        } catch (error) {
+                            console.error(`❌ Error saving modified user ${user.id}:`, error);
+                        }
+                    }
+                }
+                
+                // Clear modified records set after saving
+                modifiedExistingRecordsRef.current.clear();
+                setModifiedExistingRecords(new Set());
+            }
+            
+            // Handle any remaining pending changes from auto-save timer
+            if (hasActiveAutoSave) {
+                console.log('💾 Processing pending auto-save changes');
                 const pendingSavedCount = await executeAutoSave();
-                
                 if (pendingSavedCount > 0) {
                     savedCount += pendingSavedCount;
                 }
@@ -1486,9 +1922,25 @@ export default function ManageUsers() {
             if (savedCount > 0) {
                 showBlueNotification(`Successfully saved ${savedCount} entries.`);
                 setShowValidationErrors(false); // Clear validation errors on successful save
+                setExternalFieldErrors({});
+                
+                // Clear all pending changes and navigation warning flags on successful save
+                setPendingLocalChanges({});
+                setHasUnsavedChanges(false);
+                setPreventNavigation(false);
+                setUserConfirmedLeave(false);
+                setIncompleteRows([]);
             } else if (hasPendingChanges) {
                 showBlueNotification('Pending changes saved successfully.');
                 setShowValidationErrors(false); // Clear validation errors on successful save
+                setExternalFieldErrors({});
+                
+                // Clear all pending changes and navigation warning flags on successful save
+                setPendingLocalChanges({});
+                setHasUnsavedChanges(false);
+                setPreventNavigation(false);
+                setUserConfirmedLeave(false);
+                setIncompleteRows([]);
             } else {
                 showBlueNotification('No complete entries to save.', 3000, false);
             }
@@ -1501,7 +1953,18 @@ export default function ManageUsers() {
     // Navigation warning handler
     const handleNavigationAttempt = (navigationFn: () => void) => {
         const incomplete = getIncompleteRows();
-        if (incomplete.length > 0) {
+        const hasChanges = getUnsavedChanges();
+        
+        console.log('🚨 Navigation attempt blocked check:', {
+            incompleteCount: incomplete.length,
+            incompleteIds: incomplete,
+            hasChanges,
+            pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
+            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
+            autoSaveTimerActive: !!autoSaveTimerRef.current
+        });
+        
+        if (incomplete.length > 0 || hasChanges) {
             setIncompleteRows(incomplete);
             setPendingNavigation(() => navigationFn);
             setShowNavigationWarning(true);
@@ -1510,10 +1973,64 @@ export default function ManageUsers() {
         }
     };
 
+    // Enhanced unsaved changes detection function
+    const getUnsavedChanges = useCallback(() => {
+        const effectiveConfigs = accounts;
+        
+        // Check for pending local changes
+        const hasPendingLocalChanges = Object.keys(pendingLocalChanges).length > 0;
+        
+        // Check for modified existing records
+        const hasModifiedExistingRecords = modifiedExistingRecords.size > 0;
+        
+        // Check for new rows with any data
+        const hasPartialNewRows = effectiveConfigs.some((config: any) => {
+            const isNewRow = String(config.id).startsWith('tmp-');
+            if (!isNewRow) return false;
+            
+            // Check if there's any data in the new row
+            const hasFirstName = config.firstName?.trim();
+            const hasLastName = config.lastName?.trim();
+            const hasEmail = config.emailAddress?.trim();
+            const hasStartDate = config.startDate?.trim();
+            const hasPassword = config.password?.trim();
+            const hasTechnicalUser = config.technicalUser;
+            const hasUserGroups = config.assignedUserGroups?.length > 0;
+            
+            return hasFirstName || hasLastName || hasEmail || hasStartDate || hasPassword || hasTechnicalUser || hasUserGroups;
+        });
+        
+        const hasChanges = hasPendingLocalChanges || hasModifiedExistingRecords || hasPartialNewRows;
+        
+        console.log('🔍 getUnsavedChanges check:', {
+            hasPendingLocalChanges,
+            hasModifiedExistingRecords,
+            hasPartialNewRows,
+            pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
+            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
+            hasChanges
+        });
+        
+        return hasChanges;
+    }, [accounts, pendingLocalChanges, modifiedExistingRecords]);
+
+    // Update unsaved changes state when data changes
+    useEffect(() => {
+        const hasChanges = getUnsavedChanges();
+        setHasUnsavedChanges(hasChanges);
+        setPreventNavigation(hasChanges);
+    }, [getUnsavedChanges]);
+
     // Add beforeunload event listener for browser navigation and auto-save on exit
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            // If user has already confirmed they want to leave, don't show browser warning
+            if (userConfirmedLeave) {
+                return;
+            }
+            
             const incomplete = getIncompleteRows();
+            const hasChanges = getUnsavedChanges();
             
             // Check for pending auto-save and execute synchronously
             const storedData = localStorage.getItem('accountsAutoSave');
@@ -1523,10 +2040,11 @@ export default function ManageUsers() {
                 // The user will see a warning if there are incomplete rows
             }
             
-            if (incomplete.length > 0) {
+            if (incomplete.length > 0 || hasChanges) {
                 e.preventDefault();
-                e.returnValue =
-                    'You have incomplete account configurations. Your changes will be lost if you leave.';
+                e.returnValue = incomplete.length > 0 
+                    ? `You have ${incomplete.length} incomplete user ${incomplete.length === 1 ? 'entry' : 'entries'}. Your changes will be lost if you leave.`
+                    : 'You have unsaved changes that will be lost if you leave.';
                 return e.returnValue;
             }
         };
@@ -1587,6 +2105,88 @@ export default function ManageUsers() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [accounts]);
+
+    // Router navigation guard - comprehensive navigation interception
+    useEffect(() => {
+        // Store reference to original methods
+        const originalPush = router.push;
+        const originalReplace = router.replace;
+        
+        // Store original methods in ref so modal can access them
+        originalRouterRef.current = { push: originalPush, replace: originalReplace };
+        
+        router.push = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - push method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    pendingLocalChanges: Object.keys(pendingLocalChanges),
+                    modifiedExistingRecords: Array.from(modifiedExistingRecords),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+            return originalPush(href, options);
+        };
+
+        router.replace = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - replace method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    pendingLocalChanges: Object.keys(pendingLocalChanges),
+                    modifiedExistingRecords: Array.from(modifiedExistingRecords),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+            return originalReplace(href, options);
+        };
+
+        // Handle browser history navigation (back/forward buttons)
+        const handlePopState = (event: PopStateEvent) => {
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if ((currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                event.preventDefault();
+                // Push current state back to prevent navigation
+                window.history.pushState(null, '', window.location.href);
+                setIncompleteRows(currentIncompleteRows);
+                setShowNavigationWarning(true);
+            }
+        };
+
+        // Add history listener for browser navigation
+        window.addEventListener('popstate', handlePopState);
+
+        // Clean up by restoring original router methods and removing listeners
+        return () => {
+            router.push = originalPush;
+            router.replace = originalReplace;
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [router, hasUnsavedChanges, getIncompleteRows, userConfirmedLeave, pendingLocalChanges, modifiedExistingRecords]);
 
     // Effect to detect AI panel collapse state by observing its width
     useEffect(() => {
@@ -1704,65 +2304,44 @@ export default function ManageUsers() {
                 setIsLoading(true);
                 console.log('🔄 Loading enterprise linkages...');
 
-                // Load accounts data from localStorage instead of API
-                console.log('🔄 Loading accounts from localStorage...');
+                // Load user data from database API
+                console.log('🔄 Loading users from database API...');
                 
-                const storedAccounts = localStorage.getItem('accounts-data');
-                let accountsData = [];
+                let accountsData: any[] = [];
                 
-                if (storedAccounts) {
-                    try {
-                        accountsData = JSON.parse(storedAccounts);
-                        console.log('📊 Loaded accounts from localStorage:', accountsData.length);
-                        
-                        // Ensure all accounts have required fields (data migration)
-                        accountsData = accountsData.map((account: any) => ({
-                            ...account,
-                            masterAccount: account.masterAccount || '',
-                            cloudType: account.cloudType || '',
-                            country: account.country || '',
-                            addresses: account.addresses || [],
-                            licenses: account.licenses || [],
+                try {
+                    // Fetch users from database
+                    const response = await api.get<any[]>('/api/user-management/users');
+                    console.log('📊 Loaded users from database:', response?.length || 0);
+                    console.log('🔍 Raw API response:', response);
+                    
+                    if (response && Array.isArray(response)) {
+                        accountsData = response.map((user: any) => ({
+                            id: user.id?.toString() || `user-${Date.now()}`,
+                            firstName: user.firstName || '',
+                            middleName: user.middleName || '',
+                            lastName: user.lastName || '',
+                            emailAddress: user.emailAddress || '',
+                            status: user.status || 'ACTIVE',
+                            startDate: user.startDate || '',
+                            endDate: user.endDate || '',
+                            // Backend should decrypt and return password field
+                            password: user.password || '',
+                            technicalUser: user.technicalUser || false,
+                            assignedUserGroups: user.assignedUserGroups || [],
+                            createdAt: user.createdAt || new Date().toISOString(),
+                            updatedAt: user.updatedAt || new Date().toISOString(),
                         }));
-                    } catch (error) {
-                        console.error('Error parsing stored accounts:', error);
+                        console.log('✅ Users loaded and transformed:', accountsData.length);
+                        console.log('🔍 Transformed user data:', accountsData);
+                    } else {
+                        console.log('ℹ️ No users returned from API, starting with empty array');
                         accountsData = [];
                     }
-                } else {
-                    console.log('ℹ️ No accounts found in localStorage, starting with empty array');
-                    // Initialize with sample data for testing
-                    accountsData = [
-                        {
-                            id: 'acc-1',
-                            accountName: 'John Doe',
-                            masterAccount: '',
-                            cloudType: '',
-                            country: '',
-                            email: 'john.doe@example.com',
-                            phone: '+1-555-0123',
-                            address: '',
-                            addresses: [],
-                            licenses: [],
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        },
-                        {
-                            id: 'acc-2',
-                            accountName: 'Jane Smith',
-                            masterAccount: '',
-                            cloudType: '',
-                            country: '',
-                            email: 'jane.smith@example.com',
-                            phone: '+1-555-0456',
-                            address: '',
-                            addresses: [],
-                            licenses: [],
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        }
-                    ];
-                    // Save initial data to localStorage
-                    localStorage.setItem('accounts-data', JSON.stringify(accountsData));
+                    } catch (error) {
+                    console.error('❌ Error loading users from database:', error);
+                    console.log('ℹ️ Starting with empty array');
+                        accountsData = [];
                 }
 
                 // Only update state if component is still mounted
@@ -1783,13 +2362,21 @@ export default function ManageUsers() {
                     return;
                 }
 
-                // Transform account data to AccountRow format
+                // Transform account data to AccountRow format (preserve all user management fields)
                 const transformedAccounts = accountsData
                     .map((account: any, index: number) => ({
                         id: account.id,
-                        accountName: account.accountName || '',
-                        email: account.email || '',
-                        phone: account.phone || '',
+                        // User management fields - preserve all fields from stored data
+                        firstName: account.firstName || '',
+                        middleName: account.middleName || '',
+                        lastName: account.lastName || '',
+                        emailAddress: account.emailAddress || '',
+                        status: account.status || 'ACTIVE',
+                        startDate: account.startDate || '', // Preserve start date
+                        endDate: account.endDate || '',
+                        password: account.password || '',
+                        technicalUser: account.technicalUser || false,
+                        assignedUserGroups: account.assignedUserGroups || [],
                         // Store creation time and display order for stable sorting
                         createdAt: account.createdAt,
                         updatedAt: account.updatedAt,
@@ -1865,7 +2452,12 @@ export default function ManageUsers() {
                 displayOrder: displayOrderRef.current.get(c.id)
             }))
         );
-    }, [accounts]);
+        
+        // Update dropdown options when accounts change
+        if (accounts.length > 0) {
+            loadDropdownOptions();
+        }
+    }, [accounts, loadDropdownOptions]);
 
     // Ref for AccountsTable to access its methods
     const accountsTableRef = useRef<any>(null);
@@ -1959,21 +2551,32 @@ export default function ManageUsers() {
                 // Add a small delay to show the loading state
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Find the account to be deleted for debugging
-                const accountToDelete = accounts.find(acc => acc.id === pendingDeleteRowId);
-                console.log('📄 Account data to delete:', accountToDelete);
+                // Find the user to be deleted for debugging
+                const userToDelete = accounts.find(acc => acc.id === pendingDeleteRowId);
+                console.log('📄 User data to delete:', userToDelete);
 
-                // Remove from localStorage instead of API call
+                // Delete from database via API (only if not a temporary row)
+                if (!String(pendingDeleteRowId).startsWith('tmp-')) {
+                    try {
+                        await api.del(`/api/user-management/users/${pendingDeleteRowId}`);
+                        console.log('✅ User deleted from database via API');
+                    } catch (error) {
+                        console.error('❌ Error deleting user from database:', error);
+                        throw new Error('Failed to delete user from database');
+                    }
+                } else {
+                    console.log('ℹ️ Temporary row - only removing from frontend state and localStorage');
+                    // Remove temporary row from localStorage
                 const storedAccounts = localStorage.getItem('accounts-data');
                 if (storedAccounts) {
                     try {
                         const accountsData = JSON.parse(storedAccounts);
                         const updatedAccountsData = accountsData.filter((acc: any) => acc.id !== pendingDeleteRowId);
                         localStorage.setItem('accounts-data', JSON.stringify(updatedAccountsData));
-                        console.log('✅ Account deleted from localStorage');
+                            console.log('✅ Temporary user deleted from localStorage');
                     } catch (error) {
                         console.error('Error updating localStorage:', error);
-                        throw new Error('Failed to delete account from storage');
+                        }
                     }
                 }
 
@@ -1984,7 +2587,10 @@ export default function ManageUsers() {
                     return sortConfigsByDisplayOrder(updated);
                 });
 
-                console.log('✅ Account deleted successfully');
+                console.log('✅ User deleted successfully');
+                
+                // Show success notification
+                showBlueNotification('Successfully deleted 1 entries.');
             } else if (deleteType === 'license') {
                 console.log('🗑️ Deleting license:', pendingDeleteLicenseId);
 
@@ -2019,7 +2625,7 @@ export default function ManageUsers() {
                 deleteType,
                 pendingDeleteRowId,
                 pendingDeleteLicenseId,
-                storageType: 'localStorage'
+                storageType: 'database'
             });
             
             // Log the specific error message if available
@@ -2027,11 +2633,8 @@ export default function ManageUsers() {
                 console.error('❌ Error message:', error.message);
             }
             
-            // Show error notification using the blue notification system
-            showBlueNotification(
-                `Failed to delete the ${deleteType}. Please try again.`,
-                5000, // Show for 5 seconds for error messages
-            );
+            // Show error notification
+            showBlueNotification(`Failed to delete ${deleteType}. Please try again.`, 5000, false);
         } finally {
             setDeletingRow(false);
         }
@@ -2057,7 +2660,24 @@ export default function ManageUsers() {
 
     // User Group modal handlers
     const handleOpenUserGroupModal = (row: AccountRow) => {
-        setSelectedUserForGroups(row);
+        console.log('🔵 handleOpenUserGroupModal called with row:', row);
+        console.log('🔵 row.assignedUserGroups:', row.assignedUserGroups);
+        console.log('🔵 row.id:', row.id);
+        
+        // CRITICAL FIX: Always use the account from the accounts state instead of the row from the table
+        // This ensures we have the most up-to-date data, including any recent saves
+        const actualAccount = accounts.find(a => a.id === row.id);
+        console.log('🔍 Account from accounts state:', actualAccount);
+        console.log('🔍 Account assignedUserGroups:', actualAccount?.assignedUserGroups);
+        
+        if (actualAccount) {
+            // Use the account from state, not the row from the table
+            setSelectedUserForGroups(actualAccount as AccountRow);
+        } else {
+            // Fallback to row if account not found (shouldn't happen)
+            console.warn('⚠️ Account not found in state, falling back to row');
+            setSelectedUserForGroups(row);
+        }
         setShowUserGroupModal(true);
     };
 
@@ -2067,17 +2687,21 @@ export default function ManageUsers() {
     };
 
     const handleSaveUserGroups = (selectedUserGroups: UserGroup[]) => {
+        console.log('💾 handleSaveUserGroups called with:', selectedUserGroups);
         if (selectedUserForGroups) {
-            // Convert UserGroup objects to string array for the table
-            const groupNames = selectedUserGroups.map(group => group.groupName);
+            // Store complete UserGroup objects in assignedUserGroups
+            // This preserves all the data (groupName, entity, product, service, etc.)
             
             // Update the user's assigned groups
             setAccounts(prevAccounts => {
                 const updated = prevAccounts.map(account => 
                     account.id === selectedUserForGroups.id 
-                        ? { ...account, assignedUserGroups: groupNames }
+                        ? { ...account, assignedUserGroups: selectedUserGroups as any }
                         : account
                 );
+                const updatedAccount = updated.find(a => a.id === selectedUserForGroups.id);
+                console.log('📝 Updated accounts with user groups:', updatedAccount);
+                console.log('📝 Specifically assignedUserGroups property:', updatedAccount?.assignedUserGroups);
                 return sortConfigsByDisplayOrder(updated);
             });
             
@@ -2161,14 +2785,15 @@ export default function ManageUsers() {
             const updated = [...prev, newAccount];
             // Apply stable sorting to maintain display order
             const sorted = sortConfigsByDisplayOrder(updated);
-            // Also save to localStorage
-            saveAccountsToStorage(sorted);
+            // Don't save blank rows to localStorage - they'll be saved when fields are filled or on manual save
+            console.log('➕ New row added (not saved to localStorage yet - will save when complete)');
             return sorted;
         });
         
         // Clear validation errors when adding a new row to ensure new rows start with normal styling
         if (showValidationErrors) {
             setShowValidationErrors(false);
+            setExternalFieldErrors({});
         }
         
         console.log('➕ Added new blank row:', newId);
@@ -2200,7 +2825,7 @@ export default function ManageUsers() {
             <div className='bg-sap-light-gray px-3 py-3 text-primary border-y border-light'>
                 <div className='flex items-center justify-between gap-3'>
                     <div className='flex items-center gap-3 flex-wrap'>
-                        {/* Create New Enterprise Button */}
+                        {/* Create New User Button */}
                         <button
                             onClick={handleAddNewRow}
                             disabled={isLoading}
@@ -2338,44 +2963,275 @@ export default function ManageUsers() {
                                     </div>
                                     <div className='p-2'>
                                         <div className='space-y-2'>
-                                            {/* Cloud Type Filter */}
+                                            {/* First Name Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Cloud Type
+                                                    First Name
                                                 </label>
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.cloudType}
-                                                        onChange={(e) =>
+                                                        value={filterForm.firstName}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                cloudType:
-                                                                    e.target.value,
-                                                            })
-                                                        }
+                                                                firstName: value,
+                                                            });
+                                                            
+                                                            // Filter first names
+                                                            const filtered = dropdownOptions.firstNames.filter(firstName =>
+                                                                firstName.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredFirstNames(filtered);
+                                                            setShowFirstNameSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedFirstNameIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedFirstNameIndex(prev => 
+                                                                    prev < filteredFirstNames.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedFirstNameIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedFirstNameIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredFirstNames[selectedFirstNameIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    firstName: selected.name,
+                                                                });
+                                                                setShowFirstNameSuggestions(false);
+                                                                setSelectedFirstNameIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowFirstNameSuggestions(false);
+                                                                setSelectedFirstNameIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowFirstNameSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.firstName && filteredFirstNames.length > 0) {
+                                                                setShowFirstNameSuggestions(true);
+                                                            }
+                                                        }}
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
+                                                    {showFirstNameSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredFirstNames.map((firstName, index) => (
+                                                                <div
+                                                                    key={firstName.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedFirstNameIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            firstName: firstName.name,
+                                                                        });
+                                                                        setShowFirstNameSuggestions(false);
+                                                                        setSelectedFirstNameIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {firstName.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            {/* Address Filter */}
+                                            {/* Last Name Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Address
+                                                    Last Name
                                                 </label>
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.address}
+                                                        value={filterForm.lastName}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                lastName: value,
+                                                            });
+                                                            
+                                                            // Filter last names
+                                                            const filtered = dropdownOptions.lastNames.filter(lastName =>
+                                                                lastName.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredLastNames(filtered);
+                                                            setShowLastNameSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedLastNameIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedLastNameIndex(prev => 
+                                                                    prev < filteredLastNames.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedLastNameIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedLastNameIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredLastNames[selectedLastNameIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    lastName: selected.name,
+                                                                });
+                                                                setShowLastNameSuggestions(false);
+                                                                setSelectedLastNameIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowLastNameSuggestions(false);
+                                                                setSelectedLastNameIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowLastNameSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.lastName && filteredLastNames.length > 0) {
+                                                                setShowLastNameSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showLastNameSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredLastNames.map((lastName, index) => (
+                                                                <div
+                                                                    key={lastName.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedLastNameIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            lastName: lastName.name,
+                                                                        });
+                                                                        setShowLastNameSuggestions(false);
+                                                                        setSelectedLastNameIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {lastName.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Email Address Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Email Address
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.emailAddress}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                emailAddress: value,
+                                                            });
+                                                            
+                                                            // Filter emails
+                                                            const filtered = dropdownOptions.emails.filter(email =>
+                                                                email.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredEmails(filtered);
+                                                            setShowEmailSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedEmailIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedEmailIndex(prev => 
+                                                                    prev < filteredEmails.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedEmailIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedEmailIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredEmails[selectedEmailIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    emailAddress: selected.name,
+                                                                });
+                                                                setShowEmailSuggestions(false);
+                                                                setSelectedEmailIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowEmailSuggestions(false);
+                                                                setSelectedEmailIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowEmailSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.emailAddress && filteredEmails.length > 0) {
+                                                                setShowEmailSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showEmailSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredEmails.map((email, index) => (
+                                                                <div
+                                                                    key={email.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedEmailIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            emailAddress: email.name,
+                                                                        });
+                                                                        setShowEmailSuggestions(false);
+                                                                        setSelectedEmailIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {email.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Status Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Status
+                                                </label>
+                                                <div className='relative'>
+                                                    <select
+                                                        value={filterForm.status}
                                                         onChange={(e) =>
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                address: e.target.value,
+                                                                status: e.target.value,
                                                             })
                                                         }
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
+                                                    >
+                                                        <option value=''>All Statuses</option>
+                                                        <option value='ACTIVE'>Active</option>
+                                                        <option value='INACTIVE'>Inactive</option>
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
@@ -2443,7 +3299,7 @@ export default function ManageUsers() {
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option value=''>Select column...</option>
-                                                        {allCols.map((col) => (
+                                                        {sortableCols.map((col) => (
                                                             <option key={col} value={col}>
                                                                 {columnLabels[col]}
                                                             </option>
@@ -2628,33 +3484,52 @@ export default function ManageUsers() {
                                 )}
                             </button>
                             {groupOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
                                     <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
                                         <div className='text-xs font-semibold'>
                                             Group by
                                         </div>
+                                        {ActiveGroupLabel !== 'None' && (
+                                            <button
+                                                onClick={clearGroupBy}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
                                     <div className='p-3'>
                                         <div className='space-y-3'>
                                             <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Column
+                                                </label>
                                                 <div className='relative'>
                                                     <select
-                                                        value={ActiveGroupLabel}
-                                                        onChange={(e) =>
-                                                            setGroupByFromLabel(
-                                                                e.target.value,
-                                                            )
-                                                        }
+                                                        value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setGroupByFromLabel(value || 'None');
+                                                        }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option>None</option>
-                                                        <option>Account</option>
-                                                        <option>Master Account</option>
-                                                        <option>Cloud Type</option>
-                                                        <option>Address</option>
+                                                        <option value=''>Select column...</option>
+                                                        <option value='First Name'>First Name</option>
+                                                        <option value='Last Name'>Last Name</option>
+                                                        <option value='Email Address'>Email Address</option>
+                                                        <option value='Status'>Status</option>
                                                     </select>
                                                 </div>
                                             </div>
+
+                                            {/* Current Group Display */}
+                                            {ActiveGroupLabel !== 'None' && (
+                                                <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
+                                                    <span className='font-medium text-orange-800'>
+                                                        Grouped by: {ActiveGroupLabel}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -2883,6 +3758,8 @@ export default function ManageUsers() {
                                             startDate: a.startDate || '',
                                             endDate: a.endDate || '',
                                             password: a.password || '',
+                                            technicalUser: a.technicalUser || false,
+                                            assignedUserGroups: a.assignedUserGroups || [],
                                         }),
                                     )}
                                     onEdit={(id) => {
@@ -2951,6 +3828,7 @@ export default function ManageUsers() {
                                                         newSet.add(rowId);
                                                         return newSet;
                                                     });
+                                                    modifiedExistingRecordsRef.current.add(rowId);
                                                     
                                                     // Trigger auto-save timer for visual feedback
                                                     debouncedAutoSave();
@@ -3010,64 +3888,60 @@ export default function ManageUsers() {
 
                                         // For new rows (temporary IDs), check if we can auto-save
                                         if (rowId.startsWith('tmp-')) {
-                                            console.log('🔄 Updating temporary row:', rowId, field, value);
+                                            console.log('🔄 Updating temporary user row:', rowId, field, field === 'password' ? '***' : value);
 
                                             // Check if all required fields are filled for auto-save
-                                            const updatedAccount = accounts.find((a) => a.id === rowId);
-                                            if (updatedAccount) {
+                                            const updatedUser = accounts.find((a) => a.id === rowId);
+                                            if (updatedUser) {
                                                 // Apply the current update to check completeness
-                                                const accountWithUpdate = {
-                                                    ...updatedAccount,
+                                                const userWithUpdate = {
+                                                    ...updatedUser,
                                                     [field]: value,
                                                 };
 
-                                                // Check if we have all required fields
-                                                const hasAccountName = accountWithUpdate.accountName?.trim();
-                                                const hasMasterAccount = accountWithUpdate.masterAccount?.trim();
-                                                const hasCloudType = accountWithUpdate.cloudType?.trim();
-                                                const hasAddress = accountWithUpdate.address?.trim();
+                                                // Check if we have all required user management fields
+                                                const hasFirstName = userWithUpdate.firstName?.trim();
+                                                const hasLastName = userWithUpdate.lastName?.trim();
+                                                const hasValidEmail = userWithUpdate.emailAddress?.trim() && isValidEmail(userWithUpdate.emailAddress);
+                                                const hasStartDate = userWithUpdate.startDate?.trim();
+                                                const hasPassword = userWithUpdate.password?.trim();
 
-                                                console.log('🔍 Auto-save check:', {
+                                                console.log('🔍 Temporary user auto-save check:', {
                                                     rowId,
                                                     field,
-                                                    value,
-                                                    accountWithUpdate,
-                                                    hasAccountName,
-                                                    hasMasterAccount,
-                                                    hasCloudType,
-                                                    hasAddress,
-                                                    willTriggerDebouncedSave: hasAccountName && hasMasterAccount && hasCloudType && hasAddress,
+                                                    hasFirstName: !!hasFirstName,
+                                                    hasLastName: !!hasLastName,
+                                                    hasValidEmail: !!hasValidEmail,
+                                                    hasStartDate: !!hasStartDate,
+                                                    hasPassword: !!hasPassword,
+                                                    isComplete: !!(hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword),
                                                 });
 
                                                 // Trigger debounced auto-save if all required fields are filled
-                                                if (hasAccountName && hasMasterAccount && hasCloudType && hasAddress) {
-                                                    console.log('✅ All required account fields filled, starting 10-second auto-save timer...');
+                                                if (hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword) {
+                                                    console.log('✅ All required user fields filled, starting auto-save timer...');
                                                     
                                                     // Clear validation errors for this row since it's now complete
                                                     if (showValidationErrors) {
-                                                        const currentIncompleteRows = getIncompleteRows();
-                                                        if (!currentIncompleteRows.includes(rowId)) {
-                                                            // This row is no longer incomplete, check if all rows are complete
-                                                            const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
-                                                            if (remainingIncompleteRows.length === 0) {
-                                                                // All rows are now complete, clear validation errors
+                                                        // Remove this row from incomplete rows since it's now complete
+                                                        setIncompleteRows(prev => {
+                                                            const updated = prev.filter(id => id !== rowId);
+                                                            console.log(`✅ Removed temporary row ${rowId} from incomplete highlighting - remaining:`, updated);
+                                                            
+                                                            // If no more incomplete rows, clear validation errors
+                                                            if (updated.length === 0) {
+                                                                console.log('🎉 All validation issues resolved - clearing validation errors');
                                                                 setShowValidationErrors(false);
+                                                                setExternalFieldErrors({});
                                                             }
-                                                        }
+                                                            
+                                                            return updated;
+                                                        });
                                                     }
                                                     
                                                     debouncedAutoSave();
                                                 } else {
-                                                    console.log('❌ Auto-save conditions not met:', {
-                                                        hasAccountName,
-                                                        hasMasterAccount,
-                                                        hasCloudType,
-                                                        hasAddress,
-                                                        accountNameValue: accountWithUpdate.accountName,
-                                                        masterAccountValue: accountWithUpdate.masterAccount,
-                                                        cloudTypeValue: accountWithUpdate.cloudType,
-                                                        addressValue: accountWithUpdate.address,
-                                                    });
+                                                    console.log('ℹ️ Temporary user incomplete - will save to localStorage as draft');
                                                 }
                                             }
                                             return;
@@ -3079,84 +3953,77 @@ export default function ManageUsers() {
                                             if (account) {
                                                 const updatedAccount = { ...account, [field]: value };
                                                 
-                                                // Check if all required fields are present and not empty
-                                                const hasAccountName = updatedAccount.accountName?.trim();
-                                                const hasMasterAccount = updatedAccount.masterAccount?.trim();
-                                                const hasCloudType = updatedAccount.cloudType?.trim();
-                                                const hasAddress = updatedAccount.address?.trim();
+                                                // Check if all required fields are present and not empty (for user management)
+                                                const hasFirstName = updatedAccount.firstName?.trim();
+                                                const hasLastName = updatedAccount.lastName?.trim();
+                                                const hasValidEmail = updatedAccount.emailAddress?.trim() && isValidEmail(updatedAccount.emailAddress);
+                                                const hasStartDate = updatedAccount.startDate?.trim();
+                                                const hasPassword = updatedAccount.password?.trim();
                                                 
-                                                console.log('🔍 Existing account auto-save check:', {
+                                                console.log('🔍 Existing user field update:', {
                                                     rowId,
                                                     field,
-                                                    value,
-                                                    hasAccountName: !!hasAccountName,
-                                                    hasMasterAccount: !!hasMasterAccount,
-                                                    hasCloudType: !!hasCloudType,
-                                                    hasAddress: !!hasAddress,
-                                                    willTriggerAutoSave: !!(hasAccountName && hasMasterAccount && hasCloudType && hasAddress),
+                                                    value: field === 'password' ? '***' : value,
+                                                    hasFirstName: !!hasFirstName,
+                                                    hasLastName: !!hasLastName,
+                                                    hasValidEmail: !!hasValidEmail,
+                                                    hasStartDate: !!hasStartDate,
+                                                    hasPassword: !!hasPassword,
+                                                    isComplete: !!(hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword),
                                                 });
                                                 
-                                                // Only trigger auto-save if all fields are complete
-                                                if (hasAccountName && hasMasterAccount && hasCloudType && hasAddress) {
-                                                    console.log('🔄 Triggering auto-save timer for complete existing account:', rowId);
+                                                // Always add to modified set for any field change on existing user
+                                                setModifiedExistingRecords(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.add(rowId);
+                                                    return newSet;
+                                                });
+                                                modifiedExistingRecordsRef.current.add(rowId);
+                                                console.log(`➕ Added existing user ${rowId} to modified set (field: ${field})`);
+                                                
+                                                // Trigger auto-save if all fields are complete
+                                                if (hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword) {
+                                                    console.log('🔄 Triggering auto-save timer for complete existing user:', rowId);
                                                     
                                                     // Clear validation errors for this row since it's now complete
                                                     if (showValidationErrors) {
-                                                        const currentIncompleteRows = getIncompleteRows();
-                                                        if (!currentIncompleteRows.includes(rowId)) {
-                                                            // This row is no longer incomplete, check if all rows are complete
-                                                            const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
-                                                            if (remainingIncompleteRows.length === 0) {
-                                                                // All rows are now complete, clear validation errors
+                                                        // Remove this row from incomplete rows since it's now complete
+                                                        setIncompleteRows(prev => {
+                                                            const updated = prev.filter(id => id !== rowId);
+                                                            console.log(`✅ Removed row ${rowId} from incomplete highlighting - remaining:`, updated);
+                                                            
+                                                            // If no more incomplete rows, clear validation errors
+                                                            if (updated.length === 0) {
+                                                                console.log('🎉 All validation issues resolved - clearing validation errors');
                                                                 setShowValidationErrors(false);
+                                                                setExternalFieldErrors({});
                                                             }
-                                                        }
+                                                            
+                                                            return updated;
+                                                        });
                                                     }
                                                     
-                                                    // Add to modified records set
-                                                    setModifiedExistingRecords(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.add(rowId);
-                                                        return newSet;
-                                                    });
                                                     // Trigger auto-save timer for visual feedback
                                                     debouncedAutoSave();
                                                 } else {
-                                                    console.log('❌ Not triggering auto-save for incomplete existing account:', rowId, {
-                                                        hasAccountName: !!hasAccountName,
-                                                        hasMasterAccount: !!hasMasterAccount,
-                                                        hasCloudType: !!hasCloudType,
-                                                        hasAddress: !!hasAddress
-                                                    });
-                                                    // Remove from modified records set if it was there
-                                                    setModifiedExistingRecords(prev => {
-                                                        const newSet = new Set(prev);
-                                                        const wasRemoved = newSet.delete(rowId);
-                                                        console.log(`🧹 Removing incomplete account ${rowId} from modified set: ${wasRemoved ? 'removed' : 'not found'}`);
-                                                        return newSet;
-                                                    });
-                                                    
-                                                    // Save immediately to localStorage for existing records
-                                                    const updatedAccounts = accounts.map(acc => 
-                                                        acc.id === rowId 
-                                                            ? { ...acc, [field]: value, updatedAt: new Date().toISOString() }
-                                                            : acc
-                                                    );
-                                                    saveAccountsToStorage(updatedAccounts);
-                                                    console.log(`💾 Saved incomplete account ${rowId} to localStorage`);
-                                                    return;
+                                                    console.log('ℹ️ Incomplete existing user - will save to database on manual save:', rowId);
                                                 }
                                             }
                                         }
 
-                                        // Save to localStorage for immediate persistence
+                                        // Save to localStorage only for temporary in-progress changes
+                                        // Database records will be saved via API on manual save
+                                        if (String(rowId).startsWith('tmp-')) {
                                         const updatedAccounts = accounts.map(acc => 
                                             acc.id === rowId 
                                                 ? { ...acc, [field]: value, updatedAt: new Date().toISOString() }
                                                 : acc
                                         );
                                         saveAccountsToStorage(updatedAccounts);
-                                        console.log(`💾 Saved account ${rowId} field ${field} to localStorage`);
+                                            console.log(`💾 Saved temporary account ${rowId} field ${field} to localStorage (draft)`);
+                                        } else {
+                                            console.log(`ℹ️ Skipping localStorage save for non-temporary account ${rowId} - will save to database on manual save`);
+                                        }
                                     }}
                                     compressingRowId={compressingRowId}
                                     foldingRowId={foldingRowId}
@@ -3164,8 +4031,9 @@ export default function ManageUsers() {
                                     foldingLicenseId={foldingLicenseId}
                                     onLicenseValidationChange={handleLicenseValidationChange}
                                     onLicenseDelete={startLicenseCompressionAnimation}
-                                    incompleteRowIds={getIncompleteRows()}
+                                    incompleteRowIds={showValidationErrors ? incompleteRows : []}
                                     showValidationErrors={showValidationErrors}
+                                    externalFieldErrors={externalFieldErrors}
                                     hasBlankRow={hasBlankRow()}
                                     onOpenUserGroupModal={handleOpenUserGroupModal}
                                 />
@@ -3180,40 +4048,141 @@ export default function ManageUsers() {
                 <ConfirmModal
                     open={showNavigationWarning}
                     title="Unsaved Changes"
-                    message="You have incomplete account entries. Your changes will be lost if you leave."
+                    message="You have unsaved changes that will be lost if you leave. Are you sure you want to continue?"
                     confirmText="Leave Anyway"
                     cancelText="Stay Here"
                     onConfirm={() => {
+                        console.log('🔄 User confirmed navigation - clearing states and executing navigation');
                         setShowNavigationWarning(false);
+                        
+                        // Clear all unsaved states IMMEDIATELY
                         setIncompleteRows([]);
-                        if (pendingNavigation) {
-                            pendingNavigation();
+                        setHasUnsavedChanges(false);
+                        setPreventNavigation(false);
+                        setUserConfirmedLeave(true);
+                        
+                        // Execute navigation immediately after state update
+                        if (pendingNavigationUrl) {
+                            console.log('🔄 Executing pending navigation to:', pendingNavigationUrl);
+                            // Clear the pending URL first
+                            const targetUrl = pendingNavigationUrl;
+                            setPendingNavigationUrl(null);
+                            
+                            // Use setTimeout to ensure state updates are processed first
+                            setTimeout(() => {
+                                if (originalRouterRef.current) {
+                                    originalRouterRef.current.push(targetUrl);
+                                } else {
+                                    // Fallback: router should now allow navigation since userConfirmedLeave is true
+                                    router.push(targetUrl);
+                                }
+                            }, 0);
+                        } else if (pendingNavigation) {
+                            // Fallback for legacy navigation handling
+                            const navFn = pendingNavigation;
                             setPendingNavigation(null);
+                            setTimeout(() => {
+                                navFn();
+                            }, 0);
                         }
                     }}
                     onCancel={() => {
                         setShowNavigationWarning(false);
+                        setPendingNavigationUrl(null);
                         setPendingNavigation(null);
+                        setPreventNavigation(false);
                     }}
                 />
             )}
 
-            {/* Delete Confirmation Modal */}
+            {/* Delete Confirmation Modal - match Manage Accounts styling */}
             {showDeleteConfirmation && (
-                <ConfirmModal
-                    open={showDeleteConfirmation}
-                    title="Confirm Delete"
-                    message={deleteType === 'account' 
-                        ? "Are you sure you want to delete this user?"
-                        : "Are you sure you want to delete this license details?"
-                    }
-                    confirmText="Yes"
-                    cancelText="No"
-                    loading={deletingRow}
-                    loadingText={deleteType === 'license' ? 'Deleting License...' : 'Deleting...'}
-                    onConfirm={handleDeleteConfirm}
-                    onCancel={handleDeleteCancel}
-                />
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={handleDeleteCancel}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            {deleteType === 'account' 
+                                                ? 'Are you sure you want to delete this user?'
+                                                : 'Are you sure you want to delete this license details?'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    onClick={handleDeleteConfirm}
+                                >
+                                    {deletingRow ? (
+                                        <>
+                                            <svg
+                                                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                            >
+                                                <circle
+                                                    className='opacity-25'
+                                                    cx='12'
+                                                    cy='12'
+                                                    r='10'
+                                                    stroke='currentColor'
+                                                    strokeWidth='4'
+                                                ></circle>
+                                                <path
+                                                    className='opacity-75'
+                                                    fill='currentColor'
+                                                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                                ></path>
+                                            </svg>
+                                            {deleteType === 'license' ? 'Deleting License...' : 'Deleting...'}
+                                        </>
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </button>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    onClick={handleDeleteCancel}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
             )}
 
             {/* Start Date Protection Modal */}
@@ -3242,11 +4211,8 @@ export default function ManageUsers() {
                     style={{
                         // Position well above the toolbar with significant spacing
                         // Header height (~80px) + more gap above toolbar (40px)
-                        top: '40px',
-                        // Adjust right positioning based on AI panel state
-                        // When AI panel is open, position further left to avoid overlap
-                        // AI panel width is approximately 300px when expanded, 64px when collapsed
-                        right: isAIPanelCollapsed ? '20px' : '320px' // AI panel width + margin for safety
+                        top: '40px'
+                        // Right positioning handled by CSS classes for consistency
                     }}
                 >
                     <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
@@ -3353,6 +4319,8 @@ export default function ManageUsers() {
                                     onClick={() => {
                                         setShowValidationModal(false);
                                         setShowValidationErrors(true);
+                                        // The incompleteRows state already contains the IDs of rows that failed validation
+                                        console.log('✅ Validation modal dismissed - enabling row highlighting for incomplete rows:', incompleteRows);
                                     }}
                                     className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
                                 >
@@ -3372,7 +4340,54 @@ export default function ManageUsers() {
                     onSave={handleSaveUserGroups}
                     firstName={selectedUserForGroups.firstName || ''}
                     lastName={selectedUserForGroups.lastName || ''}
-                    initialUserGroups={[]}
+                    emailAddress={selectedUserForGroups.emailAddress || ''}
+                    userId={selectedUserForGroups.id}
+                    initialUserGroups={(() => {
+                        // assignedUserGroups can be an array of strings OR UserGroup objects
+                        const groups = selectedUserForGroups.assignedUserGroups || [];
+                        console.log('🎯 Mapping initialUserGroups from:', groups);
+                        
+                        const mapped = groups.map((item: any) => {
+                            // If it's already a UserGroup object with all properties, use it
+                            if (typeof item === 'object' && item !== null && 'id' in item) {
+                                console.log('✅ Found existing UserGroup object:', item);
+                                return item as UserGroup;
+                            }
+                            
+                            // If it's an object without id, add one
+                            if (typeof item === 'object' && item !== null) {
+                                console.log('⚙️ Adding id to UserGroup object:', item);
+                                return {
+                                    id: item.id || generateId(),
+                                    groupName: item.groupName || '',
+                                    description: item.description || '',
+                                    entity: item.entity || '',
+                                    product: item.product || '',
+                                    service: item.service || '',
+                                    roles: item.roles || ''
+                                } as UserGroup;
+                            }
+                            
+                            // If it's a string (legacy format), convert to UserGroup
+                            console.log('🔄 Converting string to UserGroup:', item);
+                            return {
+                                id: generateId(),
+                                groupName: typeof item === 'string' ? item : '',
+                                description: '',
+                                entity: '',
+                                product: '',
+                                service: '',
+                                roles: ''
+                            } as UserGroup;
+                        });
+                        
+                        console.log('🎯 Mapped initialUserGroups:', mapped);
+                        return mapped;
+                    })()}
+                    
+                    selectedEnterprise={selectedEnterprise}
+                    selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
+                    selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
                 />
             )}
         </div>
