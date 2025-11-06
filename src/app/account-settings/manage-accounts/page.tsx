@@ -5820,11 +5820,8 @@ export default function ManageAccounts() {
                     style={{
                         // Position well above the toolbar with significant spacing
                         // Header height (~80px) + more gap above toolbar (40px)
-                        top: '40px',
-                        // Adjust right positioning based on AI panel state
-                        // When AI panel is open, position further left to avoid overlap
-                        // AI panel width is approximately 300px when expanded, 64px when collapsed
-                        right: isAIPanelCollapsed ? '20px' : '320px', // AI panel width + margin for safety
+                        top: '40px'
+                        // Right positioning handled by CSS classes for consistency
                     }}
                 >
                     <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>

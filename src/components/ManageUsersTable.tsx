@@ -47,6 +47,9 @@ import {
     AtSign,
     CheckCircle,
     Lock,
+    Info,
+    Eye,
+    EyeOff,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
@@ -432,6 +435,17 @@ const ChipDropdown = ({
     );
 };
 
+export interface UserGroup {
+    id: string;
+    groupName: string;
+    description: string;
+    entity: string;
+    product: string;
+    service: string;
+    roles: string;
+    isFromDatabase?: boolean; // Flag to indicate if this is an existing group from database (fields should be read-only)
+}
+
 export interface AccountRow {
     id: string;
     // User management fields
@@ -444,109 +458,33 @@ export interface AccountRow {
     endDate?: string;
     password?: string;
     technicalUser?: boolean;
-    assignedUserGroups?: string[];
+    assignedUserGroups?: UserGroup[];
 }
 
 // Validation functions for user management fields
-const validateFirstName = (value: string): string | null => {
-    console.log('validateFirstName called with:', value);
-    
-    if (!value || value.trim().length === 0) {
-        console.log('Validation failed: empty value');
-        return 'First name is required';
-    }
-    
-    const trimmedValue = value.trim();
-    
-    if (trimmedValue.length < 2) {
-        console.log('Validation failed: too short');
-        return 'First name must be at least 2 characters long';
-    }
-    
-    if (trimmedValue.length > 50) {
-        console.log('Validation failed: too long');
-        return 'First name must not exceed 50 characters';
-    }
-    
-    const nameRegex = /^[a-zA-Z\s\-']+$/;
-    if (!nameRegex.test(trimmedValue)) {
-        console.log('Validation failed: invalid characters');
-        return 'First name can only contain letters, spaces, hyphens, and apostrophes';
-    }
-    
-    console.log('Validation passed');
+const validateFirstName = (_value: string): string | null => {
+    // Only required check handled during save flow; no inline validation
     return null;
 };
 
 // Real-time validation function to filter characters as user types
-const filterFirstNameInput = (value: string): string => {
-    // Only allow letters, spaces, hyphens, and apostrophes
-    // Remove anything that is not a letter (a-z, A-Z), space, hyphen, or apostrophe
-    console.log('🔤 FILTER FIRST NAME - Input:', value);
-    const filtered = value.replace(/[^a-zA-Z\s\-']/g, '');
-    console.log('🔤 FILTER FIRST NAME - Result:', filtered);
-    console.trace('🔤 Filter function call stack');
-    return filtered;
-};
+const filterFirstNameInput = (value: string): string => value; // No inline filtering
 
-const validateMiddleName = (value: string): string | null => {
-    // Middle name is optional, so empty is valid
-    if (!value || value.trim().length === 0) {
-        return null;
-    }
-    
-    const trimmedValue = value.trim();
-    
-    if (trimmedValue.length < 2) {
-        return 'Middle name must be at least 2 characters long';
-    }
-    
-    if (trimmedValue.length > 50) {
-        return 'Middle name must not exceed 50 characters';
-    }
-    
-    const nameRegex = /^[a-zA-Z\s\-']+$/;
-    if (!nameRegex.test(trimmedValue)) {
-        return 'Middle name can only contain letters, spaces, hyphens, and apostrophes';
-    }
-    
+const validateMiddleName = (_value: string): string | null => {
+    // No validation; field is optional
     return null;
 };
 
 // Real-time validation function to filter characters for middle name
-const filterMiddleNameInput = (value: string): string => {
-    // Only allow letters, spaces, hyphens, and apostrophes
-    return value.replace(/[^a-zA-Z\s\-']/g, '');
-};
+const filterMiddleNameInput = (value: string): string => value; // No inline filtering
 
-const validateLastName = (value: string): string | null => {
-    if (!value || value.trim().length === 0) {
-        return 'Last name is required';
-    }
-    
-    const trimmedValue = value.trim();
-    
-    if (trimmedValue.length < 2) {
-        return 'Last name must be at least 2 characters long';
-    }
-    
-    if (trimmedValue.length > 50) {
-        return 'Last name must not exceed 50 characters';
-    }
-    
-    const nameRegex = /^[a-zA-Z\s\-']+$/;
-    if (!nameRegex.test(trimmedValue)) {
-        return 'Last name can only contain letters, spaces, hyphens, and apostrophes';
-    }
-    
+const validateLastName = (_value: string): string | null => {
+    // Only required check handled during save flow; no inline validation
     return null;
 };
 
 // Real-time validation function to filter characters for last name
-const filterLastNameInput = (value: string): string => {
-    // Only allow letters, spaces, hyphens, and apostrophes
-    return value.replace(/[^a-zA-Z\s\-']/g, '');
-};
+const filterLastNameInput = (value: string): string => value; // No inline filtering
 
 const validateEmail = (value: string): string | null => {
     if (!value || value.trim().length === 0) {
@@ -574,40 +512,41 @@ const validateEmail = (value: string): string | null => {
 };
 
 const validatePassword = (value: string): string | null => {
+    // Only required check handled during save flow; no inline validation
     if (!value || value.trim().length === 0) {
         return 'Password is required';
     }
-    
-    if (value.length < 8) {
-        return 'Password must be at least 8 characters long';
-    }
-    
-    if (value.length > 128) {
-        return 'Password must not exceed 128 characters';
-    }
-    
-    const hasUpperCase = /[A-Z]/.test(value);
-    const hasLowerCase = /[a-z]/.test(value);
-    const hasNumbers = /\d/.test(value);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
-    
-    if (!hasUpperCase) {
-        return 'Password must contain at least one uppercase letter';
-    }
-    
-    if (!hasLowerCase) {
-        return 'Password must contain at least one lowercase letter';
-    }
-    
-    if (!hasNumbers) {
-        return 'Password must contain at least one number';
-    }
-    
-    if (!hasSpecialChar) {
-        return 'Password must contain at least one special character';
-    }
-    
     return null;
+};
+
+// Helper function to get password requirements (same as TechnicalUserModal)
+const getPasswordRequirements = (password: string) => {
+    return [
+        {
+            text: "At least 8 characters long",
+            met: password.length >= 8
+        },
+        {
+            text: "Contains uppercase letter (A-Z)",
+            met: /[A-Z]/.test(password)
+        },
+        {
+            text: "Contains lowercase letter (a-z)",
+            met: /[a-z]/.test(password)
+        },
+        {
+            text: "Contains number (0-9)",
+            met: /\d/.test(password)
+        },
+        {
+            text: "Contains special character (!@#$%^&*...)",
+            met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+        },
+        {
+            text: "No common patterns (123, abc, aaa)",
+            met: !/(.)\1{2,}|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i.test(password)
+        }
+    ];
 };
 
 function InlineEditableText({
@@ -715,6 +654,7 @@ function InlineEditableText({
             <div className="relative">
                 <input
                     ref={inputRef}
+                    type={type}
                     value={draft}
                     onInput={(e: React.FormEvent<HTMLInputElement>) => {
                         const target = e.target as HTMLInputElement;
@@ -934,7 +874,7 @@ function InlineEditableText({
                 stiffness: 480,
                 damping: 30,
             }}
-            className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative cursor-text ${
+            className={`w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative cursor-text ${
                 className || ''
             }`}
             style={{width: '100%', minWidth: '100%'}}
@@ -1727,7 +1667,7 @@ function UserGroupMultiSelect({
                                     stiffness: 480,
                                     damping: 30,
                                 }}
-                                className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
+                                className='w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'
                                 title={service}
                             >
                                 <span className='flex-1'>{service}</span>
@@ -1782,7 +1722,7 @@ function UserGroupMultiSelect({
                                                         key={`additional-${idx}`}
                                                         className='flex items-center group/additional w-full'
                                                     >
-                                                        <span className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'>
+                                                        <span className='w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'>
                                                             {userGroup}
                                                         </span>
                                                         <button
@@ -2374,6 +2314,7 @@ function AsyncChipSelect({
     onTabNext,
     onTabPrev,
     onFocus,
+    inputType = 'text',
 }: {
     type: CatalogType;
     value?: string;
@@ -2382,6 +2323,7 @@ function AsyncChipSelect({
     isError?: boolean;
     compact?: boolean;
     onFocus?: () => void;
+    inputType?: 'text' | 'password';
     onDropdownOptionUpdate?: (
         type: 'firstNames' | 'middleNames' | 'lastNames' | 'statusTypes' | 'emails' | 'passwords' | 'technicalUserTypes' | 'userGroups',
         action: 'update' | 'delete',
@@ -2841,7 +2783,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200 text-red-900' : 'bg-white border-transparent text-black'}`}
+                        className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative ${isError ? 'border border-red-500 bg-red-50 ring-2 ring-red-200 text-red-900' : 'bg-white text-black'} ${type === 'password' ? 'pr-8' : ''}`}
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
@@ -2875,7 +2817,12 @@ function AsyncChipSelect({
                             }
                         }}
                     >
-                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <span className='flex-1 truncate pointer-events-none'>
+                            {inputType === 'password' && (current || value)
+                                ? '•'.repeat(Math.min((current || value || '').length, 20))
+                                : (current || value)
+                            }
+                        </span>
                         {/* Dropdown arrow for status */}
                         {type === 'status' && (
                             <ChevronDown 
@@ -2883,20 +2830,23 @@ function AsyncChipSelect({
                                 className="text-slate-400 flex-shrink-0 ml-1" 
                             />
                         )}
-                        <button
-                            onClick={(e: any) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                onChange('');
-                                setCurrent('');
-                                setQuery('');
-                            }}
-                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
-                            aria-label='Remove'
-                            style={{minWidth: '20px', minHeight: '20px'}}
-                        >
-                            <X size={12} />
-                        </button>
+                        {/* Hide X button for password fields to avoid overlap with eye icon */}
+                        {type !== 'password' && (
+                            <button
+                                onClick={(e: any) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    onChange('');
+                                    setCurrent('');
+                                    setQuery('');
+                                }}
+                                className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                                aria-label='Remove'
+                                style={{minWidth: '20px', minHeight: '20px'}}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
                     </motion.span>
                 )}
                 
@@ -2905,6 +2855,7 @@ function AsyncChipSelect({
                     <div className="relative w-full">
                         <input
                             ref={inputRef}
+                            type={inputType}
                             value={query}
                             onChange={(e: any) => {
                                 const newValue = e.target.value;
@@ -3116,6 +3067,7 @@ interface AccountsTableProps {
     incompleteRowIds?: string[];
     showValidationErrors?: boolean;
     hasBlankRow?: boolean;
+    externalFieldErrors?: {[key: string]: Record<string, string>}; // Per-row field errors from parent
     onDropdownOptionUpdate?: (
         type: 'emails' | 'userGroups',
         action: 'update' | 'delete',
@@ -3228,6 +3180,109 @@ function SortableAccountRow({
         null,
     );
     const [isRowHovered, setIsRowHovered] = useState(false);
+    const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+    const [passwordVisible, setPasswordVisible] = useState(false);
+    const passwordFieldRef = useRef<HTMLDivElement>(null);
+    const [passwordRequirementsPos, setPasswordRequirementsPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+    const [currentPasswordValue, setCurrentPasswordValue] = useState<string>(row.password || '');
+    
+    // Update local password value when row password changes
+    useEffect(() => {
+        setCurrentPasswordValue(row.password || '');
+    }, [row.password]);
+    
+    // Track password field focus state and calculate position
+    useEffect(() => {
+        const checkFocus = () => {
+            const activeElement = document.activeElement;
+            if (!activeElement) {
+                setIsPasswordFocused(false);
+                setPasswordRequirementsPos(null);
+                return;
+            }
+            if (passwordFieldRef.current?.contains(activeElement)) {
+                // Check if it's actually an input field (not a button or other element)
+                if (activeElement instanceof HTMLInputElement || 
+                    activeElement.tagName === 'INPUT' ||
+                    activeElement.closest('[data-col="password"] input') === activeElement) {
+                    setIsPasswordFocused(true);
+                    // Calculate position for requirements box
+                    if (passwordFieldRef.current) {
+                        const rect = passwordFieldRef.current.getBoundingClientRect();
+                        setPasswordRequirementsPos({
+                            top: rect.bottom + 4,
+                            left: rect.left,
+                            width: Math.max(280, rect.width)
+                        });
+                    }
+                }
+            } else {
+                setIsPasswordFocused(false);
+                setPasswordRequirementsPos(null);
+            }
+        };
+        
+        const handleFocusIn = () => {
+            setTimeout(checkFocus, 10);
+        };
+        
+        const handleFocusOut = () => {
+            setTimeout(() => {
+                checkFocus();
+                // Sync currentPasswordValue with row.password when field loses focus
+                // in case the value wasn't committed (e.g., user pressed Escape)
+                const activeElement = document.activeElement;
+                if (!passwordFieldRef.current?.contains(activeElement)) {
+                    setCurrentPasswordValue(row.password || '');
+                    // Reset password visibility for security when field loses focus
+                    setPasswordVisible(false);
+                }
+            }, 10);
+        };
+        
+        // Update position on scroll/resize when password is focused
+        const updatePosition = () => {
+            if (isPasswordFocused && passwordFieldRef.current) {
+                const rect = passwordFieldRef.current.getBoundingClientRect();
+                setPasswordRequirementsPos({
+                    top: rect.bottom + 4,
+                    left: rect.left,
+                    width: Math.max(280, rect.width)
+                });
+            }
+        };
+        
+        // Track password input value in real-time for immediate requirement updates
+        const handlePasswordInput = (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            if (target && 
+                passwordFieldRef.current?.contains(target) && 
+                (target.type === 'password' || target.closest('[data-col="password"]'))) {
+                setCurrentPasswordValue(target.value || '');
+            }
+        };
+        
+        document.addEventListener('focusin', handleFocusIn);
+        document.addEventListener('focusout', handleFocusOut);
+        document.addEventListener('input', handlePasswordInput);
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+        
+        // Initial check
+        checkFocus();
+        
+        return () => {
+            document.removeEventListener('focusin', handleFocusIn);
+            document.removeEventListener('focusout', handleFocusOut);
+            document.removeEventListener('input', handlePasswordInput);
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [isPasswordFocused]);
     
     // Validation state management for each field
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{
@@ -3475,7 +3530,7 @@ function SortableAccountRow({
                 animate={{scale: 1, opacity: 1}}
                 whileHover={{y: -1, boxShadow: '0 1px 6px rgba(15,23,42,0.15)'}}
                 transition={{type: 'spring', stiffness: 480, damping: 30}}
-                className='w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative max-w-full min-w-0 overflow-hidden'
+                className='w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative max-w-full min-w-0 overflow-hidden'
                 title={text}
             >
                 <span className='truncate'>{text}</span>
@@ -3489,13 +3544,13 @@ function SortableAccountRow({
             data-account-id={row.id}
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
-            className={`w-full grid items-center gap-0 border border-slate-200 rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
+            className={`w-full grid items-center gap-0 border rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 isSelected 
-                    ? 'bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200' 
-                    : 'hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
+                    ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200' 
+                    : 'border-slate-200 hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
-                isSelected ? 'border-blue-300' : 'border-slate-200'
-            } ${inFillRange ? 'bg-primary-50/40' : ''} ${
+                inFillRange ? 'bg-primary-50/40' : ''
+            } ${
                 isExpanded
                     ? 'bg-primary-50'
                     : ''
@@ -3582,35 +3637,11 @@ function SortableAccountRow({
                                 type='firstName'
                                 value={row.firstName || ''}
                                 onChange={(v) => {
-                                    console.log('🔥 AsyncChipSelect firstName onChange triggered with:', v);
-                                    
-                                    // Update with original value (no filtering)
                                     onUpdateField(row.id, 'firstName' as any, v || '');
-                                    
-                                    // Immediate validation to clear errors when content becomes valid
-                                    const immediateValidationError = validateFirstName(v || '');
-                                    if (!immediateValidationError) {
-                                        // Clear error immediately if validation passes
-                                        console.log('🔥 AsyncChipSelect firstName validation passed immediately');
-                                        clearFieldError('firstName');
-                                    }
-                                    
-                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
-                                    setTimeout(() => {
-                                        const validationError = validateFirstName(v || '');
-                                        if (validationError) {
-                                            console.log('🔥 AsyncChipSelect firstName validation failed:', validationError);
-                                            setFieldError('firstName', validationError);
-                                            showValidationModal('firstName', validationError);
-                                        } else {
-                                            console.log('🔥 AsyncChipSelect firstName validation passed (delayed)');
-                                            clearFieldError('firstName'); // Ensure error is cleared
-                                        }
-                                    }, 500); // 500ms delay for debounced validation
                                 }}
                                 onFocus={() => handleFieldFocus('firstName')}
                                 placeholder='Enter first name'
-                                isError={isCellMissing(row.id, 'firstName') || !!fieldValidationErrors.firstName}
+                                isError={isCellMissing(row.id, 'firstName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].firstName)}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                 onNewItemCreated={onNewItemCreated as any}
                                 accounts={allRows}
@@ -3633,8 +3664,6 @@ function SortableAccountRow({
                                 dataAttr={`firstName-${row.id}`}
                                 isError={isCellMissing(row.id, 'firstName')}
                                 placeholder='Enter first name'
-                                validateFn={validateFirstName}
-                                filterFn={filterFirstNameInput}
                                 {...createTabNavigation('firstName')}
                             />
                         )}
@@ -3663,35 +3692,11 @@ function SortableAccountRow({
                                 type='middleName'
                                 value={row.middleName || ''}
                                 onChange={(v) => {
-                                    console.log('🔥 AsyncChipSelect middleName onChange triggered with:', v);
-                                    
-                                    // Update with original value (no filtering)
                                     onUpdateField(row.id, 'middleName' as any, v || '');
-                                    
-                                    // Immediate validation to clear errors when content becomes valid
-                                    const immediateValidationError = validateMiddleName(v || '');
-                                    if (!immediateValidationError) {
-                                        // Clear error immediately if validation passes
-                                        console.log('🔥 AsyncChipSelect middleName validation passed immediately');
-                                        clearFieldError('middleName');
-                                    }
-                                    
-                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
-                                    setTimeout(() => {
-                                        const validationError = validateMiddleName(v || '');
-                                        if (validationError) {
-                                            console.log('🔥 AsyncChipSelect middleName validation failed:', validationError);
-                                            setFieldError('middleName', validationError);
-                                            showValidationModal('middleName', validationError);
-                                        } else {
-                                            console.log('🔥 AsyncChipSelect middleName validation passed (delayed)');
-                                            clearFieldError('middleName'); // Ensure error is cleared
-                                        }
-                                    }, 500); // 500ms delay for debounced validation
                                 }}
                                 onFocus={() => handleFieldFocus('middleName')}
                                 placeholder='Enter middle name'
-                                isError={isCellMissing(row.id, 'middleName') || !!fieldValidationErrors.middleName}
+                                isError={isCellMissing(row.id, 'middleName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].middleName)}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                 onNewItemCreated={onNewItemCreated as any}
                                 accounts={allRows}
@@ -3714,8 +3719,6 @@ function SortableAccountRow({
                                 dataAttr={`middleName-${row.id}`}
                                 isError={isCellMissing(row.id, 'middleName')}
                                 placeholder='Enter middle name'
-                                validateFn={validateMiddleName}
-                                filterFn={filterMiddleNameInput}
                                 {...createTabNavigation('middleName')}
                             />
                         )}
@@ -3744,35 +3747,11 @@ function SortableAccountRow({
                                 type='lastName'
                                 value={row.lastName || ''}
                                 onChange={(v) => {
-                                    console.log('🔥 AsyncChipSelect lastName onChange triggered with:', v);
-                                    
-                                    // Update with original value (no filtering)
                                     onUpdateField(row.id, 'lastName' as any, v || '');
-                                    
-                                    // Immediate validation to clear errors when content becomes valid
-                                    const immediateValidationError = validateLastName(v || '');
-                                    if (!immediateValidationError) {
-                                        // Clear error immediately if validation passes
-                                        console.log('🔥 AsyncChipSelect lastName validation passed immediately');
-                                        clearFieldError('lastName');
-                                    }
-                                    
-                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
-                                    setTimeout(() => {
-                                        const validationError = validateLastName(v || '');
-                                        if (validationError) {
-                                            console.log('🔥 AsyncChipSelect lastName validation failed:', validationError);
-                                            setFieldError('lastName', validationError);
-                                            showValidationModal('lastName', validationError);
-                                        } else {
-                                            console.log('🔥 AsyncChipSelect lastName validation passed (delayed)');
-                                            clearFieldError('lastName'); // Ensure error is cleared
-                                        }
-                                    }, 500); // 500ms delay for debounced validation
                                 }}
                                 onFocus={() => handleFieldFocus('lastName')}
                                 placeholder='Enter last name'
-                                isError={isCellMissing(row.id, 'lastName') || !!fieldValidationErrors.lastName}
+                                isError={isCellMissing(row.id, 'lastName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].lastName)}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                 onNewItemCreated={onNewItemCreated as any}
                                 accounts={allRows}
@@ -3795,8 +3774,6 @@ function SortableAccountRow({
                                 dataAttr={`lastName-${row.id}`}
                                 isError={isCellMissing(row.id, 'lastName')}
                                 placeholder='Enter last name'
-                                validateFn={validateLastName}
-                                filterFn={filterLastNameInput}
                                 {...createTabNavigation('lastName')}
                             />
                         )}
@@ -3825,35 +3802,11 @@ function SortableAccountRow({
                                 type='emailAddress'
                                 value={row.emailAddress || ''}
                                 onChange={(v) => {
-                                    console.log('🔥 AsyncChipSelect emailAddress onChange triggered with:', v);
-                                    
-                                    // Update with original value
                                     onUpdateField(row.id, 'emailAddress' as any, v || '');
-                                    
-                                    // Immediate validation to clear errors when content becomes valid
-                                    const immediateValidationError = validateEmail(v || '');
-                                    if (!immediateValidationError) {
-                                        // Clear error immediately if validation passes
-                                        console.log('🔥 AsyncChipSelect emailAddress validation passed immediately');
-                                        clearFieldError('emailAddress');
-                                    }
-                                    
-                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
-                                    setTimeout(() => {
-                                        const validationError = validateEmail(v || '');
-                                        if (validationError) {
-                                            console.log('🔥 AsyncChipSelect emailAddress validation failed:', validationError);
-                                            setFieldError('emailAddress', validationError);
-                                            showValidationModal('emailAddress', validationError);
-                                        } else {
-                                            console.log('🔥 AsyncChipSelect emailAddress validation passed (delayed)');
-                                            clearFieldError('emailAddress'); // Ensure error is cleared
-                                        }
-                                    }, 500); // 500ms delay for debounced validation
                                 }}
                                 onFocus={() => handleFieldFocus('emailAddress')}
                                 placeholder='Enter email address'
-                                isError={isCellMissing(row.id, 'emailAddress') || !!fieldValidationErrors.emailAddress}
+                                isError={isCellMissing(row.id, 'emailAddress') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].emailAddress)}
                                 onDropdownOptionUpdate={onDropdownOptionUpdate as any}
                                 onNewItemCreated={onNewItemCreated as any}
                                 accounts={allRows}
@@ -3874,9 +3827,8 @@ function SortableAccountRow({
                                 }
                                 className='text-[12px]'
                                 dataAttr={`emailAddress-${row.id}`}
-                                isError={isCellMissing(row.id, 'emailAddress')}
+                                isError={isCellMissing(row.id, 'emailAddress') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].emailAddress)}
                                 placeholder='Enter email address'
-                                validateFn={validateEmail}
                                 {...createTabNavigation('emailAddress')}
                             />
                         )}
@@ -4082,71 +4034,127 @@ function SortableAccountRow({
                     }}
                 >
                     <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        ref={passwordFieldRef}
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 relative'
                         data-row-id={row.id}
                         data-col='password'
                         style={{width: '100%'}}
                     >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='password'
-                                value={row.password || ''}
-                                onChange={(v) => {
-                                    console.log('🔥 AsyncChipSelect password onChange triggered with:', v);
-                                    
-                                    // Update with original value
-                                    onUpdateField(row.id, 'password' as any, v || '');
-                                    
-                                    // Immediate validation to clear errors when content becomes valid
-                                    const immediateValidationError = validatePassword(v || '');
-                                    if (!immediateValidationError) {
-                                        // Clear error immediately if validation passes
-                                        console.log('🔥 AsyncChipSelect password validation passed immediately');
-                                        clearFieldError('password');
-                                    }
-                                    
-                                    // Delayed validation for showing errors (to avoid excessive modal popups while typing)
-                                    setTimeout(() => {
-                                        const validationError = validatePassword(v || '');
-                                        if (validationError) {
-                                            console.log('🔥 AsyncChipSelect password validation failed:', validationError);
-                                            setFieldError('password', validationError);
-                                            showValidationModal('password', validationError);
-                                        } else {
-                                            console.log('🔥 AsyncChipSelect password validation passed (delayed)');
-                                            clearFieldError('password'); // Ensure error is cleared
+                        <div className='relative w-full'>
+                            {enableDropdownChips ? (
+                                <div className='relative'>
+                                    <AsyncChipSelect
+                                        type='password'
+                                        inputType={passwordVisible ? 'text' : 'password'}
+                                        value={row.password || ''}
+                                        onChange={(v) => {
+                                            const newValue = v || '';
+                                            setCurrentPasswordValue(newValue); // Update local state immediately for real-time requirements
+                                            onUpdateField(row.id, 'password' as any, newValue);
+                                        }}
+                                        onFocus={() => {
+                                            handleFieldFocus('password');
+                                            setIsPasswordFocused(true);
+                                        }}
+                                        placeholder='Enter password'
+                                        isError={isCellMissing(row.id, 'password') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].password)}
+                                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
+                                        onNewItemCreated={onNewItemCreated as any}
+                                        accounts={allRows}
+                                        currentRowId={row.id}
+                                        currentRowEnterprise={
+                                            row.password || ''
                                         }
-                                    }, 500); // 500ms delay for debounced validation
+                                        currentRowProduct={
+                                            row.password || ''
+                                        }
+                                        {...createTabNavigation('password')}
+                                    />
+                                    {/* Eye icon button for password visibility toggle - positioned outside AsyncChipSelect to avoid overlap */}
+                                    {(isPasswordFocused || row.password || currentPasswordValue) && (
+                                        <button
+                                            type='button'
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                setPasswordVisible(!passwordVisible);
+                                            }}
+                                            className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none z-20 pointer-events-auto'
+                                            tabIndex={-1}
+                                            title={passwordVisible ? 'Hide password' : 'Show password'}
+                                        >
+                                            {passwordVisible ? (
+                                                <EyeOff size={14} />
+                                            ) : (
+                                                <Eye size={14} />
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className='relative'>
+                                    <InlineEditableText
+                                        value={row.password || ''}
+                                        onCommit={(v) =>
+                                            onUpdateField(row.id, 'password' as any, v)
+                                        }
+                                        className='text-[12px] pr-6'
+                                        dataAttr={`password-${row.id}`}
+                                        isError={isCellMissing(row.id, 'password')}
+                                        placeholder='Enter password'
+                                        type={passwordVisible ? 'text' : 'password'}
+                                        {...createTabNavigation('password')}
+                                    />
+                                    {/* Eye icon button for password visibility toggle */}
+                                    {(isPasswordFocused || row.password || currentPasswordValue) && (
+                                        <button
+                                            type='button'
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPasswordVisible(!passwordVisible);
+                                            }}
+                                            className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none z-10'
+                                            tabIndex={-1}
+                                            title={passwordVisible ? 'Hide password' : 'Show password'}
+                                        >
+                                            {passwordVisible ? (
+                                                <EyeOff size={14} />
+                                            ) : (
+                                                <Eye size={14} />
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        {/* Password Requirements - shown when field is focused, positioned absolutely */}
+                        {isPasswordFocused && passwordRequirementsPos && createPortal(
+                            <div 
+                                className="fixed z-[99999] p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-lg"
+                                style={{
+                                    top: `${passwordRequirementsPos.top}px`,
+                                    left: `${passwordRequirementsPos.left}px`,
+                                    width: `${passwordRequirementsPos.width}px`,
+                                    maxWidth: '320px'
                                 }}
-                                onFocus={() => handleFieldFocus('password')}
-                                placeholder='Enter password'
-                                isError={isCellMissing(row.id, 'password') || !!fieldValidationErrors.password}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.password || ''
-                                }
-                                currentRowProduct={
-                                    row.password || ''
-                                }
-                                {...createTabNavigation('password')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.password || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'password' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`password-${row.id}`}
-                                isError={isCellMissing(row.id, 'password')}
-                                placeholder='Enter password'
-                                type='password'
-                                validateFn={validatePassword}
-                                {...createTabNavigation('password')}
-                            />
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <p className="text-xs font-medium text-gray-700 mb-2">Password Requirements:</p>
+                                <div className="space-y-1">
+                                    {getPasswordRequirements(currentPasswordValue).map((req, reqIndex) => (
+                                        <div key={reqIndex} className="flex items-center text-xs">
+                                            <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
+                                                req.met ? 'bg-green-500' : 'bg-gray-300'
+                                            }`} />
+                                            <span className={req.met ? 'text-green-700' : 'text-gray-600'}>
+                                                {req.text}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>,
+                            document.body
                         )}
                     </div>
                 </div>
@@ -4172,14 +4180,19 @@ function SortableAccountRow({
                             <motion.input
                                 type="checkbox"
                                 checked={row.technicalUser || false}
-                                onChange={(e) =>
-                                    onUpdateField(row.id, 'technicalUser' as any, e.target.checked)
-                                }
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer transition-transform duration-200 hover:scale-110"
+                                onChange={(e) => {
+                                    console.log('🔧 TechnicalUser checkbox changed:', {
+                                        rowId: row.id,
+                                        oldValue: row.technicalUser,
+                                        newValue: e.target.checked,
+                                        fullRow: row
+                                    });
+                                    onUpdateField(row.id, 'technicalUser' as any, e.target.checked);
+                                }}
+                                className="w-4 h-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500 cursor-pointer transition-transform duration-200 hover:scale-110"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.95 }}
                                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                {...createTabNavigation('technicalUser')}
                             />
                         </div>
                     </div>
@@ -4197,56 +4210,19 @@ function SortableAccountRow({
                     }}
                 >
                     <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        className='flex items-center justify-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
                         data-col='assignedUserGroups'
                         style={{width: '100%'}}
                     >
-                        <div className="flex items-center gap-2 w-full">
-                            {/* User Groups Icon */}
-                            <button
-                                onClick={() => onOpenUserGroupModal?.(row)}
-                                className="flex-shrink-0 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors duration-200"
-                                title="Assign User Groups"
-                            >
-                                <Users className="w-4 h-4" />
-                            </button>
-                            
-                            {/* User Groups Display */}
-                            <div className="flex flex-wrap gap-1 flex-1">
-                                {(row.assignedUserGroups || []).map((group, index) => (
-                                    <span
-                                        key={index}
-                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                    >
-                                        {group}
-                                        <button
-                                            onClick={() => {
-                                                const updatedGroups = (row.assignedUserGroups || []).filter((_, i) => i !== index);
-                                                onUpdateField(row.id, 'assignedUserGroups' as any, updatedGroups);
-                                            }}
-                                            className="ml-1 text-blue-600 hover:text-blue-800"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </span>
-                                ))}
-                                <input
-                                    type="text"
-                                    placeholder="Add group..."
-                                    className="min-w-0 flex-1 text-xs border-none outline-none bg-transparent"
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                            const currentGroups = row.assignedUserGroups || [];
-                                            const newGroups = [...currentGroups, e.currentTarget.value.trim()];
-                                            onUpdateField(row.id, 'assignedUserGroups' as any, newGroups);
-                                            e.currentTarget.value = '';
-                                        }
-                                    }}
-                                    {...createTabNavigation('assignedUserGroups')}
-                                />
-                            </div>
-                        </div>
+                        {/* User Groups Icon - centered */}
+                        <button
+                            onClick={() => onOpenUserGroupModal?.(row)}
+                            className="flex-shrink-0 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors duration-200"
+                            title="Assign User Groups"
+                        >
+                            <Users className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             )}
@@ -4276,6 +4252,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     incompleteRowIds = [],
     showValidationErrors = false,
     hasBlankRow = false,
+    externalFieldErrors = {},
     onDropdownOptionUpdate,
     onNewItemCreated,
     onShowAllColumns,
@@ -4297,6 +4274,14 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     onOpenUserGroupModal,
     onShowStartDateProtectionModal,
 }, ref) => {
+    // Log component data received
+    console.log('🔍 ManageUsersTable received rows:', rows?.map(row => ({
+        id: row.id,
+        firstName: row.firstName,
+        technicalUser: row.technicalUser,
+        hasAllFields: !!row.firstName && !!row.lastName && !!row.emailAddress
+    })));
+    
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{[key: string]: Record<string, string>}>({});
@@ -4531,6 +4516,21 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         });
     }, [baseLocalRows, localEdits]);
     
+    // Helper function to validate email format
+    const isValidEmail = (email: string): boolean => {
+        if (!email || !email.trim()) return false;
+        
+        const trimmed = email.trim();
+        
+        // Length validation
+        if (trimmed.length < 5 || trimmed.length > 254) return false;
+        
+        // RFC 5322 compliant email regex
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        
+        return emailRegex.test(trimmed);
+    };
+    
     // Helper function to check if a field is missing/invalid
     const isFieldMissing = (row: AccountRow, field: string): boolean => {
         switch (field) {
@@ -4539,9 +4539,12 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             case 'lastName':
                 return !row.lastName || row.lastName.trim() === '';
             case 'emailAddress':
-                return !row.emailAddress || row.emailAddress.trim() === '';
-            case 'status':
-                return !row.status || row.status.trim() === '';
+                // Check for both missing AND invalid email format
+                return !row.emailAddress || row.emailAddress.trim() === '' || !isValidEmail(row.emailAddress);
+            case 'startDate':
+                return !row.startDate || row.startDate.trim() === '';
+            case 'password':
+                return !row.password || row.password.trim() === '';
             default:
                 return false;
         }
@@ -4574,9 +4577,11 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         
         localRows.forEach(row => {
             // Check if any required field is missing
-            if (isFieldMissing(row, 'accountName') || 
-                isFieldMissing(row, 'email') || 
-                isFieldMissing(row, 'phone')) {
+            if (isFieldMissing(row, 'firstName') ||
+                isFieldMissing(row, 'lastName') ||
+                isFieldMissing(row, 'emailAddress') ||
+                isFieldMissing(row, 'startDate') ||
+                isFieldMissing(row, 'password')) {
                 errorRowIds.add(row.id);
             }
         });
@@ -4594,9 +4599,11 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
                 // Check if any required field is missing
-                if (isFieldMissing(row, 'accountName') || 
-                    isFieldMissing(row, 'email') || 
-                    isFieldMissing(row, 'phone')) {
+                if (isFieldMissing(row, 'firstName') ||
+                    isFieldMissing(row, 'lastName') ||
+                    isFieldMissing(row, 'emailAddress') ||
+                    isFieldMissing(row, 'startDate') ||
+                    isFieldMissing(row, 'password')) {
                     errorRowIds.add(row.id);
                 }
             });
@@ -4610,17 +4617,34 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     }, [triggerValidation, baseLocalRows, localEdits, onValidationComplete]);
 
     // Effect to highlight errors when incompleteRowIds changes from parent
-    // TEMPORARILY DISABLED to fix infinite re-render loop
-    // useEffect(() => {
-    //     if (showValidationErrors && incompleteRowIds.length > 0) {
-    //         // Simply set validation errors to the incomplete row IDs from parent
-    //         // Don't do local validation here to avoid circular dependencies
-    //         setValidationErrors(new Set(incompleteRowIds));
-    //     } else {
-    //         // Clear validation errors when not showing validation or no incomplete rows from parent
-    //         setValidationErrors(new Set());
-    //     }
-    // }, [incompleteRowIds, showValidationErrors]);
+    useEffect(() => {
+        if (showValidationErrors && incompleteRowIds.length > 0) {
+            // Simply set validation errors to the incomplete row IDs from parent
+            // Don't do local validation here to avoid circular dependencies
+            setValidationErrors(new Set(incompleteRowIds));
+            console.log('🔴 ManageUsersTable: Setting validation errors for rows:', incompleteRowIds);
+        } else {
+            // Clear validation errors when not showing validation or no incomplete rows from parent
+            setValidationErrors(new Set());
+            console.log('🟢 ManageUsersTable: Clearing validation errors');
+        }
+    }, [incompleteRowIds, showValidationErrors]);
+
+    // If parent provides external field-level errors (e.g. format validation), apply them
+    useEffect(() => {
+        try {
+            if (externalFieldErrors && Object.keys(externalFieldErrors).length > 0) {
+                setFieldValidationErrors(externalFieldErrors as any);
+                setValidationErrors(new Set(Object.keys(externalFieldErrors)));
+            } else if (!showValidationErrors) {
+                // clear when validation UI not active
+                setFieldValidationErrors({});
+                setValidationErrors(new Set());
+            }
+        } catch (e) {
+            console.error('Error applying externalFieldErrors to ManageUsersTable', e);
+        }
+    }, [externalFieldErrors, showValidationErrors]);
 
     const orderedItems = useMemo(
         () =>
@@ -4801,7 +4825,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         endDate: '140px', // End Date column - no sort arrows
         password: '120px', // Password column - no sort arrows
         technicalUser: '120px', // Technical User column - no sort arrows
-        assignedUserGroups: '300px', // Assigned User Groups column - fixed width instead of flexible
+        assignedUserGroups: '160px', // Assigned User Groups column - width to fit label + icon
     } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -4828,17 +4852,13 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 endDate: { min: 120, max: 180 }, // No sort arrows, can be smaller
                 password: { min: 100, max: 150 }, // No sort arrows, can be smaller
                 technicalUser: { min: 120, max: 180 }, // No sort arrows, can be smaller
-                assignedUserGroups: { min: 300, max: 400 } // User Groups - fixed range instead of flexible
+                assignedUserGroups: { min: 160, max: 200 } // User Groups - width to fit label + icon
             };
             
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 140, max: 250 };
             
             if (dynamicWidth && dynamicWidth > 0) {
-                // For assignedUserGroups column, use minmax to fill remaining space
-                if (c === 'assignedUserGroups') {
-                    return `minmax(${Math.max(columnConstraints.min, dynamicWidth)}px, 1fr)`;
-                }
-                // Clamp the dynamic width within constraints for other columns
+                // Clamp the dynamic width within constraints for all columns
                 const clampedWidth = Math.max(
                     columnConstraints.min, 
                     Math.min(columnConstraints.max, dynamicWidth)
@@ -4849,10 +4869,6 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
-                // For assignedUserGroups column, use flexible sizing to fill remaining space
-                if (c === 'assignedUserGroups' && defaultSize === '1fr') {
-                    return `minmax(${columnConstraints.min}px, 1fr)`;
-                }
                 const numericSize = parseInt(defaultSize.replace('px', ''));
                 if (!isNaN(numericSize)) {
                     const clampedSize = Math.max(
@@ -5708,7 +5724,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                             } ${
                                                 c === 'assignedUserGroups' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'assignedUserGroups' ? { minWidth: '600px' } : undefined} // Match last column minimum width
+                                            style={c === 'assignedUserGroups' ? { minWidth: '160px' } : undefined} // Width to fit label + icon
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
