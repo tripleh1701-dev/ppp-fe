@@ -350,6 +350,9 @@ export default function Breadcrumbs({
     const [enterprises, setEnterprises] = useState<
         Array<{id: string; name: string}>
     >([]);
+    const [allEnterprises, setAllEnterprises] = useState<
+        Array<{id: string; name: string}>
+    >([]); // Store all enterprises for filtering
     const [selectedAccountId, setSelectedAccountId] = useState<
         string | undefined
     >(undefined);
@@ -523,7 +526,8 @@ export default function Breadcrumbs({
                     id: String(e.id),
                     name: e.name,
                 }));
-                setEnterprises(mapped);
+                setAllEnterprises(mapped); // Store all enterprises
+                setEnterprises(mapped); // Initially show all
                 const savedId =
                     typeof window !== 'undefined'
                         ? window.localStorage.getItem('selectedEnterpriseId') ||
@@ -563,6 +567,119 @@ export default function Breadcrumbs({
             mounted = false;
         };
     }, []);
+
+    // Filter enterprises based on selected account's licenses
+    useEffect(() => {
+        const filterEnterprisesByAccount = async () => {
+            if (!selectedAccountId || allEnterprises.length === 0) {
+                // If no account selected or no enterprises loaded, show all
+                setEnterprises(allEnterprises);
+                return;
+            }
+
+            try {
+                console.log('🔍 [Breadcrumbs] Filtering enterprises for account:', selectedAccountId);
+                
+                // Fetch account's licenses/global-settings to find which enterprises it has access to
+                const accountName = typeof window !== 'undefined' 
+                    ? window.localStorage.getItem('selectedAccountName') || '' 
+                    : '';
+                
+                // Try to get licenses from accounts API which should include license sub-rows
+                const accountsResponse = await api.get<any[]>('/api/accounts');
+                
+                console.log('📦 [Breadcrumbs] Accounts response:', accountsResponse);
+                
+                // Find the selected account and extract enterprise IDs from its licenses
+                const selectedAccount = accountsResponse?.find((acc: any) => 
+                    String(acc.id || acc.accountId) === selectedAccountId
+                );
+                
+                console.log('🔍 [Breadcrumbs] Selected account data:', selectedAccount);
+                
+                const enterpriseIds = new Set<string>();
+                
+                // Check for licenses in the account data
+                if (selectedAccount) {
+                    // Check for licenses array
+                    const licenses = selectedAccount.licenses || selectedAccount.accountLicenses || [];
+                    console.log('📦 [Breadcrumbs] Account licenses:', licenses);
+                    
+                    if (Array.isArray(licenses) && licenses.length > 0) {
+                        licenses.forEach((license: any) => {
+                            // Try to get enterprise ID directly
+                            if (license.enterpriseId) {
+                                enterpriseIds.add(String(license.enterpriseId));
+                            }
+                            // Or match enterprise NAME to get the ID
+                            else if (license.enterprise) {
+                                const matchedEnterprise = allEnterprises.find(
+                                    ent => ent.name.toLowerCase() === String(license.enterprise).toLowerCase()
+                                );
+                                if (matchedEnterprise) {
+                                    enterpriseIds.add(matchedEnterprise.id);
+                                    console.log(`✅ [Breadcrumbs] Matched enterprise "${license.enterprise}" to ID: ${matchedEnterprise.id}`);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Also check direct enterpriseId field
+                    if (selectedAccount.enterpriseId) {
+                        enterpriseIds.add(String(selectedAccount.enterpriseId));
+                    }
+                }
+                
+                console.log('🔍 [Breadcrumbs] Enterprise IDs from licenses:', Array.from(enterpriseIds));
+                console.log('🔍 [Breadcrumbs] License count for account:', selectedAccount?.licenses?.length || 0);
+                
+                // Filter allEnterprises to only show those with licenses for this account
+                // If account has no licenses, show EMPTY list (not all enterprises)
+                const filtered = enterpriseIds.size > 0 
+                    ? allEnterprises.filter(ent => enterpriseIds.has(ent.id))
+                    : [];
+                
+                console.log(`✅ [Breadcrumbs] Filtered enterprises: ${filtered.length} of ${allEnterprises.length}`);
+                console.log(`📋 [Breadcrumbs] Account "${selectedAccount?.accountName || selectedAccount?.name}" has ${enterpriseIds.size} licensed enterprises`);
+                
+                setEnterprises(filtered);
+                
+                // If no enterprises available, clear selection
+                if (filtered.length === 0) {
+                    console.log('⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection');
+                    setSelectedEnterpriseId(undefined);
+                    try {
+                        window.localStorage.removeItem('selectedEnterpriseId');
+                        window.localStorage.removeItem('selectedEnterpriseName');
+                        // Dispatch enterprise change event
+                        window.dispatchEvent(new Event('enterpriseChanged'));
+                    } catch {}
+                } 
+                // If enterprises available, ensure one is selected
+                else {
+                    // If no enterprise selected OR current enterprise not in filtered list, select first
+                    if (!selectedEnterpriseId || !filtered.some(e => e.id === selectedEnterpriseId)) {
+                        console.log('⚠️ [Breadcrumbs] Auto-selecting first available enterprise:', filtered[0].name);
+                        setSelectedEnterpriseId(filtered[0].id);
+                        try {
+                            window.localStorage.setItem('selectedEnterpriseId', filtered[0].id);
+                            window.localStorage.setItem('selectedEnterpriseName', filtered[0].name);
+                            // Dispatch enterprise change event
+                            window.dispatchEvent(new Event('enterpriseChanged'));
+                        } catch {}
+                    } else {
+                        console.log('✅ [Breadcrumbs] Current enterprise is valid for this account:', selectedEnterpriseId);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ [Breadcrumbs] Failed to filter enterprises:', error);
+                // On error, show all enterprises
+                setEnterprises(allEnterprises);
+            }
+        };
+
+        filterEnterprisesByAccount();
+    }, [selectedAccountId, allEnterprises, selectedEnterpriseId]);
 
     const accountMenuRef = useRef<HTMLDivElement | null>(null);
     const enterpriseMenuRef = useRef<HTMLDivElement | null>(null);

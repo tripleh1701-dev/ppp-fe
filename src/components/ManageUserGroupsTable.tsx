@@ -151,7 +151,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                 window.removeEventListener('scroll', calculatePosition, true);
             };
         }
-    }, [isOpen, calculatePosition]);
+    }, [isOpen]);
 
     // Close dropdown when clicking outside
     React.useEffect(() => {
@@ -441,108 +441,57 @@ export interface UserGroup {
     isFromDatabase?: boolean; // Flag to indicate if this is an existing group from database (fields should be read-only)
 }
 
-export interface AccountRow {
+export interface UserGroupRow {
     id: string;
-    // User management fields
-    firstName: string;
-    middleName?: string;
-    lastName: string;
-    emailAddress: string;
-    status: 'ACTIVE' | 'INACTIVE';
-    startDate: string;
-    endDate?: string;
-    password?: string;
-    technicalUser?: boolean;
-    assignedUserGroups?: UserGroup[];
+    // User Group fields
+    groupName: string;
+    description?: string;
+    entity: string;
+    product: string;
+    service: string;
+    roles?: string;
 }
 
-// Validation functions for user management fields
-const validateFirstName = (_value: string): string | null => {
+// Validation functions for user group fields
+const validateGroupName = (_value: string): string | null => {
     // Only required check handled during save flow; no inline validation
     return null;
 };
 
 // Real-time validation function to filter characters as user types
-const filterFirstNameInput = (value: string): string => value; // No inline filtering
+const filterGroupNameInput = (value: string): string => value; // No inline filtering
 
-const validateMiddleName = (_value: string): string | null => {
+const validateDescription = (_value: string): string | null => {
     // No validation; field is optional
     return null;
 };
 
-// Real-time validation function to filter characters for middle name
-const filterMiddleNameInput = (value: string): string => value; // No inline filtering
+// Real-time validation function to filter characters for description
+const filterDescriptionInput = (value: string): string => value; // No inline filtering
 
-const validateLastName = (_value: string): string | null => {
+const validateEntity = (_value: string): string | null => {
     // Only required check handled during save flow; no inline validation
     return null;
 };
 
-// Real-time validation function to filter characters for last name
-const filterLastNameInput = (value: string): string => value; // No inline filtering
+// Real-time validation function to filter characters for entity
+const filterEntityInput = (value: string): string => value; // No inline filtering
 
-const validateEmail = (value: string): string | null => {
-    if (!value || value.trim().length === 0) {
-        return 'Email address is required';
-    }
-    
-    const trimmedValue = value.trim();
-    
-    if (trimmedValue.length < 5) {
-        return 'Email address must be at least 5 characters long';
-    }
-    
-    if (trimmedValue.length > 254) {
-        return 'Email address must not exceed 254 characters';
-    }
-    
-    // RFC 5322 compliant email regex (simplified but comprehensive)
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    
-    if (!emailRegex.test(trimmedValue)) {
-        return 'Please enter a valid email address';
-    }
-    
-    return null;
-};
-
-const validatePassword = (value: string): string | null => {
+const validateProduct = (_value: string): string | null => {
     // Only required check handled during save flow; no inline validation
-    if (!value || value.trim().length === 0) {
-        return 'Password is required';
-    }
     return null;
 };
 
-// Helper function to get password requirements (same as TechnicalUserModal)
-const getPasswordRequirements = (password: string) => {
-    return [
-        {
-            text: "At least 8 characters long",
-            met: password.length >= 8
-        },
-        {
-            text: "Contains uppercase letter (A-Z)",
-            met: /[A-Z]/.test(password)
-        },
-        {
-            text: "Contains lowercase letter (a-z)",
-            met: /[a-z]/.test(password)
-        },
-        {
-            text: "Contains number (0-9)",
-            met: /\d/.test(password)
-        },
-        {
-            text: "Contains special character (!@#$%^&*...)",
-            met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
-        },
-        {
-            text: "No common patterns (123, abc, aaa)",
-            met: !/(.)\1{2,}|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i.test(password)
-        }
-    ];
+// Real-time validation function to filter characters for product
+const filterProductInput = (value: string): string => value; // No inline filtering
+
+const validateService = (_value: string): string | null => {
+    // Only required check handled during save flow; no inline validation
+    return null;
 };
+
+// Real-time validation function to filter characters for service
+const filterServiceInput = (value: string): string => value; // No inline filtering
 
 function InlineEditableText({
     value,
@@ -584,7 +533,7 @@ function InlineEditableText({
             const filteredValue = filterFn ? filterFn(value || '') : (value || '');
             setDraft(filteredValue);
         }
-    }, [value, editing, filterFn]);
+    }, [value, editing]);
     React.useEffect(() => {
         if (editing) {
             inputRef.current?.focus();
@@ -1000,7 +949,7 @@ function SimpleChipInput({
     );
 }
 
-type CatalogType = 'firstName' | 'middleName' | 'lastName' | 'emailAddress' | 'status' | 'startDate' | 'endDate' | 'password' | 'technicalUser' | 'assignedUserGroups';
+type CatalogType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -1280,16 +1229,16 @@ function UserGroupMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'firstNames' | 'middleNames' | 'lastNames' | 'emails' | 'statusTypes' | 'passwords' | 'technicalUserTypes' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'firstNames' | 'middleNames' | 'lastNames' | 'emails' | 'statusTypes' | 'passwords' | 'technicalUserTypes' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         item: {id: string; name: string},
     ) => void;
-    accounts?: AccountRow[];
+    accounts?: UserGroupRow[];
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -1553,7 +1502,7 @@ function UserGroupMultiSelect({
 
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
-                    onNewItemCreated('userGroups', created);
+                    onNewItemCreated('services', created);
                 }
             }
         } catch (error: any) {
@@ -1808,7 +1757,7 @@ function UserGroupMultiSelect({
 
                                             // Notify parent component about the new item
                                             if (onNewItemCreated) {
-                                                onNewItemCreated('userGroups', created);
+                                                onNewItemCreated('services', created);
                                             }
                                         }
                                     } catch (error: any) {
@@ -1824,8 +1773,6 @@ function UserGroupMultiSelect({
                                                 setOpen(false);
                                                 navigateToNextRow(e.target as HTMLInputElement);
                                             }
-                                        } else {
-                                            console.error('Failed to create service:', error);
                                         }
                                     }
                                 }
@@ -1958,10 +1905,7 @@ function UserGroupMultiSelect({
                                                             setOpen(false);
                                                         }
                                                     } catch (error) {
-                                                        console.error(
-                                                            'Failed to create service:',
-                                                            error,
-                                                        );
+                                                        // Silently handle error
                                                     }
                                                 }}
                                                 className='w-full flex items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 transition-all'
@@ -2019,7 +1963,7 @@ function UserGroupMultiSelect({
                                                 key={opt.id}
                                                 option={opt}
                                                 tone={tone}
-                                                type='assignedUserGroups'
+                                                type='service'
                                                 isInUse={isUserGroupInUse(
                                                     opt.name,
                                                 )}
@@ -2074,17 +2018,14 @@ function UserGroupMultiSelect({
                                                             onDropdownOptionUpdate
                                                         ) {
                                                             await onDropdownOptionUpdate(
-                                                                'userGroups',
+                                                                'services',
                                                                 'update',
                                                                 opt.name,
                                                                 newName,
                                                             );
                                                         }
                                                     } catch (error) {
-                                                        console.error(
-                                                            'Failed to update service:',
-                                                            error,
-                                                        );
+                                                        // Error updating service
                                                     }
                                                 }}
                                                 onDelete={async () => {
@@ -2127,16 +2068,13 @@ function UserGroupMultiSelect({
                                                             onDropdownOptionUpdate
                                                         ) {
                                                             await onDropdownOptionUpdate(
-                                                                'userGroups',
+                                                                'services',
                                                                 'delete',
                                                                 opt.name,
                                                             );
                                                         }
                                                     } catch (error) {
-                                                        console.error(
-                                                            'Failed to delete service:',
-                                                            error,
-                                                        );
+                                                        // Error deleting service
                                                     }
                                                 }}
                                             />
@@ -2273,6 +2211,163 @@ function UserGroupMultiSelect({
     );
 }
 
+// Chip component with X button on hover
+function ChipDisplay({
+    value,
+    onRemove,
+    onEdit,
+    className,
+}: {
+    value: string;
+    onRemove: () => void;
+    onEdit?: () => void;
+    className?: string;
+}) {
+    if (!value || value.length === 0) {
+        return (
+            <div 
+                className={`w-full flex items-center px-2 py-1 text-[11px] leading-[14px] bg-white text-slate-300 rounded-sm border border-blue-300 cursor-text min-h-[28px] ${className || ''}`}
+                onClick={onEdit}
+            >
+                <span>Double-click to enter value</span>
+            </div>
+        );
+    }
+
+    return (
+        <motion.span
+            initial={{scale: 0.95, opacity: 0}}
+            animate={{scale: 1, opacity: 1}}
+            whileHover={{
+                y: -1,
+                boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+            }}
+            transition={{
+                type: 'spring',
+                stiffness: 480,
+                damping: 30,
+            }}
+            className={`group/chip w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm relative ${className || ''}`}
+            style={{width: '100%', minWidth: '100%'}}
+            title={value}
+            onDoubleClick={onEdit}
+            tabIndex={0}
+        >
+            <span className='flex-1 truncate pointer-events-none'>{value}</span>
+            <button
+                onClick={(e: any) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onRemove();
+                }}
+                className='hover:text-slate-900 opacity-0 group-hover/chip:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                aria-label='Remove'
+                style={{minWidth: '20px', minHeight: '20px'}}
+            >
+                <X size={12} />
+            </button>
+        </motion.span>
+    );
+}
+
+// Editable Chip Input - simple input that converts to chip
+function EditableChipInput({
+    value,
+    onCommit,
+    onRemove,
+    isError = false,
+    className,
+    dataAttr,
+    placeholder,
+    onTabNext,
+    onTabPrev,
+}: {
+    value: string;
+    onCommit: (next: string) => void;
+    onRemove: () => void;
+    isError?: boolean;
+    className?: string;
+    dataAttr?: string;
+    placeholder?: string;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState<string>(value || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!editing) {
+            setDraft(value || '');
+        }
+    }, [value, editing]);
+
+    useEffect(() => {
+        if (editing) {
+            inputRef.current?.focus();
+        }
+    }, [editing]);
+
+    const commit = () => {
+        const next = (draft || '').trim();
+        if (next !== (value || '')) onCommit(next);
+        setEditing(false);
+    };
+    
+    const cancel = () => {
+        setDraft(value || '');
+        setEditing(false);
+    };
+
+    return (
+        <div
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%', width: '100%'}}
+        >
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%', minWidth: '100%'}}>
+                {(editing || !value || value.length === 0) ? (
+                    <div className="relative w-full" style={{padding: '2px', margin: '-2px'}}>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onBlur={commit}
+                            onKeyDown={(e: any) => {
+                                if (e.key === 'Enter') {
+                                    commit();
+                                } else if (e.key === 'Escape') {
+                                    cancel();
+                                } else if (e.key === 'Tab') {
+                                    e.preventDefault();
+                                    commit();
+                                    if (e.shiftKey && onTabPrev) {
+                                        onTabPrev();
+                                    } else if (!e.shiftKey && onTabNext) {
+                                        onTabNext();
+                                    }
+                                }
+                            }}
+                            className={`min-w-0 w-full rounded-sm border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white'} px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} ${
+                                className || ''
+                            }`}
+                            data-inline={dataAttr || undefined}
+                            placeholder=""
+                        />
+                    </div>
+                ) : (
+                    <ChipDisplay
+                        value={value}
+                        onRemove={onRemove}
+                        onEdit={() => setEditing(true)}
+                        className={className}
+                    />
+                )}
+            </div>
+        </div>
+    );
+}
+
 function AsyncChipSelect({
     type,
     value,
@@ -2301,28 +2396,26 @@ function AsyncChipSelect({
     onFocus?: () => void;
     inputType?: 'text' | 'password';
     onDropdownOptionUpdate?: (
-        type: 'firstNames' | 'middleNames' | 'lastNames' | 'statusTypes' | 'emails' | 'passwords' | 'technicalUserTypes' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'firstNames' | 'middleNames' | 'lastNames' | 'statusTypes' | 'emails' | 'passwords' | 'technicalUserTypes' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         item: {id: string; name: string},
     ) => void;
-    accounts?: AccountRow[];
+    accounts?: UserGroupRow[];
     currentRowId?: string;
     currentRowEnterprise?: string;
     currentRowProduct?: string;
     dropdownOptions?: {
-        firstNames: Array<{id: string; name: string}>;
-        middleNames: Array<{id: string; name: string}>;
-        lastNames: Array<{id: string; name: string}>;
-        statusTypes: Array<{id: string; name: string}>;
-        emails: Array<{id: string; name: string}>;
-        passwords: Array<{id: string; name: string}>;
-        technicalUserTypes: Array<{id: string; name: string}>;
-        userGroups: Array<{id: string; name: string}>;
+        groupNames: Array<{id: string; name: string}>;
+        descriptions: Array<{id: string; name: string}>;
+        entities: Array<{id: string; name: string}>;
+        products: Array<{id: string; name: string}>;
+        services: Array<{id: string; name: string}>;
+        roles: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -2352,14 +2445,17 @@ function AsyncChipSelect({
                     return false;
                 }
 
-                if (type === 'firstName') {
-                    // Never filter first names - show all options
+                if (type === 'groupName') {
+                    // Never filter group names - show all options
                     return false;
-                } else if (type === 'lastName') {
-                    // Never filter last names - show all options
+                } else if (type === 'entity') {
+                    // Never filter entities - show all options
                     return false;
-                } else if (type === 'emailAddress') {
-                    // Never filter email addresses - show all options
+                } else if (type === 'product') {
+                    // Never filter products - show all options
+                    return false;
+                } else if (type === 'service') {
+                    // Never filter services - show all options
                     return false;
                 }
                 return false;
@@ -2409,10 +2505,10 @@ function AsyncChipSelect({
         const minLeft = Math.max(tableRect.left + 32, 32); // More padding
         const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
         
-        // Prefer below if there's enough space, otherwise use above if there's more space above
-        // For user fields, always prefer below unless there's really no space
+        // Prefer below if there's enough space, otherwise use above if there's really no space
+        // For user group fields, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'status';
+        const forceBelow = type === 'entity' || type === 'product' || type === 'service' || type === 'description' || type === 'groupName' || type === 'roles';
         
         if (forceBelow && spaceBelow >= 100) {
             // For status fields, show below if there's at least 100px space
@@ -2459,50 +2555,59 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
             
-            
-            // Use dropdownOptions if available for firstName
-            if (type === 'firstName' && dropdownOptions?.firstNames) {
-                allData = dropdownOptions.firstNames;
-            } else if (type === 'middleName' && dropdownOptions?.middleNames) {
-                allData = dropdownOptions.middleNames;
-            } else if (type === 'lastName' && dropdownOptions?.lastNames) {
-                allData = dropdownOptions.lastNames;
-            } else if (type === 'status') {
-                // Always use predefined status options (prioritize dropdownOptions)
-                if (dropdownOptions?.statusTypes && dropdownOptions.statusTypes.length > 0) {
-                    allData = dropdownOptions.statusTypes;
-                } else {
-                    allData = [
-                        { id: 'ACTIVE', name: 'Active' },
-                        { id: 'INACTIVE', name: 'Inactive' }
-                    ];
-                }
-            } else if (type === 'emailAddress') {
+            // Use dropdownOptions if available for groupName
+            if (type === 'groupName' && dropdownOptions?.groupNames) {
+                allData = dropdownOptions.groupNames;
+            } else if (type === 'description' && dropdownOptions?.descriptions) {
+                allData = dropdownOptions.descriptions;
+            } else if (type === 'entity' && dropdownOptions?.entities) {
+                allData = dropdownOptions.entities;
+            } else if (type === 'product' && dropdownOptions?.products) {
+                allData = dropdownOptions.products;
+            } else if (type === 'service' && dropdownOptions?.services) {
+                allData = dropdownOptions.services;
+            } else if (type === 'roles' && dropdownOptions?.roles) {
+                allData = dropdownOptions.roles;
+            } else if (type === 'groupName') {
+                // Build groups URL with account filter (enterprise filter makes backend too restrictive)
+                // Get values from localStorage
+                const selectedAccountId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null;
+                const selectedAccountName = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null;
+                const selectedEnterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
+                const selectedEnterprise = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null;
+                
+                let groupsUrl = '/api/user-management/groups';
+                const params = new URLSearchParams();
+                if (selectedAccountId) params.append('accountId', selectedAccountId);
+                if (selectedAccountName) params.append('accountName', selectedAccountName);
+                if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
+                if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise);
+                if (params.toString()) groupsUrl += `?${params.toString()}`;
+
+                const response = await api.get<Array<{id: string; name: string; groupName?: string}>>(groupsUrl) || [];
+                allData = response.map((item: any) => ({
+                    id: item.id || item.groupId || String(Math.random()),
+                    name: item.name || item.groupName || ''
+                })).filter((item: any) => item.name);
+            } else if (type === 'entity') {
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/emails',
+                    '/api/entities',
                 ) || [];
-            } else if (type === 'password' && dropdownOptions?.passwords) {
-                allData = dropdownOptions.passwords;
-            } else if (type === 'technicalUser') {
-                // Boolean field, no dropdown options needed
-                allData = [];
-            } else if (type === 'assignedUserGroups' && dropdownOptions?.userGroups) {
-                allData = dropdownOptions.userGroups;
-            } else if (type === 'startDate' || type === 'endDate') {
-                allData = [];
-            } else if (type === 'assignedUserGroups') {
+            } else if (type === 'product') {
                 allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/userGroups',
+                    '/api/products',
+                ) || [];
+            } else if (type === 'service') {
+                allData = await api.get<Array<{id: string; name: string}>>(
+                    '/api/services',
                 ) || [];
             } else {
-                allData = await api.get<Array<{id: string; name: string}>>(
-                    '/api/accountNames',
-                ) || [];
+                // Default empty
+                allData = [];
             }
             
             setAllOptions(allData);
         } catch (error) {
-            console.error(`API call failed for ${type}:`, error);
             setAllOptions([]);
         } finally {
             setLoading(false);
@@ -2543,7 +2648,7 @@ function AsyncChipSelect({
     // Filter options when query or allOptions change
     React.useEffect(() => {
         filterOptions();
-    }, [filterOptions]);
+    }, [allOptions, query]);
 
     // Load options when dropdown opens
     React.useEffect(() => {
@@ -2552,9 +2657,9 @@ function AsyncChipSelect({
         }
     }, [open, allOptions.length, loadAllOptions]);
 
-    // Load status options immediately on mount since they're predefined
+    // Load groupName options immediately on mount if needed
     React.useEffect(() => {
-        if (type === 'status' && allOptions.length === 0) {
+        if (type === 'groupName' && allOptions.length === 0) {
             loadAllOptions();
         }
     }, [type, allOptions.length, loadAllOptions]);
@@ -2598,45 +2703,45 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'firstName') {
+            if (type === 'groupName') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/firstNames',
-                    {name},
+                    '/api/user-management/groups',
+                    {name, groupName: name},
                 );
-            } else if (type === 'middleName') {
-                created = await api.post<{id: string; name: string}>(
-                    '/api/middleNames',
-                    {name},
-                );
-            } else if (type === 'lastName') {
-                created = await api.post<{id: string; name: string}>(
-                    '/api/lastNames',
-                    {name},
-                );
-            } else if (type === 'status') {
-                // Status has predefined options, don't create new ones
+            } else if (type === 'description') {
+                // Description is free text, no API creation needed
+                onChange(name);
+                setShowAdder(false);
+                setAdding('');
+                setQuery('');
+                setOpen(false);
                 return;
-            } else if (type === 'emailAddress') {
+            } else if (type === 'entity') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/emails',
+                    '/api/entities',
                     {name},
                 );
-            } else if (type === 'password') {
-                // Passwords are typically not saved as dropdown options for security
-                return;
-            } else if (type === 'technicalUser') {
-                // Boolean field, no creation needed
-                return;
-            } else if (type === 'assignedUserGroups') {
+            } else if (type === 'product') {
                 created = await api.post<{id: string; name: string}>(
-                    '/api/userGroups',
+                    '/api/products',
                     {name},
                 );
+            } else if (type === 'service') {
+                created = await api.post<{id: string; name: string}>(
+                    '/api/services',
+                    {name},
+                );
+            } else if (type === 'roles') {
+                // Roles are managed separately
+                return;
             } else {
-                created = await api.post<{id: string; name: string}>(
-                    '/api/accountNames',
-                    {name},
-                );
+                // Default - just accept the value
+                onChange(name);
+                setShowAdder(false);
+                setAdding('');
+                setQuery('');
+                setOpen(false);
+                return;
             }
             if (created) {
                 // Inject newly created into the current dropdown list and select it
@@ -2656,38 +2761,21 @@ function AsyncChipSelect({
                 setOpen(false);
 
                 // Notify parent component about the new item
-                if (onNewItemCreated) {
-                    let dropdownType: string;
+                if (onNewItemCreated && created) {
+                    const typeMap: Record<string, string> = {
+                        'groupName': 'groupNames',
+                        'description': 'descriptions',
+                        'entity': 'entities',
+                        'product': 'products',
+                        'service': 'services',
+                        'roles': 'roles'
+                    };
                     
-                    switch (type) {
-                        case 'firstName':
-                            dropdownType = 'firstNames';
-                            break;
-                        case 'middleName':
-                            dropdownType = 'middleNames';
-                            break;
-                        case 'lastName':
-                            dropdownType = 'lastNames';
-                            break;
-                        case 'emailAddress':
-                            dropdownType = 'emails';
-                            break;
-                        case 'assignedUserGroups':
-                            dropdownType = 'userGroups';
-                            break;
-                        default:
-                            dropdownType = 'emails'; // fallback
-                            break;
-                    }
-                    
-                    // Only call if this is a supported type for the callback
-                    if (type === 'firstName' || type === 'middleName' || type === 'lastName' || type === 'emailAddress' || type === 'assignedUserGroups') {
-                        onNewItemCreated(dropdownType as any, created);
-                    }
+                    const dropdownType = typeMap[type as string] || 'groupNames';
+                    onNewItemCreated(dropdownType as any, created);
                 }
             }
         } catch (error: any) {
-            console.error(`Failed to create ${type}:`, error);
             // Handle duplicate error from backend
             if (
                 error?.message?.includes('already exists') ||
@@ -2713,9 +2801,9 @@ function AsyncChipSelect({
         setCurrent(value);
     }, [value]);
 
-    // Debug logging for status
+    // Debug logging for groupName
     React.useEffect(() => {
-        if (type === 'status') {
+        if (type === 'groupName') {
         }
     }, [type, allOptions]);
 
@@ -2741,7 +2829,7 @@ function AsyncChipSelect({
                             stiffness: 480,
                             damping: 30,
                         }}
-                        className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative ${isError ? 'border border-red-500 bg-red-50 ring-2 ring-red-200 text-red-900' : 'bg-white text-black'} ${type === 'password' ? 'pr-8' : ''}`}
+                        className={`w-full flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative ${isError ? 'border border-red-500 bg-red-50 ring-2 ring-red-200 text-red-900' : 'bg-white text-black'}`}
                         style={{width: '100%', minWidth: '100%'}}
                         title={`Double-click to edit: ${current || value}`}
                         onDoubleClick={(e: any) => {
@@ -2759,52 +2847,24 @@ function AsyncChipSelect({
                                 }, 10);
                             }
                         }}
-                        onClick={(e: any) => {
-                            // For status, also allow single click to open dropdown
-                            if (type === 'status' && allOptions.length > 0) {
-                                const target = e.target as HTMLElement;
-                                if (!target.closest('button')) {
-                                    setQuery('');
-                                    setOpen(true);
-                                    setTimeout(() => {
-                                        if (inputRef.current) {
-                                            inputRef.current.focus();
-                                        }
-                                    }, 10);
-                                }
-                            }
-                        }}
                     >
                         <span className='flex-1 truncate pointer-events-none'>
-                            {inputType === 'password' && (current || value)
-                                ? '•'.repeat(Math.min((current || value || '').length, 20))
-                                : (current || value)
-                            }
+                            {current || value}
                         </span>
-                        {/* Dropdown arrow for status */}
-                        {type === 'status' && (
-                            <ChevronDown 
-                                size={12} 
-                                className="text-slate-400 flex-shrink-0 ml-1" 
-                            />
-                        )}
-                        {/* Hide X button for password fields to avoid overlap with eye icon */}
-                        {type !== 'password' && (
-                            <button
-                                onClick={(e: any) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    onChange('');
-                                    setCurrent('');
-                                    setQuery('');
-                                }}
-                                className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
-                                aria-label='Remove'
-                                style={{minWidth: '20px', minHeight: '20px'}}
-                            >
-                                <X size={12} />
-                            </button>
-                        )}
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
                     </motion.span>
                 )}
                 
@@ -2886,7 +2946,7 @@ function AsyncChipSelect({
                                     setQuery('');
                                 }
                             }}
-                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 placeholder:font-normal focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} font-normal`}
+                            className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'} font-normal`}
                             style={{fontWeight: '400', fontFamily: 'inherit', fontStyle: 'normal'}}
                             placeholder=''
                         />
@@ -2898,22 +2958,24 @@ function AsyncChipSelect({
             {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
                 <div 
                     ref={dropdownRef}
-                    className='bg-white border border-gray-200 rounded-md shadow-md'
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
                     onMouseDown={(e: any) => e.stopPropagation()}
                     onClick={(e: any) => e.stopPropagation()}
                     style={{
                         position: 'fixed',
                         top: `${dropdownPortalPos.top}px`,
                         left: `${dropdownPortalPos.left}px`,
-                        width: `${Math.min(dropdownPortalPos.width, 180)}px`,
-                        maxWidth: '180px',
-                        minWidth: '140px'
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px',
+                        zIndex: 10000
                     }}
                 >
-                        <div className='py-1'>
-                            <div className='max-h-48 overflow-y-auto overflow-x-hidden'>
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    <div className='relative z-10 flex flex-col'>
+                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
                             {loading ? (
-                                <div className='px-3 py-2 text-slate-500'>
+                                <div className='px-3 py-2 text-slate-500 text-center'>
                                     Loading…
                                 </div>
                             ) : (
@@ -2939,40 +3001,87 @@ function AsyncChipSelect({
                                         })
                                         : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
                                     
+                                    
+                                    // Check if query exactly matches an existing option
+                                    const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    ) : null;
+                                    
+                                    // Show + button if query is entered and no exact match
+                                    const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
 
                                     return (
-                                        <div>
-                                            {/* Show existing matching options */}
-                                            {filteredOptions.length > 0 && (
-                                                <div>
-                                                    {filteredOptions.map((opt, idx) => (
+                                        <>
+                                            {filteredOptions.map((opt, idx) => {
+                                                const palette = [
+                                                    { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                                    { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                                    { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                                    { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                                ];
+                                                const tone = palette[idx % palette.length];
+                                                
+                                                return (
+                                                    <motion.div
+                                                        key={opt.id}
+                                                        initial={{scale: 0.98, opacity: 0}}
+                                                        animate={{scale: 1, opacity: 1}}
+                                                        whileHover={{scale: 1.02, y: -1}}
+                                                        transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                        className='relative group'
+                                                    >
                                                         <div
-                                                            key={opt.id}
+                                                            className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                            style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
                                                             onClick={() => {
                                                                 onChange(opt.name);
                                                                 setCurrent(opt.name);
                                                                 setQuery('');
                                                                 setOpen(false);
                                                             }}
-                                                            className='w-full px-3 py-2.5 text-left text-sm cursor-pointer bg-blue-50 text-blue-800 hover:bg-blue-100 border-b border-blue-100 last:border-b-0 transition-colors duration-200 font-medium'
                                                         >
-                                                            {opt.name}
+                                                            <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                            <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                            
+                                            {/* Add button inside scrollable area */}
+                                            {showCreateNew && (
+                                                <motion.div
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
+                                                    className='mt-2 border-t border-slate-200 pt-2'
+                                                >
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            addNew();
+                                                        }}
+                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                        type='button'
+                                                    >
+                                                        + Add &quot;{query.trim()}&quot;
+                                                    </button>
+                                                </motion.div>
                                             )}
                                             
                                             {/* Show "No results" message */}
-                                            {filteredOptions.length === 0 && (
-                                                <div className='px-3 py-2 text-center text-sm text-slate-500'>
-                                                    {query.trim() ? (
-                                                        <div>No {type}s found matching &quot;{query}&quot;</div>
-                                                    ) : (
-                                                        <div>No {type}s available</div>
-                                                    )}
+                                            {filteredOptions.length === 0 && !showCreateNew && allOptions.length > 0 && (
+                                                <div className='px-3 py-2 text-slate-500 text-center'>
+                                                    No matches
                                                 </div>
                                             )}
-                                        </div>
+                                            
+                                            {/* Show empty state */}
+                                            {filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0 && (
+                                                <div className='px-3 py-2 text-slate-500 text-center'>
+                                                    No value found
+                                                </div>
+                                            )}
+                                        </>
                                     );
                                 })()
                             )}
@@ -2986,37 +3095,2937 @@ function AsyncChipSelect({
     );
 }
 
-interface AccountsTableProps {
-    rows: AccountRow[];
+// AsyncChipSelect for Group Name with dropdown and + sign for new values
+function AsyncChipSelectGroupName({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    userGroups = [],
+    onNewItemCreated,
+    selectedAccountId,
+    selectedAccountName,
+    selectedEnterpriseId,
+    selectedEnterprise,
+}: {
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    userGroups?: UserGroupRow[];
+    onNewItemCreated?: (item: {id: string; name: string}) => void;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
+    selectedEnterpriseId?: string;
+    selectedEnterprise?: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [current, setCurrent] = useState<string | undefined>(value);
+    const [query, setQuery] = useState('');
+    const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [allOptions, setAllOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasPendingNewValue, setHasPendingNewValue] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [dropdownPortalPos, setDropdownPortalPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+
+    // Load options from database API - exactly like AssignedUserGroupTable
+    const loadAllOptions = useCallback(async () => {
+        console.log('🔄 [GroupName] loadAllOptions called');
+        setLoading(true);
+        try {
+            // Build URL with account/enterprise filters when available
+            let groupsUrl = '/api/user-management/groups';
+            const params = new URLSearchParams();
+            if (selectedAccountId) params.append('accountId', selectedAccountId);
+            if (selectedAccountName) params.append('accountName', selectedAccountName || '');
+            if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise || '');
+            if (params.toString()) groupsUrl += `?${params.toString()}`;
+
+            console.log('📡 [GroupName] Calling API:', groupsUrl);
+            const allData = await api.get<Array<{id: string; name: string}>>(groupsUrl) || [];
+            console.log(`✅ [GroupName] API call successful, got ${allData.length} items:`, allData);
+            // Transform the data to match expected format if needed
+            const transformedData = allData.map((item: any) => ({
+                id: item.id || item.groupId || String(Math.random()),
+                name: item.name || item.groupName || item.group || ''
+            })).filter((item: any) => item.name); // Filter out items without names
+            
+            // Get distinct group names only (remove duplicates)
+            const uniqueGroupNames = new Map<string, {id: string; name: string}>();
+            transformedData.forEach((item: any) => {
+                const lowerName = item.name.toLowerCase();
+                if (!uniqueGroupNames.has(lowerName)) {
+                    uniqueGroupNames.set(lowerName, item);
+                }
+            });
+            const distinctData = Array.from(uniqueGroupNames.values());
+            
+            // Filter out group names that are already used in the current table
+            // This prevents duplicate group names within the same account/enterprise
+            const usedGroupNames = new Set(
+                userGroups
+                    .map(ug => ug.groupName?.toLowerCase().trim())
+                    .filter(name => name) // Remove empty/null names
+            );
+            
+            const availableData = distinctData.filter(item => 
+                !usedGroupNames.has(item.name.toLowerCase().trim())
+            );
+            
+            console.log(`📋 [GroupName] Total groups: ${transformedData.length}, Distinct group names: ${distinctData.length}`);
+            console.log(`📋 [GroupName] Already used in table: ${usedGroupNames.size}`);
+            console.log(`📋 [GroupName] Available (unused) group names: ${availableData.length}`);
+            console.log(`📋 [GroupName] Available group names for dropdown:`, availableData.map(d => d.name));
+            setAllOptions(availableData);
+        } catch (error) {
+            console.error('❌ [GroupName] API call failed:', error);
+            // Don't set empty array - keep previous data if any
+            // This way, if API fails but user types, showCreateNew will still be true
+            setAllOptions([]);
+        } finally {
+            setLoading(false);
+            console.log('🏁 [GroupName] loadAllOptions completed, loading set to false');
+        }
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, userGroups]);
+
+    // Check if query is a new value
+    const isNewValuePending = useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        return !exactMatch;
+    }, [allOptions]);
+
+    useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
+
+    // Calculate dropdown position - simple positioning
+    const calculateDropdownPosition = useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const width = Math.max(140, Math.min(200, containerRect.width));
+        const top = containerRect.bottom + 2;
+        const left = containerRect.left;
+        
+        setDropdownPortalPos({ top, left, width });
+    }, []);
+
+    useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    useEffect(() => {
+        if (open && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, loadAllOptions]);
+
+    useEffect(() => {
+        setCurrent(value);
+    }, [value]);
+
+    useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    // Filter options - exactly like AssignedUserGroupTable
+    const filterOptions = useCallback(() => {
+        console.log('🔍 [GroupName] filterOptions called', { allOptionsLength: allOptions.length, query });
+        if (allOptions.length === 0) {
+            console.log('⚠️ [GroupName] allOptions is empty, setting options to []');
+            setOptions([]);
+            return;
+        }
+        let filtered = allOptions;
+        
+        // Don't filter out already selected group names - allow users to select existing group names
+        // Duplicate prevention happens during save validation (checking Group Name + Entity + Product + Service)
+        console.log(`🔍 [GroupName] Starting with ${filtered.length} options from API`);
+        
+        // Apply search filter
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
+            );
+            console.log(`🔍 [GroupName] After startsWith filter (${queryLower}): ${filtered.length} items`, filtered);
+            
+            // Sort filtered results: exact matches first, then alphabetical - exactly like AssignedUserGroupTable
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+                
+                // Exact match comes first
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+                
+                // Otherwise alphabetical order
+                return aLower.localeCompare(bLower);
+            });
+        }
+        
+        console.log(`✅ [GroupName] Setting options to ${filtered.length} filtered items`);
+        setOptions(filtered);
+    }, [allOptions, query]);
+
+    useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    const addNew = async () => {
+        const name = (query || '').trim();
+        if (!name) return;
+
+        // Check if group name is already used in the current table (duplicate check)
+        const isDuplicateInTable = userGroups.some(
+            ug => ug.groupName?.toLowerCase().trim() === name.toLowerCase()
+        );
+        
+        if (isDuplicateInTable) {
+            console.log('❌ [GroupName] Duplicate group name detected in table:', name);
+            alert(`Group name "${name}" already exists in the table. Please use a different name.`);
+            return;
+        }
+
+        // Check for existing entries (case-insensitive) - exactly like AssignedUserGroupTable
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            // If exact match exists, select it instead of creating new
+            onChange(existingMatch.name);
+            setCurrent(existingMatch.name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
+            return;
+        }
+
+        try {
+            // Create new user group in database via API with account/enterprise context
+            console.log('➕ [GroupName] Creating new group:', name);
+            console.log('📦 [GroupName] Account/Enterprise context:', {
+                selectedAccountId,
+                selectedAccountName,
+                selectedEnterpriseId,
+                selectedEnterprise
+            });
+            
+            // Include account/enterprise context in request body - exactly like Save All
+            const groupData = {
+                name,
+                groupName: name,
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise
+            };
+            
+            console.log('🌐 [GroupName] Creating group with context:', groupData);
+            
+            const created = await api.post<{id: string; name: string} | any>(
+                '/api/user-management/groups',
+                groupData
+            );
+            
+            console.log('✅ [GroupName] Group created:', created);
+            
+            // Transform response to match expected format
+            const formattedCreated = {
+                id: created?.id || created?.groupId || String(Math.random()),
+                name: created?.name || created?.groupName || name
+            };
+            
+            if (formattedCreated) {
+                // Add newly created to the dropdown list and select it
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                // Also add to allOptions for future exact match checking
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                onChange(formattedCreated.name);
+                setCurrent(formattedCreated.name);
+                setQuery('');
+                setOpen(false);
+                setHasPendingNewValue(false);
+                
+                // Focus the chip after creating new value so Tab navigation works - exactly like AssignedUserGroupTable
+                setTimeout(() => {
+                    try {
+                        // Find the chip element (which now has tabIndex=0 and is focusable)
+                        if (inputRef.current) {
+                            // inputRef should now point to the chip (motion.span)
+                            if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
+                                inputRef.current.focus();
+                                console.log('🎯 [GroupName] Focused chip after creation');
+                            } else {
+                                // If inputRef is still the input, find the chip
+                                const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                                if (chipElement) {
+                                    chipElement.focus();
+                                    console.log('🎯 [GroupName] Focused chip after creation (found via querySelector)');
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('🎯 [GroupName] Error focusing chip after creation:', e);
+                    }
+                }, 100); // Small delay to ensure React state updates are complete
+                
+                // Notify parent component about the new item
+                if (onNewItemCreated) {
+                    onNewItemCreated(formattedCreated);
+                }
+            }
+        } catch (error: any) {
+            console.error('Failed to create userGroup:', error);
+            // Handle duplicate error from backend
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                // Try to find the existing item and select it
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setCurrent(existingItem.name);
+                    setQuery('');
+                    setOpen(false);
+                    setHasPendingNewValue(false);
+                }
+            }
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%', width: '100%'}}
+        >
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%', minWidth: '100%'}}>
+                {(current || value) && !open ? (
+                    <motion.span
+                        ref={inputRef}
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%'}}
+                        title={current || value}
+                        tabIndex={0}
+                        onClick={(e: any) => {
+                            if (!(e.target as HTMLElement).closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                        onKeyDown={(e: any) => {
+                            // Handle Tab navigation from the chip to next field (Description) - exactly like AssignedUserGroupTable
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Find the current row and navigate to Description field
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                if (currentRowId) {
+                                    // Find the Description field in the same row
+                                    const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="description"]`);
+                                    
+                                    if (nextColDiv) {
+                                        // Find the input or chip element in the Description field
+                                        const descriptionInput = nextColDiv.querySelector('input') as HTMLInputElement;
+                                        const descriptionChip = nextColDiv.querySelector('span[tabindex="0"]') as HTMLElement;
+                                        
+                                        // Focus the input if available, otherwise the chip
+                                        const targetElement = descriptionInput || descriptionChip;
+                                        
+                                        if (targetElement) {
+                                            setTimeout(() => {
+                                                targetElement.focus();
+                                            }, 10);
+                                        }
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                ) : null}
+                
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            console.log('⌨️ [GroupName] onChange:', { newValue, allOptionsLength: allOptions.length, open });
+                            setQuery(newValue);
+                            // Always open dropdown when typing to show options or + button
+                            console.log('📂 [GroupName] Setting open to true');
+                            setOpen(true);
+                            // Calculate position immediately
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                console.log('📍 [GroupName] Setting dropdown position:', { top, left, width });
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            // Reload options to exclude already-used group names
+                            console.log('📥 [GroupName] Reloading options to filter out used group names');
+                            loadAllOptions();
+                            // Clear current selection if user clears the input completely
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            console.log('👁️ [GroupName] onFocus:', { allOptionsLength: allOptions.length, open, query });
+                            setOpen(true);
+                            // Calculate position immediately on focus
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                console.log('📍 [GroupName] Setting dropdown position on focus:', { top, left, width });
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            // Always reload options on focus to exclude already-used group names
+                            console.log('📥 [GroupName] Reloading options on focus to filter out used group names');
+                            loadAllOptions();
+                        }}
+                        onKeyDown={async (e: any) => {
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault(); // Prevent form submission
+                                e.stopPropagation(); // Stop event bubbling
+                                
+                                // Check for exact match first - exactly like AssignedUserGroupTable
+                                const exactMatch = allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                
+                                if (exactMatch) {
+                                    // Double-check for duplicate (safeguard)
+                                    const isDuplicate = userGroups.some(
+                                        ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                    );
+                                    
+                                    if (isDuplicate) {
+                                        console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                        alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
+                                        setQuery('');
+                                        setOpen(false);
+                                        return;
+                                    }
+                                    
+                                    // Select existing value
+                                    onChange(exactMatch.name);
+                                    setCurrent(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                    
+                                    // Focus the chip after selecting existing value so Tab navigation works - exactly like AssignedUserGroupTable
+                                    setTimeout(() => {
+                                        try {
+                                            // Find the chip element (which now has tabIndex=0 and is focusable)
+                                            if (inputRef.current) {
+                                                // inputRef should now point to the chip (motion.span)
+                                                if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
+                                                    inputRef.current.focus();
+                                                    console.log('🎯 [GroupName] Focused chip after Enter on existing value');
+                                                } else {
+                                                    // If inputRef is still the input, find the chip
+                                                    const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                                                    if (chipElement) {
+                                                        chipElement.focus();
+                                                        console.log('🎯 [GroupName] Focused chip after Enter on existing value (found via querySelector)');
+                                                    }
+                                                }
+                                            }
+                                        } catch (e) {
+                                            console.log('🎯 [GroupName] Error focusing chip after Enter on existing value:', e);
+                                        }
+                                    }, 100); // Small delay to ensure React state updates are complete
+                                } else {
+                                    // Create new entry (same logic as Add button) - exactly like AssignedUserGroupTable
+                                    await addNew();
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            } else if (e.key === 'Tab') {
+                                // Check if user has entered a new value that doesn't exist - exactly like AssignedUserGroupTable
+                                if (query.trim() && hasPendingNewValue) {
+                                    // Prevent Tab navigation - user must click + button first
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    // Focus back on the input and show dropdown if not already open
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    return;
+                                }
+                                
+                                // If existing value, allow Tab to navigate - exactly like AssignedUserGroupTable
+                                if (query.trim()) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        // Double-check for duplicate (safeguard)
+                                        const isDuplicate = userGroups.some(
+                                            ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                        );
+                                        
+                                        if (isDuplicate) {
+                                            console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                            alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
+                                            e.preventDefault();
+                                            setQuery('');
+                                            setOpen(false);
+                                            return;
+                                        }
+                                        
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+                                        setHasPendingNewValue(false);
+                                        
+                                        // Focus the chip after selecting existing value so Tab navigation works - exactly like AssignedUserGroupTable
+                                        setTimeout(() => {
+                                            try {
+                                                // Find the chip element (which now has tabIndex=0 and is focusable)
+                                                const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                                                if (chipElement) {
+                                                    chipElement.focus();
+                                                    console.log('🎯 [GroupName] Focused chip after Tab on existing value');
+                                                    
+                                                    // Now trigger Tab navigation to next field - exactly like AssignedUserGroupTable
+                                                    setTimeout(() => {
+                                                        const currentElement = chipElement;
+                                                        const currentColDiv = currentElement.closest('[data-col]');
+                                                        const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                                        
+                                                        if (currentRowId) {
+                                                            // Find the Description field in the same row
+                                                            const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="description"]`);
+                                                            
+                                                            if (nextColDiv) {
+                                                                // Find the input or chip element in the Description field
+                                                                const descriptionInput = nextColDiv.querySelector('input') as HTMLInputElement;
+                                                                const descriptionChip = nextColDiv.querySelector('span[tabindex="0"]') as HTMLElement;
+                                                                
+                                                                // Focus the input if available, otherwise the chip
+                                                                const targetElement = descriptionInput || descriptionChip;
+                                                                
+                                                                if (targetElement) {
+                                                                    targetElement.focus();
+                                                                }
+                                                            }
+                                                        }
+                                                    }, 50);
+                                                }
+                                            } catch (e) {
+                                                console.log('🎯 [GroupName] Error focusing chip after Tab on existing value:', e);
+                                            }
+                                        }, 100);
+                                    }
+                                } else {
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                }
+                            }
+                        }}
+                        onBlur={(e) => {
+                            // Check if the blur is due to clicking within the dropdown - exactly like AssignedUserGroupTable
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            
+                            // If user has a pending new value and they're not clicking in dropdown, prevent blur
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                // Prevent the field from losing focus if there's a pending new value
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Refocus the input after a short delay
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    // Ensure dropdown stays open to show the + button
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
+                            }
+                            
+                            setTimeout(() => {
+                                if (!open) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === (query || '').toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setHasPendingNewValue(false);
+                                    } else if (query && query !== (current || value)) {
+                                        // Keep the typed value for potential creation
+                                    } else if (!query) {
+                                        setQuery('');
+                                        setHasPendingNewValue(false);
+                                    }
+                                    setQuery('');
+                                }
+                            }, 150);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder={placeholder}
+                    />
+                ) : null}
+            </div>
+            
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px',
+                        zIndex: 10000
+                    }}
+                >
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    <div className='relative z-10 flex flex-col'>
+                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
+                            {(() => {
+                                console.log('🎨 [GroupName] Rendering dropdown content', {
+                                    query: query.trim(),
+                                    optionsLength: options.length,
+                                    allOptionsLength: allOptions.length,
+                                    loading
+                                });
+                                
+                                // Filter options that match the query (show all if no query) - exactly like AssignedUserGroupTable
+                                const filteredOptions = query.trim() 
+                                    ? options.filter(opt => 
+                                        opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                        opt.name.toLowerCase().includes(query.toLowerCase())
+                                    ).sort((a, b) => {
+                                        const aLower = a.name.toLowerCase();
+                                        const bLower = b.name.toLowerCase();
+                                        const queryLower = query.toLowerCase();
+                                        
+                                        // Prioritize starts with matches
+                                        const aStartsWith = aLower.startsWith(queryLower);
+                                        const bStartsWith = bLower.startsWith(queryLower);
+                                        
+                                        if (aStartsWith && !bStartsWith) return -1;
+                                        if (bStartsWith && !aStartsWith) return 1;
+                                        
+                                        return aLower.localeCompare(bLower);
+                                    })
+                                    : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                
+                                console.log('🔍 [GroupName] filteredOptions:', filteredOptions);
+                                
+                                // Check if query exactly matches an existing option - always check allOptions when available (database source of truth)
+                                const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                ) : null;
+                                
+                                console.log('🎯 [GroupName] exactMatch check:', {
+                                    query: query.trim(),
+                                    allOptionsLength: allOptions.length,
+                                    exactMatch: exactMatch?.name || null,
+                                    allOptionsSample: allOptions.slice(0, 5).map(o => o.name)
+                                });
+                                
+                                // Show + button if:
+                                // 1. Query is entered
+                                // 2. Either allOptions is empty (still loading) OR no exact match found in database
+                                const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
+                                
+                                console.log('➕ [GroupName] showCreateNew calculation:', {
+                                    queryTrimmed: query.trim(),
+                                    queryHasValue: !!query.trim(),
+                                    allOptionsEmpty: allOptions.length === 0,
+                                    exactMatchFound: !!exactMatch,
+                                    showCreateNew
+                                });
+                                
+                                // Show loading only if loading AND no query entered yet
+                                if (loading && allOptions.length === 0 && !query.trim()) {
+                                    console.log('⏳ [GroupName] Showing loading message');
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            Loading…
+                                        </div>
+                                    );
+                                }
+                                
+                                // Only show "No matches" if there are no filtered options AND no new value to create AND not loading AND allOptions is loaded
+                                if (filteredOptions.length === 0 && !showCreateNew && !loading && allOptions.length > 0) {
+                                    console.log('🚫 [GroupName] Showing "No matches" message');
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            No matches
+                                        </div>
+                                    );
+                                }
+                                
+                                // Show empty state when no values exist in database
+                                if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
+                                    console.log('📭 [GroupName] Showing "No value found" message');
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            No value found
+                                        </div>
+                                    );
+                                }
+                                
+                                console.log('✅ [GroupName] Rendering dropdown items and + button', {
+                                    filteredOptionsCount: filteredOptions.length,
+                                    showCreateNew,
+                                    showCreateNewType: typeof showCreateNew,
+                                    showCreateNewValue: String(showCreateNew)
+                                });
+
+                                return (
+                                    <>
+                                        {filteredOptions.map((opt, idx) => {
+                                            const palette = [
+                                                { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                                { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                                { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                                { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                            ];
+                                            const tone = palette[idx % palette.length];
+                                            
+                                            return (
+                                                <motion.div
+                                                    key={opt.id}
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
+                                                    whileHover={{scale: 1.02, y: -1}}
+                                                    transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                    className='relative group'
+                                                >
+                                                    <div
+                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                        style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                        onClick={() => {
+                                                            // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
+                                                            const isDuplicate = userGroups.some(
+                                                                ug => ug.groupName?.toLowerCase().trim() === opt.name.toLowerCase().trim()
+                                                            );
+                                                            
+                                                            if (isDuplicate) {
+                                                                console.log('❌ [GroupName] Cannot select duplicate group name:', opt.name);
+                                                                alert(`Group name "${opt.name}" already exists in the table. Please use a different name.`);
+                                                                return;
+                                                            }
+                                                            
+                                                            onChange(opt.name);
+                                                            setCurrent(opt.name);
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                            setHasPendingNewValue(false);
+                                                            
+                                                            // Focus the chip after selecting option so Tab navigation works - exactly like AssignedUserGroupTable
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    // Find the chip element (which now has tabIndex=0 and is focusable)
+                                                                    const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                                                                    if (chipElement) {
+                                                                        chipElement.focus();
+                                                                        console.log('🎯 [GroupName] Focused chip after dropdown selection');
+                                                                    }
+                                                                } catch (e) {
+                                                                    console.log('🎯 [GroupName] Error focusing chip after dropdown selection:', e);
+                                                                }
+                                                            }, 100); // Small delay to ensure React state updates are complete
+                                                        }}
+                                                    >
+                                                        <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                        
+                                        {/* Add button inside scrollable area - exactly like AssignedUserGroupTable */}
+                                        {showCreateNew && (
+                                            <motion.div
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                className='mt-2 border-t border-slate-200 pt-2'
+                                            >
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        console.log('🖱️ [GroupName] + button clicked for:', query.trim());
+                                                        addNew();
+                                                    }}
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                    type='button'
+                                                >
+                                                    + Add &quot;{query.trim()}&quot;
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+// AsyncChipSelect for Entity with dropdown and filtering
+function AsyncChipSelectEntity({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    accounts = [],
+    onNewItemCreated,
+    onTabNext,
+    onTabPrev,
+    selectedEnterprise = '',
+    selectedEnterpriseId = '',
+    selectedAccountId = '',
+    selectedAccountName = '',
+}: {
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    accounts?: UserGroupRow[];
+    onNewItemCreated?: (item: {id: string; name: string}) => void;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+    selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [current, setCurrent] = useState<string | undefined>(value);
+    const [query, setQuery] = useState('');
+    const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [allOptions, setAllOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasPendingNewValue, setHasPendingNewValue] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [dropdownPortalPos, setDropdownPortalPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+
+    // Load options from database API
+    const loadAllOptions = useCallback(async () => {
+        console.log('🔄 [Entity] loadAllOptions called', {
+            selectedEnterprise,
+            selectedAccountId
+        });
+        setLoading(true);
+        try {
+            if (!selectedAccountId || !selectedEnterprise) {
+                console.log('⚠️ [Entity] Missing dependencies, clearing options', {
+                    hasAccountId: !!selectedAccountId,
+                    hasEnterprise: !!selectedEnterprise,
+                    selectedAccountIdValue: selectedAccountId,
+                    selectedEnterpriseValue: selectedEnterprise
+                });
+                
+                // Try to get values directly from localStorage as fallback
+                const directAccountId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null;
+                const directEnterprise = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null;
+                
+                console.log('🔍 [Entity] Direct localStorage check:', {
+                    directAccountId,
+                    directEnterprise
+                });
+                
+                if (directAccountId && directEnterprise) {
+                    console.log('✅ [Entity] Found values in localStorage, proceeding with API call');
+                    // Continue with the API call using direct values
+                } else {
+                    setAllOptions([]);
+                    setLoading(false);
+                    return;
+                }
+            }
+            
+            // Get actual values to use (props or localStorage fallback)
+            const actualAccountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
+            const actualEnterprise = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+            const actualAccountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
+            
+            // Get enterpriseId from localStorage
+            const enterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            if (!enterpriseId) {
+                console.log('⚠️ [Entity] No enterpriseId in localStorage');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+            
+            // Get exact same localStorage values for comparison
+            const debugValues = {
+                actualAccountId,
+                actualEnterprise,
+                actualAccountName,
+                enterpriseId,
+                directAccountName: typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null,
+                directEnterpriseId: typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null,
+                directEnterpriseName: typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null
+            };
+            
+            console.log('📡 [Entity] Calling API: /api/global-settings with values:', debugValues);
+            console.log('🔍 [Entity] Expected entity in DB:', {
+                expectedAccountName: 'Accenture Digital',
+                expectedAccountId: '143b655b-5d42-48c8-8343-c2177068fab5',
+                expectedEnterpriseName: 'Enterprise Business Suite', 
+                expectedEnterpriseId: '8d8c053a-bb38-48ba-8ea4-02695e319e9b',
+                expectedEntityName: 'Finance'
+            });
+            
+            const apiUrl = `/api/global-settings?accountId=${actualAccountId}&accountName=${encodeURIComponent(actualAccountName || '')}&enterpriseId=${enterpriseId}`;
+            console.log('🌐 [Entity] Full API URL:', apiUrl);
+            
+            const response = await api.get<Array<{
+                id?: string;
+                entityName: string;
+                enterprise?: string;
+            }>>(apiUrl) || [];
+            
+            console.log('📦 [Entity] API response:', response);
+            console.log('📦 [Entity] API response type:', typeof response);
+            console.log('📦 [Entity] API response length:', Array.isArray(response) ? response.length : 'N/A');
+            
+            // Check if response is an error object
+            if (response && typeof response === 'object' && 'error' in response) {
+                console.error('❌ [Entity] API error:', response.error);
+                console.log('🔍 [Entity] This suggests the API endpoint is receiving the request but has an internal error');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+            
+            // Ensure response is an array before filtering
+            if (!Array.isArray(response)) {
+                console.error('❌ [Entity] Invalid response format - expected array:', response);
+                console.log('🔍 [Entity] This suggests the API returned an unexpected format');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+            
+            // If we get an empty array, the API call worked but no data was found
+            if (response.length === 0) {
+                console.log('⚠️ [Entity] API returned empty array - no entities found for this account/enterprise combination');
+                console.log('🔍 [Entity] This suggests a mismatch between our parameters and the database query logic');
+            }
+            
+            // Debug the response structure if we got data
+            if (response.length > 0) {
+                console.log('🎯 [Entity] Sample response item structure:', response[0]);
+                console.log('🎯 [Entity] All response items:', response);
+            }
+            
+            // Extract unique entity names filtered by Account and Enterprise
+            const uniqueEntities = Array.from(new Set(
+                response
+                    .filter(item => item.entityName && item.entityName.trim() !== '')
+                    .map(item => item.entityName)
+            ));
+            
+            console.log('✅ [Entity] Filtered unique entities:', uniqueEntities);
+            
+            // Compare with expected result
+            if (uniqueEntities.length === 0) {
+                console.log('🔍 [Entity] DEBUGGING: Expected to find "Finance" entity but got none');
+                console.log('🔍 [Entity] Database has: Accenture Digital + Enterprise Business Suite + Finance');
+                console.log('🔍 [Entity] API called with:', {
+                    accountId: actualAccountId,
+                    accountName: actualEnterprise,
+                    enterpriseId: enterpriseId
+                });
+                console.log('🔍 [Entity] Possible issues:');
+                console.log('  1. API endpoint query logic mismatch');
+                console.log('  2. Parameter encoding/format issues');
+                console.log('  3. Database key structure mismatch');
+                console.log('  4. Case sensitivity in query');
+            }
+            
+            const allData = uniqueEntities.map((entity, index) => ({
+                id: `entity-${index}`,
+                name: entity
+            }));
+            
+            console.log('✅ [Entity] Setting allOptions with', allData.length, 'items:', allData);
+            setAllOptions(allData);
+        } catch (error) {
+            console.error('❌ [Entity] Failed to load entities:', error);
+            setAllOptions([]);
+        } finally {
+            console.log('🏁 [Entity] loadAllOptions completed, loading set to false');
+            setLoading(false);
+        }
+    }, [selectedEnterprise, selectedAccountId]);
+
+    // Check if query is a new value
+    const isNewValuePending = useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        return !exactMatch;
+    }, [allOptions]);
+
+    useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
+
+    // Calculate dropdown position
+    const calculateDropdownPosition = useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const width = Math.max(140, Math.min(200, containerRect.width));
+        const top = containerRect.bottom + 2;
+        const left = containerRect.left;
+        
+        setDropdownPortalPos({ top, left, width });
+    }, []);
+
+    useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    useEffect(() => {
+        if (open && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, loadAllOptions]);
+
+    useEffect(() => {
+        setCurrent(value);
+    }, [value]);
+
+    useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    // Filter options
+    const filterOptions = useCallback(() => {
+        if (allOptions.length === 0) {
+            setOptions([]);
+            return;
+        }
+        let filtered = allOptions;
+        
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
+            );
+            
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+                return aLower.localeCompare(bLower);
+            });
+        }
+        
+        setOptions(filtered);
+    }, [allOptions, query]);
+
+    useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    const addNew = async () => {
+        const name = (query || '').trim();
+        if (!name) return;
+
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            onChange(existingMatch.name);
+            setCurrent(existingMatch.name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
+            return;
+        }
+
+        try {
+            // Get actual values to use (props or localStorage fallback)
+            const actualAccountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
+            const actualEnterprise = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+            const actualAccountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
+            
+            // Create new entity via global-settings API to match AssignedUserGroupTable
+            console.log('🆕 [Entity] Creating new entity:', name, 'with values:', {
+                actualAccountId,
+                actualEnterprise,
+                actualAccountName,
+                enterpriseId: window.localStorage.getItem('selectedEnterpriseId')
+            });
+            const created = await api.post<{id: string; entityName: string} | any>(
+                '/api/global-settings',
+                {
+                    entityName: name,
+                    accountId: actualAccountId,
+                    accountName: actualAccountName,
+                    enterpriseId: window.localStorage.getItem('selectedEnterpriseId')
+                },
+            );
+            
+            const formattedCreated = {
+                id: created?.id || `entity-${Date.now()}`,
+                name: created?.entityName || name
+            };
+            
+            if (formattedCreated) {
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                onChange(formattedCreated.name);
+                setCurrent(formattedCreated.name);
+                setQuery('');
+                setOpen(false);
+                setHasPendingNewValue(false);
+                
+                if (onNewItemCreated) {
+                    onNewItemCreated(formattedCreated);
+                }
+            }
+        } catch (error: any) {
+            console.error('❌ [Entity] Failed to create entity:', error);
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setCurrent(existingItem.name);
+                    setQuery('');
+                    setOpen(false);
+                    setHasPendingNewValue(false);
+                }
+            }
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%', width: '100%'}}
+        >
+            <div className='relative w-full flex items-center gap-1' style={{width: '100%', minWidth: '100%'}}>
+                {(current || value) && !open ? (
+                    <motion.span
+                        ref={inputRef}
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%'}}
+                        title={current || value}
+                        tabIndex={0}
+                        onClick={(e: any) => {
+                            if (!(e.target as HTMLElement).closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                        onKeyDown={(e: any) => {
+                            // Handle Tab navigation from the chip to next field (Product) - exactly like AssignedUserGroupTable
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Find the current row and navigate to Product field
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                if (currentRowId) {
+                                    // Find the Product field in the same row
+                                    const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="product"]`);
+                                    
+                                    if (nextColDiv) {
+                                        // Find the input or chip element in the Product field
+                                        const productInput = nextColDiv.querySelector('input') as HTMLInputElement;
+                                        const productChip = nextColDiv.querySelector('span[tabindex="0"]') as HTMLElement;
+                                        
+                                        // Focus the input if available, otherwise the chip
+                                        const targetElement = productInput || productChip;
+                                        
+                                        if (targetElement) {
+                                            setTimeout(() => {
+                                                targetElement.focus();
+                                            }, 10);
+                                        }
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                ) : null}
+                
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
+                            }
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0) {
+                                loadAllOptions();
+                            }
+                        }}
+                        onKeyDown={async (e: any) => {
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const exactMatch = allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                if (exactMatch) {
+                                    onChange(exactMatch.name);
+                                    setCurrent(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                    
+                                    // Focus the chip after selecting existing value so Tab navigation works - exactly like AssignedUserGroupTable
+                                    setTimeout(() => {
+                                        try {
+                                            if (inputRef.current) {
+                                                inputRef.current.blur();
+                                            }
+                                            const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                            const currentColDiv = currentElement?.closest('[data-col]');
+                                            const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                            if (currentRowId) {
+                                                const chipElement = document.querySelector(
+                                                    `[data-row-id="${currentRowId}"][data-col="entity"] span[tabindex="0"]`
+                                                ) as HTMLElement;
+                                                if (chipElement) {
+                                                    chipElement.focus();
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Failed to focus chip after Enter:', error);
+                                        }
+                                    }, 50);
+                                } else {
+                                    await addNew();
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            } else if (e.key === 'Tab') {
+                                if (query.trim() && hasPendingNewValue) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    return;
+                                }
+                                if (query.trim()) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+                                        setHasPendingNewValue(false);
+                                    }
+                                } else {
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                }
+                                
+                                // Handle tab navigation
+                                if (!e.shiftKey && onTabNext) {
+                                    onTabNext();
+                                } else if (e.shiftKey && onTabPrev) {
+                                    onTabPrev();
+                                }
+                            }
+                        }}
+                        onBlur={(e) => {
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
+                            }
+                            setTimeout(() => {
+                                if (!open) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === (query || '').toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setHasPendingNewValue(false);
+                                    } else if (query && query !== (current || value)) {
+                                        // Keep the typed value
+                                    } else if (!query) {
+                                        setQuery('');
+                                        setHasPendingNewValue(false);
+                                    }
+                                    setQuery('');
+                                }
+                            }, 150);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=""
+                    />
+                ) : null}
+            </div>
+            
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px',
+                        zIndex: 10000
+                    }}
+                >
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    <div className='relative z-10 flex flex-col'>
+                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
+                            {loading && allOptions.length === 0 && !query.trim() ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
+                            ) : (() => {
+                                const filteredOptions = query.trim() 
+                                    ? options.filter(opt => 
+                                        opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                        opt.name.toLowerCase().includes(query.toLowerCase())
+                                    ).sort((a, b) => {
+                                        const aLower = a.name.toLowerCase();
+                                        const bLower = b.name.toLowerCase();
+                                        const queryLower = query.toLowerCase();
+                                        const aStartsWith = aLower.startsWith(queryLower);
+                                        const bStartsWith = bLower.startsWith(queryLower);
+                                        if (aStartsWith && !bStartsWith) return -1;
+                                        if (bStartsWith && !aStartsWith) return 1;
+                                        return aLower.localeCompare(bLower);
+                                    })
+                                    : options.slice(0, 50);
+                                
+                                const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                ) : null;
+                                
+                                // Disable "Add new" functionality for Entity field
+                                const showCreateNew = false;
+                                
+                                if (filteredOptions.length === 0 && !showCreateNew && !loading && allOptions.length > 0) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            No matches
+                                        </div>
+                                    );
+                                }
+                                
+                                if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            No value found
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        {filteredOptions.map((opt, idx) => {
+                                            const palette = [
+                                                { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                                { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                                { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                                { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                            ];
+                                            const tone = palette[idx % palette.length];
+                                            
+                                            return (
+                                                <motion.div
+                                                    key={opt.id}
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
+                                                    whileHover={{scale: 1.02, y: -1}}
+                                                    transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                    className='relative group'
+                                                >
+                                                    <div
+                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                        style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                        onClick={() => {
+                                                            onChange(opt.name);
+                                                            setCurrent(opt.name);
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                            setHasPendingNewValue(false);
+                                                            
+                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    if (inputRef.current) {
+                                                                        inputRef.current.blur();
+                                                                    }
+                                                                    const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                                                    const currentColDiv = currentElement?.closest('[data-col]');
+                                                                    const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                                                    if (currentRowId) {
+                                                                        const chipElement = document.querySelector(
+                                                                            `[data-row-id="${currentRowId}"][data-col="entity"] span[tabindex="0"]`
+                                                                        ) as HTMLElement;
+                                                                        if (chipElement) {
+                                                                            chipElement.focus();
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error('Failed to focus chip after dropdown selection:', error);
+                                                                }
+                                                            }, 50);
+                                                        }}
+                                                    >
+                                                        <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                        
+                                        {showCreateNew && (
+                                            <motion.div
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                className='mt-2 border-t border-slate-200 pt-2'
+                                            >
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        addNew();
+                                                    }}
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                    type='button'
+                                                >
+                                                    + Add &quot;{query.trim()}&quot;
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+// AsyncChipSelect for Product with dropdown filtered by Enterprise (selection only, no new entries)
+function AsyncChipSelectProduct({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    selectedEnterprise = '',
+    selectedAccountId = '',
+    selectedEnterpriseId = '',
+    onNewItemCreated,
+    onTabNext,
+    onTabPrev,
+}: {
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    selectedEnterprise?: string;
+    selectedAccountId?: string;
+    selectedEnterpriseId?: string;
+    onNewItemCreated?: (item: {id: string; name: string}) => void;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [current, setCurrent] = useState<string | undefined>(value);
+    const [query, setQuery] = useState('');
+    const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [allOptions, setAllOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasPendingNewValue, setHasPendingNewValue] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [dropdownPortalPos, setDropdownPortalPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+
+    // Load options from account licenses filtered by Account and Enterprise
+    const loadAllOptions = useCallback(async () => {
+        setLoading(true);
+        try {
+            if (!selectedAccountId) {
+                console.log('🔍 [Product] No account selected, clearing options');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            console.log('🔍 [Product] Loading products for account:', selectedAccountId, 'enterprise:', selectedEnterprise);
+
+            // Get account data with licenses to find products for this account and enterprise
+            const accountData = await api.get<{
+                id: string;
+                accountName: string;
+                licenses: Array<{
+                    id: string;
+                    enterprise: string;
+                    product: string;
+                    service: string;
+                }>;
+            }>(`/api/accounts/${selectedAccountId}`) || null;
+            
+            if (!accountData || !accountData.licenses) {
+                console.log('🔍 [Product] No account data or licenses found');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            console.log('🔍 [Product] Account licenses:', accountData.licenses);
+            
+            // Extract unique product names from licenses that match the selected enterprise
+            const uniqueProducts = Array.from(new Set(
+                accountData.licenses
+                    .filter(license => {
+                        // Match by enterprise name if available, otherwise show all products for this account
+                        return !selectedEnterprise || license.enterprise === selectedEnterprise;
+                    })
+                    .map(license => license.product)
+                    .filter(product => product && product.trim() !== '')
+            ));
+            
+            console.log('🔍 [Product] Filtered products:', uniqueProducts);
+            
+            // Convert to the expected format
+            const allData = uniqueProducts.map((product, index) => ({
+                id: `product-${product}-${index}`,
+                name: product
+            }));
+            
+            setAllOptions(allData);
+        } catch (error) {
+            console.error('❌ [Product] Failed to load products:', error);
+            setAllOptions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedAccountId, selectedEnterprise]);
+
+    // Check if query is a new value
+    const isNewValuePending = useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        return !exactMatch;
+    }, [allOptions]);
+
+    useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
+
+    // Calculate dropdown position
+    const calculateDropdownPosition = useCallback(() => {
+        if (!containerRef.current) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const width = Math.max(140, Math.min(200, containerRect.width));
+        const top = containerRect.bottom + 2;
+        const left = containerRect.left;
+        
+        setDropdownPortalPos({ top, left, width });
+    }, []);
+
+    useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    useEffect(() => {
+        if (open && allOptions.length === 0 && selectedEnterprise) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, selectedEnterprise, loadAllOptions]);
+
+    useEffect(() => {
+        setCurrent(value);
+    }, [value]);
+
+    useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    // Filter options
+    const filterOptions = useCallback(() => {
+        if (allOptions.length === 0) {
+            setOptions([]);
+            return;
+        }
+        let filtered = allOptions;
+        
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
+            );
+            
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+                return aLower.localeCompare(bLower);
+            });
+        }
+        
+        setOptions(filtered);
+    }, [allOptions, query]);
+
+    useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    const addNew = async () => {
+        const name = (query || '').trim();
+        if (!name) return;
+
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            onChange(existingMatch.name);
+            setCurrent(existingMatch.name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
+            return;
+        }
+
+        try {
+            // Create new product via API
+            const created = await api.post<{id: string; name: string} | any>(
+                '/api/products',
+                {name},
+            );
+            
+            const formattedCreated = {
+                id: created?.id || String(Math.random()),
+                name: created?.name || name
+            };
+            
+            if (formattedCreated) {
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                onChange(formattedCreated.name);
+                setCurrent(formattedCreated.name);
+                setQuery('');
+                setOpen(false);
+                setHasPendingNewValue(false);
+                
+                if (onNewItemCreated) {
+                    onNewItemCreated(formattedCreated);
+                }
+            }
+        } catch (error: any) {
+            console.error('Failed to create product:', error);
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setCurrent(existingItem.name);
+                    setQuery('');
+                    setOpen(false);
+                    setHasPendingNewValue(false);
+                }
+            }
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%', width: '100%'}}
+        >
+            <div 
+                className='relative w-full flex items-center gap-1' 
+                style={{width: '100%', minWidth: '100%'}}
+            >
+                {(current || value) && !open ? (
+                    <motion.span
+                        ref={inputRef}
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%'}}
+                        title={current || value}
+                        tabIndex={0}
+                        onClick={(e: any) => {
+                            if (!(e.target as HTMLElement).closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                        onKeyDown={(e: any) => {
+                            // Handle Tab navigation from the chip to next field (Service) - exactly like AssignedUserGroupTable
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Find the current row and navigate to Service field
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                if (currentRowId) {
+                                    // Find the Service field in the same row
+                                    const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="service"]`);
+                                    
+                                    if (nextColDiv) {
+                                        // Find the input or chip element in the Service field
+                                        const serviceInput = nextColDiv.querySelector('input') as HTMLInputElement;
+                                        const serviceChip = nextColDiv.querySelector('span[tabindex="0"]') as HTMLElement;
+                                        
+                                        // Focus the input if available, otherwise the chip
+                                        const targetElement = serviceInput || serviceChip;
+                                        
+                                        if (targetElement) {
+                                            setTimeout(() => {
+                                                targetElement.focus();
+                                            }, 10);
+                                        }
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                ) : null}
+                
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(e: any) => {
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0 && selectedEnterprise) {
+                                loadAllOptions();
+                            }
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0 && selectedEnterprise) {
+                                loadAllOptions();
+                            }
+                        }}
+                        onKeyDown={async (e: any) => {
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const exactMatch = allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                if (exactMatch) {
+                                    onChange(exactMatch.name);
+                                    setCurrent(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                    
+                                    // Focus the chip after selecting existing value so Tab navigation works - exactly like AssignedUserGroupTable
+                                    setTimeout(() => {
+                                        try {
+                                            if (inputRef.current) {
+                                                inputRef.current.blur();
+                                            }
+                                            const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                            const currentColDiv = currentElement?.closest('[data-col]');
+                                            const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                            if (currentRowId) {
+                                                const chipElement = document.querySelector(
+                                                    `[data-row-id="${currentRowId}"][data-col="product"] span[tabindex="0"]`
+                                                ) as HTMLElement;
+                                                if (chipElement) {
+                                                    chipElement.focus();
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Failed to focus chip after Enter:', error);
+                                        }
+                                    }, 50);
+                                } else {
+                                    await addNew();
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            } else if (e.key === 'Tab') {
+                                if (query.trim() && hasPendingNewValue) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    return;
+                                }
+                                if (query.trim()) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+                                        setHasPendingNewValue(false);
+                                    }
+                                } else {
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                }
+                                
+                                // Handle tab navigation
+                                if (!e.shiftKey && onTabNext) {
+                                    onTabNext();
+                                } else if (e.shiftKey && onTabPrev) {
+                                    onTabPrev();
+                                }
+                            }
+                        }}
+                        onBlur={(e) => {
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
+                            }
+                            setTimeout(() => {
+                                if (!open) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === (query || '').toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setHasPendingNewValue(false);
+                                    } else if (query && query !== (current || value)) {
+                                        // Keep the typed value
+                                    } else if (!query) {
+                                        setQuery('');
+                                        setHasPendingNewValue(false);
+                                    }
+                                    setQuery('');
+                                }
+                            }, 150);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterprise ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=""
+                        disabled={!selectedEnterprise}
+                        readOnly={!selectedEnterprise}
+                    />
+                ) : null}
+            </div>
+            
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px',
+                        zIndex: 10000
+                    }}
+                >
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    <div className='relative z-10 flex flex-col'>
+                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
+                            {loading && allOptions.length === 0 && !query.trim() ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
+                            ) : !selectedEnterprise ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Please select Enterprise first</div>
+                            ) : (() => {
+                                const filteredOptions = query.trim() 
+                                    ? options.filter(opt => 
+                                        opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                        opt.name.toLowerCase().includes(query.toLowerCase())
+                                    ).sort((a, b) => {
+                                        const aLower = a.name.toLowerCase();
+                                        const bLower = b.name.toLowerCase();
+                                        const queryLower = query.toLowerCase();
+                                        const aStartsWith = aLower.startsWith(queryLower);
+                                        const bStartsWith = bLower.startsWith(queryLower);
+                                        if (aStartsWith && !bStartsWith) return -1;
+                                        if (bStartsWith && !aStartsWith) return 1;
+                                        return aLower.localeCompare(bLower);
+                                    })
+                                    : options.slice(0, 50);
+                                
+                                const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                ) : null;
+                                const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
+                                
+                                if (filteredOptions.length === 0 && query.trim() && !loading) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>No matches found</div>
+                                    );
+                                }
+
+                                if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>No value found</div>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        {filteredOptions.map((opt, idx) => {
+                                            const palette = [
+                                                { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                                { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                                { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                                { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                            ];
+                                            const tone = palette[idx % palette.length];
+                                            
+                                            return (
+                                                <motion.div
+                                                    key={opt.id}
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
+                                                    whileHover={{scale: 1.02, y: -1}}
+                                                    transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                    className='relative group'
+                                                >
+                                                    <div
+                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                        style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                        onClick={() => {
+                                                            onChange(opt.name);
+                                                            setCurrent(opt.name);
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                            setHasPendingNewValue(false);
+                                                            
+                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    if (inputRef.current) {
+                                                                        inputRef.current.blur();
+                                                                    }
+                                                                    const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                                                    const currentColDiv = currentElement?.closest('[data-col]');
+                                                                    const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                                                    if (currentRowId) {
+                                                                        const chipElement = document.querySelector(
+                                                                            `[data-row-id="${currentRowId}"][data-col="product"] span[tabindex="0"]`
+                                                                        ) as HTMLElement;
+                                                                        if (chipElement) {
+                                                                            chipElement.focus();
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error('Failed to focus chip after dropdown selection:', error);
+                                                                }
+                                                            }, 50);
+                                                        }}
+                                                    >
+                                                        <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                        
+                                        {showCreateNew && (
+                                            <motion.div
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                className='mt-2 border-t border-slate-200 pt-2'
+                                            >
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        addNew();
+                                                    }}
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                    type='button'
+                                                >
+                                                    + Add &quot;{query.trim()}&quot;
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+// AsyncChipSelect for Service with dropdown filtered by Account, Enterprise, and Product
+function AsyncChipSelectService({
+    value,
+    onChange,
+    placeholder = '',
+    isError = false,
+    selectedEnterprise = '',
+    selectedProduct = '',
+    selectedAccountId = '',
+    selectedEnterpriseId = '',
+    onNewItemCreated,
+    onTabNext,
+    onTabPrev,
+}: {
+    value?: string;
+    onChange: (next?: string) => void;
+    placeholder?: string;
+    isError?: boolean;
+    selectedEnterprise?: string;
+    selectedProduct?: string;
+    selectedAccountId?: string;
+    selectedEnterpriseId?: string;
+    onNewItemCreated?: (item: {id: string; name: string}) => void;
+    onTabNext?: () => void;
+    onTabPrev?: () => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [current, setCurrent] = useState<string | undefined>(value);
+    const [query, setQuery] = useState('');
+    const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [allOptions, setAllOptions] = useState<Array<{id: string; name: string}>>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasPendingNewValue, setHasPendingNewValue] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [dropdownPortalPos, setDropdownPortalPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
+
+    // Load options from account licenses filtered by Account, Enterprise, and Product
+    const loadAllOptions = useCallback(async (overrideProduct?: string) => {
+        const productToUse = overrideProduct !== undefined ? overrideProduct : selectedProduct;
+        
+        setLoading(true);
+        try {
+            // Service field is disabled until Product is selected
+            if (!selectedAccountId || !selectedEnterprise || !productToUse) {
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            // Get account data to find services from licenses
+            const accountData = await api.get<{
+                licenses: Array<{
+                    enterprise: string;
+                    product: string;
+                    service: string;
+                }>;
+            }>(`/api/accounts/${selectedAccountId}`) || { licenses: [] };
+            
+            // Extract unique service names from licenses that match selected enterprise and product
+            const uniqueServices = Array.from(new Set(
+                accountData.licenses
+                    .filter(license => 
+                        license.enterprise === selectedEnterprise &&
+                        license.product === productToUse &&
+                        license.service && license.service.trim() !== ''
+                    )
+                    .map(license => license.service.trim())
+            ));
+            
+            // Convert to the expected format
+            const allData = uniqueServices.map((service, index) => ({
+                id: `service-${index}`,
+                name: service
+            }));
+            
+            setAllOptions(allData);
+        } catch (error) {
+            console.error('Failed to load services:', error);
+            setAllOptions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedEnterprise, selectedProduct]);
+
+    const isNewValuePending = useCallback((queryValue: string): boolean => {
+        if (!queryValue.trim()) return false;
+        const exactMatch = allOptions.find(opt => 
+            opt.name.toLowerCase() === queryValue.toLowerCase().trim()
+        );
+        return !exactMatch;
+    }, [allOptions]);
+
+    useEffect(() => {
+        setHasPendingNewValue(isNewValuePending(query));
+    }, [query, isNewValuePending]);
+
+    const calculateDropdownPosition = useCallback(() => {
+        if (!containerRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const width = Math.max(140, Math.min(200, containerRect.width));
+        const top = containerRect.bottom + 2;
+        const left = containerRect.left;
+        setDropdownPortalPos({ top, left, width });
+    }, []);
+
+    useEffect(() => {
+        if (open) {
+            calculateDropdownPosition();
+            const handleReposition = () => calculateDropdownPosition();
+            window.addEventListener('scroll', handleReposition, true);
+            window.addEventListener('resize', handleReposition);
+            return () => {
+                window.removeEventListener('scroll', handleReposition, true);
+                window.removeEventListener('resize', handleReposition);
+            };
+        }
+    }, [open, calculateDropdownPosition]);
+
+    useEffect(() => {
+        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+            loadAllOptions();
+        }
+    }, [open, allOptions.length, selectedEnterprise, selectedProduct, loadAllOptions]);
+    
+    useEffect(() => {
+        if (selectedEnterprise && selectedProduct && allOptions.length === 0) {
+            loadAllOptions();
+        }
+    }, [selectedProduct, selectedEnterprise, allOptions.length, loadAllOptions]);
+
+    useEffect(() => {
+        setCurrent(value);
+    }, [value]);
+
+    useEffect(() => {
+        const onDoc = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const withinAnchor = !!containerRef.current?.contains(target);
+            const withinDropdown = !!dropdownRef.current?.contains(target);
+            if (!withinAnchor && !withinDropdown) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('click', onDoc, true);
+        return () => document.removeEventListener('click', onDoc, true);
+    }, []);
+
+    const filterOptions = useCallback(() => {
+        if (allOptions.length === 0) {
+            setOptions([]);
+            return;
+        }
+        let filtered = allOptions;
+        
+        if (query) {
+            const queryLower = query.toLowerCase();
+            filtered = filtered.filter(opt => 
+                opt.name.toLowerCase().startsWith(queryLower)
+            );
+            
+            filtered = filtered.sort((a, b) => {
+                const aLower = a.name.toLowerCase();
+                const bLower = b.name.toLowerCase();
+                if (aLower === queryLower && bLower !== queryLower) return -1;
+                if (bLower === queryLower && aLower !== queryLower) return 1;
+                return aLower.localeCompare(bLower);
+            });
+        }
+        
+        setOptions(filtered);
+    }, [allOptions, query]);
+
+    useEffect(() => {
+        filterOptions();
+    }, [filterOptions]);
+
+    const addNew = async () => {
+        const name = (query || '').trim();
+        if (!name) return;
+
+        const existingMatch = allOptions.find(
+            (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+        );
+
+        if (existingMatch) {
+            onChange(existingMatch.name);
+            setCurrent(existingMatch.name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
+            return;
+        }
+
+        try {
+            const created = await api.post<{id: string; name: string} | any>(
+                '/api/services',
+                {name},
+            );
+            
+            const formattedCreated = {
+                id: created?.id || String(Math.random()),
+                name: created?.name || name
+            };
+            
+            if (formattedCreated) {
+                setOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                setAllOptions((prev) => {
+                    const exists = prev.some((o) => o.id === formattedCreated.id);
+                    return exists ? prev : [...prev, formattedCreated];
+                });
+                onChange(formattedCreated.name);
+                setCurrent(formattedCreated.name);
+                setQuery('');
+                setOpen(false);
+                setHasPendingNewValue(false);
+                
+                if (onNewItemCreated) {
+                    onNewItemCreated(formattedCreated);
+                }
+            }
+        } catch (error: any) {
+            console.error('Failed to create service:', error);
+            if (
+                error?.message?.includes('already exists') ||
+                error?.message?.includes('duplicate')
+            ) {
+                const existingItem = allOptions.find(
+                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
+                );
+                if (existingItem) {
+                    onChange(existingItem.name);
+                    setCurrent(existingItem.name);
+                    setQuery('');
+                    setOpen(false);
+                    setHasPendingNewValue(false);
+                }
+            }
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className='relative min-w-0 flex items-center gap-1 group/item'
+            style={{maxWidth: '100%', width: '100%'}}
+        >
+            <div 
+                className='relative w-full flex items-center gap-1' 
+                style={{width: '100%', minWidth: '100%'}}
+            >
+                {(current || value) && !open ? (
+                    <motion.span
+                        ref={inputRef}
+                        initial={{scale: 0.95, opacity: 0}}
+                        animate={{scale: 1, opacity: 1}}
+                        whileHover={{
+                            y: -1,
+                            boxShadow: '0 1px 6px rgba(15,23,42,0.15)',
+                        }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 480,
+                            damping: 30,
+                        }}
+                        className='w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] bg-white text-black rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%'}}
+                        title={current || value}
+                        tabIndex={0}
+                        onClick={(e: any) => {
+                            if (!(e.target as HTMLElement).closest('button')) {
+                                setQuery(current || value || '');
+                                setOpen(true);
+                            }
+                        }}
+                        onKeyDown={(e: any) => {
+                            // Handle Tab navigation from the chip to next field (Roles) - exactly like AssignedUserGroupTable
+                            if (e.key === 'Tab') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Find the current row and navigate to Roles field
+                                const currentElement = e.target as HTMLElement;
+                                const currentColDiv = currentElement.closest('[data-col]');
+                                const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                
+                                if (currentRowId) {
+                                    // Find the Roles field in the same row
+                                    const nextColDiv = document.querySelector(`[data-row-id="${currentRowId}"][data-col="roles"]`);
+                                    
+                                    if (nextColDiv) {
+                                        // Find the SVG or focusable element in the Roles field
+                                        const rolesElement = nextColDiv.querySelector('svg') as SVGSVGElement;
+                                        
+                                        if (rolesElement) {
+                                            setTimeout(() => {
+                                                rolesElement.focus();
+                                            }, 10);
+                                        }
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
+                        <button
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onChange('');
+                                setCurrent('');
+                                setQuery('');
+                            }}
+                            className='hover:text-slate-900 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded-sm hover:bg-blue-100 flex-shrink-0'
+                            aria-label='Remove'
+                            style={{minWidth: '20px', minHeight: '20px'}}
+                        >
+                            <X size={12} />
+                        </button>
+                    </motion.span>
+                ) : null}
+                
+                {(!current && !value) || open ? (
+                    <input
+                        ref={inputRef}
+                        value={query}
+                        disabled={!selectedProduct}
+                        onChange={(e: any) => {
+                            if (!selectedProduct) return; // Prevent changes when disabled
+                            const newValue = e.target.value;
+                            setQuery(newValue);
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+                                loadAllOptions();
+                            }
+                            if (newValue === '') {
+                                onChange('');
+                                setCurrent('');
+                            }
+                        }}
+                        onFocus={() => {
+                            if (!selectedProduct) return; // Prevent focus when disabled
+                            setOpen(true);
+                            if (containerRef.current) {
+                                const containerRect = containerRef.current.getBoundingClientRect();
+                                const width = Math.max(140, Math.min(200, containerRect.width));
+                                const top = containerRect.bottom + 2;
+                                const left = containerRect.left;
+                                setDropdownPortalPos({ top, left, width });
+                            }
+                            if (allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+                                loadAllOptions();
+                            }
+                        }}
+                        onKeyDown={async (e: any) => {
+                            if (e.key === 'Enter' && query.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const exactMatch = allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                );
+                                if (exactMatch) {
+                                    onChange(exactMatch.name);
+                                    setCurrent(exactMatch.name);
+                                    setQuery('');
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                    
+                                    // Focus the chip after selecting existing value so Tab navigation works - exactly like AssignedUserGroupTable
+                                    setTimeout(() => {
+                                        try {
+                                            if (inputRef.current) {
+                                                inputRef.current.blur();
+                                            }
+                                            const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                            const currentColDiv = currentElement?.closest('[data-col]');
+                                            const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                            if (currentRowId) {
+                                                const chipElement = document.querySelector(
+                                                    `[data-row-id="${currentRowId}"][data-col="service"] span[tabindex="0"]`
+                                                ) as HTMLElement;
+                                                if (chipElement) {
+                                                    chipElement.focus();
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Failed to focus chip after Enter:', error);
+                                        }
+                                    }, 50);
+                                } else {
+                                    await addNew();
+                                }
+                            } else if (e.key === 'Escape') {
+                                setOpen(false);
+                                setQuery('');
+                            } else if (e.key === 'Tab') {
+                                if (query.trim() && hasPendingNewValue) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                    inputRef.current?.focus();
+                                    return;
+                                }
+                                if (query.trim()) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === query.toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setQuery('');
+                                        setOpen(false);
+                                        setHasPendingNewValue(false);
+                                    }
+                                } else {
+                                    setOpen(false);
+                                    setHasPendingNewValue(false);
+                                }
+                                
+                                // Handle tab navigation
+                                if (!e.shiftKey && onTabNext) {
+                                    onTabNext();
+                                } else if (e.shiftKey && onTabPrev) {
+                                    onTabPrev();
+                                }
+                            }
+                        }}
+                        onBlur={(e) => {
+                            const relatedTarget = e.relatedTarget as HTMLElement;
+                            const isClickingInDropdown = dropdownRef.current?.contains(relatedTarget);
+                            if (query.trim() && hasPendingNewValue && !isClickingInDropdown) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                    if (!open) {
+                                        setOpen(true);
+                                    }
+                                }, 10);
+                                return;
+                            }
+                            setTimeout(() => {
+                                if (!open) {
+                                    const exactMatch = allOptions.find(opt => 
+                                        opt.name.toLowerCase() === (query || '').toLowerCase().trim()
+                                    );
+                                    if (exactMatch) {
+                                        onChange(exactMatch.name);
+                                        setCurrent(exactMatch.name);
+                                        setHasPendingNewValue(false);
+                                    } else if (query && query !== (current || value)) {
+                                        // Keep the typed value
+                                    } else if (!query) {
+                                        setQuery('');
+                                        setHasPendingNewValue(false);
+                                    }
+                                    setQuery('');
+                                }
+                            }, 150);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterprise || !selectedProduct ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        placeholder=""
+                        readOnly={!selectedEnterprise || !selectedProduct}
+                    />
+                ) : null}
+            </div>
+            
+            {open && dropdownPortalPos && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                    onMouseDown={(e: any) => e.stopPropagation()}
+                    onClick={(e: any) => e.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPortalPos.top}px`,
+                        left: `${dropdownPortalPos.left}px`,
+                        width: 'max-content',
+                        minWidth: `${dropdownPortalPos.width}px`,
+                        maxWidth: '500px',
+                        zIndex: 10000
+                    }}
+                >
+                    <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
+                    <div className='relative z-10 flex flex-col'>
+                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
+                            {loading && allOptions.length === 0 && !query.trim() ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
+                            ) : !selectedEnterprise ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Please select Enterprise first</div>
+                            ) : !selectedProduct ? (
+                                <div className='px-3 py-2 text-slate-500 text-center'>Please select Product first</div>
+                            ) : (() => {
+                                const filteredOptions = query.trim() 
+                                    ? options.filter(opt => 
+                                        opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                        opt.name.toLowerCase().includes(query.toLowerCase())
+                                    ).sort((a, b) => {
+                                        const aLower = a.name.toLowerCase();
+                                        const bLower = b.name.toLowerCase();
+                                        const queryLower = query.toLowerCase();
+                                        const aStartsWith = aLower.startsWith(queryLower);
+                                        const bStartsWith = bLower.startsWith(queryLower);
+                                        if (aStartsWith && !bStartsWith) return -1;
+                                        if (bStartsWith && !aStartsWith) return 1;
+                                        return aLower.localeCompare(bLower);
+                                    })
+                                    : options.slice(0, 50);
+                                
+                                const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                    opt.name.toLowerCase() === query.toLowerCase().trim()
+                                ) : null;
+                                const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
+                                
+                                if (filteredOptions.length === 0 && query.trim() && !loading) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>No matches found</div>
+                                    );
+                                }
+
+                                if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>No value found</div>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        {filteredOptions.map((opt, idx) => {
+                                            const palette = [
+                                                { bg: 'bg-blue-100', hover: 'hover:bg-blue-200', text: 'text-blue-700' },
+                                                { bg: 'bg-cyan-100', hover: 'hover:bg-cyan-200', text: 'text-cyan-700' },
+                                                { bg: 'bg-sky-100', hover: 'hover:bg-sky-200', text: 'text-sky-700' },
+                                                { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
+                                            ];
+                                            const tone = palette[idx % palette.length];
+                                            
+                                            return (
+                                                <motion.div
+                                                    key={opt.id}
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
+                                                    whileHover={{scale: 1.02, y: -1}}
+                                                    transition={{type: 'spring', stiffness: 400, damping: 25}}
+                                                    className='relative group'
+                                                >
+                                                    <div
+                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                        style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
+                                                        onClick={() => {
+                                                            onChange(opt.name);
+                                                            setCurrent(opt.name);
+                                                            setQuery('');
+                                                            setOpen(false);
+                                                            setHasPendingNewValue(false);
+                                                            
+                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                            setTimeout(() => {
+                                                                try {
+                                                                    if (inputRef.current) {
+                                                                        inputRef.current.blur();
+                                                                    }
+                                                                    const currentElement = inputRef.current || (document.activeElement as HTMLElement);
+                                                                    const currentColDiv = currentElement?.closest('[data-col]');
+                                                                    const currentRowId = currentColDiv?.getAttribute('data-row-id');
+                                                                    if (currentRowId) {
+                                                                        const chipElement = document.querySelector(
+                                                                            `[data-row-id="${currentRowId}"][data-col="service"] span[tabindex="0"]`
+                                                                        ) as HTMLElement;
+                                                                        if (chipElement) {
+                                                                            chipElement.focus();
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error('Failed to focus chip after dropdown selection:', error);
+                                                                }
+                                                            }, 50);
+                                                        }}
+                                                    >
+                                                        <span className='relative z-10 flex-1'>{opt.name}</span>
+                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                        
+                                        {showCreateNew && (
+                                            <motion.div
+                                                initial={{scale: 0.98, opacity: 0}}
+                                                animate={{scale: 1, opacity: 1}}
+                                                className='mt-2 border-t border-slate-200 pt-2'
+                                            >
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        addNew();
+                                                    }}
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                    type='button'
+                                                >
+                                                    + Add &quot;{query.trim()}&quot;
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+interface UserGroupsTableProps {
+    rows: UserGroupRow[];
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'firstName' | 'lastName' | 'emailAddress' | 'status';
+    groupByExternal?: 'none' | 'groupName' | 'entity' | 'product' | 'service';
     onGroupByChange?: (
-        g: 'none' | 'accountName' | 'email' | 'userGroup',
+        g: 'none' | 'groupName' | 'entity' | 'product' | 'service',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'firstName'
-        | 'middleName'
-        | 'lastName'
-        | 'emailAddress'
-        | 'status'
-        | 'startDate'
-        | 'endDate'
-        | 'password'
-        | 'technicalUser'
-        | 'assignedUserGroups'
+        | 'groupName'
+        | 'description'
+        | 'entity'
+        | 'product'
+        | 'service'
+        | 'roles'
         | 'actions'
     >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
-        accountNames?: Array<{id: string; name: string}>;
-        cloudTypes?: Array<{id: string; name: string}>;
-        emails?: Array<{id: string; name: string}>;
-        userGroups?: Array<{id: string; name: string}>;
+        groupNames?: Array<{id: string; name: string}>;
+        descriptions?: Array<{id: string; name: string}>;
+        entities?: Array<{id: string; name: string}>;
+        products?: Array<{id: string; name: string}>;
+        services?: Array<{id: string; name: string}>;
+        roles?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -3026,13 +6035,13 @@ interface AccountsTableProps {
     hasBlankRow?: boolean;
     externalFieldErrors?: {[key: string]: Record<string, string>}; // Per-row field errors from parent
     onDropdownOptionUpdate?: (
-        type: 'emails' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'emails' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -3041,6 +6050,10 @@ interface AccountsTableProps {
     compressingLicenseId?: string | null;
     foldingLicenseId?: string | null;
     triggerValidation?: boolean; // Trigger validation highlighting
+    selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
     onValidationComplete?: (errorRowIds: string[]) => void; // Callback with validation results
     onAddNewRow?: () => void; // Callback to add a new row
     externalSortColumn?: string; // External sort column from parent
@@ -3050,12 +6063,13 @@ interface AccountsTableProps {
     onLicenseValidationChange?: (hasIncompleteLicenses: boolean, incompleteLicenseRows: string[]) => void; // Callback for license validation state
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
-    onOpenAddressModal?: (row: AccountRow) => void; // Callback to open address modal
-    onOpenUserGroupModal?: (row: AccountRow) => void; // Callback to open user group modal
+    onOpenAddressModal?: (row: UserGroupRow) => void; // Callback to open address modal
+    onOpenUserGroupModal?: (row: UserGroupRow) => void; // Callback to open user group modal
     onShowStartDateProtectionModal?: (message: string) => void; // Callback to show start date protection modal
+    onDuplicateDetected?: (message: string) => void; // Callback to show duplicate entry modal
 }
 
-function SortableAccountRow({
+function SortableUserGroupRow({
     row,
     index,
     onEdit,
@@ -3087,9 +6101,13 @@ function SortableAccountRow({
     onOpenAddressModal,
     onOpenUserGroupModal,
     onShowStartDateProtectionModal,
+    selectedEnterprise = '',
+    selectedEnterpriseId = '',
+    selectedAccountId = '',
+    selectedAccountName = '',
     onShowGlobalValidationModal,
 }: {
-    row: AccountRow;
+    row: UserGroupRow;
     index: number;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
@@ -3100,10 +6118,10 @@ function SortableAccountRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (rowId: string, key: keyof AccountRow, value: any) => void;
+    onUpdateField: (rowId: string, key: keyof UserGroupRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onStartFill: (rowId: string, col: keyof AccountRow, value: string) => void;
+    onStartFill: (rowId: string, col: keyof UserGroupRow, value: string) => void;
     inFillRange: boolean;
     pinFirst?: boolean;
     firstColWidth?: string;
@@ -3111,24 +6129,28 @@ function SortableAccountRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'emails' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'emails' | 'userGroups',
+        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    allRows?: AccountRow[];
+    allRows?: UserGroupRow[];
     onDeleteClick?: (rowId: string) => void;
-    onOpenAddressModal?: (row: AccountRow) => void;
-    onOpenUserGroupModal?: (row: AccountRow) => void;
+    onOpenAddressModal?: (row: UserGroupRow) => void;
+    onOpenUserGroupModal?: (row: UserGroupRow) => void;
     onShowStartDateProtectionModal?: (message: string) => void;
     onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
+    selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -3137,117 +6159,14 @@ function SortableAccountRow({
         null,
     );
     const [isRowHovered, setIsRowHovered] = useState(false);
-    const [isPasswordFocused, setIsPasswordFocused] = useState(false);
-    const [passwordVisible, setPasswordVisible] = useState(false);
-    const passwordFieldRef = useRef<HTMLDivElement>(null);
-    const [passwordRequirementsPos, setPasswordRequirementsPos] = useState<{
-        top: number;
-        left: number;
-        width: number;
-    } | null>(null);
-    const [currentPasswordValue, setCurrentPasswordValue] = useState<string>(row.password || '');
-    
-    // Update local password value when row password changes
-    useEffect(() => {
-        setCurrentPasswordValue(row.password || '');
-    }, [row.password]);
-    
-    // Track password field focus state and calculate position
-    useEffect(() => {
-        const checkFocus = () => {
-            const activeElement = document.activeElement;
-            if (!activeElement) {
-                setIsPasswordFocused(false);
-                setPasswordRequirementsPos(null);
-                return;
-            }
-            if (passwordFieldRef.current?.contains(activeElement)) {
-                // Check if it's actually an input field (not a button or other element)
-                if (activeElement instanceof HTMLInputElement || 
-                    activeElement.tagName === 'INPUT' ||
-                    activeElement.closest('[data-col="password"] input') === activeElement) {
-                    setIsPasswordFocused(true);
-                    // Calculate position for requirements box
-                    if (passwordFieldRef.current) {
-                        const rect = passwordFieldRef.current.getBoundingClientRect();
-                        setPasswordRequirementsPos({
-                            top: rect.bottom + 4,
-                            left: rect.left,
-                            width: Math.max(280, rect.width)
-                        });
-                    }
-                }
-            } else {
-                setIsPasswordFocused(false);
-                setPasswordRequirementsPos(null);
-            }
-        };
-        
-        const handleFocusIn = () => {
-            setTimeout(checkFocus, 10);
-        };
-        
-        const handleFocusOut = () => {
-            setTimeout(() => {
-                checkFocus();
-                // Sync currentPasswordValue with row.password when field loses focus
-                // in case the value wasn't committed (e.g., user pressed Escape)
-                const activeElement = document.activeElement;
-                if (!passwordFieldRef.current?.contains(activeElement)) {
-                    setCurrentPasswordValue(row.password || '');
-                    // Reset password visibility for security when field loses focus
-                    setPasswordVisible(false);
-                }
-            }, 10);
-        };
-        
-        // Update position on scroll/resize when password is focused
-        const updatePosition = () => {
-            if (isPasswordFocused && passwordFieldRef.current) {
-                const rect = passwordFieldRef.current.getBoundingClientRect();
-                setPasswordRequirementsPos({
-                    top: rect.bottom + 4,
-                    left: rect.left,
-                    width: Math.max(280, rect.width)
-                });
-            }
-        };
-        
-        // Track password input value in real-time for immediate requirement updates
-        const handlePasswordInput = (e: Event) => {
-            const target = e.target as HTMLInputElement;
-            if (target && 
-                passwordFieldRef.current?.contains(target) && 
-                (target.type === 'password' || target.closest('[data-col="password"]'))) {
-                setCurrentPasswordValue(target.value || '');
-            }
-        };
-        
-        document.addEventListener('focusin', handleFocusIn);
-        document.addEventListener('focusout', handleFocusOut);
-        document.addEventListener('input', handlePasswordInput);
-        window.addEventListener('scroll', updatePosition, true);
-        window.addEventListener('resize', updatePosition);
-        
-        // Initial check
-        checkFocus();
-        
-        return () => {
-            document.removeEventListener('focusin', handleFocusIn);
-            document.removeEventListener('focusout', handleFocusOut);
-            document.removeEventListener('input', handlePasswordInput);
-            window.removeEventListener('scroll', updatePosition, true);
-            window.removeEventListener('resize', updatePosition);
-        };
-    }, [isPasswordFocused]);
     
     // Validation state management for each field
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{
-        firstName?: string;
-        middleName?: string;
-        lastName?: string;
-        emailAddress?: string;
-        password?: string;
+        groupName?: string;
+        description?: string;
+        entity?: string;
+        product?: string;
+        service?: string;
     }>({});
 
     // Helper functions for validation error management
@@ -3305,11 +6224,11 @@ function SortableAccountRow({
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
         [
-            'firstName',
-            'middleName',
-            'lastName',
-            'emailAddress',
-            'password',
+            'groupName',
+            'description',
+            'entity',
+            'product',
+            'service',
         ].includes(col),
     );
 
@@ -3527,7 +6446,7 @@ function SortableAccountRow({
                 minWidth: 'max-content',
                 width: '100%',
                 maxWidth: '100%',
-                overflow: 'visible',
+                overflow: 'hidden',
                 borderTop: index === 0 ? '1px solid rgb(226 232 240)' : 'none', // Top border for first row only
             }}
             onPointerDown={(e: React.PointerEvent<HTMLDivElement>) => {
@@ -3570,7 +6489,7 @@ function SortableAccountRow({
                     </motion.button>
                 )}
             </div>
-            {cols.includes('firstName') && (
+            {cols.includes('groupName') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible ${
                         pinFirst && !shouldShowHorizontalScroll
@@ -3584,336 +6503,132 @@ function SortableAccountRow({
                     }}
                 >
                     <div
-                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 overflow-visible'
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='firstName'
-                        style={{width: '100%'}}
+                        data-col='groupName'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%', overflow: 'visible'}}
                     >
                         {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='firstName'
-                                value={row.firstName || ''}
+                            <AsyncChipSelectGroupName
+                                value={row.groupName || ''}
                                 onChange={(v) => {
-                                    onUpdateField(row.id, 'firstName' as any, v || '');
+                                    onUpdateField(row.id, 'groupName' as any, v || '');
                                 }}
-                                onFocus={() => handleFieldFocus('firstName')}
-                                placeholder='Enter first name'
-                                isError={isCellMissing(row.id, 'firstName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].firstName)}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.firstName || ''
-                                }
-                                currentRowProduct={
-                                    row.firstName || ''
-                                }
-                                {...createTabNavigation('firstName')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.firstName || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'firstName' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`firstName-${row.id}`}
-                                isError={isCellMissing(row.id, 'firstName')}
-                                placeholder='Enter first name'
-                                {...createTabNavigation('firstName')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Middle Name Column */}
-            {cols.includes('middleName') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 overflow-visible'
-                        data-row-id={row.id}
-                        data-col='middleName'
-                        style={{width: '100%'}}
-                    >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='middleName'
-                                value={row.middleName || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'middleName' as any, v || '');
-                                }}
-                                onFocus={() => handleFieldFocus('middleName')}
-                                placeholder='Enter middle name'
-                                isError={isCellMissing(row.id, 'middleName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].middleName)}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.middleName || ''
-                                }
-                                currentRowProduct={
-                                    row.middleName || ''
-                                }
-                                {...createTabNavigation('middleName')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.middleName || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'middleName' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`middleName-${row.id}`}
-                                isError={isCellMissing(row.id, 'middleName')}
-                                placeholder='Enter middle name'
-                                {...createTabNavigation('middleName')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Last Name Column */}
-            {cols.includes('lastName') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 overflow-visible'
-                        data-row-id={row.id}
-                        data-col='lastName'
-                        style={{width: '100%'}}
-                    >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='lastName'
-                                value={row.lastName || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'lastName' as any, v || '');
-                                }}
-                                onFocus={() => handleFieldFocus('lastName')}
-                                placeholder='Enter last name'
-                                isError={isCellMissing(row.id, 'lastName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].lastName)}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.lastName || ''
-                                }
-                                currentRowProduct={
-                                    row.lastName || ''
-                                }
-                                {...createTabNavigation('lastName')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.lastName || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'lastName' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`lastName-${row.id}`}
-                                isError={isCellMissing(row.id, 'lastName')}
-                                placeholder='Enter last name'
-                                {...createTabNavigation('lastName')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Email Address Column */}
-            {cols.includes('emailAddress') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 overflow-visible'
-                        data-row-id={row.id}
-                        data-col='emailAddress'
-                        style={{width: '100%'}}
-                    >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelect
-                                type='emailAddress'
-                                value={row.emailAddress || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'emailAddress' as any, v || '');
-                                }}
-                                onFocus={() => handleFieldFocus('emailAddress')}
-                                placeholder='Enter email address'
-                                isError={isCellMissing(row.id, 'emailAddress') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].emailAddress)}
-                                onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                onNewItemCreated={onNewItemCreated as any}
-                                accounts={allRows}
-                                currentRowId={row.id}
-                                currentRowEnterprise={
-                                    row.emailAddress || ''
-                                }
-                                currentRowProduct={
-                                    row.emailAddress || ''
-                                }
-                                {...createTabNavigation('emailAddress')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.emailAddress || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'emailAddress' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`emailAddress-${row.id}`}
-                                isError={isCellMissing(row.id, 'emailAddress') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].emailAddress)}
-                                placeholder='Enter email address'
-                                {...createTabNavigation('emailAddress')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Status Column */}
-            {cols.includes('status') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
-                        data-row-id={row.id}
-                        data-col='status'
-                        style={{width: '100%'}}
-                    >
-                        <button
-                            className={`status-cell-button ${
-                                row.status === 'ACTIVE'
-                                    ? 'status-cell-active'
-                                    : row.status === 'INACTIVE'
-                                    ? 'status-cell-inactive'
-                                    : 'status-cell-active' // Default to Active for new records
-                            }`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                // Toggle between Active and Inactive
-                                const currentStatus = row.status || 'ACTIVE'; // Default to Active
-                                const isCurrentlyActive = currentStatus === 'ACTIVE';
-                                const newStatus = isCurrentlyActive ? 'INACTIVE' : 'ACTIVE';
-                                
-                                // Update status field
-                                onUpdateField(row.id, 'status' as any, newStatus);
-                                
-                                // Auto-populate dates based on status change
-                                if (newStatus === 'ACTIVE') {
-                                    // Activating user - clear end date and set start date to today
-                                    onUpdateField(row.id, 'endDate' as any, '');
-                                    const today = new Date();
-                                    const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                                    onUpdateField(row.id, 'startDate' as any, localToday);
-                                } else if (newStatus === 'INACTIVE') {
-                                    // User becoming inactive - set end date to today
-                                    const today = new Date();
-                                    const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                                    onUpdateField(row.id, 'endDate' as any, localToday);
-                                }
-                            }}
-                            title={`Click to ${
-                                row.status === 'ACTIVE' ? 'deactivate' : 'activate'
-                            }`}
-                        >
-                            {row.status || 'ACTIVE'}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Start Date Column */}
-            {cols.includes('startDate') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
-                        data-row-id={row.id}
-                        data-col='startDate'
-                        style={{width: '100%'}}
-                    >
-                        <DateChipSelect
-                            value={row.startDate || ''}
-                            onChange={(v) => {
-                                // Check if trying to clear the start date
-                                if (!v || v.trim() === '') {
-                                    // If start date already exists, prevent clearing it
-                                    if (row.startDate && row.startDate.trim() !== '') {
-                                        // Show modal and revert to the existing start date
-                                        if (onShowStartDateProtectionModal) {
-                                            onShowStartDateProtectionModal('Start date cannot be removed once set. You can change it to a different date, but not clear it completely.');
-                                        }
-                                        return; // Don't update the field
+                                placeholder=''
+                                isError={isCellMissing(row.id, 'groupName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].groupName)}
+                                userGroups={allRows}
+                                onNewItemCreated={(item) => {
+                                    if (onNewItemCreated) {
+                                        onNewItemCreated('groupNames', item);
                                     }
+                                }}
+                                selectedAccountId={selectedAccountId}
+                                selectedAccountName={selectedAccountName}
+                                selectedEnterpriseId={selectedEnterpriseId}
+                                selectedEnterprise={selectedEnterprise}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.groupName || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'groupName' as any, v)
                                 }
-                                
-                                // Check if the selected date is in the past
-                                if (v && v.trim() !== '') {
-                                    const selectedDate = new Date(v);
-                                    const today = new Date();
-                                    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
-                                    
-                                    if (selectedDate < today) {
-                                        // Show modal for past date selection
-                                        if (onShowStartDateProtectionModal) {
-                                            onShowStartDateProtectionModal('Start date cannot be set to a past date. Please select today or a future date.');
-                                        }
-                                        return; // Don't update the field
-                                    }
-                                }
-                                
-                                // Allow the change if it passes all validations
-                                onUpdateField(row.id, 'startDate' as any, v);
-                            }}
-                            placeholder=''
-                            isError={isCellMissing(row.id, 'startDate')}
-                            minDate={(() => {
-                                const today = new Date();
-                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                            })()} // Today's date as minimum (local timezone)
-                            {...createTabNavigation('startDate')}
+                                className='text-[12px]'
+                                dataAttr={`groupName-${row.id}`}
+                                isError={isCellMissing(row.id, 'groupName')}
+                                placeholder='Enter group name'
+                                {...createTabNavigation('groupName')}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Description Column */}
+            {cols.includes('description') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='description'
+                        style={{width: '100%', overflow: 'visible'}}
+                    >
+                        <EditableChipInput
+                            value={row.description || ''}
+                            onCommit={(v) => onUpdateField(row.id, 'description' as any, v)}
+                            onRemove={() => onUpdateField(row.id, 'description' as any, '')}
+                            className='text-[12px]'
+                            dataAttr={`description-${row.id}`}
+                            isError={isCellMissing(row.id, 'description') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].description)}
+                            placeholder='Enter description'
+                            {...createTabNavigation('description')}
                         />
                     </div>
                 </div>
             )}
 
-            {/* End Date Column */}
-            {cols.includes('endDate') && (
+            {/* Entity Column */}
+            {cols.includes('entity') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='entity'
+                        style={{width: '100%', overflow: 'visible'}}
+                    >
+                        {enableDropdownChips ? (
+                            <AsyncChipSelectEntity
+                                value={row.entity || ''}
+                                onChange={(v) => {
+                                    onUpdateField(row.id, 'entity' as any, v || '');
+                                }}
+                                placeholder='Enter entity'
+                                isError={isCellMissing(row.id, 'entity') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].entity)}
+                                accounts={allRows}
+                                onNewItemCreated={(item) => {
+                                    if (onNewItemCreated) {
+                                        onNewItemCreated('entities', item);
+                                    }
+                                }}
+                                selectedEnterprise={selectedEnterprise}
+                                selectedEnterpriseId={selectedEnterpriseId}
+                                selectedAccountId={selectedAccountId}
+                                selectedAccountName={selectedAccountName}
+                                {...createTabNavigation('entity')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.entity || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'entity' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`entity-${row.id}`}
+                                isError={isCellMissing(row.id, 'entity')}
+                                placeholder='Enter entity'
+                                {...createTabNavigation('entity')}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Product Column */}
+            {cols.includes('product') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -3925,63 +6640,46 @@ function SortableAccountRow({
                     <div
                         className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='endDate'
-                        style={{width: '100%'}}
+                        data-col='product'
+                        style={{width: '100%', overflow: 'visible'}}
                     >
-                        <DateChipSelect
-                            value={row.endDate || ''}
-                            onChange={(v) => {
-                                // Check if the selected end date is in the past
-                                if (v && v.trim() !== '') {
-                                    const selectedDate = new Date(v);
-                                    const today = new Date();
-                                    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
-                                    
-                                    if (selectedDate < today) {
-                                        // Show modal for past date selection
-                                        if (onShowStartDateProtectionModal) {
-                                            onShowStartDateProtectionModal('End date cannot be set to a past date. Please select today or a future date.');
-                                        }
-                                        return; // Don't update the field
+                        {enableDropdownChips ? (
+                            <AsyncChipSelectProduct
+                                value={row.product || ''}
+                                onChange={(v) => {
+                                    onUpdateField(row.id, 'product' as any, v || '');
+                                }}
+                                placeholder='Enter product'
+                                isError={isCellMissing(row.id, 'product') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].product)}
+                                selectedEnterprise={selectedEnterprise}
+                                selectedAccountId={selectedAccountId}
+                                selectedEnterpriseId={selectedEnterpriseId}
+                                onNewItemCreated={(item) => {
+                                    if (onNewItemCreated) {
+                                        onNewItemCreated('products', item);
                                     }
+                                }}
+                                {...createTabNavigation('product')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.product || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'product' as any, v)
                                 }
-                                
-                                // Check if end date is before start date
-                                if (v && v.trim() !== '' && row.startDate && row.startDate.trim() !== '') {
-                                    const endDate = new Date(v);
-                                    const startDate = new Date(row.startDate);
-                                    
-                                    if (endDate < startDate) {
-                                        // Show modal for invalid end date selection
-                                        if (onShowStartDateProtectionModal) {
-                                            onShowStartDateProtectionModal('End date cannot be earlier than the start date. Please select a date equal to or after the start date.');
-                                        }
-                                        return; // Don't update the field
-                                    }
-                                }
-                                
-                                // Update the end date
-                                onUpdateField(row.id, 'endDate' as any, v);
-                                
-                                // If end date is cleared (empty), automatically set status to Active
-                                if (!v || v.trim() === '') {
-                                    onUpdateField(row.id, 'status' as any, 'Active');
-                                }
-                            }}
-                            placeholder=''
-                            isError={isCellMissing(row.id, 'endDate')}
-                            minDate={row.startDate || (() => {
-                                const today = new Date();
-                                return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                            })()} // Start date or today as minimum (local timezone)
-                            {...createTabNavigation('endDate')}
-                        />
+                                className='text-[12px]'
+                                dataAttr={`product-${row.id}`}
+                                isError={isCellMissing(row.id, 'product') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].product)}
+                                placeholder='Enter product'
+                                {...createTabNavigation('product')}
+                            />
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Password Column */}
-            {cols.includes('password') && (
+            {/* Service Column */}
+            {cols.includes('service') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -3991,134 +6689,49 @@ function SortableAccountRow({
                     }}
                 >
                     <div
-                        ref={passwordFieldRef}
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1 relative'
+                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='password'
-                        style={{width: '100%'}}
+                        data-col='service'
+                        style={{width: '100%', overflow: 'visible'}}
                     >
-                        <div className='relative w-full'>
-                            {enableDropdownChips ? (
-                                <div className='relative'>
-                                    <AsyncChipSelect
-                                        type='password'
-                                        inputType={passwordVisible ? 'text' : 'password'}
-                                        value={row.password || ''}
-                                        onChange={(v) => {
-                                            const newValue = v || '';
-                                            setCurrentPasswordValue(newValue); // Update local state immediately for real-time requirements
-                                            onUpdateField(row.id, 'password' as any, newValue);
-                                        }}
-                                        onFocus={() => {
-                                            handleFieldFocus('password');
-                                            setIsPasswordFocused(true);
-                                        }}
-                                        placeholder='Enter password'
-                                        isError={isCellMissing(row.id, 'password') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].password)}
-                                        onDropdownOptionUpdate={onDropdownOptionUpdate as any}
-                                        onNewItemCreated={onNewItemCreated as any}
-                                        accounts={allRows}
-                                        currentRowId={row.id}
-                                        currentRowEnterprise={
-                                            row.password || ''
-                                        }
-                                        currentRowProduct={
-                                            row.password || ''
-                                        }
-                                        {...createTabNavigation('password')}
-                                    />
-                                    {/* Eye icon button for password visibility toggle - positioned outside AsyncChipSelect to avoid overlap */}
-                                    {(isPasswordFocused || row.password || currentPasswordValue) && (
-                                        <button
-                                            type='button'
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                                setPasswordVisible(!passwordVisible);
-                                            }}
-                                            className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none z-20 pointer-events-auto'
-                                            tabIndex={-1}
-                                            title={passwordVisible ? 'Hide password' : 'Show password'}
-                                        >
-                                            {passwordVisible ? (
-                                                <EyeOff size={14} />
-                                            ) : (
-                                                <Eye size={14} />
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className='relative'>
-                                    <InlineEditableText
-                                        value={row.password || ''}
-                                        onCommit={(v) =>
-                                            onUpdateField(row.id, 'password' as any, v)
-                                        }
-                                        className='text-[12px] pr-6'
-                                        dataAttr={`password-${row.id}`}
-                                        isError={isCellMissing(row.id, 'password')}
-                                        placeholder='Enter password'
-                                        type={passwordVisible ? 'text' : 'password'}
-                                        {...createTabNavigation('password')}
-                                    />
-                                    {/* Eye icon button for password visibility toggle */}
-                                    {(isPasswordFocused || row.password || currentPasswordValue) && (
-                                        <button
-                                            type='button'
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPasswordVisible(!passwordVisible);
-                                            }}
-                                            className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none z-10'
-                                            tabIndex={-1}
-                                            title={passwordVisible ? 'Hide password' : 'Show password'}
-                                        >
-                                            {passwordVisible ? (
-                                                <EyeOff size={14} />
-                                            ) : (
-                                                <Eye size={14} />
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {/* Password Requirements - shown when field is focused, positioned absolutely */}
-                        {isPasswordFocused && passwordRequirementsPos && createPortal(
-                            <div 
-                                className="fixed z-[99999] p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-lg"
-                                style={{
-                                    top: `${passwordRequirementsPos.top}px`,
-                                    left: `${passwordRequirementsPos.left}px`,
-                                    width: `${passwordRequirementsPos.width}px`,
-                                    maxWidth: '320px'
+                        {enableDropdownChips ? (
+                            <AsyncChipSelectService
+                                value={row.service || ''}
+                                onChange={(v) => {
+                                    onUpdateField(row.id, 'service' as any, v || '');
                                 }}
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <p className="text-xs font-medium text-gray-700 mb-2">Password Requirements:</p>
-                                <div className="space-y-1">
-                                    {getPasswordRequirements(currentPasswordValue).map((req, reqIndex) => (
-                                        <div key={reqIndex} className="flex items-center text-xs">
-                                            <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                                                req.met ? 'bg-green-500' : 'bg-gray-300'
-                                            }`} />
-                                            <span className={req.met ? 'text-green-700' : 'text-gray-600'}>
-                                                {req.text}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>,
-                            document.body
+                                placeholder={row.product ? 'Select service' : 'Select product first'}
+                                isError={isCellMissing(row.id, 'service') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].service)}
+                                selectedEnterprise={selectedEnterprise}
+                                selectedProduct={row.product || ''}
+                                selectedAccountId={selectedAccountId}
+                                selectedEnterpriseId={selectedEnterpriseId}
+                                onNewItemCreated={(item) => {
+                                    if (onNewItemCreated) {
+                                        onNewItemCreated('services', item);
+                                    }
+                                }}
+                                {...createTabNavigation('service')}
+                            />
+                        ) : (
+                            <InlineEditableText
+                                value={row.service || ''}
+                                onCommit={(v) =>
+                                    onUpdateField(row.id, 'service' as any, v)
+                                }
+                                className='text-[12px]'
+                                dataAttr={`service-${row.id}`}
+                                isError={isCellMissing(row.id, 'service') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].service)}
+                                placeholder='Enter service'
+                                {...createTabNavigation('service')}
+                            />
                         )}
                     </div>
                 </div>
             )}
 
-            {/* Technical User Column */}
-            {cols.includes('technicalUser') && (
+            {/* Roles Column */}
+            {cols.includes('roles') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -4130,63 +6743,23 @@ function SortableAccountRow({
                     <div
                         className='flex items-center justify-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='technicalUser'
-                        style={{width: '100%'}}
+                        data-col='roles'
+                        style={{width: '100%', overflow: 'visible'}}
                     >
-                        <div className="flex items-center justify-center">
-                            <motion.input
-                                type="checkbox"
-                                checked={row.technicalUser || false}
-                                onChange={(e) => {
-                                    console.log('🔧 TechnicalUser checkbox changed:', {
-                                        rowId: row.id,
-                                        oldValue: row.technicalUser,
-                                        newValue: e.target.checked,
-                                        fullRow: row
-                                    });
-                                    onUpdateField(row.id, 'technicalUser' as any, e.target.checked);
-                                }}
-                                className="w-4 h-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500 cursor-pointer transition-transform duration-200 hover:scale-110"
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            />
-                        </div>
+                        <button
+                       onClick={() => {
+                           // TODO: Open roles modal
+                       }}
+                            className="relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-colors duration-150 hover:bg-blue-200 hover:border-blue-400"
+                            title={`Manage roles for ${row.groupName || 'this group'}`}
+                            tabIndex={-1}
+                        >
+                            <Shield className="w-5 h-5 text-blue-600" />
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Assigned User Groups Column */}
-            {cols.includes('assignedUserGroups') && (
-                <div
-                    className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
-                            : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
-                    }`}
-                    data-row-id={row.id}
-                    data-col='assignedUserGroups'
-                    style={{width: '100%'}}
-                >
-                    <button
-                        onClick={() => onOpenUserGroupModal?.(row)}
-                        className="group relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-all duration-200 hover:bg-blue-200 hover:border-blue-400 hover:scale-110 shadow-sm hover:shadow-md"
-                        title={`Manage user groups for ${row.firstName} ${row.lastName} (${row.assignedUserGroups?.length || 0} assigned)`}
-                        tabIndex={-1}
-                    >
-                        <Users className="w-5 h-5 text-blue-600 group-hover:text-blue-700" />
-                        {row.assignedUserGroups && row.assignedUserGroups.length > 0 && (() => {
-                            return (
-                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-800 rounded-full flex items-center justify-center">
-                                    <span className="text-[8px] text-white font-bold">
-                                        {row.assignedUserGroups.length}
-                                    </span>
-                                </div>
-                            );
-                        })()}
-                    </button>
-                </div>
-            )}
 
             {/* actions column removed */}
             {/* trailing add row removed; fill handle removed */}
@@ -4194,7 +6767,7 @@ function SortableAccountRow({
     );
 }
 
-const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
+const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     rows,
     onEdit,
     onDelete,
@@ -4228,13 +6801,27 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     externalSortDirection,
     onSortChange,
     isAIInsightsPanelOpen = false,
+    selectedEnterprise = '',
+    selectedEnterpriseId = '',
+    selectedAccountId = '',
+    selectedAccountName = '',
     onLicenseValidationChange,
     onLicenseDelete,
     onCompleteLicenseDeletion,
     onOpenAddressModal,
     onOpenUserGroupModal,
     onShowStartDateProtectionModal,
+    onDuplicateDetected,
 }, ref) => {
+    // Debug: Log received props
+    console.log('🐛 [ManageUserGroupsTable] Props received:', {
+        selectedEnterprise,
+        selectedEnterpriseId,
+        selectedAccountId,
+        selectedAccountName,
+        rowsLength: rows.length
+    });
+
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{[key: string]: Record<string, string>}>({});
@@ -4425,11 +7012,11 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     // Validation state
 
     // Use refs to track previous values and avoid infinite loops
-    const prevRowsRef = useRef<AccountRow[]>([]);
+    const prevRowsRef = useRef<UserGroupRow[]>([]);
     const orderRef = useRef<string[]>([]);
     
     // Keep local state for editing, but initialize it safely
-    const [localEdits, setLocalEdits] = useState<Record<string, Partial<AccountRow>>>({});
+    const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserGroupRow>>>({});
     
     // Use useMemo for base derived state with stable comparison
     const { baseLocalRows, order } = useMemo(() => {
@@ -4437,13 +7024,8 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         const currentIds = rows.map(r => r.id).join(',');
         const prevIds = prevRowsRef.current.map(r => r.id).join(',');
         
-        // Also check if assignedUserGroups have changed (for badge updates)
-        const currentGroupCounts = rows.map(r => `${r.id}:${r.assignedUserGroups?.length || 0}`).join(',');
-        const prevGroupCounts = prevRowsRef.current.map(r => `${r.id}:${r.assignedUserGroups?.length || 0}`).join(',');
-        
         if (currentIds === prevIds && 
-            rows.length === prevRowsRef.current.length &&
-            currentGroupCounts === prevGroupCounts) {
+            rows.length === prevRowsRef.current.length) {
             // No changes detected - return cached data
             return {
                 baseLocalRows: prevRowsRef.current,
@@ -4492,19 +7074,16 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     };
     
     // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (row: AccountRow, field: string): boolean => {
+    const isFieldMissing = (row: UserGroupRow, field: string): boolean => {
         switch (field) {
-            case 'firstName':
-                return !row.firstName || row.firstName.trim() === '';
-            case 'lastName':
-                return !row.lastName || row.lastName.trim() === '';
-            case 'emailAddress':
-                // Check for both missing AND invalid email format
-                return !row.emailAddress || row.emailAddress.trim() === '' || !isValidEmail(row.emailAddress);
-            case 'startDate':
-                return !row.startDate || row.startDate.trim() === '';
-            case 'password':
-                return !row.password || row.password.trim() === '';
+            case 'groupName':
+                return !row.groupName || row.groupName.trim() === '';
+            case 'entity':
+                return !row.entity || row.entity.trim() === '';
+            case 'product':
+                return !row.product || row.product.trim() === '';
+            case 'service':
+                return !row.service || row.service.trim() === '';
             default:
                 return false;
         }
@@ -4537,11 +7116,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         
         localRows.forEach(row => {
             // Check if any required field is missing
-            if (isFieldMissing(row, 'firstName') ||
-                isFieldMissing(row, 'lastName') ||
-                isFieldMissing(row, 'emailAddress') ||
-                isFieldMissing(row, 'startDate') ||
-                isFieldMissing(row, 'password')) {
+            if (isFieldMissing(row, 'groupName') ||
+                isFieldMissing(row, 'entity') ||
+                isFieldMissing(row, 'product') ||
+                isFieldMissing(row, 'service')) {
                 errorRowIds.add(row.id);
             }
         });
@@ -4559,11 +7137,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
                 // Check if any required field is missing
-                if (isFieldMissing(row, 'firstName') ||
-                    isFieldMissing(row, 'lastName') ||
-                    isFieldMissing(row, 'emailAddress') ||
-                    isFieldMissing(row, 'startDate') ||
-                    isFieldMissing(row, 'password')) {
+                if (isFieldMissing(row, 'groupName') ||
+                    isFieldMissing(row, 'entity') ||
+                    isFieldMissing(row, 'product') ||
+                    isFieldMissing(row, 'service')) {
                     errorRowIds.add(row.id);
                 }
             });
@@ -4578,29 +7155,51 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     // Effect to highlight errors when incompleteRowIds changes from parent
     useEffect(() => {
-        if (showValidationErrors && incompleteRowIds.length > 0) {
-            // Simply set validation errors to the incomplete row IDs from parent
-            // Don't do local validation here to avoid circular dependencies
-            setValidationErrors(new Set(incompleteRowIds));
-        } else {
-            // Clear validation errors when not showing validation or no incomplete rows from parent
-            setValidationErrors(new Set());
-        }
+        const newValidationErrors = showValidationErrors && incompleteRowIds.length > 0 
+            ? new Set<string>(incompleteRowIds) 
+            : new Set<string>();
+        
+        // Only update if there's actually a change to prevent infinite loops
+        setValidationErrors(prev => {
+            const prevArray = Array.from(prev).sort();
+            const newArray = Array.from(newValidationErrors).sort();
+            
+            if (prevArray.length !== newArray.length || 
+                prevArray.some((id, index) => id !== newArray[index])) {
+                return newValidationErrors;
+            }
+            return prev;
+        });
     }, [incompleteRowIds, showValidationErrors]);
 
     // If parent provides external field-level errors (e.g. format validation), apply them
     useEffect(() => {
         try {
             if (externalFieldErrors && Object.keys(externalFieldErrors).length > 0) {
-                setFieldValidationErrors(externalFieldErrors as any);
-                setValidationErrors(new Set(Object.keys(externalFieldErrors)));
+                const errorRowIds = new Set<string>(Object.keys(externalFieldErrors));
+                
+                setFieldValidationErrors(prev => {
+                    const hasChanged = JSON.stringify(prev) !== JSON.stringify(externalFieldErrors);
+                    return hasChanged ? (externalFieldErrors as any) : prev;
+                });
+                
+                setValidationErrors(prev => {
+                    const prevArray = Array.from(prev).sort();
+                    const newArray = Array.from(errorRowIds).sort();
+                    
+                    if (prevArray.length !== newArray.length || 
+                        prevArray.some((id, index) => id !== newArray[index])) {
+                        return errorRowIds;
+                    }
+                    return prev;
+                });
             } else if (!showValidationErrors) {
                 // clear when validation UI not active
-                setFieldValidationErrors({});
-                setValidationErrors(new Set());
+                setFieldValidationErrors(prev => Object.keys(prev).length > 0 ? {} : prev);
+                setValidationErrors(prev => prev.size > 0 ? new Set<string>() : prev);
             }
         } catch (e) {
-            // Error applying field errors
+            console.warn('Error applying field errors:', e);
         }
     }, [externalFieldErrors, showValidationErrors]);
 
@@ -4608,22 +7207,22 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         () =>
             order
                 .map((id) => localRows.find((r) => r.id === id))
-                .filter(Boolean) as AccountRow[],
+                .filter(Boolean) as UserGroupRow[],
         [order, localRows],
     );
 
     // Persist helpers
     // Debounced autosave per-row to avoid excessive API traffic
     const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, AccountRow>>({});
-    function schedulePersist(row: AccountRow, delay = 600) {
+    const latestRowRef = useRef<Record<string, UserGroupRow>>({});
+    function schedulePersist(row: UserGroupRow, delay = 600) {
         const rowId = String(row.id);
         latestRowRef.current[rowId] = row;
         if (saveTimersRef.current[rowId])
             clearTimeout(saveTimersRef.current[rowId]);
         saveTimersRef.current[rowId] = setTimeout(() => {
             const latest = latestRowRef.current[rowId];
-            if (latest) void persistAccountRow(latest);
+            if (latest) void persistUserGroupRow(latest);
         }, delay);
     }
     useEffect(() => {
@@ -4636,47 +7235,69 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         };
     }, []);
 
-    async function persistAccountRow(row: AccountRow) {
+    async function persistUserGroupRow(row: UserGroupRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
             if (String(row.id || '').startsWith('tmp-')) {
                 return;
             }
             const core = {
-                // Core fields for user management
-                firstName: row.firstName,
-                lastName: row.lastName,
-                emailAddress: row.emailAddress,
-                status: row.status,
+                // Core fields for user group management
+                groupName: row.groupName,
+                description: row.description,
+                entity: row.entity,
+                product: row.product,
+                service: row.service,
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
-                // User management specific fields
-                firstName: row.firstName || '',
-                lastName: row.lastName || '',
-                emailAddress: row.emailAddress || '',
-                status: row.status || '',
+                // User group specific fields
+                groupName: row.groupName || '',
+                description: row.description || '',
+                entity: row.entity || '',
+                product: row.product || '',
+                service: row.service || '',
+                roles: row.roles || '',
             } as any;
             // Handle existing (non-temporary) rows
-            // Check if we're on user management page
+            // Check if we're on user group management page
             if (
                 typeof window !== 'undefined' &&
-                window.location.pathname.includes('/manage-users')
+                window.location.pathname.includes('/manage-user-groups')
             ) {
-                // For user management, update the data via the parent's onUpdateField
-                // The parent component will handle the user data updates
+                // For user group management, update the data via the parent's onUpdateField
+                // The parent component will handle the user group data updates
                 return;
             }
 
-            // For user management, all persistence is handled by parent component
+            // For user group management, all persistence is handled by parent component
             return;
         } catch (_e) {
             // TODO: surface toast; keep silent here to avoid blocking UI
         }
     }
 
-    function updateRowField(rowId: string, key: keyof AccountRow, value: any) {
-        let changed: AccountRow | null = null;
+    // Helper function to check for duplicate combinations
+    const checkForDuplicate = (rowId: string, updatedRow: UserGroupRow): boolean => {
+        // Check if combination of groupName + entity + product + service already exists in another row
+        const duplicateRow = localRows.find(row => 
+            row.id !== rowId && // Exclude current row
+            row.groupName?.trim().toLowerCase() === updatedRow.groupName?.trim().toLowerCase() &&
+            row.entity?.trim().toLowerCase() === updatedRow.entity?.trim().toLowerCase() &&
+            row.product?.trim().toLowerCase() === updatedRow.product?.trim().toLowerCase() &&
+            row.service?.trim().toLowerCase() === updatedRow.service?.trim().toLowerCase() &&
+            // Only check for duplicates if all key fields are filled
+            updatedRow.groupName?.trim() && 
+            updatedRow.entity?.trim() && 
+            updatedRow.product?.trim() && 
+            updatedRow.service?.trim()
+        );
+        
+        return !!duplicateRow;
+    };
+
+    function updateRowField(rowId: string, key: keyof UserGroupRow, value: any) {
+        let changed: UserGroupRow | null = null;
         
         // Update local edits instead of directly modifying localRows
         setLocalEdits(prev => {
@@ -4685,14 +7306,43 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             if (baseRow) {
                 const currentEdits = prev[rowId] || {};
                 const currentRow = { ...baseRow, ...currentEdits };
-                const next = {...currentRow, [key]: value} as AccountRow;
+                const next = {...currentRow, [key]: value} as UserGroupRow;
+                
+                // If product field is being cleared, also clear the service field
+                if (key === 'product' && (!value || value.trim() === '')) {
+                    next.service = '';
+                }
+                
+                // Check for duplicates only for key fields
+                if (['groupName', 'entity', 'product', 'service'].includes(key as string)) {
+                    const isDuplicate = checkForDuplicate(rowId, next);
+                    if (isDuplicate) {
+                        // Show duplicate modal via callback instead of browser alert
+                        const message = `This combination of Group Name (${next.groupName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
+                        if (onDuplicateDetected) {
+                            onDuplicateDetected(message);
+                        } else {
+                            console.error('❌ Duplicate detected but no callback provided:', message);
+                        }
+                        return prev; // Don't update if duplicate
+                    }
+                }
+                
                 changed = next;
+                
+                // Prepare the field updates
+                let fieldUpdates: any = { [key]: value };
+                
+                // If product field is being cleared, also clear the service field
+                if (key === 'product' && (!value || value.trim() === '')) {
+                    fieldUpdates.service = '';
+                }
                 
                 return {
                     ...prev,
                     [rowId]: {
                         ...(prev[rowId] || {}),
-                        [key]: value
+                        ...fieldUpdates
                     }
                 };
             }
@@ -4708,15 +7358,16 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     }
 
     // Helper function to check if main row fields are complete
-    const isMainRowComplete = (row: AccountRow): boolean => {
-        return !!(row.firstName && row.firstName.trim() && 
-                 row.lastName && row.lastName.trim() && 
-                 row.emailAddress && row.emailAddress.trim());
+    const isMainRowComplete = (row: UserGroupRow): boolean => {
+        return !!(row.groupName && row.groupName.trim() && 
+                 row.entity && row.entity.trim() && 
+                 row.product && row.product.trim() &&
+                 row.service && row.service.trim());
     };
 
     // State for grouping
     const [groupBy, setGroupBy] = useState<
-        'none' | 'firstName' | 'lastName' | 'emailAddress' | 'status'
+        'none' | 'groupName' | 'entity' | 'product' | 'service'
     >('none');
     
     // sync external groupBy
@@ -4725,19 +7376,15 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     }, [groupByExternal]);
 
     // Clean break - license management removed
-    const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
+    const columnOrder: UserGroupsTableProps['visibleColumns'] = useMemo(
         () => [
-            // User management columns
-            'firstName',
-            'middleName',
-            'lastName',
-            'emailAddress',
-            'status',
-            'startDate',
-            'endDate',
-            'password',
-            'technicalUser',
-            'assignedUserGroups',
+            // User group columns
+            'groupName',
+            'description',
+            'entity',
+            'product',
+            'service',
+            'roles',
         ],
         [],
     );
@@ -4754,16 +7401,12 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
-        firstName: '180px', // First Name column - increased for sort arrows
-        middleName: '200px', // Middle Name column - increased more for sort arrows
-        lastName: '180px', // Last Name column - increased for sort arrows
-        emailAddress: '220px', // Email Address column - adequate for sort arrows
-        status: '140px', // Status column - increased for sort arrows
-        startDate: '140px', // Start Date column - no sort arrows
-        endDate: '140px', // End Date column - no sort arrows
-        password: '120px', // Password column - no sort arrows
-        technicalUser: '120px', // Technical User column - no sort arrows
-        assignedUserGroups: '160px', // Assigned User Groups column - width to fit label + icon
+        groupName: '200px', // Group Name column - increased for sort arrows
+        description: '250px', // Description column - needs more space
+        entity: '180px', // Entity column - increased for sort arrows
+        product: '180px', // Product column - increased for sort arrows
+        service: '180px', // Service column - increased for sort arrows
+        roles: '100px', // Roles column - icon only
     } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
     const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -4781,16 +7424,12 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             
             // Define minimum and maximum widths per column
             const constraints = {
-                firstName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
-                middleName: { min: 160, max: 250 }, // Increased even more for Middle Name - prevents arrow overlap  
-                lastName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
-                emailAddress: { min: 180, max: 300 }, // Email needs more space - prevents arrow overlap
-                status: { min: 140, max: 200 }, // Increased to match Enterprise Config - prevents arrow overlap
-                startDate: { min: 120, max: 180 }, // No sort arrows, can be smaller
-                endDate: { min: 120, max: 180 }, // No sort arrows, can be smaller
-                password: { min: 100, max: 150 }, // No sort arrows, can be smaller
-                technicalUser: { min: 120, max: 180 }, // No sort arrows, can be smaller
-                assignedUserGroups: { min: 160, max: 200 } // User Groups - width to fit label + icon
+                groupName: { min: 160, max: 280 }, // Group Name - needs more space
+                description: { min: 200, max: 350 }, // Description - needs even more space
+                entity: { min: 140, max: 250 }, // Entity column
+                product: { min: 140, max: 250 }, // Product column
+                service: { min: 140, max: 250 }, // Service column
+                roles: { min: 80, max: 120 } // Roles - icon only, smaller
             };
             
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 140, max: 250 };
@@ -5134,23 +7773,23 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             return { 'All Records': displayItems };
         }
 
-        const groups: Record<string, AccountRow[]> = {};
+        const groups: Record<string, UserGroupRow[]> = {};
         
         displayItems.forEach((item) => {
             let groupKey = '';
             
             switch (groupBy) {
-                case 'firstName':
-                    groupKey = item.firstName || '(No First Name)';
+                case 'groupName':
+                    groupKey = item.groupName || '(No Group Name)';
                     break;
-                case 'lastName':
-                    groupKey = item.lastName || '(No Last Name)';
+                case 'entity':
+                    groupKey = item.entity || '(No Entity)';
                     break;
-                case 'emailAddress':
-                    groupKey = item.emailAddress || '(No Email Address)';
+                case 'product':
+                    groupKey = item.product || '(No Product)';
                     break;
-                case 'status':
-                    groupKey = item.status || '(No Status)';
+                case 'service':
+                    groupKey = item.service || '(No Service)';
                     break;
                 default:
                     groupKey = 'All Records';
@@ -5163,7 +7802,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         });
 
         // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-        const sortedGroups: Record<string, AccountRow[]> = {};
+        const sortedGroups: Record<string, UserGroupRow[]> = {};
         const sortedKeys = Object.keys(groups).sort((a, b) => {
             const aIsEmpty = a.startsWith('(No ');
             const bIsEmpty = b.startsWith('(No ');
@@ -5187,10 +7826,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         const checkScrollNeed = () => {
             if (!tableContainerRef.current) return;
             
-            // With 10+ columns, we likely always need horizontal scrolling
+            // With 6+ columns, we likely always need horizontal scrolling
             // Simplified logic: if we have more than 6 columns, enable scrolling
-            const totalColumns = 10; // firstName, middleName, lastName, emailAddress, status, startDate, endDate, password, technicalUser, assignedUserGroups
-            const shouldAlwaysScroll = totalColumns > 6;
+            const totalColumns = 6; // groupName, description, entity, product, service, roles
+            const shouldAlwaysScroll = totalColumns >= 6;
             
             if (shouldAlwaysScroll) {
                 setShouldShowHorizontalScroll(true);
@@ -5336,36 +7975,36 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
     
     return (
-        <div className='compact-table safari-tight manage-users-table' style={{ width: 'max(100%, 1400px)', minWidth: 'max-content' }}>
+        <div className='compact-table safari-tight manage-user-groups-table' style={{ width: '100%', minWidth: 'max-content' }}>
             {/* Using browser default scrollbars only - remove internal scroll containers */}
             <style dangerouslySetInnerHTML={{
                 __html: `
                     /* Use browser's natural scrolling - no internal scroll containers */
-                    .manage-users-table div[role="table"] {
+                    .manage-user-groups-table div[role="table"] {
                         overflow: visible !important;
                         position: relative;
                     }
                     
                     /* Ensure all field value containers span full width */
-                    .manage-users-table [data-col] .bg-white {
+                    .manage-user-groups-table [data-col] .bg-white {
                         width: 100% !important;
                         min-width: 100% !important;
                         display: flex !important;
                     }
                     
                     /* Ensure AsyncChipSelect containers span full width */
-                    .manage-users-table .relative.min-w-0 {
+                    .manage-user-groups-table .relative.min-w-0 {
                         width: 100% !important;
                     }
                     
                     /* Ensure all motion spans with white background span full width */
-                    .manage-users-table motion-span[style*="background"] {
+                    .manage-user-groups-table motion-span[style*="background"] {
                         width: 100% !important;
                         min-width: 100% !important;
                     }
                     
                     /* Force all motion spans in data cells to be full width */
-                    .manage-users-table [data-col] motion-span {
+                    .manage-user-groups-table [data-col] motion-span {
                         width: 100% !important;
                         display: flex !important;
                     }
@@ -5378,7 +8017,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     }
                     
                     /* Ensure the header row respects the container's rounded corners */
-                    .manage-users-table .rounded-xl > .bg-slate-50 {
+                    .manage-user-groups-table .rounded-xl > .bg-slate-50 {
                         border-top-left-radius: 0.75rem !important;  /* Match rounded-xl */
                         border-top-right-radius: 0.75rem !important; /* Match rounded-xl */
                         margin: 0 !important;
@@ -5387,14 +8026,14 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         border-top: none !important;
                     }
                     
-                    /* Ensure the header container clips content properly */
-                    .manage-users-table .rounded-xl {
-                        overflow: hidden !important;
+                    /* Allow chips to move freely on hover */
+                    .manage-user-groups-table .rounded-xl {
+                        overflow: visible !important;
                         border-radius: 0.75rem !important;
                     }
                     
                     /* Override any border-radius interference */
-                    .manage-users-table .bg-slate-50 > div.rounded-sm {
+                    .manage-user-groups-table .bg-slate-50 > div.rounded-sm {
                         border-radius: 0.125rem !important;
                     }
                     
@@ -5562,20 +8201,17 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 >
                 <div className='w-full relative' style={{ 
                     minWidth: 'max-content', // Let content determine the minimum width
-                    width: 'max(100%, 1400px)' // Ensure wide enough to trigger browser horizontal scroll
+                    width: '100%', // Respect container width
+                    maxWidth: '100%' // Don't exceed container
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
-                            firstName: 'First Name',
-                            middleName: 'Middle Name',
-                            lastName: 'Last Name',
-                            emailAddress: 'Email Address',
-                            status: 'Status',
-                            startDate: 'Start Date',
-                            endDate: 'End Date',
-                            password: 'Password',
-                            technicalUser: 'Technical User',
-                            assignedUserGroups: 'Assigned User Groups',
+                            groupName: 'Group Name',
+                            description: 'Description',
+                            entity: 'Entity',
+                            product: 'Product',
+                            service: 'Service',
+                            roles: 'Roles',
                         };
 
                         // Merge custom labels with defaults
@@ -5585,35 +8221,23 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         };
 
                         const iconFor: Record<string, React.ReactNode> = {
-                            firstName: (
-                                <User size={14} />
-                            ),
-                            middleName: (
-                                <User size={14} />
-                            ),
-                            lastName: (
-                                <User size={14} />
-                            ),
-                            emailAddress: (
-                                <AtSign size={14} />
-                            ),
-                            status: (
-                                <CheckCircle size={14} />
-                            ),
-                            startDate: (
-                                <Calendar size={14} />
-                            ),
-                            endDate: (
-                                <Calendar size={14} />
-                            ),
-                            password: (
-                                <Lock size={14} />
-                            ),
-                            technicalUser: (
-                                <Key size={14} />
-                            ),
-                            assignedUserGroups: (
+                            groupName: (
                                 <Users size={14} />
+                            ),
+                            description: (
+                                <FileText size={14} />
+                            ),
+                            entity: (
+                                <Building2 size={14} />
+                            ),
+                            product: (
+                                <Package size={14} />
+                            ),
+                            service: (
+                                <Settings size={14} />
+                            ),
+                            roles: (
+                                <Shield size={14} />
                             ),
                         };
                         return (
@@ -5649,22 +8273,22 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                                     ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
                                             } ${
-                                                c === 'assignedUserGroups' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
+                                                c === 'roles' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'assignedUserGroups' ? { minWidth: '160px' } : undefined} // Width to fit label + icon
+                                            style={c === 'roles' ? { minWidth: '100px' } : undefined} // Width for roles icon
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
                                                 <span>{labelFor[c] || c}</span>
                                             </div>
                                             {[
-                                                'firstName',
-                                                'middleName',
-                                                'lastName',
-                                                'emailAddress',
-                                                'status',
+                                                'groupName',
+                                                'description',
+                                                'entity',
+                                                'product',
+                                                'service',
                                             ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'assignedUserGroups' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                <div className={`inline-flex items-center ml-4 ${c === 'roles' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
                                                     <button
                                                         onClick={() => toggleSort(c as any, 'asc')}
                                                         className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
@@ -5684,7 +8308,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                                 </div>
                                             )}
                                             {/* Show resize handle for resizable columns but not for last column */}
-                                            {['firstName', 'middleName', 'lastName', 'emailAddress', 'status', 'startDate', 'endDate', 'password', 'technicalUser'].includes(c) && (
+                                            {['groupName', 'description', 'entity', 'product', 'service'].includes(c) && (
                                                 <div
                                                     onMouseDown={(e: any) =>
                                                         startResize(c, e)
@@ -5695,7 +8319,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                                     <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
-                                            {c === 'firstName' && (
+                                            {c === 'groupName' && (
                                                 <span
                                                     aria-hidden
                                                     className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
@@ -5717,10 +8341,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         );
                     })()}
                     {groupBy === 'none' ? (
-                        <div className='mt-2'>
+                        <div className='space-y-1 pt-2'>
                             {displayItems.map((r, idx) => (
-                                <div key={`${r.id}-${r.assignedUserGroups?.length || 0}`}>
-                                    <SortableAccountRow
+                                <div key={r.id}>
+                                    <SortableUserGroupRow
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -5757,6 +8381,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                         onOpenUserGroupModal={onOpenUserGroupModal}
                                         onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                         onShowGlobalValidationModal={showGlobalValidationModal}
+                                        selectedEnterprise={selectedEnterprise}
+                                        selectedEnterpriseId={selectedEnterpriseId}
+                                        selectedAccountId={selectedAccountId}
+                                        selectedAccountName={selectedAccountName}
                                     />
                                 </div>
                             ))}
@@ -5803,10 +8431,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                     </div>
                                     
                                     {/* Group Rows */}
-                                    <div className='border-b border-slate-200 overflow-hidden'>
+                                    <div className='border-b border-slate-200 overflow-visible'>
                                         {groupRows.map((r, idx) => (
                                             <div key={r.id}>
-                                                <SortableAccountRow
+                                                <SortableUserGroupRow
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
@@ -5843,6 +8471,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                                     onOpenUserGroupModal={onOpenUserGroupModal}
                                                     onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                                     onShowGlobalValidationModal={showGlobalValidationModal}
+                                                    selectedEnterprise={selectedEnterprise}
+                                                    selectedEnterpriseId={selectedEnterpriseId}
+                                                    selectedAccountId={selectedAccountId}
+                                                    selectedAccountName={selectedAccountName}
                                                 />
                                             </div>
                                         ))}
@@ -5852,7 +8484,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                             
                             {/* Add New Row Button for grouped view */}
                             {onAddNewRow && (
-                                <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
+                                <div className='border border-slate-200 rounded-lg overflow-visible mt-4'>
                                     <div 
                                         className="grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                         style={{
@@ -5939,6 +8571,6 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 });
 
 // Set the display name for debugging
-ManageUsersTable.displayName = 'ManageUsersTable';
+ManageUserGroupsTable.displayName = 'ManageUserGroupsTable';
 
-export default ManageUsersTable;
+export default ManageUserGroupsTable;

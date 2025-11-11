@@ -91,37 +91,68 @@ export default function ManageUsers() {
     const [showUserGroupModal, setShowUserGroupModal] = useState(false);
     const [selectedUserForGroups, setSelectedUserForGroups] = useState<AccountRow | null>(null);
     
-    // Selected Enterprise from top right corner
+    // Selected Account and Enterprise from top right corner - exactly like Manage User Groups
     const [selectedEnterprise, setSelectedEnterprise] = useState<string>('');
+    const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>('');
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [selectedAccountName, setSelectedAccountName] = useState<string>('');
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
     
-    // Load selected enterprise from localStorage and listen for changes
+    // Load selected enterprise and account from localStorage and listen for changes
     useEffect(() => {
-        const loadSelectedEnterprise = () => {
+        const loadSelectedValues = () => {
             try {
-                const savedName = window.localStorage.getItem('selectedEnterpriseName');
-                if (savedName) {
-                    setSelectedEnterprise(savedName);
-                    console.log(`🏢 [ManageUsers] Loaded selected enterprise: ${savedName}`);
+                console.log('🐛 [ManageUsers Page] Loading localStorage values...');
+                
+                const savedEnterpriseName = window.localStorage.getItem('selectedEnterpriseName');
+                const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+                const savedAccountId = window.localStorage.getItem('selectedAccountId');
+                const savedAccountName = window.localStorage.getItem('selectedAccountName');
+                
+                console.log('🐛 [ManageUsers Page] localStorage values:', {
+                    selectedEnterpriseName: savedEnterpriseName,
+                    selectedEnterpriseId: savedEnterpriseId,
+                    selectedAccountId: savedAccountId,
+                    selectedAccountName: savedAccountName
+                });
+                
+                if (savedEnterpriseName) {
+                    setSelectedEnterprise(savedEnterpriseName);
                 }
+                if (savedEnterpriseId && savedEnterpriseId !== 'null') {
+                    setSelectedEnterpriseId(savedEnterpriseId);
+                }
+                if (savedAccountId && savedAccountId !== 'null') {
+                    setSelectedAccountId(savedAccountId);
+                }
+                if (savedAccountName && savedAccountName !== 'null') {
+                    setSelectedAccountName(savedAccountName);
+                }
+                
+                console.log('🐛 [ManageUsers Page] State updated');
+                setIsInitialized(true);
             } catch (error) {
-                console.warn('Failed to load selected enterprise:', error);
+                console.warn('Failed to load selected values:', error);
+                setIsInitialized(true);
             }
         };
 
         // Load on mount
-        loadSelectedEnterprise();
+        loadSelectedValues();
 
-        // Listen for enterprise changes
-        const handleEnterpriseChange = () => {
-            loadSelectedEnterprise();
+        // Listen for changes
+        const handleValuesChange = () => {
+            loadSelectedValues();
         };
 
-        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
-        window.addEventListener('storage', handleEnterpriseChange);
+        window.addEventListener('enterpriseChanged', handleValuesChange);
+        window.addEventListener('accountChanged', handleValuesChange);
+        window.addEventListener('storage', handleValuesChange);
 
         return () => {
-            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
-            window.removeEventListener('storage', handleEnterpriseChange);
+            window.removeEventListener('enterpriseChanged', handleValuesChange);
+            window.removeEventListener('accountChanged', handleValuesChange);
+            window.removeEventListener('storage', handleValuesChange);
         };
     }, []);
     
@@ -154,6 +185,16 @@ export default function ManageUsers() {
     useEffect(() => {
         modifiedExistingRecordsRef.current = modifiedExistingRecords;
     }, [modifiedExistingRecords]);
+
+    // Helper function to show notifications - exactly like Manage User Groups
+    const showBlueNotification = (message: string, duration: number = 3000, showCheckmark: boolean = true) => {
+        console.log('📢 Showing notification:', message);
+        setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
+    };
 
     // State to track user's pending local changes that haven't been saved yet
     const [pendingLocalChanges, setPendingLocalChanges] = useState<Record<string, any>>({});
@@ -226,15 +267,433 @@ export default function ManageUsers() {
     const hideRef = useRef<HTMLDivElement>(null);
     const groupRef = useRef<HTMLDivElement>(null);
 
-    // Helper function to show notifications
-    const showBlueNotification = (message: string, duration: number = 3000, showCheckmark: boolean = true) => {
-        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
-        setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
-        setShowNotification(true);
-        setTimeout(() => {
-            setShowNotification(false);
-        }, duration);
+    // Ref to track current filter form values for outside click handler - exactly like Manage User Groups
+    const filterFormRef = useRef({
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
+        status: '',
+    });
+
+    // Ref to track if "Clear All" was clicked in filter panel
+    const filterClearedRef = useRef(false);
+
+    // Click outside handler to close toolbar dialogs - exactly like Manage User Groups
+    // Filter panel closes on outside click if: all fields are empty OR Clear All was clicked
+    // Filter panel stays open if any field has a value (to prevent accidental closure while typing)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            
+            // Check if any dialog is open
+            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
+                return; // No dialog is open
+            }
+            
+            // Check if click is outside dialog containers
+            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
+            
+            // Close Filter panel if:
+            // 1. Clear All was clicked, OR
+            // 2. All filter fields are empty (no values entered)
+            if (filterVisible && isOutsideFilter) {
+                const currentForm = filterFormRef.current;
+                const isFilterEmpty = !currentForm.firstName && !currentForm.lastName && !currentForm.emailAddress && !currentForm.status;
+                
+                if (filterClearedRef.current || isFilterEmpty) {
+                    setFilterVisible(false);
+                    filterClearedRef.current = false; // Reset flag
+                }
+            }
+            
+            // Close Sort, Hide, Group panels immediately on outside click
+            if (sortOpen && isOutsideSort) {
+                setSortOpen(false);
+            }
+            if (hideOpen && isOutsideHide) {
+                setHideOpen(false);
+            }
+            if (groupOpen && isOutsideGroup) {
+                setGroupOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [filterVisible, sortOpen, hideOpen, groupOpen]);
+
+    // Filter form state - exactly like Manage User Groups
+    const [filterForm, setFilterForm] = useState({
+        firstName: '',
+        lastName: '',
+        emailAddress: '',
+        status: '',
+    });
+
+    // Update filterFormRef whenever filterForm changes - exactly like Manage User Groups
+    useEffect(() => {
+        filterFormRef.current = filterForm;
+    }, [filterForm]);
+
+    // Filter dropdown suggestions state - exactly like Manage User Groups
+    const [showFirstNameSuggestions, setShowFirstNameSuggestions] = useState(false);
+    const [showLastNameSuggestions, setShowLastNameSuggestions] = useState(false);
+    const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+    const [showStatusSuggestions, setShowStatusSuggestions] = useState(false);
+    
+    const [filteredFirstNames, setFilteredFirstNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredLastNames, setFilteredLastNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEmails, setFilteredEmails] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredStatuses, setFilteredStatuses] = useState<Array<{id: string; name: string}>>([]);
+    
+    const [selectedFirstNameIndex, setSelectedFirstNameIndex] = useState(-1);
+    const [selectedLastNameIndex, setSelectedLastNameIndex] = useState(-1);
+    const [selectedEmailIndex, setSelectedEmailIndex] = useState(-1);
+    const [selectedStatusIndex, setSelectedStatusIndex] = useState(-1);
+
+    // Apply and clear filter handlers - exactly like Manage User Groups
+    const handleApplyFilters = () => {
+        const filters: Record<string, any> = {};
+        if (filterForm.firstName) filters.firstName = filterForm.firstName;
+        if (filterForm.lastName) filters.lastName = filterForm.lastName;
+        if (filterForm.emailAddress) filters.emailAddress = filterForm.emailAddress;
+        if (filterForm.status) filters.status = filterForm.status;
+        
+        setActiveFilters(filters);
+        setFilterVisible(false);
+        
+        // Reset the cleared flag when panel is closed via Apply
+        filterClearedRef.current = false;
     };
+
+    const handleClearFilters = () => {
+        setFilterForm({
+            firstName: '',
+            lastName: '',
+            emailAddress: '',
+            status: '',
+        });
+        setActiveFilters({});
+        
+        // Mark that filters were cleared - allow closing on outside click
+        filterClearedRef.current = true;
+    };
+
+    // Load users from API with account/enterprise filters - exactly like Manage User Groups
+    const loadUsers = useCallback(async () => {
+        try {
+            console.log('🔄 [ManageUsers] loadUsers called with context:', {
+                selectedAccountId,
+                selectedAccountName,
+                selectedEnterprise,
+                selectedEnterpriseId,
+                hasAccountId: !!selectedAccountId,
+                hasEnterpriseId: !!selectedEnterpriseId,
+                isInitialized
+            });
+
+            // Only load data if we have both account and enterprise selected
+            if (!selectedAccountId || !selectedEnterpriseId) {
+                console.log('🔄 [ManageUsers] Waiting for initialization...');
+                return;
+            }
+
+            // Show loading indicator - exactly like Manage User Groups
+            setIsLoading(true);
+            console.log('✅ [ManageUsers] Both Account and Enterprise selected, loading filtered data');
+
+            // Build query parameters - exactly like Manage User Groups
+            const queryParams = new URLSearchParams({
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise
+            });
+
+            console.log('🌐 [API Call] Making request to:', `/api/user-management/users?${queryParams.toString()}`);
+            console.log('🔍 [API Call] Filters applied:', {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise
+            });
+
+            const response = await api.get<any[]>(`/api/user-management/users?${queryParams.toString()}`);
+            console.log('📊 Loaded users from database:', response?.length || 0);
+            console.log('🔍 Raw API response:', response);
+
+            if (response && Array.isArray(response)) {
+                // Transform the data to match the component's expected format
+                const transformedData = response.map((item: any, index: number) => {
+                    const displayOrder = Date.now() + index;
+                    displayOrderRef.current.set(item.id, displayOrder);
+                    
+                    console.log('🔍 [Transform] User item from API:', {
+                        id: item.id,
+                        firstName: item.firstName,
+                        assignedUserGroups: item.assignedUserGroups,
+                        assignedUserGroupsType: typeof item.assignedUserGroups,
+                        assignedUserGroupsIsArray: Array.isArray(item.assignedUserGroups),
+                        assignedUserGroupsLength: item.assignedUserGroups?.length
+                    });
+                    
+                    return {
+                        id: item.id || `user-${Date.now()}-${index}`,
+                        firstName: item.firstName || '',
+                        middleName: item.middleName || '',
+                        lastName: item.lastName || '',
+                        emailAddress: item.emailAddress || '',
+                        status: item.status || 'ACTIVE',
+                        startDate: item.startDate || '',
+                        endDate: item.endDate || '',
+                        // Display actual password from database
+                        password: item.password || '',
+                        technicalUser: item.technicalUser || false,
+                        assignedUserGroups: item.assignedUserGroups || [],
+                        createdAt: item.createdAt,
+                        updatedAt: item.updatedAt
+                    };
+                });
+
+                console.log('✅ Users loaded and transformed:', transformedData.length);
+
+                // Sort by display order before setting
+                const finalSortedConfigs = sortConfigsByDisplayOrder(transformedData);
+
+                setAccounts(finalSortedConfigs);
+                console.log('✅ Users loaded and transformed successfully');
+            } else {
+                console.log('ℹ️ No users returned from API, starting with empty array');
+                setAccounts([]);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load users:', error);
+            setAccounts([]);
+        } finally {
+            // Hide loading indicator
+            setIsLoading(false);
+        }
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, isInitialized, sortConfigsByDisplayOrder]);
+
+    // Auto-reload users when account or enterprise changes
+    useEffect(() => {
+        if (isInitialized && selectedAccountId && selectedEnterpriseId) {
+            console.log('🔄 [ManageUsers] Reloading users due to account/enterprise change');
+            loadUsers();
+        }
+    }, [selectedAccountId, selectedEnterpriseId, isInitialized, loadUsers]);
+
+    // Auto-save new user when all required fields are filled - exactly like Manage User Groups
+    const autoSaveNewAccount = async (tempRowId: string, updatedAccount?: any) => {
+        try {
+            console.log('🚀 autoSaveNewAccount function called with tempRowId:', tempRowId);
+
+            // Mark row as saving
+            setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
+
+            // Use the provided updated account or find it from current ref state
+            const account = updatedAccount || accountsRef.current.find((a) => a.id === tempRowId);
+            if (!account) {
+                console.error('❌ User not found for auto-save:', tempRowId);
+                setSavingRows((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tempRowId);
+                    return newSet;
+                });
+                return;
+            }
+
+            console.log('💾 Auto-saving new user:', account);
+
+            // Build user data with account/enterprise context - exactly like Manage User Groups
+            const userData = {
+                firstName: account.firstName || '',
+                lastName: account.lastName || '',
+                middleName: account.middleName || '',
+                emailAddress: account.emailAddress || '',
+                status: account.status || 'ACTIVE',
+                startDate: account.startDate || '',
+                endDate: account.endDate || '',
+                password: account.password || '',
+                technicalUser: account.technicalUser || false,
+                assignedUserGroups: account.assignedUserGroups || [],
+                // Include account/enterprise context
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise
+            };
+
+            console.log('💾 Creating new user with data (including context):', userData);
+
+            try {
+                // Save user to database via API
+                const response = await api.post<{id?: string}>('/api/user-management/users', userData);
+                console.log('✅ User saved to database via API:', response);
+
+                // Update the account with the real ID from the API response
+                const savedUserId = response?.id || `user-${Date.now()}`;
+
+                // Preserve display order for the new ID
+                const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+
+                // Update the account with the real ID
+                setAccounts((prev) => {
+                    const updated = prev.map((acc) =>
+                        acc.id === tempRowId
+                            ? {...acc, id: savedUserId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                            : acc,
+                    );
+                    // Apply stable sorting to maintain display order
+                    return sortConfigsByDisplayOrder(updated);
+                });
+
+                // Update display order reference with the new ID
+                if (oldDisplayOrder !== undefined) {
+                    displayOrderRef.current.delete(tempRowId); // Remove old reference
+                    displayOrderRef.current.set(savedUserId, oldDisplayOrder); // Add new reference
+                    console.log(`📍 Preserved display order ${oldDisplayOrder} for new user ID ${savedUserId}`);
+                }
+
+                console.log('🎉 New user saved successfully to database!');
+            } catch (apiError) {
+                console.error('❌ Failed to save user to database:', apiError);
+                throw apiError;
+            }
+        } catch (error) {
+            console.error('❌ Auto-save failed:', error);
+        } finally {
+            // Remove from saving state
+            setSavingRows((prev) => {
+                const newSet = new Set(Array.from(prev));
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+        }
+    };
+
+    // Debounced auto-save function - exactly like Manage User Groups
+    const debouncedAutoSave = useCallback(() => {
+        // Clear any existing timer and countdown
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            console.log('⏱️ Cleared previous auto-save timer');
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            console.log('⏱️ Cleared previous countdown interval');
+        }
+
+        // Start countdown from 10 seconds
+        setAutoSaveCountdown(10);
+
+        // Update countdown every second
+        let countdown = 10;
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            setAutoSaveCountdown(countdown);
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+        
+        // Store countdown interval in ref so it can be cleared externally (e.g., manual save)
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        autoSaveTimerRef.current = setTimeout(async () => {
+            // Clear countdown immediately when execution starts
+            clearInterval(countdownInterval);
+            countdownIntervalRef.current = null;
+            setAutoSaveCountdown(null);
+            autoSaveTimerRef.current = null;
+
+            try {
+                setIsAutoSaving(true);
+                console.log('⏰ Auto-save triggered after 10 seconds!');
+
+                // Get all temporary rows (new users not yet saved)
+                const temporaryRows = accountsRef.current.filter((acc: any) => 
+                    acc.id.startsWith('tmp-')
+                );
+
+                // Get all modified existing rows
+                const modifiedRowIds = Array.from(modifiedExistingRecordsRef.current);
+                const modifiedRows = accountsRef.current.filter((acc: any) => 
+                    modifiedRowIds.includes(acc.id)
+                );
+
+                console.log('📊 Auto-save summary:', {
+                    temporaryCount: temporaryRows.length,
+                    modifiedCount: modifiedRows.length,
+                    temporaryIds: temporaryRows.map((r: any) => r.id),
+                    modifiedIds: modifiedRowIds
+                });
+
+                // Save new users via POST
+                for (const tempRow of temporaryRows) {
+                    console.log('💾 Auto-saving new user:', tempRow.id);
+                    await autoSaveNewAccount(tempRow.id, tempRow);
+                }
+
+                // Save modified users via PUT
+                for (const modifiedRow of modifiedRows) {
+                    console.log('💾 Auto-updating modified user:', modifiedRow.id);
+                    
+                    const updateData = {
+                        firstName: modifiedRow.firstName || '',
+                        lastName: modifiedRow.lastName || '',
+                        middleName: modifiedRow.middleName || '',
+                        emailAddress: modifiedRow.emailAddress || '',
+                        status: modifiedRow.status || 'ACTIVE',
+                        startDate: modifiedRow.startDate || '',
+                        endDate: modifiedRow.endDate || '',
+                        password: modifiedRow.password || '',
+                        technicalUser: modifiedRow.technicalUser || false,
+                        assignedUserGroups: modifiedRow.assignedUserGroups || [],
+                        // Include account/enterprise context
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    };
+
+                    console.log('🔄 Updating user with data (including context):', updateData);
+
+                    await api.put(`/api/user-management/users/${modifiedRow.id}`, updateData);
+                    console.log('✅ User updated successfully:', modifiedRow.id);
+                }
+
+                // Clear modified records after successful save
+                modifiedExistingRecordsRef.current.clear();
+                setModifiedExistingRecords(new Set());
+
+                // Reload users from database to get latest data and clear temporary IDs
+                console.log('🔄 Reloading users after successful autosave...');
+                await loadUsers();
+                
+                // Show success notification
+                showBlueNotification('Changes saved successfully!', 3000, true);
+                setShowAutoSaveSuccess(true);
+                setTimeout(() => setShowAutoSaveSuccess(false), 2000);
+
+                console.log('✅ Auto-save completed successfully!');
+            } catch (error) {
+                console.error('❌ Auto-save failed:', error);
+                showBlueNotification('Failed to save changes. Please try again.', 5000, false);
+            } finally {
+                setIsAutoSaving(false);
+            }
+        }, 10000);
+
+        console.log('⏱️ Auto-save timer started - will execute in 10 seconds');
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, loadUsers, showBlueNotification, sortConfigsByDisplayOrder]);
 
     // Load dropdown options from API
     const loadDropdownOptions = useCallback(async () => {
@@ -309,36 +768,6 @@ export default function ManageUsers() {
         setGroupOpen(false);
     };
 
-    // Click-outside behavior to close dialogs
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            
-            // Check if any dialog is open (excluding search since it's always visible)
-            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
-                return; // No dialog is open, nothing to do
-            }
-            
-            // Check if click is outside all dialog containers (excluding search)
-            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
-            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
-            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
-            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
-            
-            // If click is outside all dialogs, close them (search remains open)
-            if (isOutsideFilter && isOutsideSort && isOutsideHide && isOutsideGroup) {
-                closeAllDialogs();
-            }
-        };
-
-        // Add event listener
-        document.addEventListener('mousedown', handleClickOutside);
-        
-        // Cleanup
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [filterVisible, sortOpen, hideOpen, groupOpen]);
 
     // Listen for sort changes from the AccountsTable
     useEffect(() => {
@@ -542,51 +971,6 @@ export default function ManageUsers() {
         closeAllDialogs();
     };
 
-    // Filter form state
-    const [filterForm, setFilterForm] = useState({
-        firstName: '',
-        lastName: '',
-        emailAddress: '',
-        status: '',
-    });
-    
-    // Autocomplete states for filter fields
-    const [showFirstNameSuggestions, setShowFirstNameSuggestions] = useState(false);
-    const [showLastNameSuggestions, setShowLastNameSuggestions] = useState(false);
-    const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
-    const [filteredFirstNames, setFilteredFirstNames] = useState<Array<{id: string; name: string}>>([]);
-    const [filteredLastNames, setFilteredLastNames] = useState<Array<{id: string; name: string}>>([]);
-    const [filteredEmails, setFilteredEmails] = useState<Array<{id: string; name: string}>>([]);
-    const [selectedFirstNameIndex, setSelectedFirstNameIndex] = useState(-1);
-    const [selectedLastNameIndex, setSelectedLastNameIndex] = useState(-1);
-    const [selectedEmailIndex, setSelectedEmailIndex] = useState(-1);
-
-    const handleApplyFilters = () => {
-        const newFilters: Record<string, any> = {};
-
-        if (filterForm.firstName.trim()) {
-            newFilters.firstName = filterForm.firstName.trim();
-        }
-        if (filterForm.lastName.trim()) {
-            newFilters.lastName = filterForm.lastName.trim();
-        }
-        if (filterForm.emailAddress.trim()) {
-            newFilters.emailAddress = filterForm.emailAddress.trim();
-        }
-        if (filterForm.status.trim()) {
-            newFilters.status = filterForm.status.trim();
-        }
-
-        setActiveFilters(newFilters);
-        closeAllDialogs();
-    };
-
-    const handleClearFilters = () => {
-        setFilterForm({firstName: '', lastName: '', emailAddress: '', status: ''});
-        setActiveFilters({});
-        closeAllDialogs();
-    };
-
     const setGroupByFromLabel = (label: string) => {
         const l = label as 'None' | 'First Name' | 'Last Name' | 'Email Address' | 'Status';
         setActiveGroupLabel(l);
@@ -755,100 +1139,6 @@ export default function ManageUsers() {
             return result;
         }
     };
-
-    // Auto-save new account when all required fields are filled
-    const autoSaveNewAccount = async (tempRowId: string, updatedAccount?: any) => {
-        try {
-            console.log('🚀 autoSaveNewAccount function called with tempRowId:', tempRowId);
-
-            // Mark row as saving
-            setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
-
-            // Use the provided updated account or find it from current ref state
-            const account = updatedAccount || accountsRef.current.find((a) => a.id === tempRowId);
-            if (!account) {
-                console.error('❌ Account not found for auto-save:', tempRowId);
-                console.log('📋 Available accounts from ref:', accountsRef.current.map((a) => ({
-                    id: a.id,
-                    accountName: a.accountName,
-                    address: a.address,
-                })));
-                setSavingRows((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.delete(tempRowId);
-                    return newSet;
-                });
-                return;
-            }
-
-            console.log('💾 Auto-saving new user:', account);
-
-            // For users, save to database via API
-            const newId = `user-${Date.now()}`;
-            const userData = {
-                firstName: account.firstName || '',
-                lastName: account.lastName || '',
-                middleName: account.middleName || '',
-                emailAddress: account.emailAddress || '',
-                status: account.status || 'ACTIVE',
-                startDate: account.startDate || '',
-                endDate: account.endDate || '',
-                password: account.password || '',
-                technicalUser: account.technicalUser || false,
-                assignedUserGroups: account.assignedUserGroups || [],
-            };
-
-            console.log('💾 Creating new user with data:', userData);
-
-            try {
-                // Save user to database via API
-                const response = await api.post<{id?: string}>('/api/user-management/users', userData);
-                console.log('✅ User saved to database via API:', response);
-                
-                // Update the account with the real ID from the API response
-                const savedUserId = response?.id || newId;
-
-            // Preserve display order for the new ID
-            const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
-            
-            // Update the account with the real ID
-            setAccounts((prev) => {
-                const updated = prev.map((acc) =>
-                    acc.id === tempRowId
-                            ? {...acc, id: savedUserId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
-                        : acc,
-                );
-                // Apply stable sorting to maintain display order
-                return sortConfigsByDisplayOrder(updated);
-            });
-
-            // Update display order reference with the new ID
-            if (oldDisplayOrder !== undefined) {
-                displayOrderRef.current.delete(tempRowId); // Remove old reference
-                    displayOrderRef.current.set(savedUserId, oldDisplayOrder); // Add new reference
-                    console.log(`📍 Preserved display order ${oldDisplayOrder} for new user ID ${savedUserId}`);
-                }
-
-                console.log('🎉 New user saved successfully to database!');
-            } catch (apiError) {
-                console.error('❌ Failed to save user to database:', apiError);
-                throw apiError; // Re-throw to trigger catch block
-            }
-            
-            
-        } catch (error) {
-            console.error('❌ Auto-save failed:', error);
-        } finally {
-            // Remove from saving state
-            setSavingRows((prev) => {
-                const newSet = new Set(Array.from(prev));
-                newSet.delete(tempRowId);
-                return newSet;
-            });
-        }
-    };
-
-
 
     // Function to check if there's a completely blank row
     const hasBlankRow = () => {
@@ -1038,325 +1328,6 @@ export default function ManageUsers() {
         return incompleteRows;
     };
 
-    const debouncedAutoSave = async () => {
-        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
-        
-        // Clear existing timer
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-            clearInterval(countdownIntervalRef.current!);
-        }
-
-        // Clear validation errors when auto-save timer starts (user is actively editing)
-        if (showValidationErrors) {
-            console.log('🧹 Clearing validation errors as user is actively editing');
-            setShowValidationErrors(false);
-            setExternalFieldErrors({});
-        }
-
-        // Start countdown
-        setAutoSaveCountdown(10);
-        
-        // Countdown interval
-        const countdownInterval = setInterval(() => {
-            setAutoSaveCountdown((prev) => {
-                if (prev === null || prev <= 1) {
-                    clearInterval(countdownInterval);
-                    return null;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        countdownIntervalRef.current = countdownInterval;
-
-        // Set new timer for 10 seconds
-        const timer = setTimeout(async () => {
-            try {
-                console.log('🔥 10-second timer triggered - starting auto-save process');
-                setIsAutoSaving(true);
-                setAutoSaveCountdown(null);
-                clearInterval(countdownIntervalRef.current!);
-                
-                // Get all temporary (unsaved) rows that are complete using current ref
-                const temporaryRows = accountsRef.current.filter((config) => {
-                    const isTemp = String(config.id).startsWith('tmp-');
-                    if (!isTemp) return false;
-                    
-                    // Be more strict about what constitutes a complete user row
-                    const hasFirstName = config.firstName?.trim() && config.firstName.trim().length > 0;
-                    const hasLastName = config.lastName?.trim() && config.lastName.trim().length > 0;
-                    const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
-                    const hasStartDate = config.startDate?.trim() && config.startDate.trim().length > 0;
-                    const hasPassword = config.password?.trim() && config.password.trim().length > 0;
-                    
-                    const isComplete = hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword;
-                    
-                    if (isTemp && !isComplete) {
-                        console.log(`🚫 Skipping incomplete temporary user ${config.id}:`, {
-                            hasFirstName: !!hasFirstName,
-                            hasLastName: !!hasLastName,
-                            hasValidEmail: !!hasValidEmail,
-                            hasStartDate: !!hasStartDate,
-                            hasPassword: !!hasPassword,
-                            firstNameValue: config.firstName,
-                            lastNameValue: config.lastName,
-                            emailValue: config.emailAddress,
-                            startDateValue: config.startDate
-                        });
-                    }
-                    
-                    return isComplete;
-                });
-                
-                // Get all modified existing records that are still complete
-                const modifiedRows = accountsRef.current.filter((config) => {
-                    const isExisting = !String(config.id).startsWith('tmp-');
-                    const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
-                    
-                    if (isExisting && isModified) {
-                        // Double-check that the record still has all required user fields
-                        const hasFirstName = config.firstName?.trim();
-                        const hasLastName = config.lastName?.trim();
-                        const hasValidEmail = config.emailAddress?.trim() && isValidEmail(config.emailAddress);
-                        const hasStartDate = config.startDate?.trim();
-                        const hasPassword = config.password?.trim();
-                        
-                        const isComplete = hasFirstName && hasLastName && hasValidEmail && hasStartDate && hasPassword;
-                        
-                        console.log(`🔍 Checking modified user ${config.id}: isComplete=${isComplete}`, {
-                            hasFirstName: !!hasFirstName,
-                            hasLastName: !!hasLastName,
-                            hasValidEmail: !!hasValidEmail,
-                            hasStartDate: !!hasStartDate,
-                            hasPassword: !!hasPassword,
-                            firstNameValue: config.firstName,
-                            lastNameValue: config.lastName,
-                            emailValue: config.emailAddress,
-                            startDateValue: config.startDate
-                        });
-                        
-                        return isComplete;
-                    }
-                    
-                    console.log(`🔍 Checking user ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
-                    return false;
-                });
-                
-            console.log(`📊 Found ${temporaryRows.length} complete temporary users to auto-save`);
-            console.log(`📊 Found ${modifiedRows.length} modified existing users to auto-save`);
-            console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
-            console.log('🔍 All current users:', accountsRef.current.map(c => ({
-                id: c.id,
-                isTemp: String(c.id).startsWith('tmp-'),
-                isModified: modifiedExistingRecordsRef.current.has(String(c.id)),
-                firstName: c.firstName,
-                lastName: c.lastName,
-                emailAddress: c.emailAddress,
-                hasFirstName: !!c.firstName?.trim(),
-                hasLastName: !!c.lastName?.trim(),
-                hasValidEmail: !!c.emailAddress?.trim() && isValidEmail(c.emailAddress)
-            })));
-            
-            // Check for orphaned records in modifiedExistingRecords
-            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
-                !accountsRef.current.find(config => String(config.id) === recordId)
-            );
-            if (orphanedRecords.length > 0) {
-                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
-                console.log('🧹 Cleaning up orphaned records from modified set');
-                setModifiedExistingRecords(prev => {
-                    const newSet = new Set(prev);
-                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
-                    return newSet;
-                });
-                // Update the ref immediately for this operation
-                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
-                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
-                modifiedExistingRecordsRef.current = cleanedSet;
-            }
-            
-            const totalRowsToSave = temporaryRows.length + modifiedRows.length;
-            if (totalRowsToSave > 0) {
-                console.log('💾 Auto-saving accounts after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
-                
-                for (const tempRow of temporaryRows) {
-                    console.log(`💾 Auto-saving user: ${tempRow.id}`);
-                    await autoSaveNewAccount(tempRow.id);
-                }
-                
-                // Save modified existing users to database via API
-                for (const modifiedRow of modifiedRows) {
-                    console.log(`💾 Saving modified existing user: ${modifiedRow.id}`);
-                    try {
-                        // Update user in database via API
-                        const userData = {
-                            firstName: modifiedRow.firstName || '',
-                            lastName: modifiedRow.lastName || '',
-                            middleName: modifiedRow.middleName || '',
-                            emailAddress: modifiedRow.emailAddress || '',
-                            status: modifiedRow.status || 'ACTIVE',
-                            startDate: modifiedRow.startDate || '',
-                            endDate: modifiedRow.endDate || '',
-                            password: modifiedRow.password || '',
-                            technicalUser: modifiedRow.technicalUser || false,
-                            assignedUserGroups: modifiedRow.assignedUserGroups || [],
-                        };
-                        
-                        await api.put(`/api/user-management/users/${modifiedRow.id}`, userData);
-                        console.log(`✅ Modified user ${modifiedRow.id} saved to database`);
-                        } catch (error) {
-                        console.error(`❌ Error updating user ${modifiedRow.id}:`, error);
-                    }
-                }
-                    
-                    // Clear the modified records set (including any incomplete records that were filtered out)
-                    const modifiedRecordIds = modifiedRows.map(row => String(row.id));
-                    console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
-                    setModifiedExistingRecords(new Set());
-                    
-                    // Clear pending local changes for auto-saved records
-                    setPendingLocalChanges({});
-                    console.log('🧹 Cleared pendingLocalChanges after successful autosave');
-                    
-                    // Show success animation for all auto-saved entries
-                    console.log('✨ Showing auto-save success animation for all entries');
-                    setShowAutoSaveSuccess(true);
-                    
-                    // Also show notification
-                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
-                        ? `Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
-                        : temporaryRows.length > 0
-                        ? `Auto-saved ${temporaryRows.length} new entries`
-                        : `Auto-saved ${modifiedRows.length} updated entries`;
-                    
-                    showBlueNotification(message);
-                    
-                    setTimeout(() => {
-                        console.log('✨ Hiding auto-save success animation');
-                        setShowAutoSaveSuccess(false);
-                    }, 3000); // Show for 3 seconds
-                    
-                    console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
-                    
-                    // Clear navigation warning flags on successful auto-save
-                    setHasUnsavedChanges(false);
-                    setPreventNavigation(false);
-                    setUserConfirmedLeave(false);
-                } else {
-                    console.log('ℹ️ No rows found to auto-save');
-                }
-                
-                // After auto-save completes, validate all remaining rows and highlight issues
-                console.log('🔍 Running validation check after auto-save completion');
-                const remainingRows = accountsRef.current.filter(config => {
-                    // Check both temporary rows and existing rows for validation issues
-                    return true; // Check all rows
-                });
-                
-                const validationIssueRows: any[] = [];
-                const allMissingFields = new Set<string>();
-                const allInvalidFields = new Set<string>();
-                
-                remainingRows.forEach((config) => {
-                    // Skip completely blank rows (no fields have been touched)
-                    const isCompletelyBlank = (
-                        !config.firstName?.trim() &&
-                        !config.lastName?.trim() &&
-                        !config.emailAddress?.trim() &&
-                        !config.startDate?.trim() &&
-                        !config.password?.trim()
-                    );
-                    
-                    if (isCompletelyBlank) {
-                        console.log(`⚪ Skipping completely blank row ${config.id} from validation`);
-                        return; // Skip this row
-                    }
-                    
-                    let hasIssues = false;
-                    const rowIssues = {
-                        id: config.id,
-                        missingFields: [] as string[],
-                        invalidFields: [] as string[]
-                    };
-                    
-                    // Check for missing fields
-                    if (!config.firstName?.trim()) {
-                        allMissingFields.add('First Name');
-                        rowIssues.missingFields.push('firstName');
-                        hasIssues = true;
-                    }
-                    if (!config.lastName?.trim()) {
-                        allMissingFields.add('Last Name');
-                        rowIssues.missingFields.push('lastName');
-                        hasIssues = true;
-                    }
-                    if (!config.emailAddress?.trim()) {
-                        allMissingFields.add('Email Address');
-                        rowIssues.missingFields.push('emailAddress');
-                        hasIssues = true;
-                    }
-                    if (!config.startDate?.trim()) {
-                        allMissingFields.add('Start Date');
-                        rowIssues.missingFields.push('startDate');
-                        hasIssues = true;
-                    }
-                    if (!config.password?.trim()) {
-                        allMissingFields.add('Password');
-                        rowIssues.missingFields.push('password');
-                        hasIssues = true;
-                    }
-                    
-                    // Check for invalid fields (present but invalid format)
-                    if (config.emailAddress?.trim() && !isValidEmail(config.emailAddress)) {
-                        allInvalidFields.add('Email Address');
-                        rowIssues.invalidFields.push('emailAddress');
-                        hasIssues = true;
-                    }
-                    
-                    if (hasIssues) {
-                        validationIssueRows.push(config);
-                    }
-                });
-                
-                // Enable validation highlighting if there are any validation issues
-                if (validationIssueRows.length > 0) {
-                    console.log(`🚨 Found ${validationIssueRows.length} rows with validation issues after auto-save:`, {
-                        affectedRowIds: validationIssueRows.map(r => r.id),
-                        missingFields: Array.from(allMissingFields),
-                        invalidFields: Array.from(allInvalidFields)
-                    });
-                    
-                    setShowValidationErrors(true);
-                    
-                    // Set incomplete row IDs for highlighting
-                    const incompleteRowIds = validationIssueRows.map(r => r.id);
-                    console.log('🎯 Enabling validation highlighting for rows after auto-save:', incompleteRowIds);
-                    // Build per-row field errors (e.g. invalid email)
-                    const fieldErrorsAfterAuto: {[key:string]: Record<string,string>} = {};
-                    validationIssueRows.forEach((r) => {
-                        if (r.emailAddress?.trim() && !isValidEmail(r.emailAddress)) {
-                            fieldErrorsAfterAuto[r.id] = {
-                                ...(fieldErrorsAfterAuto[r.id] || {}),
-                                emailAddress: 'Please enter a valid email address'
-                            };
-                        }
-                    });
-                    setExternalFieldErrors(fieldErrorsAfterAuto);
-                } else {
-                    console.log('✅ No validation issues found after auto-save - all remaining rows are valid');
-                    setShowValidationErrors(false);
-                }
-            } catch (error) {
-                console.error('❌ Auto-save failed:', error);
-            } finally {
-                setIsAutoSaving(false);
-            }
-        }, 10000); // 10 seconds delay
-
-        autoSaveTimerRef.current = timer;
-        console.log('⏰ Auto-save timer set for 10 seconds');
-    };
-
     // Extract auto-save logic into a separate function for reuse
     const executeAutoSave = async () => {
         console.log('🔥 Executing auto-save process');
@@ -1526,16 +1497,18 @@ export default function ManageUsers() {
             });
         });
 
-        // Clear auto-save timer since user is manually saving
+        // Clear auto-save timer and countdown since user is manually saving
         if (autoSaveTimerRef.current) {
             console.log('🛑 Manual save clicked - clearing auto-save timer');
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
-            setAutoSaveCountdown(null);
-            if (countdownIntervalRef.current) {
-                clearInterval(countdownIntervalRef.current);
-            }
         }
+        if (countdownIntervalRef.current) {
+            console.log('🛑 Manual save clicked - clearing countdown interval');
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setAutoSaveCountdown(null);
         
         // Clear any pending auto-save data from localStorage
         localStorage.removeItem('accountsAutoSave');
@@ -1857,6 +1830,7 @@ export default function ManageUsers() {
         // Save all complete temporary rows and handle pending changes
         try {
             let savedCount = 0;
+            let hasError = false;
             const completeTemporaryRows = temporaryRows.filter((config: any) => {
                 const hasFirstName = config.firstName?.trim();
                 const hasLastName = config.lastName?.trim();
@@ -1870,8 +1844,13 @@ export default function ManageUsers() {
             
             // Save temporary rows
             for (const tempRow of completeTemporaryRows) {
-                await autoSaveNewAccount(tempRow.id);
-                savedCount++;
+                try {
+                    await autoSaveNewAccount(tempRow.id);
+                    savedCount++;
+                } catch (error) {
+                    console.error(`❌ Error saving temporary user ${tempRow.id}:`, error);
+                    hasError = true;
+                }
             }
             
             // Save modified existing users to database
@@ -1883,6 +1862,7 @@ export default function ManageUsers() {
                     const user = accounts.find(acc => acc.id === userId);
                     if (user && !String(user.id).startsWith('tmp-')) {
                         try {
+                            // Include account/enterprise context - exactly like autosave
                             const userData = {
                                 firstName: user.firstName || '',
                                 lastName: user.lastName || '',
@@ -1894,13 +1874,20 @@ export default function ManageUsers() {
                                 password: user.password || '',
                                 technicalUser: user.technicalUser || false,
                                 assignedUserGroups: user.assignedUserGroups || [],
+                                // Include account/enterprise context
+                                accountId: selectedAccountId,
+                                accountName: selectedAccountName,
+                                enterpriseId: selectedEnterpriseId,
+                                enterpriseName: selectedEnterprise
                             };
                             
+                            console.log(`🔄 Updating user ${user.id} with context:`, userData);
                             await api.put(`/api/user-management/users/${user.id}`, userData);
                             console.log(`✅ Modified user ${user.id} saved to database`);
                             savedCount++;
                         } catch (error) {
                             console.error(`❌ Error saving modified user ${user.id}:`, error);
+                            hasError = true;
                         }
                     }
                 }
@@ -1920,7 +1907,16 @@ export default function ManageUsers() {
             }
             
             if (savedCount > 0) {
-                showBlueNotification(`Successfully saved ${savedCount} entries.`);
+                // Reload data from database to get latest state
+                console.log('🔄 Reloading users after successful manual save...');
+                await loadUsers();
+                
+                // Show success notification
+                if (hasError) {
+                    showBlueNotification(`Successfully saved ${savedCount} entries in database. Some entries had errors.`);
+                } else {
+                    showBlueNotification(`Successfully saved ${savedCount} entries in database.`);
+                }
                 setShowValidationErrors(false); // Clear validation errors on successful save
                 setExternalFieldErrors({});
                 
@@ -1931,7 +1927,7 @@ export default function ManageUsers() {
                 setUserConfirmedLeave(false);
                 setIncompleteRows([]);
             } else if (hasPendingChanges) {
-                showBlueNotification('Pending changes saved successfully.');
+                showBlueNotification('No changes to save.');
                 setShowValidationErrors(false); // Clear validation errors on successful save
                 setExternalFieldErrors({});
                 
@@ -2295,8 +2291,16 @@ export default function ManageUsers() {
         };
     }
 
-    // Load data on component mount
+    // Load data on component mount - DISABLED: Now using loadUsers() with account/enterprise filters
+    // The new loadUsers() function (line 271) handles data loading with proper account/enterprise context
+    // This legacy code loads all users without filters and is no longer needed
     useEffect(() => {
+        // Skip legacy data loading - now handled by loadUsers() with account/enterprise filters
+        console.log('ℹ️ [ManageUsers] Legacy useEffect skipped - using new loadUsers() with filters');
+        setIsLoading(false);
+        return;
+        
+        /* LEGACY CODE - DISABLED
         let mounted = true; // Prevent state updates if component unmounted
         
         (async () => {
@@ -2325,7 +2329,7 @@ export default function ManageUsers() {
                             status: user.status || 'ACTIVE',
                             startDate: user.startDate || '',
                             endDate: user.endDate || '',
-                            // Backend should decrypt and return password field
+                            // Display actual password from database
                             password: user.password || '',
                             technicalUser: user.technicalUser || false,
                             assignedUserGroups: user.assignedUserGroups || [],
@@ -2434,6 +2438,7 @@ export default function ManageUsers() {
         return () => {
             mounted = false;
         };
+        END OF LEGACY CODE */
     }, []); // Empty dependency array - only run once on mount
 
     // Force table re-render when accounts data changes
@@ -2558,7 +2563,23 @@ export default function ManageUsers() {
                 // Delete from database via API (only if not a temporary row)
                 if (!String(pendingDeleteRowId).startsWith('tmp-')) {
                     try {
-                        await api.del(`/api/user-management/users/${pendingDeleteRowId}`);
+                        // Build query parameters with account/enterprise context - exactly like Manage User Groups
+                        const deleteParams = new URLSearchParams({
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        });
+                        
+                        console.log('🗑️ Deleting user with context:', {
+                            userId: pendingDeleteRowId,
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        });
+                        
+                        await api.del(`/api/user-management/users/${pendingDeleteRowId}?${deleteParams.toString()}`);
                         console.log('✅ User deleted from database via API');
                     } catch (error) {
                         console.error('❌ Error deleting user from database:', error);
@@ -2979,6 +3000,9 @@ export default function ManageUsers() {
                                                                 firstName: value,
                                                             });
                                                             
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
                                                             // Filter first names
                                                             const filtered = dropdownOptions.firstNames.filter(firstName =>
                                                                 firstName.name.toLowerCase().includes(value.toLowerCase())
@@ -3061,6 +3085,9 @@ export default function ManageUsers() {
                                                                 ...filterForm,
                                                                 lastName: value,
                                                             });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
                                                             
                                                             // Filter last names
                                                             const filtered = dropdownOptions.lastNames.filter(lastName =>
@@ -3145,6 +3172,9 @@ export default function ManageUsers() {
                                                                 emailAddress: value,
                                                             });
                                                             
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
                                                             // Filter emails
                                                             const filtered = dropdownOptions.emails.filter(email =>
                                                                 email.name.toLowerCase().includes(value.toLowerCase())
@@ -3220,12 +3250,16 @@ export default function ManageUsers() {
                                                 <div className='relative'>
                                                     <select
                                                         value={filterForm.status}
-                                                        onChange={(e) =>
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                status: e.target.value,
-                                                            })
-                                                        }
+                                                                status: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user selects a status
+                                                            filterClearedRef.current = false;
+                                                        }}
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option value=''>All Statuses</option>
@@ -4351,7 +4385,18 @@ export default function ManageUsers() {
                             // If it's already a UserGroup object with all properties, use it
                             if (typeof item === 'object' && item !== null && 'id' in item) {
                                 console.log('✅ Found existing UserGroup object:', item);
-                                return item as UserGroup;
+                                // Backend might return 'name' instead of 'groupName', so normalize it
+                                // Since this is loaded from database, mark as isFromDatabase: true
+                                return {
+                                    id: item.id,
+                                    groupName: item.groupName || item.name || '',
+                                    description: item.description || '',
+                                    entity: item.entity || '',
+                                    product: item.product || '',
+                                    service: item.service || '',
+                                    roles: item.roles || '',
+                                    isFromDatabase: true // Always true for groups loaded from saved user
+                                } as UserGroup;
                             }
                             
                             // If it's an object without id, add one
@@ -4359,7 +4404,7 @@ export default function ManageUsers() {
                                 console.log('⚙️ Adding id to UserGroup object:', item);
                                 return {
                                     id: item.id || generateId(),
-                                    groupName: item.groupName || '',
+                                    groupName: item.groupName || item.name || '',
                                     description: item.description || '',
                                     entity: item.entity || '',
                                     product: item.product || '',
@@ -4386,8 +4431,9 @@ export default function ManageUsers() {
                     })()}
                     
                     selectedEnterprise={selectedEnterprise}
-                    selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
-                    selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
+                    selectedEnterpriseId={selectedEnterpriseId}
+                    selectedAccountId={selectedAccountId}
+                    selectedAccountName={selectedAccountName}
                 />
             )}
         </div>
