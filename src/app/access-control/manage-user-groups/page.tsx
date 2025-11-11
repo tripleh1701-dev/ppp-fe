@@ -1,544 +1,1402 @@
 'use client';
 
-import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {motion} from 'framer-motion';
-import {BookmarkIcon} from '@heroicons/react/24/outline';
-import ReusableTableComponent from '@/components/Manage_User/TableComponent';
-import ManageUserGroups_tableConfig from '@/config/ManageUserGroups_tableConfig';
-import RolesCountCell from '@/components/RolesCountCell';
-import SimpleSlidingPanels from '@/components/SimpleSlidingPanels';
-
-// Define types for better TypeScript support
-interface UserGroup {
-    id: string;
-    groupName: string;
-    description: string;
-    entity: string;
-    service: string;
-    roles: string[];
-    createdDate: string;
-    lastModified: string;
-    memberCount: number;
-    isNew?: boolean;
-}
-
-interface DropdownOption {
-    value: string;
-    label: string;
-    id?: string;
-}
-
-// Reusable trash button (copied from enterprise configuration)
-function ToolbarTrashButton({
-    onClick,
-    bounce = false,
-}: {
-    onClick?: () => void;
-    bounce?: boolean;
-}) {
-    const [over, setOver] = useState(false);
-    return (
-        <motion.button
-            id='usergroups-trash-target'
-            type='button'
-            onClick={onClick}
-            aria-label='Trash'
-            aria-dropeffect='move'
-            className={`group relative ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all duration-300 transform ${
-                over
-                    ? 'bg-gradient-to-br from-red-400 to-red-600 border-red-500 ring-4 ring-red-300/50 scale-110 shadow-lg'
-                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:from-red-500 hover:to-red-600 hover:border-red-500 hover:shadow-lg hover:scale-105'
-            } ${over ? 'drag-over' : ''}`}
-            title='Trash'
-            whileHover={{
-                scale: 1.1,
-                rotate: [0, -8, 8, 0],
-                transition: {duration: 0.4},
-            }}
-            whileTap={{
-                scale: 0.95,
-                transition: {duration: 0.1},
-            }}
-            onDragOver={(e) => {
-                e.preventDefault();
-                try {
-                    e.dataTransfer.dropEffect = 'move';
-                } catch {}
-                if (!over) setOver(true);
-            }}
-            onDragEnter={() => setOver(true)}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-                console.log('🎯 Drop event on trash button triggered');
-                setOver(false);
-                try {
-                    const json = e.dataTransfer.getData('application/json');
-                    console.log('📦 Drag data received:', json);
-                    if (!json) {
-                        console.warn('⚠️ No drag data found');
-                        return;
-                    }
-                    const payload = JSON.parse(json);
-                    console.log('📋 Parsed payload:', payload);
-                    const rowId = payload?.rowId as string | undefined;
-                    if (!rowId) {
-                        console.warn('⚠️ No rowId in payload');
-                        return;
-                    }
-                    console.log(
-                        '🚀 Dispatching usergroups-row-drop-trash event for rowId:',
-                        rowId,
-                    );
-                    const event = new CustomEvent('usergroups-row-drop-trash', {
-                        detail: {rowId},
-                    });
-                    window.dispatchEvent(event);
-                } catch (error) {
-                    console.error('❌ Error in drop handler:', error);
-                }
-            }}
-        >
-            {/* Animated background glow */}
-            <div className='absolute inset-0 bg-red-400 rounded-full opacity-0 group-hover:opacity-30 blur-md transition-opacity duration-300'></div>
-
-            {/* Enhanced trash icon */}
-            <svg
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                className='w-5 h-5 text-red-700 group-hover:text-white transition-colors duration-200 z-10 relative'
-            >
-                <path
-                    className='trash-lid'
-                    d='M10 2v2m4-2v2M4 7h16l-1 12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 7Z'
-                    fill='currentColor'
-                    fillOpacity='0.3'
-                />
-                <path d='M4 7h16' />
-                <path d='M10 11v6' />
-                <path d='M14 11v6' />
-            </svg>
-
-            {/* Tooltip */}
-            <span
-                className={`pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-md bg-slate-900 text-white text-xs px-2 py-1 shadow-lg transition-opacity duration-200 ${
-                    over ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                }`}
-            >
-                Drag a row here to delete
-            </span>
-
-            {/* Ripple effect on click */}
-            <div className='absolute inset-0 rounded-full opacity-0 group-active:opacity-40 bg-red-300 animate-ping'></div>
-            <style jsx>{`
-                .trash-lid {
-                    transform-box: fill-box;
-                    transform-origin: 60% 30%;
-                }
-                .group:hover .trash-lid,
-                .drag-over .trash-lid {
-                    animation: trash-lid-wiggle 0.55s ease-in-out;
-                }
-                @keyframes trash-lid-wiggle {
-                    0% {
-                        transform: rotate(0deg) translateY(0);
-                    }
-                    35% {
-                        transform: rotate(-16deg) translateY(-1px);
-                    }
-                    65% {
-                        transform: rotate(-6deg) translateY(-0.5px);
-                    }
-                    100% {
-                        transform: rotate(0deg) translateY(0);
-                    }
-                }
-            `}</style>
-        </motion.button>
-    );
-}
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import {
+    PlusIcon,
+    MagnifyingGlassIcon,
+    ArrowsUpDownIcon,
+    EyeSlashIcon,
+    EyeIcon,
+    RectangleStackIcon,
+    BookmarkIcon,
+} from '@heroicons/react/24/outline';
+import ConfirmModal from '@/components/ConfirmModal';
+import ManageUserGroupsTable, { UserGroupRow } from '@/components/ManageUserGroupsTable';
+import { api, API_BASE } from '@/utils/api';
+import { generateId } from '@/utils/id-generator';
 
 export default function ManageUserGroups() {
-    // State management
-    const [tableData, setTableData] = useState<UserGroup[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [searchVisible, setSearchVisible] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedGroupBy, setSelectedGroupBy] = useState('');
+    // Router for navigation interception
+    const router = useRouter();
+    
+    // Debug: Track re-renders
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
 
-    // State for action buttons
-    const [filterVisible, setFilterVisible] = useState(false);
-    const [sortVisible, setSortVisible] = useState(false);
-    const [groupByVisible, setGroupByVisible] = useState(false);
-    const [hideColumnsVisible, setHideColumnsVisible] = useState(false);
+    // User Group data state
+    const [userGroups, setUserGroups] = useState<UserGroupRow[]>([]);
+    
+    // Client-side display order tracking - independent of API timestamps
+    const displayOrderRef = useRef<Map<string, number>>(new Map());
 
-    // Refs for dialog containers to detect outside clicks
-    const filterRef = useRef<HTMLDivElement>(null);
-    const sortRef = useRef<HTMLDivElement>(null);
-    const groupByRef = useRef<HTMLDivElement>(null);
-    const hideColumnsRef = useRef<HTMLDivElement>(null);
+    // Function to sort configs by client-side display order for stable UI
+    const sortConfigsByDisplayOrder = useCallback((configs: UserGroupRow[]) => {
+        return [...configs].sort((a, b) => {
+            const orderA = displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderB = displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return orderA - orderB;
+        });
+    }, []);
+    
+    const [isLoading, setIsLoading] = useState(true);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
 
-    // State for sorting, filtering, and column visibility
-    const [sortConfig, setSortConfig] = useState<{
-        column: string;
-        direction: 'asc' | 'desc';
-    } | null>(null);
-    const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
-    const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+    // Notification state
+    const [notificationMessage, setNotificationMessage] = useState<string>('');
+    const [showNotification, setShowNotification] = useState(false);
 
-    // State for dropdown options
-    const [entities, setEntities] = useState<DropdownOption[]>([]);
-    const [services, setServices] = useState<DropdownOption[]>([]);
-    const [entitiesLoading, setEntitiesLoading] = useState(false);
-    const [servicesLoading, setServicesLoading] = useState(false);
-
-    // Auto-save timer states (10-second timer with countdown)
-    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
-        null,
-    );
-    const [isAutoSaving, setIsAutoSaving] = useState(false);
-    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
-    const tableDataRef = useRef<UserGroup[]>([]);
-    const autoSaveGroupRef = useRef<((groupData: UserGroup, isNewGroup?: boolean) => Promise<void>) | null>(null);
-    const [savingStates, setSavingStates] = useState<
-        Record<string, 'saving' | 'saved' | 'error'>
-    >({});
-
-    // State for role assignment sliding panel
-    const [showRolePanel, setShowRolePanel] = useState(false);
-    const [selectedGroupForRoles, setSelectedGroupForRoles] =
-        useState<UserGroup | null>(null);
-
-    // Update ref to track current tableData state
-    useEffect(() => {
-        tableDataRef.current = tableData;
-    }, [tableData]);
-
-    // Fetch entities from backend API
-    const fetchEntities = useCallback(async () => {
-        console.log('🚀 Starting to fetch entities from API...');
-        setEntitiesLoading(true);
+    // Delete confirmation modal state
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
+    const [validationMessage, setValidationMessage] = useState('');
+    const [incompleteRows, setIncompleteRows] = useState<string[]>([]);
+    const [externalFieldErrors, setExternalFieldErrors] = useState<{[key:string]: Record<string,string>}>({});
+    
+    // Duplicate entry modal state
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    const [duplicateMessage, setDuplicateMessage] = useState('');
+    const duplicateDetectedRef = useRef(false); // Track if duplicate was detected during autosave
+    
+    // Navigation warning state - exactly like Manage Users
+    const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+    const [pendingNavigation, setPendingNavigation] = useState<
+        (() => void) | null
+    >(null);
+    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [preventNavigation, setPreventNavigation] = useState(false);
+    const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
+    
+    // Initialize state with localStorage values to prevent initial empty state
+    const initializeFromLocalStorage = () => {
+        if (typeof window === 'undefined') return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
+        
         try {
-            const response = await fetch(
-                'http://localhost:4000/api/business-units/entities?accountId=1&enterpriseId=1',
-            );
-            console.log('📡 Entities API response status:', response.status);
-            if (response.ok) {
-                const data = await response.json();
-                console.log('📦 Entities fetched from API:', data);
+            const savedName = window.localStorage.getItem('selectedEnterpriseName');
+            const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            const savedAccountId = window.localStorage.getItem('selectedAccountId');
+            const savedAccountName = window.localStorage.getItem('selectedAccountName');
+            
+            return {
+                enterprise: savedName || '',
+                enterpriseId: (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '',
+                accountId: (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '',
+                accountName: (savedAccountName && savedAccountName !== 'null') ? savedAccountName : ''
+            };
+        } catch (error) {
+            console.warn('Failed to initialize from localStorage:', error);
+            return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
+        }
+    };
 
-                // Transform entities data to dropdown options format
-                const entityOptions = data.map((entity: any) => {
-                    // Handle both string arrays and object arrays
-                    if (typeof entity === 'string') {
-                        return {
-                            value: entity,
-                            label: entity,
-                            id: entity,
-                        };
-                    } else {
-                        return {
-                            value:
-                                entity.name || entity.entityName || entity.id,
-                            label:
-                                entity.name || entity.entityName || entity.id,
-                            id: entity.id,
-                        };
-                    }
+    const initialValues = initializeFromLocalStorage();
+    
+    // Selected Enterprise from top right corner
+    const [selectedEnterprise, setSelectedEnterprise] = useState<string>(initialValues.enterprise);
+    const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>(initialValues.enterpriseId);
+    
+    // Selected Account from top right corner
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(initialValues.accountId);
+    const [selectedAccountName, setSelectedAccountName] = useState<string>(initialValues.accountName);
+    
+    // Track if we've completed initial localStorage loading to prevent premature auto-refresh
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    
+    // Load selected enterprise from localStorage and listen for changes
+    useEffect(() => {
+        const loadSelectedEnterprise = () => {
+            try {
+                console.log('🐛 [ManageUserGroups Page] Loading localStorage values...');
+                
+                const savedName = window.localStorage.getItem('selectedEnterpriseName');
+                const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+                const savedAccountId = window.localStorage.getItem('selectedAccountId');
+                const savedAccountName = window.localStorage.getItem('selectedAccountName');
+                
+                console.log('🐛 [ManageUserGroups Page] localStorage values:', {
+                    selectedEnterpriseName: savedName,
+                    selectedEnterpriseId: savedEnterpriseId,
+                    selectedAccountId: savedAccountId,
+                    selectedAccountName: savedAccountName
                 });
-
-                console.log('✅ Setting entities state with:', entityOptions);
-                setEntities(entityOptions);
-            } else {
-                console.warn(
-                    '⚠️ Entities API returned non-OK status:',
-                    response.status,
-                );
-                // Fallback to default entities
-                setEntities([
-                    {value: 'Finance', label: 'Finance'},
-                    {value: 'HR', label: 'HR'},
-                    {value: 'IT Operations', label: 'IT Operations'},
-                    {value: 'Sales', label: 'Sales'},
-                    {value: 'Marketing', label: 'Marketing'},
-                    {value: 'Engineering', label: 'Engineering'},
-                ]);
-            }
-        } catch (error) {
-            console.error('❌ Error fetching entities:', error);
-            // Fallback to default entities
-            setEntities([
-                {value: 'Finance', label: 'Finance'},
-                {value: 'HR', label: 'HR'},
-                {value: 'IT Operations', label: 'IT Operations'},
-                {value: 'Sales', label: 'Sales'},
-                {value: 'Marketing', label: 'Marketing'},
-                {value: 'Engineering', label: 'Engineering'},
-            ]);
-        } finally {
-            setEntitiesLoading(false);
-        }
-    }, []);
-
-    // Fetch services from backend API
-    const fetchServices = useCallback(async () => {
-        console.log('🚀 Starting to fetch services from API...');
-        setServicesLoading(true);
-        try {
-            const response = await fetch('http://localhost:4000/api/services');
-            console.log('📡 Services API response status:', response.status);
-            if (response.ok) {
-                const data = await response.json();
-                console.log('📦 Services fetched from API:', data);
-
-                // Transform services data to dropdown options format
-                const serviceOptions = data.map((service: any) => {
-                    // Handle both string arrays and object arrays
-                    if (typeof service === 'string') {
-                        return {
-                            value: service,
-                            label: service,
-                            id: service,
-                        };
-                    } else {
-                        return {
-                            value:
-                                service.name ||
-                                service.serviceName ||
-                                service.id,
-                            label:
-                                service.name ||
-                                service.serviceName ||
-                                service.id,
-                            id: service.id,
-                        };
-                    }
+                
+                // Only update state if values have actually changed to prevent unnecessary re-renders
+                if (savedName !== selectedEnterprise) {
+                    setSelectedEnterprise(savedName || '');
+                }
+                
+                const newEnterpriseId = (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '';
+                if (newEnterpriseId !== selectedEnterpriseId) {
+                    setSelectedEnterpriseId(newEnterpriseId);
+                }
+                
+                const newAccountId = (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '';
+                const newAccountName = (savedAccountName && savedAccountName !== 'null') ? savedAccountName : '';
+                
+                if (newAccountId !== selectedAccountId) {
+                    setSelectedAccountId(newAccountId);
+                }
+                if (newAccountName !== selectedAccountName) {
+                    setSelectedAccountName(newAccountName);
+                }
+                
+                console.log('🐛 [ManageUserGroups Page] Setting state values:', {
+                    enterprise: savedName || '',
+                    enterpriseId: newEnterpriseId,
+                    accountId: newAccountId,
+                    accountName: newAccountName
                 });
-
-                console.log('✅ Setting services state with:', serviceOptions);
-                setServices(serviceOptions);
-            } else {
-                console.warn(
-                    '⚠️ Services API returned non-OK status:',
-                    response.status,
-                );
-                // Fallback to default services
-                setServices([
-                    {value: 'Budget Management', label: 'Budget Management'},
-                    {value: 'Employee Relations', label: 'Employee Relations'},
-                    {value: 'Infrastructure', label: 'Infrastructure'},
-                    {
-                        value: 'Strategy Management',
-                        label: 'Strategy Management',
-                    },
-                    {value: 'Communications', label: 'Communications'},
-                    {value: 'Quality Control', label: 'Quality Control'},
-                ]);
+                
+                // Mark as initialized after first load
+                setIsInitialized(true);
+            } catch (error) {
+                console.warn('Failed to load selected enterprise/account:', error);
+                setIsInitialized(true); // Still mark as initialized even on error
             }
-        } catch (error) {
-            console.error('❌ Error fetching services:', error);
-            // Fallback to default services
-            setServices([
-                {value: 'Budget Management', label: 'Budget Management'},
-                {value: 'Employee Relations', label: 'Employee Relations'},
-                {value: 'Infrastructure', label: 'Infrastructure'},
-                {value: 'Strategy Management', label: 'Strategy Management'},
-                {value: 'Communications', label: 'Communications'},
-                {value: 'Quality Control', label: 'Quality Control'},
-            ]);
-        } finally {
-            setServicesLoading(false);
-        }
-    }, []);
-
-    // Load user groups data
-    const loadUserGroups = useCallback(async () => {
-        console.log('🔵 ========================================');
-        console.log('🔵 loadUserGroups FUNCTION CALLED');
-        console.log('🔵 ========================================');
-        setLoading(true);
-        try {
-            // Get selected account from localStorage
-            const selectedAccountId =
-                typeof window !== 'undefined'
-                    ? window.localStorage.getItem('selectedAccountId')
-                    : null;
-            const selectedAccountName =
-                typeof window !== 'undefined'
-                    ? window.localStorage.getItem('selectedAccountName')
-                    : null;
-
-            console.log(
-                '🚀 Fetching user groups from API with account context:',
-                {
-                    accountId: selectedAccountId,
-                    accountName: selectedAccountName,
-                    accountIdType: typeof selectedAccountId,
-                    accountNameType: typeof selectedAccountName,
-                },
-            );
-
-            // Build API URL with account parameters
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-            const params = new URLSearchParams();
-
-            // Only add params if we have a non-Systiva account
-            const hasValidAccountId =
-                selectedAccountId &&
-                selectedAccountId !== 'null' &&
-                selectedAccountId !== '';
-            const hasValidAccountName =
-                selectedAccountName &&
-                selectedAccountName !== 'null' &&
-                selectedAccountName !== '';
-
-            console.log('🔍 Account validation:', {
-                hasValidAccountId,
-                hasValidAccountName,
-                willAddParams: hasValidAccountId && hasValidAccountName,
-            });
-
-            if (hasValidAccountId && hasValidAccountName) {
-                params.append('accountId', selectedAccountId);
-                params.append('accountName', selectedAccountName);
-                console.log('✅ Added account params to URL');
-            } else {
-                console.log(
-                    'ℹ️ No account params added (Systiva or invalid account)',
-                );
-            }
-
-            const queryString = params.toString();
-            const url = queryString
-                ? `${apiBase}/api/user-management/groups?${queryString}`
-                : `${apiBase}/api/user-management/groups`;
-
-            console.log('🌐 Final API URL:', url);
-            console.log('🌐 Query string:', queryString || '(empty)');
-
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch groups: ${response.status}`);
-            }
-
-            const groupsData = await response.json();
-            console.log('📊 Groups fetched from API:', groupsData);
-            console.log(
-                '📊 Number of groups fetched:',
-                groupsData?.length || 0,
-            );
-
-            // Handle case where API returns non-array
-            if (!Array.isArray(groupsData)) {
-                console.warn('⚠️ API returned non-array response:', groupsData);
-                throw new Error('Invalid response format from API');
-            }
-
-            // Transform API data to match the table structure
-            console.log('🔄 Transforming groups to table format...');
-            const transformedGroups = groupsData.map((group: any) => {
-                console.log('🔄 Transforming group:', group);
-                return {
-                    id: group.id,
-                    groupName: group.name,
-                    description: group.description || 'No description provided',
-                    entity: group.entity || 'General',
-                    service: group.service || 'General',
-                    roles: group.assignedRoles || [],
-                    createdDate: group.createdAt
-                        ? new Date(group.createdAt).toISOString().split('T')[0]
-                        : new Date().toISOString().split('T')[0],
-                    lastModified:
-                        group.updatedAt ||
-                        group.createdAt ||
-                        new Date().toISOString(),
-                    memberCount: 0, // Will be populated later if needed
-                };
-            });
-
-            console.log('✅ Transformed groups data:', transformedGroups);
-            console.log('✅ Sample group structure:', transformedGroups[0]);
-            console.log(
-                `✅ Successfully loaded ${transformedGroups.length} groups from systiva DB`,
-            );
-
-            // Set only the API data, no fallback to mock data
-            console.log(
-                '📝 About to call setTableData with:',
-                transformedGroups,
-            );
-            setTableData(transformedGroups);
-            console.log(
-                '✅ setTableData called with',
-                transformedGroups.length,
-                'groups',
-            );
-            console.log('🎉 Groups are now visible in the table!');
-            console.log('🔵 ========================================');
-            console.log('🔵 loadUserGroups COMPLETED SUCCESSFULLY');
-            console.log('🔵 ========================================');
-        } catch (error) {
-            console.error('❌ Error loading user groups:', error);
-            // Set empty array if API fails
-            setTableData([]);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        console.log('🟢 Component mounted - calling loadUserGroups...');
-        loadUserGroups();
-        fetchEntities();
-        fetchServices();
-    }, [loadUserGroups, fetchEntities, fetchServices]);
-
-    // Listen for account changes and reload groups
-    useEffect(() => {
-        const handleAccountChange = () => {
-            console.log('🔄 Account changed, reloading groups...');
-            loadUserGroups();
         };
 
-        // Listen for the custom accountChanged event
+        // Load on mount
+        loadSelectedEnterprise();
+
+        // Listen for enterprise and account changes
+        const handleEnterpriseChange = () => {
+            loadSelectedEnterprise();
+        };
+
+        const handleAccountChange = () => {
+            loadSelectedEnterprise(); // This function loads both account and enterprise values
+        };
+
+        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
         window.addEventListener('accountChanged', handleAccountChange);
+        window.addEventListener('storage', handleEnterpriseChange);
 
         return () => {
+            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
             window.removeEventListener('accountChanged', handleAccountChange);
+            window.removeEventListener('storage', handleEnterpriseChange);
         };
-    }, [loadUserGroups]);
+    }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
 
-    // Debug: Log when tableData changes
+    // Debug: Log current state values
     useEffect(() => {
-        console.log('🟡 tableData STATE CHANGED:', {
-            length: tableData.length,
-            data: tableData,
+        console.log('🐛 [ManageUserGroups Page] State updated:', {
+            selectedEnterprise,
+            selectedEnterpriseId,
+            selectedAccountId,
+            selectedAccountName
         });
-    }, [tableData]);
+    }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
+    
+    const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+    const [deletingRow, setDeletingRow] = useState(false);
 
-    // Debounced auto-save function (10-second timer with countdown)
-    const debouncedAutoSave = useCallback(async () => {
-        console.log(
-            '🕐 debouncedAutoSave called - clearing existing timer and starting new one',
+    // Auto-save related state - use useRef to persist through re-renders
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const userGroupsRef = useRef<UserGroupRow[]>([]);
+    const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
+    const originalRouterRef = useRef<any>(null); // Store original router for navigation after confirmation
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
+    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<Set<string>>(new Set());
+
+    // Update ref to track current userGroups state
+    useEffect(() => {
+        userGroupsRef.current = userGroups;
+    }, [userGroups]);
+
+    // Update ref to track current modifiedExistingRecords state
+    useEffect(() => {
+        modifiedExistingRecordsRef.current = modifiedExistingRecords;
+    }, [modifiedExistingRecords]);
+
+    // State to track AI panel collapse state for notification positioning
+    const [isAIPanelCollapsed, setIsAIPanelCollapsed] = useState(false);
+
+    // Row animation states
+    const [compressingRowId, setCompressingRowId] = useState<string | null>(null);
+    const [foldingRowId, setFoldingRowId] = useState<string | null>(null);
+
+    // Dropdown options for chips and filters
+    const [dropdownOptions, setDropdownOptions] = useState({
+        groupNames: [] as Array<{id: string; name: string}>,
+        descriptions: [] as Array<{id: string; name: string}>,
+        entities: [] as Array<{id: string; name: string}>,
+        products: [] as Array<{id: string; name: string}>,
+        services: [] as Array<{id: string; name: string}>,
+        roles: [] as Array<{id: string; name: string}>,
+    });
+
+    // Toolbar controls state
+    const [showSearchBar, setShowSearchBar] = useState(true); // Always show search
+    const [searchTerm, setSearchTerm] = useState('');
+    const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Applied search term
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+    const [sortOpen, setSortOpen] = useState(false);
+    const [sortColumn, setSortColumn] = useState('');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
+    const [hideOpen, setHideOpen] = useState(false);
+    const [hideQuery, setHideQuery] = useState('');
+    const [groupOpen, setGroupOpen] = useState(false);
+    const [ActiveGroupLabel, setActiveGroupLabel] = useState<
+        'None' | 'Group Name' | 'Entity' | 'Product' | 'Service'
+    >('None');
+    
+    type ColumnType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles' | 'actions';
+    
+    const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
+        'groupName',
+        'description',
+        'entity',
+        'product',
+        'service',
+        'roles',
+    ]);
+
+    // Refs for dropdowns
+    const searchRef = useRef<HTMLDivElement>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
+    const sortRef = useRef<HTMLDivElement>(null);
+    const hideRef = useRef<HTMLDivElement>(null);
+    const groupRef = useRef<HTMLDivElement>(null);
+
+    // Helper function to show notifications
+    const showBlueNotification = (message: string, duration: number = 3000, showCheckmark: boolean = true) => {
+        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
+        setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
+    };
+
+    // Load dropdown options from API
+    const loadDropdownOptions = useCallback(async () => {
+        try {
+            const [groupsRes, productsRes, servicesRes] =
+                await Promise.all([
+                    api.get<Array<{id: string; name: string; groupName?: string}>>(
+                        '/api/user-management/groups',
+                    ),
+                    api.get<Array<{id: string; name: string}>>('/api/products'),
+                    api.get<Array<{id: string; name: string}>>('/api/services'),
+                ]).catch(errors => {
+                    console.warn('Some API endpoints failed:', errors);
+                    return [[], [], []];
+                });
+
+            // Extract unique group names from current user groups
+            const uniqueGroupNames = Array.from(new Set(userGroups
+                .map(group => group.groupName)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `groupname-${name}-${index}`,
+                name: name
+            }));
+
+            // Extract unique entities from current user groups
+            const uniqueEntities = Array.from(new Set(userGroups
+                .map(group => group.entity)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `entity-${name}-${index}`,
+                name: name
+            }));
+
+            setDropdownOptions({
+                groupNames: [...uniqueGroupNames, ...(groupsRes?.map((g: any) => ({
+                    id: g.id || g.groupId || String(Math.random()),
+                    name: g.name || g.groupName || ''
+                })).filter((g: any) => g.name) || [])],
+                descriptions: [],
+                entities: uniqueEntities,
+                products: productsRes || [],
+                services: servicesRes || [],
+                roles: [],
+            });
+        } catch (error) {
+            console.error('Failed to load dropdown options:', error);
+            // Set empty dropdown options on error to prevent infinite loops
+            setDropdownOptions({
+                groupNames: [],
+                descriptions: [],
+                entities: [],
+                products: [],
+                services: [],
+                roles: [],
+            });
+        }
+    }, [userGroups]);
+
+    // Helper function to close all dialogs
+    const closeAllDialogs = () => {
+        setFilterVisible(false);
+        setSortOpen(false);
+        setHideOpen(false);
+        setGroupOpen(false);
+    };
+
+    // Function to toggle dialogs
+    const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'group') => {
+        closeAllDialogs();
+        setTimeout(() => {
+            switch (dialogType) {
+                case 'filter':
+                    setFilterVisible(true);
+                    break;
+                case 'sort':
+                    setSortOpen(true);
+                    break;
+                case 'hide':
+                    setHideOpen(true);
+                    break;
+                case 'group':
+                    setGroupOpen(true);
+                    break;
+            }
+        }, 10);
+    };
+
+    // Ref to track current filter form values for outside click handler
+    const filterFormRef = useRef({
+        groupName: '',
+        entity: '',
+        product: '',
+        service: '',
+    });
+
+    // Click outside handler to close toolbar dialogs
+    // Filter panel closes on outside click if: all fields are empty OR Clear All was clicked
+    // Filter panel stays open if any field has a value (to prevent accidental closure while typing)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            
+            // Check if any dialog is open
+            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
+                return; // No dialog is open
+            }
+            
+            // Check if click is outside dialog containers
+            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
+            
+            // Close Filter panel if:
+            // 1. Clear All was clicked, OR
+            // 2. All filter fields are empty (no values entered)
+            if (filterVisible && isOutsideFilter) {
+                const currentForm = filterFormRef.current;
+                const isFilterEmpty = !currentForm.groupName && !currentForm.entity && !currentForm.product && !currentForm.service;
+                
+                if (filterClearedRef.current || isFilterEmpty) {
+                    setFilterVisible(false);
+                    filterClearedRef.current = false; // Reset flag
+                }
+            }
+            
+            // Close Sort, Hide, Group panels immediately on outside click
+            if (sortOpen && isOutsideSort) {
+                setSortOpen(false);
+            }
+            if (hideOpen && isOutsideHide) {
+                setHideOpen(false);
+            }
+            if (groupOpen && isOutsideGroup) {
+                setGroupOpen(false);
+            }
+        };
+
+        // Add event listener
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [filterVisible, sortOpen, hideOpen, groupOpen]);
+
+    // All available columns
+    const allCols: ColumnType[] = ['groupName', 'description', 'entity', 'product', 'service', 'roles'];
+    
+    // Columns available for sorting
+    const sortableCols: ColumnType[] = ['groupName', 'description', 'entity', 'product', 'service'];
+
+    // Column label mapping - exactly like Manage Users
+    const columnLabels: Record<string, string> = {
+        groupName: 'Group Name',
+        description: 'Description',
+        entity: 'Entity',
+        product: 'Product',
+        service: 'Service',
+        roles: 'Roles'
+    };
+
+    // Process user group data with filtering, sorting, and search
+    const processedConfigs = React.useMemo(() => {
+        let filtered = [...userGroups];
+
+        // Apply search filter
+        if (appliedSearchTerm.trim()) {
+            filtered = filtered.filter((config) => {
+                const searchLower = appliedSearchTerm.toLowerCase();
+                return (
+                    config.groupName?.toLowerCase().includes(searchLower) ||
+                    config.description?.toLowerCase().includes(searchLower) ||
+                    config.entity?.toLowerCase().includes(searchLower) ||
+                    config.product?.toLowerCase().includes(searchLower) ||
+                    config.service?.toLowerCase().includes(searchLower) ||
+                    config.roles?.toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        // Apply filters
+        if (activeFilters.groupName) {
+            filtered = filtered.filter(
+                (config) => config.groupName?.toLowerCase().includes(activeFilters.groupName.toLowerCase()),
+            );
+        }
+        if (activeFilters.entity) {
+            filtered = filtered.filter(
+                (config) => config.entity?.toLowerCase().includes(activeFilters.entity.toLowerCase()),
+            );
+        }
+        if (activeFilters.product) {
+            filtered = filtered.filter(
+                (config) => config.product?.toLowerCase().includes(activeFilters.product.toLowerCase()),
+            );
+        }
+        if (activeFilters.service) {
+            filtered = filtered.filter(
+                (config) => config.service?.toLowerCase().includes(activeFilters.service.toLowerCase()),
+            );
+        }
+
+        // Apply sorting only when both column and direction are explicitly set
+        if (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc')) {
+            filtered.sort((a, b) => {
+                let valueA = '';
+                let valueB = '';
+
+                switch (sortColumn) {
+                    case 'groupName':
+                        valueA = (a.groupName || '').toString().toLowerCase();
+                        valueB = (b.groupName || '').toString().toLowerCase();
+                        break;
+                    case 'description':
+                        valueA = (a.description || '').toString().toLowerCase();
+                        valueB = (b.description || '').toString().toLowerCase();
+                        break;
+                    case 'entity':
+                        valueA = (a.entity || '').toString().toLowerCase();
+                        valueB = (b.entity || '').toString().toLowerCase();
+                        break;
+                    case 'product':
+                        valueA = (a.product || '').toString().toLowerCase();
+                        valueB = (b.product || '').toString().toLowerCase();
+                        break;
+                    case 'service':
+                        valueA = (a.service || '').toString().toLowerCase();
+                        valueB = (b.service || '').toString().toLowerCase();
+                        break;
+                    default:
+                        valueA = '';
+                        valueB = '';
+                        break;
+                }
+
+                if (valueA < valueB) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (valueA > valueB) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [
+        userGroups, 
+        appliedSearchTerm, 
+        activeFilters, 
+        sortColumn,
+        sortDirection
+    ]);
+
+    // Helper functions for filter management
+    const applyFilters = (filters: Record<string, any>) => {
+        setActiveFilters(filters);
+        closeAllDialogs();
+    };
+
+    const clearFilters = () => {
+        setActiveFilters({});
+    };
+
+    const applySort = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+    };
+
+    const applySorting = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        // Don't close dialog to allow multiple adjustments
+    };
+
+    const applySortAndClose = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        closeAllDialogs();
+    };
+
+    const clearSorting = () => {
+        setSortColumn('');
+        setSortDirection('');
+        
+        // Dispatch custom event to clear table sorting
+        const clearEvent = new CustomEvent('clearTableSorting');
+        window.dispatchEvent(clearEvent);
+    };
+
+    const clearSort = () => {
+        clearSorting();
+    };
+
+    const setGroupByFromLabel = (label: string) => {
+        setActiveGroupLabel(label as any);
+        closeAllDialogs();
+    };
+
+    const clearGroupBy = () => {
+        setActiveGroupLabel('None');
+    };
+
+    // Load user groups from database. Accept optional filters so we can request groups
+    // for a specific account/enterprise combination: { accountId, accountName, enterpriseId, enterpriseName }
+    const loadUserGroups = useCallback(async (filters?: {
+        accountId?: string | null;
+        accountName?: string | null;
+        enterpriseId?: string | null;
+        enterpriseName?: string | null;
+    }) => {
+        setIsLoading(true);
+        try {
+            let url = '/api/user-management/groups';
+            
+            // Add account/enterprise filtering parameters if provided
+            if (filters && (filters.accountId || filters.accountName || filters.enterpriseId || filters.enterpriseName)) {
+                const params = new URLSearchParams();
+                
+                if (filters.accountId) {
+                    params.append('accountId', filters.accountId);
+                }
+                if (filters.accountName) {
+                    params.append('accountName', filters.accountName);
+                }
+                if (filters.enterpriseId) {
+                    params.append('enterpriseId', filters.enterpriseId);
+                }
+                if (filters.enterpriseName) {
+                    params.append('enterpriseName', filters.enterpriseName);
+                }
+                
+                url += `?${params.toString()}`;
+            }
+
+            console.log('🌐 [API Call] Making request to:', url);
+            console.log('🔍 [API Call] Filters applied:', filters);
+            console.log('🌐 [API Call] Full URL being called:', `${API_BASE || 'http://localhost:3000'}${url}`);
+            
+            const response = await api.get<any>(url);
+            
+            console.log('📥 [API Response] Raw response:', response);
+            console.log('📥 [API Response] Response type:', typeof response);
+            console.log('📥 [API Response] Response keys:', response ? Object.keys(response) : 'null');
+            
+            let groupsData = response;
+            console.log('🔄 [API Processing] Initial groupsData:', groupsData);
+            
+            if (response && typeof response === 'object' && 'data' in response) {
+                groupsData = response.data;
+                console.log('🔄 [API Processing] Extracted data property:', groupsData);
+                if (groupsData && typeof groupsData === 'object' && 'groups' in groupsData) {
+                    groupsData = groupsData.groups;
+                    console.log('🔄 [API Processing] Extracted groups property:', groupsData);
+                }
+            }
+
+            console.log('🔄 [API Processing] Final groupsData:', groupsData);
+            console.log('🔄 [API Processing] groupsData is array?', Array.isArray(groupsData));
+            console.log('🔄 [API Processing] groupsData length:', Array.isArray(groupsData) ? groupsData.length : 'N/A');
+
+            if (groupsData && Array.isArray(groupsData)) {
+                const formattedGroups: UserGroupRow[] = groupsData.map((group: any, index: number) => {
+                    const newGroup: UserGroupRow = {
+                        id: group.id?.toString() || generateId(),
+                        groupName: group.name || group.groupName || '',
+                        description: group.description || '',
+                        entity: group.entity || '',
+                        product: group.product || '',
+                        service: group.service || '',
+                        roles: Array.isArray(group.assignedRoles) 
+                            ? group.assignedRoles.join(', ') 
+                            : (group.roles || ''),
+                    };
+
+                    // Track display order
+                    displayOrderRef.current.set(newGroup.id, index);
+
+                    return newGroup;
+                });
+
+                console.log('✅ [API Processing] Setting user groups:', formattedGroups);
+                setUserGroups(formattedGroups);
+            } else {
+                console.log('❌ [API Processing] No valid groups data found - setting empty array');
+                setUserGroups([]);
+            }
+        } catch (error) {
+            console.error('Failed to load user groups:', error);
+            setUserGroups([]);
+            
+            // Provide specific error feedback based on error type
+            let errorMessage = 'Failed to load user groups';
+            if (error && typeof error === 'object') {
+                const err = error as any;
+                if (err.response?.status === 500) {
+                    errorMessage = 'Server error: Unable to load user groups. Please try again or contact support.';
+                } else if (err.response?.status === 404) {
+                    errorMessage = 'No user groups found for the selected Account and Enterprise combination.';
+                } else if (err.response?.status === 403) {
+                    errorMessage = 'Access denied: You do not have permission to view user groups for this Account and Enterprise.';
+                } else if (err.message) {
+                    errorMessage = `Failed to load user groups: ${err.message}`;
+                }
+            }
+            
+            // Only show notification on first load failure. Use ref to get latest value.
+            if ((userGroupsRef.current?.length || 0) === 0) {
+                showBlueNotification(errorMessage, 5000, false);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Load user groups on mount and whenever the selected account/enterprise changes.
+    // This ensures that when the top-right account dropdown changes (and the enterprise
+    // selection remains), the table refreshes automatically for that Account+Enterprise.
+    // ALWAYS requires both Account and Enterprise to be selected.
+    useEffect(() => {
+        // Don't run auto-refresh until localStorage initialization is complete
+        if (!isInitialized) {
+            console.log('🔄 [ManageUserGroups] Waiting for initialization...');
+            return;
+        }
+
+        // Read enterpriseId from localStorage (some other components keep the id there)
+        const enterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
+
+        console.log('🔄 [ManageUserGroups] Loading user groups with context:', {
+            selectedAccountId,
+            selectedAccountName,
+            selectedEnterprise,
+            enterpriseId,
+            hasAccountId: !!selectedAccountId,
+            hasEnterprise: !!(selectedEnterprise || enterpriseId),
+            isInitialized
+        });
+
+        // Clear existing data immediately when enterprise/account changes to prevent stale data
+        setUserGroups([]);
+
+        // ONLY load data if both account id and enterprise selection exist
+        if (selectedAccountId && (selectedEnterprise || enterpriseId)) {
+            console.log('✅ [ManageUserGroups] Both Account and Enterprise selected, loading filtered data');
+            loadUserGroups({
+                accountId: selectedAccountId,
+                accountName: selectedAccountName || null,
+                enterpriseId: enterpriseId || null,
+                enterpriseName: selectedEnterprise || null,
+            });
+            return;
+        }
+
+        // Clear table and show message when required context is missing
+        console.log('⚠️ [ManageUserGroups] Missing Account or Enterprise selection, clearing table');
+        setUserGroups([]);
+        setIsLoading(false);
+        
+        // Show a notification to guide user (only after initialization to avoid false warnings)
+        if (!selectedAccountId) {
+            showBlueNotification('Please select an Account from the top-right dropdown to view user groups', 5000, false);
+        }
+        // Enterprise notification removed - enterprise is now auto-selected based on account licenses
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, isInitialized, loadUserGroups]);
+    
+    // Load dropdown options whenever userGroups changes - use a ref to prevent infinite loops
+    const userGroupsCountRef = useRef(0);
+    const dropdownOptionsLoadedRef = useRef(false);
+    useEffect(() => {
+        if (!isLoading && userGroups.length > 0 && 
+            (userGroups.length !== userGroupsCountRef.current || !dropdownOptionsLoadedRef.current)) {
+            userGroupsCountRef.current = userGroups.length;
+            dropdownOptionsLoadedRef.current = true;
+            loadDropdownOptions();
+        }
+    }, [userGroups.length, loadDropdownOptions, isLoading]);
+    
+    // Clear auto-save timer on component unmount - exactly like Manage Users
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // Effect to detect AI panel collapse state by observing its width - exactly like Manage Users
+    useEffect(() => {
+        const detectAIPanelState = () => {
+            // Look for the AI panel by finding the motion.div with width animations
+            const aiPanel = document.querySelector('[class*="w-\\[300px\\]"], [class*="w-16"]') as HTMLElement;
+            if (aiPanel) {
+                const computedStyle = window.getComputedStyle(aiPanel);
+                const width = parseInt(computedStyle.width);
+                const isCollapsed = width <= 80; // 64px + some margin for safety
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel width detected:', width, 'Collapsed:', isCollapsed);
+            }
+        };
+
+        // Create a ResizeObserver to watch for AI panel width changes
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                const isCollapsed = width <= 80;
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel resized to:', width, 'Collapsed:', isCollapsed);
+            }
+        });
+
+        // Find and observe the AI panel
+        const findAndObserveAIPanel = () => {
+            // Look for the AI panel container
+            const aiPanelContainer = document.querySelector('.order-1.lg\\:order-2') as HTMLElement;
+            if (aiPanelContainer) {
+                const aiPanel = aiPanelContainer.querySelector('div') as HTMLElement;
+                if (aiPanel) {
+                    resizeObserver.observe(aiPanel);
+                    detectAIPanelState(); // Initial detection
+                    console.log('🤖 AI Panel observer attached');
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Try to find the panel immediately
+        if (!findAndObserveAIPanel()) {
+            // If not found, try again after a short delay
+            const timeoutId = setTimeout(() => {
+                findAndObserveAIPanel();
+            }, 500);
+
+            return () => {
+                clearTimeout(timeoutId);
+                resizeObserver.disconnect();
+            };
+        }
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, []);
+
+    // Function to check if there's a blank row - exactly like Manage Users
+    const hasBlankRow = () => {
+        return userGroups.some((group) => {
+            const isTemporary = String(group.id).startsWith('tmp-');
+            const isEmpty =
+                !group.groupName &&
+                !group.entity &&
+                !group.product &&
+                !group.service;
+            return isTemporary && isEmpty;
+        });
+    };
+
+    // Function to validate incomplete rows and return validation details - exactly like Manage Users
+    const validateIncompleteRows = () => {
+        // Get all temporary (unsaved) rows
+        const temporaryRows = userGroups.filter((group: any) => 
+            String(group.id).startsWith('tmp-')
         );
 
-        // Clear existing timer
+        // Get all existing rows
+        const existingRows = userGroups.filter((group: any) => 
+            !String(group.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows (exclude completely blank rows)
+        const incompleteTemporaryRows = temporaryRows.filter((group: any) => {
+            const hasGroupName = group.groupName?.trim();
+            const hasEntity = group.entity?.trim();
+            const hasProduct = group.product?.trim();
+            const hasService = group.service?.trim();
+
+            // Don't include completely blank rows (new rows that haven't been touched)
+            const isCompletelyBlank = !hasGroupName && !hasEntity && !hasProduct && !hasService;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
+            return !hasGroupName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Check for incomplete existing rows
+        const incompleteExistingRows = existingRows.filter((group: any) => {
+            const hasGroupName = group.groupName?.trim();
+            const hasEntity = group.entity?.trim();
+            const hasProduct = group.product?.trim();
+            const hasService = group.service?.trim();
+
+            // Don't include completely blank rows
+            const isCompletelyBlank = !hasGroupName && !hasEntity && !hasProduct && !hasService;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
+            return !hasGroupName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        if (incompleteRows.length > 0) {
+            const missingFields = new Set<string>();
+            incompleteRows.forEach((group) => {
+                if (!group.groupName?.trim()) missingFields.add('Group Name');
+                if (!group.entity?.trim()) missingFields.add('Entity');
+                if (!group.product?.trim()) missingFields.add('Product');
+                if (!group.service?.trim()) missingFields.add('Service');
+            });
+            
+            const incompleteCount = incompleteRows.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
+            
+            return {
+                hasIncomplete: true,
+                incompleteRows,
+                message
+            };
+        }
+        
+        return {
+            hasIncomplete: false,
+            incompleteRows: [],
+            message: ''
+        };
+    };
+
+    // Handle adding new user group row
+    const handleAddNewRow = () => {
+        console.log('➕ Add new row requested');
+        
+        // Clear any pending autosave to prevent blank rows from being saved
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
         }
         if (countdownIntervalRef.current) {
             clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setAutoSaveCountdown(null);
+        setIsAutoSaving(false);
+        
+        // Check if there's already a blank row
+        if (hasBlankRow()) {
+            showBlueNotification(
+                'Please complete the existing blank row before adding a new one.',
+                3000,
+                false // No checkmark for error message
+            );
+            return;
+        }
+
+        // Check for incomplete rows before adding new row
+        const validation = validateIncompleteRows();
+        if (validation.hasIncomplete) {
+            // Show notification instead of modal - exactly like Manage Users
+            showBlueNotification(
+                validation.message,
+                5000,
+                false // No checkmark for error message
+            );
+            
+            // Enable red border highlighting for incomplete rows
+            setShowValidationErrors(true);
+            setIncompleteRows(validation.incompleteRows.map((r: any) => r.id));
+            
+            return;
+        }
+        
+        const newGroup: UserGroupRow = {
+            id: `tmp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            groupName: '',
+            description: '',
+            entity: '',
+            product: '',
+            service: '',
+            roles: '',
+        };
+        
+        // Add to end of array with display order
+        displayOrderRef.current.set(newGroup.id, Date.now());
+        
+        setUserGroups([...userGroups, newGroup]);
+        
+        // Clear validation errors when adding a new row to ensure new rows start with normal styling
+        if (showValidationErrors) {
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
+        }
+        
+        console.log('➕ Added new blank row:', newGroup.id);
+    };
+
+    // Ref to store the autosave function
+    const debouncedAutoSaveRef = useRef<(() => void) | null>(null);
+
+    // Handle field updates
+    const handleUpdateField = useCallback((rowId: string, field: string, value: any) => {
+        console.log('🔄 handleUpdateField called:', { rowId, field, value });
+        
+        // First, update the state
+        let updatedGroup: UserGroupRow | null = null;
+        setUserGroups(prev => {
+            // Always create new array and new objects for React to detect changes
+            return prev.map(group => {
+                if (group.id === rowId) {
+                    // Track if this is an existing record (not temporary)
+                    if (!String(rowId).startsWith('tmp-')) {
+                        setModifiedExistingRecords((prevModified) => {
+                            const newSet = new Set(prevModified);
+                            newSet.add(String(rowId));
+                            return newSet;
+                        });
+                    }
+                    
+                    // Create new object with updated field
+                    updatedGroup = { ...group, [field]: value };
+                    return updatedGroup;
+                }
+                return group; // Return same reference for unchanged rows
+            });
+        });
+        
+        // Check if all mandatory fields are now filled for this row
+        if (updatedGroup) {
+            const hasGroupName = (updatedGroup as any).groupName?.trim() && (updatedGroup as any).groupName.trim().length > 0;
+            const hasEntity = (updatedGroup as any).entity?.trim() && (updatedGroup as any).entity.trim().length > 0;
+            const hasProduct = (updatedGroup as any).product?.trim() && (updatedGroup as any).product.trim().length > 0;
+            const hasService = (updatedGroup as any).service?.trim() && (updatedGroup as any).service.trim().length > 0;
+            
+            const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
+            
+            console.log('🔍 Checking if row is complete after update:', {
+                rowId,
+                field,
+                value,
+                hasGroupName,
+                hasEntity,
+                hasProduct,
+                hasService,
+                isComplete
+            });
+            
+            // Only trigger autosave if all mandatory fields are filled
+            if (isComplete && debouncedAutoSaveRef.current) {
+                console.log('✅ All mandatory fields filled - triggering autosave timer');
+                debouncedAutoSaveRef.current();
+            } else {
+                console.log('⏸️ Not all mandatory fields filled - clearing autosave timer if exists');
+                // Clear autosave timer if row becomes incomplete
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                    autoSaveTimerRef.current = null;
+                    setAutoSaveCountdown(null);
+                    if (countdownIntervalRef.current) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownIntervalRef.current = null;
+                    }
+                }
+            }
+        }
+    }, []);
+
+    // Row squeeze animation sequence - exactly like Manage Users
+    const startRowCompressionAnimation = async (rowId: string) => {
+        console.log('🎬 Starting squeeze animation for row:', rowId);
+
+        // Step 1: Squeeze the row horizontally with animation
+        setCompressingRowId(rowId);
+
+        // Wait for squeeze animation
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Step 2: Fade out the row
+        setFoldingRowId(rowId);
+        setCompressingRowId(null);
+
+        // Wait for fade animation
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Step 3: Show confirmation modal
+        setPendingDeleteRowId(rowId);
+        setShowDeleteConfirmation(true);
+        setFoldingRowId(null);
+    };
+
+    // Handle delete confirmation
+    const handleDeleteClick = (groupId: string) => {
+        startRowCompressionAnimation(groupId);
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingDeleteRowId) return;
+        
+        setDeletingRow(true);
+        try {
+            console.log('🗑️ Deleting user group:', pendingDeleteRowId);
+            
+            // Add a small delay to show the loading state
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Find the group to be deleted for debugging
+            const groupToDelete = userGroups.find(g => g.id === pendingDeleteRowId);
+            console.log('📄 User group data to delete:', groupToDelete);
+
+            // Delete from database via API (only if not a temporary row)
+            if (!String(pendingDeleteRowId).startsWith('tmp-')) {
+                try {
+                    // Build delete URL with query parameters
+                    const deleteParams = new URLSearchParams();
+                    if (selectedAccountId) deleteParams.append('accountId', selectedAccountId);
+                    if (selectedAccountName) deleteParams.append('accountName', selectedAccountName);
+                    if (selectedEnterpriseId) deleteParams.append('enterpriseId', selectedEnterpriseId);
+                    if (selectedEnterprise) deleteParams.append('enterpriseName', selectedEnterprise);
+                    
+                    const deleteUrl = `/api/user-management/groups/${pendingDeleteRowId}?${deleteParams.toString()}`;
+                    console.log('🗑️ Deleting user group with URL:', deleteUrl);
+                    
+                    await api.del(deleteUrl);
+                    console.log('✅ User group deleted from database via API');
+                } catch (error) {
+                    console.error('❌ Error deleting user group from database:', error);
+                    throw new Error('Failed to delete user group from database');
+                }
+            } else {
+                console.log('ℹ️ Temporary row - only removing from frontend state and localStorage');
+                // Remove temporary row from localStorage if needed
+                const storedGroups = localStorage.getItem('user-groups-data');
+                if (storedGroups) {
+                    try {
+                        const groupsData = JSON.parse(storedGroups);
+                        const updatedGroupsData = groupsData.filter((g: any) => g.id !== pendingDeleteRowId);
+                        localStorage.setItem('user-groups-data', JSON.stringify(updatedGroupsData));
+                        console.log('✅ Temporary user group deleted from localStorage');
+                    } catch (error) {
+                        console.error('Error updating localStorage:', error);
+                    }
+                }
+            }
+
+            // Remove from local state
+            setUserGroups((prev) => {
+                const updated = prev.filter((group) => group.id !== pendingDeleteRowId);
+                // Apply stable sorting to maintain display order
+                return sortConfigsByDisplayOrder(updated);
+            });
+
+            console.log('✅ User group deleted successfully');
+            
+            // Show success notification
+            showBlueNotification('Successfully deleted 1 entries.');
+
+            // Close modal and reset state
+            setShowDeleteConfirmation(false);
+            setPendingDeleteRowId(null);
+            setCompressingRowId(null);
+            setFoldingRowId(null);
+        } catch (error) {
+            console.error('❌ Failed to delete user group:', error);
+            console.error('❌ Full error details:', {
+                error,
+                pendingDeleteRowId,
+                storageType: 'database'
+            });
+            
+            // Log the specific error message if available
+            if (error instanceof Error) {
+                console.error('❌ Error message:', error.message);
+            }
+            
+            // Show error notification
+            showBlueNotification('Failed to delete user group. Please try again.', 5000, false);
+        } finally {
+            setDeletingRow(false);
+        }
+    };
+
+    // Auto-save new user group when all required fields are filled - exactly like Manage Users
+    const autoSaveNewUserGroup = async (tempRowId: string, updatedGroup?: any) => {
+        console.log('🚀 autoSaveNewUserGroup function called with tempRowId:', tempRowId);
+
+        // Mark row as saving
+        setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
+
+        // Use the provided updated group or find it from current ref state
+        const group = updatedGroup || userGroupsRef.current.find((g) => g.id === tempRowId);
+        if (!group) {
+            console.error('❌ User group not found for auto-save:', tempRowId);
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+            return;
+        }
+
+        console.log('💾 Auto-saving new user group:', group);
+
+        // Check for duplicate entry (same groupName + entity + product + service)
+        const isDuplicate = userGroupsRef.current.some((existingGroup) => {
+            // Skip the current temporary row being saved
+            if (existingGroup.id === tempRowId) return false;
+            
+            // Check if all key fields match
+            return existingGroup.groupName?.toLowerCase().trim() === group.groupName?.toLowerCase().trim() &&
+                   existingGroup.entity?.toLowerCase().trim() === group.entity?.toLowerCase().trim() &&
+                   existingGroup.product?.toLowerCase().trim() === group.product?.toLowerCase().trim() &&
+                   existingGroup.service?.toLowerCase().trim() === group.service?.toLowerCase().trim();
+        });
+
+        if (isDuplicate) {
+            console.error('❌ Duplicate entry detected - User group with same Group Name, Entity, Product, and Service already exists');
+            
+            // Mark that duplicate was detected (to suppress generic error notification)
+            duplicateDetectedRef.current = true;
+            
+            // Clear autosave timer and countdown
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+            setAutoSaveCountdown(null);
+            setIsAutoSaving(false);
+            
+            // Show duplicate modal
+            setDuplicateMessage(
+                `This combination of Group Name (${group.groupName}), Entity (${group.entity}), Product (${group.product}), and Service (${group.service}) already exists in another row. Please use a different combination.`
+            );
+            setShowDuplicateModal(true);
+            
+            // Don't save the duplicate - return early instead of throwing error
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+            return; // Exit early without saving
+        }
+
+        // Check if a group with this name already exists in the database (created via + Add button)
+        console.log('🔍 [AutoSave] Checking if group exists in database:', group.groupName);
+        const checkQueryParams = new URLSearchParams();
+        checkQueryParams.append('name', group.groupName);
+        if (selectedAccountId) checkQueryParams.append('accountId', selectedAccountId);
+        if (selectedAccountName) checkQueryParams.append('accountName', selectedAccountName);
+        if (selectedEnterpriseId) checkQueryParams.append('enterpriseId', selectedEnterpriseId);
+        if (selectedEnterprise) checkQueryParams.append('enterpriseName', selectedEnterprise);
+        
+        try {
+            const existingGroupsResponse = await api.get<any[]>(`/api/user-management/groups?${checkQueryParams.toString()}`);
+            console.log('📦 [AutoSave] Existing groups response:', existingGroupsResponse);
+            
+            const existingGroupsArray = Array.isArray(existingGroupsResponse) ? existingGroupsResponse : [];
+            const exactMatch = existingGroupsArray.find(
+                (g: any) => g.name?.toLowerCase().trim() === group.groupName.toLowerCase().trim() ||
+                            g.groupName?.toLowerCase().trim() === group.groupName.toLowerCase().trim()
+            );
+            
+            if (exactMatch) {
+                // Group already exists (created via + Add button), UPDATE it with the filled fields
+                console.log('✅ [AutoSave] Found existing group created via + Add, updating with fields:', exactMatch.id);
+                const updateData = {
+                    groupName: group.groupName,
+                    description: group.description || '',
+                    entity: group.entity,
+                    product: group.product,
+                    service: group.service,
+                    roles: group.roles || '',
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                };
+                
+                console.log('📦 [AutoSave] Updating group with data:', updateData);
+                await api.put(`/api/user-management/groups/${exactMatch.id}`, updateData);
+                
+                // Get the display order before updating
+                const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+                
+                // Update the row ID in state to use the real database ID
+                setUserGroups((prev) => {
+                    const updated = prev.map((g) =>
+                        g.id === tempRowId
+                            ? {...g, id: exactMatch.id, updatedAt: new Date().toISOString()}
+                            : g,
+                    );
+                    // Apply stable sorting to maintain display order
+                    return sortConfigsByDisplayOrder(updated);
+                });
+                
+                // Update display order reference with the new ID
+                if (oldDisplayOrder !== undefined) {
+                    displayOrderRef.current.delete(tempRowId); // Remove old reference
+                    displayOrderRef.current.set(exactMatch.id, oldDisplayOrder); // Add new reference
+                    console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for updated group ID ${exactMatch.id}`);
+                }
+                
+                console.log('✅ [AutoSave] Updated existing group with filled fields:', exactMatch.id);
+                
+                // Clean up after successful update
+                setSavingRows((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tempRowId);
+                    return newSet;
+                });
+            } else {
+                // Group doesn't exist, CREATE it
+                const newId = `group-${Date.now()}-${Math.random()}`;
+                const groupData = {
+                    groupName: group.groupName,
+                    description: group.description || '',
+                    entity: group.entity,
+                    product: group.product,
+                    service: group.service,
+                    roles: group.roles || '',
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                };
+
+                console.log('📡 [AutoSave] Calling API POST /api/user-management/groups with data:', groupData);
+                const savedGroup = await api.post('/api/user-management/groups', groupData) as any;
+                console.log('📥 [AutoSave] API Response received:', savedGroup);
+                console.log('📥 [AutoSave] API Response type:', typeof savedGroup);
+                console.log('📥 [AutoSave] API Response has id?', savedGroup?.id);
+                
+                const savedGroupId = savedGroup?.id || newId;
+                console.log('🆔 [AutoSave] Using saved group ID:', savedGroupId);
+
+                // Verify the API actually returned a real ID from the database
+                if (!savedGroup?.id) {
+                    console.error('⚠️ [AutoSave] WARNING: API did not return an ID. Response:', savedGroup);
+                    showBlueNotification('Failed to save user group - API did not return a valid ID. Please try again.', 5000, false);
+                    setSavingRows((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(tempRowId);
+                        return newSet;
+                    });
+                    return;
+                }
+
+                // Get the display order before updating
+                const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+
+                // Update the accounts state with the new ID
+                setUserGroups((prev) => {
+                    const updated = prev.map((g) =>
+                        g.id === tempRowId
+                            ? {...g, id: savedGroupId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                            : g,
+                    );
+                    // Apply stable sorting to maintain display order
+                    return sortConfigsByDisplayOrder(updated);
+                });
+
+                // Update display order reference with the new ID
+                if (oldDisplayOrder !== undefined) {
+                    displayOrderRef.current.delete(tempRowId); // Remove old reference
+                    displayOrderRef.current.set(savedGroupId, oldDisplayOrder); // Add new reference
+                    console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for new user group ID ${savedGroupId}`);
+                }
+
+                console.log('🎉 [AutoSave] New user group saved successfully to database with ID:', savedGroupId);
+                
+                // Clean up after successful save
+                setSavingRows((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tempRowId);
+                    return newSet;
+                });
+            }
+        } catch (apiError) {
+            console.error('❌ [AutoSave] Failed to save user group to database:', apiError);
+            console.error('❌ [AutoSave] Error details:', JSON.stringify(apiError, null, 2));
+            
+            // Show error notification instead of throwing
+            showBlueNotification('Failed to auto-save user group. Please try saving manually.', 5000, false);
+            
+            // Clean up saving state
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+        }
+    };
+
+    // Debounced auto-save function with countdown - exactly like Manage Users
+    const debouncedAutoSave = useCallback(async () => {
+        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
+        
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            clearInterval(countdownIntervalRef.current!);
+        }
+
+        // Clear validation errors when auto-save timer starts (user is actively editing)
+        if (showValidationErrors) {
+            console.log('🧹 Clearing validation errors as user is actively editing');
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
         }
 
         // Start countdown
         setAutoSaveCountdown(10);
-
+        
         // Countdown interval
         const countdownInterval = setInterval(() => {
             setAutoSaveCountdown((prev) => {
@@ -554,1117 +1412,1652 @@ export default function ManageUserGroups() {
         // Set new timer for 10 seconds
         const timer = setTimeout(async () => {
             try {
-                console.log(
-                    '🔥 10-second timer triggered - starting auto-save process',
-                );
+                console.log('🔥 10-second timer triggered - starting auto-save process');
+                
+                // Clear the timer ref immediately since it's now executing - prevents navigation warning
+                autoSaveTimerRef.current = null;
+                console.log('✅ Cleared autoSaveTimerRef - navigation should be allowed during autosave execution');
+                
+                // Reset duplicate detection flag at the start of each autosave
+                duplicateDetectedRef.current = false;
+                
                 setIsAutoSaving(true);
                 setAutoSaveCountdown(null);
-                if (countdownIntervalRef.current) {
-                    clearInterval(countdownIntervalRef.current);
-                }
-
-                // Get all groups that need to be saved (temp groups with complete data)
-                const groupsToSave = tableDataRef.current.filter((group) => {
-                    const isTemp =
-                        group.id.toString().startsWith('temp-') ||
-                        group.id.toString().startsWith('new-') ||
-                        group.isNew === true;
-
+                clearInterval(countdownIntervalRef.current!);
+                countdownIntervalRef.current = null;
+                
+                // Get all temporary (unsaved) rows that are complete using current ref
+                const temporaryRows = userGroupsRef.current.filter((group) => {
+                    const isTemp = String(group.id).startsWith('tmp-');
                     if (!isTemp) return false;
-
-                    // Check if group has all required fields
-                    const hasGroupName = group.groupName?.trim();
-                    const hasDescription = group.description?.trim();
-
-                    const isComplete = hasGroupName && hasDescription;
-
+                    
+                    // Be more strict about what constitutes a complete user group row
+                    const hasGroupName = group.groupName?.trim() && group.groupName.trim().length > 0;
+                    const hasEntity = group.entity?.trim() && group.entity.trim().length > 0;
+                    const hasProduct = group.product?.trim() && group.product.trim().length > 0;
+                    const hasService = group.service?.trim() && group.service.trim().length > 0;
+                    
+                    const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
+                    
                     if (isTemp && !isComplete) {
-                        console.log(
-                            `🚫 Skipping incomplete temporary group ${group.id}:`,
-                            {
-                                hasGroupName: !!hasGroupName,
-                                hasDescription: !!hasDescription,
-                                groupNameValue: group.groupName,
-                                descriptionValue: group.description,
-                            },
-                        );
+                        console.log(`🚫 Skipping incomplete temporary user group ${group.id}:`, {
+                            hasGroupName: !!hasGroupName,
+                            hasEntity: !!hasEntity,
+                            hasProduct: !!hasProduct,
+                            hasService: !!hasService,
+                            groupNameValue: group.groupName,
+                            entityValue: group.entity,
+                            productValue: group.product,
+                            serviceValue: group.service
+                        });
                     }
-
+                    
                     return isComplete;
                 });
-
-                console.log(
-                    `📊 Found ${groupsToSave.length} complete groups to auto-save`,
-                );
-
-                if (groupsToSave.length > 0) {
-                    console.log(
-                        '💾 Auto-saving groups after 10 seconds of inactivity...',
-                        groupsToSave.map((g) => g.id),
-                    );
-
-                    for (const group of groupsToSave) {
-                        if (autoSaveGroupRef.current) {
-                            await autoSaveGroupRef.current(group, true);
+                
+                // Get all modified existing records that are still complete
+                const modifiedRows = userGroupsRef.current.filter((group) => {
+                    const isExisting = !String(group.id).startsWith('tmp-');
+                    const isModified = modifiedExistingRecordsRef.current.has(String(group.id));
+                    
+                    if (isExisting && isModified) {
+                        // Double-check that the record still has all required fields
+                        const hasGroupName = group.groupName?.trim();
+                        const hasEntity = group.entity?.trim();
+                        const hasProduct = group.product?.trim();
+                        const hasService = group.service?.trim();
+                        
+                        const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
+                        
+                        console.log(`🔍 Checking modified user group ${group.id}: isComplete=${isComplete}`, {
+                            hasGroupName: !!hasGroupName,
+                            hasEntity: !!hasEntity,
+                            hasProduct: !!hasProduct,
+                            hasService: !!hasService,
+                            groupNameValue: group.groupName,
+                            entityValue: group.entity,
+                            productValue: group.product,
+                            serviceValue: group.service
+                        });
+                        
+                        return isComplete;
+                    }
+                    
+                    console.log(`🔍 Checking user group ${group.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                    return false;
+                });
+                
+            console.log(`📊 Found ${temporaryRows.length} complete temporary user groups to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing user groups to auto-save`);
+            
+            // Check for orphaned records in modifiedExistingRecords
+            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
+                !userGroupsRef.current.find(group => String(group.id) === recordId)
+            );
+            if (orphanedRecords.length > 0) {
+                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
+                console.log('🧹 Cleaning up orphaned records from modified set');
+                setModifiedExistingRecords(prev => {
+                    const newSet = new Set(prev);
+                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
+                    return newSet;
+                });
+                // Update the ref immediately for this operation
+                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
+                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
+                modifiedExistingRecordsRef.current = cleanedSet;
+            }
+            
+            const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+            if (totalRowsToSave > 0) {
+                console.log('💾 Auto-saving user groups after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
+                
+                let successCount = 0;
+                let failureCount = 0;
+                
+                // Save new temporary user groups
+                for (const tempRow of temporaryRows) {
+                    console.log(`💾 Auto-saving user group: ${tempRow.id}`);
+                    
+                    // Reset duplicate flag before each save attempt
+                    const duplicateFlagBefore = duplicateDetectedRef.current;
+                    
+                    try {
+                        await autoSaveNewUserGroup(tempRow.id);
+                        
+                        // Check if duplicate was detected during save
+                        if (!duplicateDetectedRef.current || duplicateFlagBefore === duplicateDetectedRef.current) {
+                            // Only count as success if no duplicate was detected
+                            successCount++;
+                        } else {
+                            // Duplicate detected - don't count as success or failure
+                            console.log('ℹ️ Duplicate detected - not counting as success or failure');
+                        }
+                    } catch (error) {
+                        console.error(`❌ Failed to auto-save new user group ${tempRow.id}:`, error);
+                        // Only count as failure if not a duplicate (duplicate modal already shown)
+                        if (!duplicateDetectedRef.current) {
+                            failureCount++;
                         }
                     }
+                }
+                
+                // Save modified existing user groups to database via API
+                for (const modifiedRow of modifiedRows) {
+                    console.log(`💾 Saving modified existing user group: ${modifiedRow.id}`);
+                    try {
+                        // Check for duplicate entry (same groupName + entity + product + service as another record)
+                        const isDuplicate = userGroupsRef.current.some((existingGroup) => {
+                            // Skip the current row being updated
+                            if (existingGroup.id === modifiedRow.id) return false;
+                            
+                            // Check if all key fields match with another existing record
+                            return existingGroup.groupName?.toLowerCase().trim() === modifiedRow.groupName?.toLowerCase().trim() &&
+                                   existingGroup.entity?.toLowerCase().trim() === modifiedRow.entity?.toLowerCase().trim() &&
+                                   existingGroup.product?.toLowerCase().trim() === modifiedRow.product?.toLowerCase().trim() &&
+                                   existingGroup.service?.toLowerCase().trim() === modifiedRow.service?.toLowerCase().trim();
+                        });
 
-                    // Show success animation
-                    console.log('✨ Showing auto-save success animation');
+                        if (isDuplicate) {
+                            console.error(`❌ Duplicate entry detected for autosave update: ${modifiedRow.groupName}`);
+                            
+                            // Mark that duplicate was detected (to suppress generic error notification)
+                            duplicateDetectedRef.current = true;
+                            
+                            // Show duplicate modal
+                            setDuplicateMessage(
+                                `This combination of Group Name (${modifiedRow.groupName}), Entity (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
+                            );
+                            setShowDuplicateModal(true);
+                            
+                            failureCount++;
+                            continue; // Skip this row
+                        }
+                        
+                        await api.put(`/api/user-management/groups/${modifiedRow.id}`, {
+                            groupName: modifiedRow.groupName,
+                            description: modifiedRow.description || '',
+                            entity: modifiedRow.entity,
+                            product: modifiedRow.product,
+                            service: modifiedRow.service,
+                            roles: modifiedRow.roles || '',
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        });
+                        console.log(`✅ Modified user group ${modifiedRow.id} saved successfully`);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`❌ Failed to save modified user group ${modifiedRow.id}:`, error);
+                        failureCount++;
+                    }
+                }
+                
+                // Clear the modified records tracking only if all saves succeeded
+                if (failureCount === 0) {
+                    setModifiedExistingRecords(new Set());
+                    modifiedExistingRecordsRef.current = new Set();
+                    console.log('✅ Cleared modifiedExistingRecords - no more unsaved changes');
+                }
+                
+                // Show appropriate notification based on results
+                // Don't show any notification if duplicate modal was shown
+                if (duplicateDetectedRef.current && successCount === 0 && failureCount === 0) {
+                    // Only duplicate detected - modal already shown, no notification needed
+                    console.log('ℹ️ Duplicate detected - modal shown, skipping all notifications');
+                } else if (successCount > 0 && failureCount === 0 && !duplicateDetectedRef.current) {
+                    // All succeeded and no duplicates
+                    console.log('✨ Showing auto-save success animation for all entries');
                     setShowAutoSaveSuccess(true);
-
+                    
+                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
+                        : temporaryRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new entries`
+                        : `Auto-saved ${modifiedRows.length} updated entries`;
+                    
+                    showBlueNotification(message);
+                    
                     setTimeout(() => {
                         console.log('✨ Hiding auto-save success animation');
                         setShowAutoSaveSuccess(false);
                     }, 3000);
-
-                    console.log(
-                        `✅ Auto-saved ${groupsToSave.length} groups successfully`,
-                    );
-                } else {
-                    console.log('ℹ️ No groups found to auto-save');
+                    
+                    console.log(`✅ Auto-saved ${successCount} entries successfully`);
+                    
+                    // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
+                    console.log('🔄 Reloading user groups after successful autosave to update IDs...');
+                    await loadUserGroups({
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    });
+                    
+                    console.log('✅ Reload complete after autosave - checking state:', {
+                        autoSaveTimerRef: autoSaveTimerRef.current,
+                        modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                        userGroupsCount: userGroupsRef.current.length,
+                        hasTempRows: userGroupsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                    });
+                } else if (successCount > 0 && failureCount > 0 && !duplicateDetectedRef.current) {
+                    // Partial success and no duplicates
+                    console.warn(`⚠️ Auto-save partial: ${successCount} succeeded, ${failureCount} failed`);
+                    showBlueNotification(`Partially saved: ${successCount} succeeded, ${failureCount} failed. Please try saving manually.`, 8000, false);
+                } else if (failureCount > 0 && !duplicateDetectedRef.current) {
+                    // All failed (but not due to duplicate)
+                    console.error(`❌ All auto-save attempts failed: ${failureCount} errors`);
+                    showBlueNotification(`Failed to auto-save changes. Please save manually.`, 8000, false);
                 }
+            } else {
+                console.log('ℹ️ No complete rows to auto-save');
+            }
+            
+            setIsAutoSaving(false);
             } catch (error) {
-                console.error('❌ Auto-save failed:', error);
-            } finally {
+                console.error('❌ Auto-save error:', error);
                 setIsAutoSaving(false);
             }
-        }, 10000); // 10 seconds delay
+        }, 10000); // 10 seconds
 
         autoSaveTimerRef.current = timer;
-        console.log('⏰ Auto-save timer set for 10 seconds');
-    }, []);
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, showValidationErrors, loadUserGroups]);
 
-    // Auto-save individual group function
-    const autoSaveGroup = useCallback(
-        async (groupData: UserGroup, isNewGroup: boolean = false) => {
-            const groupId = groupData.id;
-            console.log(
-                `🎯 ${isNewGroup ? 'Creating' : 'Updating'} group: ${
-                    groupData.groupName
-                } (${groupId})`,
-            );
-
-            // Set saving state
-            setSavingStates((prev) => ({...prev, [groupId]: 'saving'}));
-
-            try {
-                if (
-                    isNewGroup ||
-                    groupData.id.toString().startsWith('temp-') ||
-                    groupData.id.toString().startsWith('new-') ||
-                    groupData.id.toString().startsWith('item-') ||
-                    groupData.isNew
-                ) {
-                    // Validate required fields
-                    const hasRequiredFields =
-                        groupData.groupName?.trim() &&
-                        groupData.description?.trim();
-
-                    if (!hasRequiredFields) {
-                        console.log(
-                            '⚠️ Skipping auto-save: Required fields missing',
-                            {
-                                groupName: groupData.groupName,
-                                description: groupData.description,
-                            },
-                        );
-                        setSavingStates((prev) => ({
-                            ...prev,
-                            [groupId]: 'error',
-                        }));
-                        return;
-                    }
-
-                    // Create new group via userManagement API
-                    console.log('🆕 Auto-saving new group:', groupData);
-
-                    // Get selected account from localStorage
-                    const selectedAccountId =
-                        typeof window !== 'undefined'
-                            ? window.localStorage.getItem('selectedAccountId')
-                            : null;
-                    const selectedAccountName =
-                        typeof window !== 'undefined'
-                            ? window.localStorage.getItem('selectedAccountName')
-                            : null;
-
-                    const requestBody: any = {
-                        name: groupData.groupName,
-                        description: groupData.description,
-                        entity: groupData.entity || '',
-                        service: groupData.service || '',
-                        assignedRoles: groupData.roles || [],
-                    };
-
-                    // Add account context if not Systiva
-                    if (selectedAccountId && selectedAccountId !== 'null') {
-                        requestBody.selectedAccountId = selectedAccountId;
-                    }
-                    if (selectedAccountName && selectedAccountName !== 'null') {
-                        requestBody.selectedAccountName = selectedAccountName;
-                    }
-
-                    console.log('📤 POST Request Body:', requestBody);
-
-                    const apiBase =
-                        process.env.NEXT_PUBLIC_API_BASE ||
-                        'http://localhost:4000';
-                    const response = await fetch(
-                        `${apiBase}/api/user-management/groups`,
-                        {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(requestBody),
-                        },
-                    );
-
-                    console.log(
-                        '📥 POST Response Status:',
-                        response.status,
-                        response.statusText,
-                    );
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to create group: ${response.status}`,
-                        );
-                    }
-
-                    const newGroup = await response.json();
-                    console.log('📦 Created group response:', newGroup);
-
-                    // Update the group ID with the real backend ID
-                    setTableData((prevData) =>
-                        prevData.map((g) =>
-                            g.id === groupId
-                                ? {
-                                      ...g,
-                                      id: newGroup.id,
-                                      isNew: false,
-                                      lastModified:
-                                          newGroup.updatedAt ||
-                                          new Date().toISOString(),
-                                  }
-                                : g,
-                        ),
-                    );
-
-                    setSavingStates((prev) => ({
-                        ...prev,
-                        [newGroup.id]: 'saved',
-                    }));
-                    console.log(`🎉 Created group: ${groupData.groupName}`);
-
-                    // Clear the temp ID from saving states
-                    setSavingStates((prev) => {
-                        const newStates = {...prev};
-                        delete newStates[groupId];
-                        return newStates;
-                    });
-                } else {
-                    // Update existing group
-                    console.log(
-                        '🔄 Auto-saving existing group:',
-                        groupId,
-                        groupData,
-                    );
-
-                    // Get selected account from localStorage
-                    const selectedAccountId =
-                        typeof window !== 'undefined'
-                            ? window.localStorage.getItem('selectedAccountId')
-                            : null;
-                    const selectedAccountName =
-                        typeof window !== 'undefined'
-                            ? window.localStorage.getItem('selectedAccountName')
-                            : null;
-
-                    const updateBody: any = {
-                        name: groupData.groupName,
-                        description: groupData.description,
-                        entity: groupData.entity || '',
-                        service: groupData.service || '',
-                        assignedRoles: groupData.roles || [],
-                    };
-
-                    // Add account context if not Systiva
-                    if (selectedAccountId && selectedAccountId !== 'null') {
-                        updateBody.selectedAccountId = selectedAccountId;
-                    }
-                    if (selectedAccountName && selectedAccountName !== 'null') {
-                        updateBody.selectedAccountName = selectedAccountName;
-                    }
-
-                    console.log('📤 PUT Request Body:', updateBody);
-
-                    const apiBase =
-                        process.env.NEXT_PUBLIC_API_BASE ||
-                        'http://localhost:4000';
-                    const response = await fetch(
-                        `${apiBase}/api/user-management/groups/${groupId}`,
-                        {
-                            method: 'PUT',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(updateBody),
-                        },
-                    );
-
-                    console.log(
-                        '📥 PUT Response Status:',
-                        response.status,
-                        response.statusText,
-                    );
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `Failed to update group: ${response.status}`,
-                        );
-                    }
-
-                    // Handle empty response body (backend might return 200 OK with no body)
-                    const responseText = await response.text();
-                    const updatedGroup = responseText
-                        ? JSON.parse(responseText)
-                        : null;
-                    console.log('📦 Updated group response:', updatedGroup);
-
-                    // If update returned null, the group doesn't exist in DB - create it instead
-                    if (updatedGroup === null) {
-                        console.warn(
-                            '⚠️ Group not found in database, creating it instead...',
-                        );
-                        const createBody: any = {
-                            name: groupData.groupName,
-                            description: groupData.description,
-                            entity: groupData.entity || '',
-                            service: groupData.service || '',
-                            assignedRoles: groupData.roles || [],
-                        };
-
-                        // Add account context if not Systiva
-                        if (selectedAccountId && selectedAccountId !== 'null') {
-                            createBody.selectedAccountId = selectedAccountId;
-                        }
-                        if (
-                            selectedAccountName &&
-                            selectedAccountName !== 'null'
-                        ) {
-                            createBody.selectedAccountName =
-                                selectedAccountName;
-                        }
-
-                        const createResponse = await fetch(
-                            `${apiBase}/api/user-management/groups`,
-                            {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify(createBody),
-                            },
-                        );
-
-                        if (!createResponse.ok) {
-                            throw new Error(
-                                `Failed to create group: ${createResponse.status}`,
-                            );
-                        }
-
-                        const newGroup = await createResponse.json();
-                        console.log('✅ Created group (fallback):', newGroup);
-
-                        // Update the group ID with the real backend ID
-                        setTableData((prevData) =>
-                            prevData.map((g) =>
-                                g.id === groupId
-                                    ? {
-                                          ...g,
-                                          id: newGroup.id,
-                                          isNew: false,
-                                          lastModified:
-                                              newGroup.updatedAt ||
-                                              new Date().toISOString(),
-                                      }
-                                    : g,
-                            ),
-                        );
-
-                        setSavingStates((prev) => ({
-                            ...prev,
-                            [newGroup.id]: 'saved',
-                        }));
-
-                        // Clear the old ID from saving states
-                        setSavingStates((prev) => {
-                            const newStates = {...prev};
-                            delete newStates[groupId];
-                            return newStates;
-                        });
-                    } else {
-                        setSavingStates((prev) => ({
-                            ...prev,
-                            [groupId]: 'saved',
-                        }));
-                        console.log(`💾 Updated group: ${groupData.groupName}`);
-                    }
-                }
-
-                // Clear saved state after 2 seconds
-                setTimeout(() => {
-                    setSavingStates((prev) => {
-                        const newStates = {...prev};
-                        delete newStates[groupId];
-                        return newStates;
-                    });
-                }, 2000);
-            } catch (error) {
-                console.error('❌ Auto-save failed for group:', groupId, error);
-                setSavingStates((prev) => ({...prev, [groupId]: 'error'}));
-
-                // Clear error state after 5 seconds
-                setTimeout(() => {
-                    setSavingStates((prev) => {
-                        const newStates = {...prev};
-                        delete newStates[groupId];
-                        return newStates;
-                    });
-                }, 5000);
-            }
-        },
-        [],
-    );
-
-    // Update ref to track current autoSaveGroup function
+    // Update the ref whenever debouncedAutoSave changes
     useEffect(() => {
-        autoSaveGroupRef.current = autoSaveGroup;
-    }, [autoSaveGroup]);
+        debouncedAutoSaveRef.current = debouncedAutoSave;
+    }, [debouncedAutoSave]);
 
-    // Manual Save All function
-    const handleSaveAll = async () => {
-        console.log('='.repeat(80));
-        console.log('💾 SAVE BUTTON CLICKED');
-        console.log('='.repeat(80));
-        console.log('📊 Current tableData state:', tableData);
-        console.log('📊 Current tableDataRef.current:', tableDataRef.current);
-        console.log('📊 Number of groups in tableData:', tableData.length);
-        console.log(
-            '📊 Number of groups in tableDataRef:',
-            tableDataRef.current.length,
+    // Function to check for unsaved changes - exactly like Manage Users
+    const getUnsavedChanges = () => {
+        const hasActiveTimer = !!autoSaveTimerRef.current;
+        const hasModifiedRecords = modifiedExistingRecordsRef.current.size > 0;
+        const hasTempRows = userGroupsRef.current.some((group: any) => 
+            String(group.id).startsWith('tmp-')
         );
+        
+        const hasUnsavedChanges = hasActiveTimer || hasModifiedRecords || hasTempRows;
+        
+        console.log('🔍 [getUnsavedChanges] Check:', {
+            hasActiveTimer,
+            hasModifiedRecords,
+            modifiedRecordsCount: modifiedExistingRecordsRef.current.size,
+            hasTempRows,
+            tempRowsIds: userGroupsRef.current.filter(g => String(g.id).startsWith('tmp-')).map(g => g.id),
+            totalGroups: userGroupsRef.current.length,
+            hasUnsavedChanges
+        });
+        
+        return hasUnsavedChanges;
+    };
 
-        // Clear auto-save timer
+    // Function to check for incomplete rows - exactly like Manage Users
+    const getIncompleteRows = () => {
+        const incompleteRows = userGroups
+            .filter((group: any) => {
+                const hasGroupName = group.groupName?.trim();
+                const hasEntity = group.entity?.trim();
+                const hasProduct = group.product?.trim();
+                const hasService = group.service?.trim();
+
+                // Include completely blank rows only when validation is explicitly shown
+                const isCompletelyBlank = !hasGroupName && !hasEntity && !hasProduct && !hasService;
+                if (isCompletelyBlank && !showValidationErrors) return false;
+
+                // Row is incomplete if any required field is missing
+                const isIncomplete = !hasGroupName || !hasEntity || !hasProduct || !hasService;
+                
+                console.log('🔍 Row validation check:', {
+                    id: group.id,
+                    hasGroupName,
+                    hasEntity,
+                    hasProduct,
+                    hasService,
+                    isIncomplete
+                });
+                
+                return isIncomplete;
+            })
+            .map((group: any) => group.id);
+            
+        // Only log when showValidationErrors is true to prevent infinite loops
+        if (showValidationErrors && incompleteRows.length > 0) {
+            console.log('🔍 getIncompleteRows result:', {
+                incompleteRowIds: incompleteRows,
+                totalGroups: userGroups.length,
+                showValidationErrors,
+                sampleGroupIds: userGroups.slice(0, 3).map(g => g.id)
+            });
+        }
+        
+        return incompleteRows;
+    };
+
+    // Router interception for navigation prevention - exactly like Manage Users
+    useEffect(() => {
+        // Store reference to original methods
+        const originalPush = router.push;
+        const originalReplace = router.replace;
+        
+        // Store original router for use in navigation confirmation
+        originalRouterRef.current = { push: originalPush, replace: originalReplace };
+
+        // Override router.push to intercept navigation
+        router.push = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - push method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+
+            return originalPush(href, options);
+        };
+
+        router.replace = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - replace method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+            return originalReplace(href, options);
+        };
+
+        // Handle browser history navigation (back/forward buttons)
+        const handlePopState = (event: PopStateEvent) => {
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if ((currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                event.preventDefault();
+                // Push current state back to prevent navigation
+                window.history.pushState(null, '', window.location.href);
+                setIncompleteRows(currentIncompleteRows);
+                setShowNavigationWarning(true);
+            }
+        };
+
+        // Add history listener for browser navigation
+        window.addEventListener('popstate', handlePopState);
+
+        // Cleanup on unmount
+        return () => {
+            router.push = originalPush;
+            router.replace = originalReplace;
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [router, userConfirmedLeave]);
+
+    // Handle search
+    const handleSearch = () => {
+        setAppliedSearchTerm(searchTerm);
+    };
+
+    const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
+
+    // Handle save all - exactly like Manage Users
+    const handleSaveAll = async () => {
+        console.log('💾 Save all clicked - validating and saving user groups...');
+        
+        // Reset duplicate detection flag at the start of manual save
+        duplicateDetectedRef.current = false;
+        
+        // Clear auto-save timer since user is manually saving
         if (autoSaveTimerRef.current) {
             console.log('🛑 Manual save clicked - clearing auto-save timer');
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
             setAutoSaveCountdown(null);
-        }
-        if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-        }
-
-        // Get all groups with complete data (both temp and existing)
-        console.log('🔍 Filtering groups from tableDataRef.current...');
-        const groupsToSave = tableDataRef.current.filter((group) => {
-            // Check if this is a temp/new group
-            const isTemp =
-                group.id.toString().startsWith('temp-') ||
-                group.id.toString().startsWith('new-') ||
-                group.isNew === true;
-
-            // Validate required fields
-            const hasGroupName = group.groupName?.trim();
-            const hasDescription = group.description?.trim();
-            const isComplete = hasGroupName && hasDescription;
-
-            console.log(`🔍 Checking group ${group.id}:`, {
-                id: group.id,
-                groupName: group.groupName,
-                description: group.description,
-                entity: group.entity,
-                service: group.service,
-                isTemp,
-                hasGroupName: !!hasGroupName,
-                hasDescription: !!hasDescription,
-                isComplete,
-                willBeSaved: isComplete ? '✅ YES' : '❌ NO',
-            });
-
-            // Save if it has complete data (regardless of temp or existing)
-            return isComplete;
-        });
-
-        console.log(
-            `📊 Found ${groupsToSave.length} groups to save manually:`,
-            groupsToSave.map((g) => ({
-                id: g.id,
-                name: g.groupName,
-                isNew: g.isNew,
-            })),
-        );
-
-        if (groupsToSave.length === 0) {
-            console.log(
-                'ℹ️ No groups to save - all groups are either incomplete or unchanged',
-            );
-            return;
-        }
-
-        setIsAutoSaving(true);
-
-        try {
-            for (const group of groupsToSave) {
-                // Determine if this is a new group based on ID pattern
-                const isNewGroup =
-                    group.id.toString().startsWith('temp-') ||
-                    group.id.toString().startsWith('new-') ||
-                    group.id.toString().startsWith('item-') ||
-                    group.isNew === true;
-
-                console.log(
-                    `💾 Saving group ${group.groupName} (isNew: ${isNewGroup})`,
-                );
-                await autoSaveGroup(group, isNewGroup);
-            }
-
-            // Show success animation
-            setShowAutoSaveSuccess(true);
-
-            setTimeout(() => {
-                setShowAutoSaveSuccess(false);
-            }, 3000);
-
-            console.log(
-                `✅ Manually saved ${groupsToSave.length} groups successfully`,
-            );
-        } catch (error) {
-            console.error('❌ Manual save failed:', error);
-        } finally {
-            setIsAutoSaving(false);
-        }
-    };
-
-    // Enhanced onDataChange with 10-second debounced auto-save
-    const handleDataChange = useCallback(
-        (newData: UserGroup[]) => {
-            console.log('🚀 HANDLE_DATA_CHANGE CALLED for groups!');
-            console.log(
-                '📝 Data changed, starting 10-second auto-save timer...',
-                {
-                    newDataLength: newData.length,
-                    newData: newData.map((g) => ({
-                        id: g.id,
-                        groupName: g.groupName,
-                        description: g.description,
-                    })),
-                },
-            );
-
-            // Check if data has actually changed to prevent infinite loops
-            const hasChanged =
-                JSON.stringify(newData) !== JSON.stringify(tableData);
-            if (!hasChanged) {
-                console.log('⏭️ Data unchanged, skipping auto-save timer');
-                return;
-            }
-
-            // Update table data immediately for UI responsiveness
-            setTableData(newData);
-
-            // CRITICAL: Also update the ref so autosave and manual save can access the latest data
-            tableDataRef.current = newData;
-            console.log('✅ Updated tableDataRef.current with new data');
-
-            // Trigger debounced auto-save timer (10 seconds)
-            debouncedAutoSave();
-        },
-        [tableData, debouncedAutoSave],
-    );
-
-    // Cleanup timeouts on unmount
-    useEffect(() => {
-        return () => {
-            if (autoSaveTimerRef.current) {
-                clearTimeout(autoSaveTimerRef.current);
-            }
             if (countdownIntervalRef.current) {
                 clearInterval(countdownIntervalRef.current);
             }
-        };
-    }, []);
-
-    // Handler functions for action buttons
-    const handleSort = (column: string) => {
-        setSortConfig((prev) => {
-            if (prev?.column === column) {
-                return {
-                    column,
-                    direction: prev.direction === 'asc' ? 'desc' : 'asc',
-                };
-            }
-            return {column, direction: 'asc'};
-        });
-        setSortVisible(false);
-    };
-
-    const handleFilter = (column: string, value: any) => {
-        setActiveFilters((prev) => ({
-            ...prev,
-            [column]: value,
-        }));
-    };
-
-    const clearFilters = () => {
-        setActiveFilters({});
-    };
-
-    const toggleColumnVisibility = (columnId: string) => {
-        setHiddenColumns((prev) => {
-            if (prev.includes(columnId)) {
-                return prev.filter((id) => id !== columnId);
-            } else {
-                return [...prev, columnId];
-            }
-        });
-    };
-
-    const handleGroupByAction = (groupByColumn: string) => {
-        setSelectedGroupBy((prev) =>
-            prev === groupByColumn ? '' : groupByColumn,
+        }
+        
+        // Get temporary (unsaved) and existing rows
+        const temporaryRows = userGroups.filter((group: any) => 
+            String(group.id).startsWith('tmp-')
         );
-    };
+        const existingRows = userGroups.filter((group: any) => 
+            !String(group.id).startsWith('tmp-')
+        );
 
-    // Process data with filters and sorting
-    const processedTableData = useMemo(() => {
-        console.log('🔄 processedTableData useMemo triggered');
-        console.log('📊 tableData length:', tableData.length);
-        console.log('📊 tableData:', tableData);
-        let processed = [...tableData];
+        // Check for incomplete temporary rows (including completely blank rows) - exactly like Manage Users
+        const incompleteTemporaryRows = temporaryRows.filter((group: any) => {
+            const hasGroupName = group.groupName?.trim();
+            const hasEntity = group.entity?.trim();
+            const hasProduct = group.product?.trim();
+            const hasService = group.service?.trim();
 
-        // Apply filters
-        Object.entries(activeFilters).forEach(([column, value]) => {
-            if (value) {
-                processed = processed.filter((row) => {
-                    const cellValue = row[column as keyof UserGroup];
-                    if (typeof cellValue === 'string') {
-                        return cellValue
-                            .toLowerCase()
-                            .includes(value.toLowerCase());
-                    }
-                    return cellValue === value;
+            // Row is incomplete if any required field is missing (including completely blank rows)
+            return !hasGroupName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Check for incomplete existing rows (including completely blank rows) - exactly like Manage Users
+        const incompleteExistingRows = existingRows.filter((group: any) => {
+            const hasGroupName = group.groupName?.trim();
+            const hasEntity = group.entity?.trim();
+            const hasProduct = group.product?.trim();
+            const hasService = group.service?.trim();
+
+            // Row is incomplete if any required field is missing (including completely blank rows)
+            return !hasGroupName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRowsData = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        // Get count of modified existing rows
+        const modifiedExistingRowsCount = existingRows.filter((group: any) => 
+            modifiedExistingRecords.has(group.id)
+        ).length;
+        
+        if (temporaryRows.length === 0 && modifiedExistingRowsCount === 0) {
+            showBlueNotification('No unsaved entries to save.', 3000, false);
+            return;
+        }
+
+        if (incompleteRowsData.length > 0) {
+            const allMissingFields = new Set<string>();
+            
+            console.log('🔍 Checking missing fields for incomplete rows:', incompleteRowsData);
+            incompleteRowsData.forEach((group) => {
+                console.log('📋 Checking group:', {
+                    id: group.id,
+                    groupName: group.groupName || '(empty)',
+                    entity: group.entity || '(empty)',
+                    product: group.product || '(empty)',
+                    service: group.service || '(empty)'
                 });
-            }
-        });
-
-        // Apply sorting
-        if (sortConfig) {
-            processed.sort((a, b) => {
-                const aVal = a[sortConfig.column as keyof UserGroup];
-                const bVal = b[sortConfig.column as keyof UserGroup];
-
-                if (!aVal && !bVal) return 0;
-                if (!aVal) return 1;
-                if (!bVal) return -1;
-
-                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+                
+                // Check for missing fields
+                if (!group.groupName?.trim()) allMissingFields.add('Group Name');
+                if (!group.entity?.trim()) allMissingFields.add('Entity');
+                if (!group.product?.trim()) allMissingFields.add('Product');
+                if (!group.service?.trim()) allMissingFields.add('Service');
             });
+            
+            console.log('📝 All missing fields:', Array.from(allMissingFields));
+            
+            const incompleteCount = incompleteRowsData.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
+            
+            setValidationMessage(message);
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
+            
+            // Set incomplete row IDs for highlighting
+            const incompleteRowIds = incompleteRowsData.map(r => r.id);
+            console.log('🎯 Setting incomplete row IDs for highlighting:', incompleteRowIds);
+            setIncompleteRows(incompleteRowIds); // Store incomplete row IDs for highlighting
+            
+            setShowValidationModal(true);
+            return;
         }
 
-        console.log('✅ processedTableData result:', processed);
-        console.log('✅ processedTableData length:', processed.length);
-        return processed;
-    }, [tableData, activeFilters, sortConfig]);
-
-    // Close dropdowns when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-
-            // Check if click is outside filter dialog
-            if (
-                filterVisible &&
-                filterRef.current &&
-                !filterRef.current.contains(target)
-            ) {
-                setFilterVisible(false);
-            }
-
-            // Check if click is outside sort dialog
-            if (
-                sortVisible &&
-                sortRef.current &&
-                !sortRef.current.contains(target)
-            ) {
-                setSortVisible(false);
-            }
-
-            // Check if click is outside group by dialog
-            if (
-                groupByVisible &&
-                groupByRef.current &&
-                !groupByRef.current.contains(target)
-            ) {
-                setGroupByVisible(false);
-            }
-
-            // Check if click is outside hide columns dialog
-            if (
-                hideColumnsVisible &&
-                hideColumnsRef.current &&
-                !hideColumnsRef.current.contains(target)
-            ) {
-                setHideColumnsVisible(false);
-            }
-        };
-
-        // Add event listener when any dialog is open
-        if (
-            filterVisible ||
-            sortVisible ||
-            groupByVisible ||
-            hideColumnsVisible
-        ) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        // Cleanup event listener
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [filterVisible, sortVisible, groupByVisible, hideColumnsVisible]);
-
-    // Handle user group creation
-    const handleCreateUserGroup = () => {
-        // Create a new blank row with unique ID
-        const newUserGroup = {
-            id: `new-${Date.now()}`, // Temporary ID for new rows
-            groupName: '',
-            description: '',
-            entity: '',
-            service: '',
-            roles: [],
-            status: 'active',
-            createdDate: new Date().toISOString().split('T')[0],
-            lastModified: new Date().toISOString(),
-            memberCount: 0,
-            isNew: true, // Flag to identify new rows
-        };
-
-        // Add the new row at the top of the table
-        setTableData((prevData) => [newUserGroup, ...prevData]);
-        console.log('✅ Added new blank row at top of table');
-    };
-
-    // Handle role management for a user group
-    const handleManageRoles = (groupData: UserGroup) => {
-        console.log('🎭 Opening role assignment panel for group:', groupData);
-        setSelectedGroupForRoles(groupData);
-        setShowRolePanel(true);
-    };
-
-    // Handle role assignment callback from sliding panel
-    const handleRoleAssignment = async (groupId: string, roles: any[]) => {
-        console.log('💾 Assigning roles to group:', groupId, roles);
-
+        // Save all complete temporary rows
         try {
-            // Extract role IDs from the roles array
-            const roleIds = roles.map((role) => role.id || role);
+            let savedCount = 0;
+            const completeTemporaryRows = temporaryRows.filter((group: any) => {
+                const hasGroupName = group.groupName?.trim();
+                const hasEntity = group.entity?.trim();
+                const hasProduct = group.product?.trim();
+                const hasService = group.service?.trim();
+                return hasGroupName && hasEntity && hasProduct && hasService;
+            });
+            
+            console.log('✅ Complete temporary rows to save:', completeTemporaryRows.length, completeTemporaryRows);
+            
+            // Get complete modified existing rows
+            const completeModifiedRows = existingRows.filter((group: any) => {
+                const hasGroupName = group.groupName?.trim();
+                const hasEntity = group.entity?.trim();
+                const hasProduct = group.product?.trim();
+                const hasService = group.service?.trim();
+                const isModified = modifiedExistingRecords.has(group.id);
+                return hasGroupName && hasEntity && hasProduct && hasService && isModified;
+            });
+            
+            console.log('✅ Complete modified rows to save:', completeModifiedRows.length, completeModifiedRows);
+            
+            let failedCount = 0;
+            
+            // Save temporary rows to database
+            for (const tempGroup of completeTemporaryRows) {
+                try {
+                    // Check for duplicate entry (same groupName + entity + product + service)
+                    const isDuplicate = userGroups.some((existingGroup: any) => {
+                        // Skip the current temporary row being saved
+                        if (existingGroup.id === tempGroup.id) return false;
+                        
+                        // Check if all key fields match
+                        return existingGroup.groupName?.toLowerCase().trim() === tempGroup.groupName?.toLowerCase().trim() &&
+                               existingGroup.entity?.toLowerCase().trim() === tempGroup.entity?.toLowerCase().trim() &&
+                               existingGroup.product?.toLowerCase().trim() === tempGroup.product?.toLowerCase().trim() &&
+                               existingGroup.service?.toLowerCase().trim() === tempGroup.service?.toLowerCase().trim();
+                    });
 
-            // Update the group with assigned roles
-            const response = await fetch(
-                `http://localhost:4000/api/user-management/groups/${groupId}`,
-                {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        assignedRoles: roleIds,
-                    }),
-                },
-            );
-
-            if (!response.ok) {
-                throw new Error(`Failed to assign roles: ${response.status}`);
-            }
-
-            console.log('✅ Roles assigned successfully');
-
-            // Update local state
-            setTableData((prevData) =>
-                prevData.map((group) =>
-                    group.id === groupId ? {...group, roles: roleIds} : group,
-                ),
-            );
-
-            // Close the panel
-            setShowRolePanel(false);
-            setSelectedGroupForRoles(null);
-        } catch (error) {
-            console.error('❌ Error assigning roles:', error);
-        }
-    };
-
-    // Use the base configuration - API integration is handled by ReusableTableComponent
-    const dynamicTableConfig = useMemo(() => {
-        console.log('📋 Using base table configuration with API integration');
-        console.log('🔧 Injecting fetched services into config:', services);
-
-        // Clone the config and inject the fetched services into the service column
-        const configWithServices = {
-            ...ManageUserGroups_tableConfig,
-            mainTableColumns: ManageUserGroups_tableConfig.mainTableColumns.map(
-                (col) => {
-                    if (col.id === 'service') {
-                        // Extract just the string values for the dropdown (TableComponent expects array of strings)
-                        const serviceValues =
-                            services.length > 0
-                                ? services.map((s) => s.value || s.label || s)
-                                : col.options;
-                        console.log(
-                            '🔧 Service dropdown values:',
-                            serviceValues,
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for:', tempGroup.groupName);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Group Name (${tempGroup.groupName}), Entity (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
                         );
-                        return {
-                            ...col,
-                            options: serviceValues,
-                        };
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
                     }
-                    if (col.id === 'entity') {
-                        // Extract just the string values for the dropdown (TableComponent expects array of strings)
-                        const entityValues =
-                            entities.length > 0
-                                ? entities.map((e) => e.value || e.label || e)
-                                : col.options;
-                        console.log('🔧 Entity dropdown values:', entityValues);
-                        return {
-                            ...col,
-                            options: entityValues,
+                    
+                    // Check if a group with this name already exists in the database (created via + Add button)
+                    console.log('🔍 Checking if group exists in database:', tempGroup.groupName);
+                    const queryParams = new URLSearchParams();
+                    queryParams.append('name', tempGroup.groupName);
+                    if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+                    if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+                    if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+                    if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+                    
+                    const existingGroupsResponse = await api.get<any[]>(`/api/user-management/groups?${queryParams.toString()}`);
+                    console.log('📦 Existing groups response:', existingGroupsResponse);
+                    
+                    const existingGroupsArray = Array.isArray(existingGroupsResponse) ? existingGroupsResponse : [];
+                    const exactMatch = existingGroupsArray.find(
+                        (g: any) => g.name?.toLowerCase().trim() === tempGroup.groupName.toLowerCase().trim() ||
+                                    g.groupName?.toLowerCase().trim() === tempGroup.groupName.toLowerCase().trim()
+                    );
+                    
+                    if (exactMatch) {
+                        // Group already exists (created via + Add button), UPDATE it with the filled fields
+                        console.log('✅ Found existing group created via + Add, updating with fields:', exactMatch.id);
+                        const updateData = {
+                            groupName: tempGroup.groupName,
+                            description: tempGroup.description || '',
+                            entity: tempGroup.entity,
+                            product: tempGroup.product,
+                            service: tempGroup.service,
+                            roles: tempGroup.roles || '',
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
                         };
+                        
+                        console.log('📦 Updating group with data:', updateData);
+                        await api.put(`/api/user-management/groups/${exactMatch.id}`, updateData);
+                        
+                        // Update the row ID in state to use the real database ID
+                        setUserGroups((prev) =>
+                            prev.map((g) =>
+                                g.id === tempGroup.id
+                                    ? {...g, id: exactMatch.id, updatedAt: new Date().toISOString()}
+                                    : g,
+                            ),
+                        );
+                        
+                        savedCount++;
+                        console.log('✅ Updated existing group with filled fields:', exactMatch.id);
+                    } else {
+                        // Group doesn't exist, CREATE it
+                        const newId = `group-${Date.now()}-${Math.random()}`;
+                        const groupData = {
+                            groupName: tempGroup.groupName,
+                            description: tempGroup.description || '',
+                            entity: tempGroup.entity,
+                            product: tempGroup.product,
+                            service: tempGroup.service,
+                            roles: tempGroup.roles || '',
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        };
+                        
+                        console.log('💾 Creating new user group:', groupData);
+                        const savedGroup = await api.post('/api/user-management/groups', groupData) as any;
+                        const savedGroupId = savedGroup?.id || newId;
+                        
+                        // Update the row ID in state
+                        setUserGroups((prev) =>
+                            prev.map((g) =>
+                                g.id === tempGroup.id
+                                    ? {...g, id: savedGroupId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                                    : g,
+                            ),
+                        );
+                        
+                        savedCount++;
+                        console.log('🎉 New user group saved successfully!');
                     }
-                    return col;
-                },
-            ),
-        };
+                } catch (error) {
+                    console.error('❌ Failed to save new user group:', error);
+                    failedCount++;
+                }
+            }
+            
+            // Save modified existing rows to database
+            for (const modifiedGroup of completeModifiedRows) {
+                try {
+                    // Check for duplicate entry (same groupName + entity + product + service as another record)
+                    const isDuplicate = userGroups.some((existingGroup: any) => {
+                        // Skip the current row being updated
+                        if (existingGroup.id === modifiedGroup.id) return false;
+                        
+                        // Check if all key fields match with another existing record
+                        return existingGroup.groupName?.toLowerCase().trim() === modifiedGroup.groupName?.toLowerCase().trim() &&
+                               existingGroup.entity?.toLowerCase().trim() === modifiedGroup.entity?.toLowerCase().trim() &&
+                               existingGroup.product?.toLowerCase().trim() === modifiedGroup.product?.toLowerCase().trim() &&
+                               existingGroup.service?.toLowerCase().trim() === modifiedGroup.service?.toLowerCase().trim();
+                    });
 
-        console.log('✅ Config with services:', configWithServices);
-        return configWithServices;
-    }, [services, entities]);
-
-    // Handle user group actions
-    const handleGroupAction = (
-        action: string,
-        groupId: string,
-        groupData: UserGroup,
-    ) => {
-        console.log('Group action:', action, groupId, groupData);
-        switch (action) {
-            case 'save':
-                // Handle saving new or edited groups
-                if (groupData.isNew) {
-                    // Generate a real ID for the new group
-                    const savedGroup = {
-                        ...groupData,
-                        id: `group-${Date.now()}`,
-                        isNew: false,
-                        lastModified: new Date().toISOString(),
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for update:', modifiedGroup.groupName);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Group Name (${modifiedGroup.groupName}), Entity (${modifiedGroup.entity}), Product (${modifiedGroup.product}), and Service (${modifiedGroup.service}) already exists in another row. Please use a different combination.`
+                        );
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
+                    }
+                    
+                    const groupData = {
+                        groupName: modifiedGroup.groupName,
+                        description: modifiedGroup.description || '',
+                        entity: modifiedGroup.entity,
+                        product: modifiedGroup.product,
+                        service: modifiedGroup.service,
+                        roles: modifiedGroup.roles || '',
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
                     };
-
-                    setTableData((prev) =>
-                        prev.map((group) =>
-                            group.id === groupId ? savedGroup : group,
+                    
+                    console.log('💾 Updating existing user group:', modifiedGroup.id, groupData);
+                    await api.put(`/api/user-management/groups/${modifiedGroup.id}`, groupData);
+                    
+                    // Update the row's updatedAt timestamp in state
+                    setUserGroups((prev) =>
+                        prev.map((g) =>
+                            g.id === modifiedGroup.id
+                                ? {...g, updatedAt: new Date().toISOString()}
+                                : g,
                         ),
                     );
-                    console.log('✅ Saved new group:', savedGroup);
-                } else {
-                    // Update existing group
-                    setTableData((prev) =>
-                        prev.map((group) =>
-                            group.id === groupId
-                                ? {
-                                      ...groupData,
-                                      lastModified: new Date().toISOString(),
-                                  }
-                                : group,
-                        ),
-                    );
-                    console.log('✅ Updated existing group:', groupData);
+                    
+                    savedCount++;
+                    console.log('🎉 Existing user group updated successfully!');
+                } catch (error) {
+                    console.error('❌ Failed to update user group:', error);
+                    failedCount++;
                 }
-                break;
-            case 'edit':
-                // Open edit modal
-                console.log('Edit group:', groupId);
-                break;
-            case 'duplicate':
-                // Duplicate group
-                const duplicatedGroup = {
-                    ...groupData,
-                    id: `new-${Date.now()}`,
-                    groupName: `${groupData.groupName} (Copy)`,
-                    isNew: true,
-                    createdDate: new Date().toISOString().split('T')[0],
-                    lastModified: new Date().toISOString(),
-                };
-                setTableData((prev) => [duplicatedGroup, ...prev]);
-                console.log('✅ Duplicated group:', duplicatedGroup);
-                break;
-            case 'delete':
-                // Implement delete logic
-                setTableData((prev) =>
-                    prev.filter((group) => group.id !== groupId),
-                );
-                console.log('✅ Deleted group:', groupId);
-                break;
-            case 'cancel':
-                // Cancel editing new row
-                if (groupData.isNew) {
-                    setTableData((prev) =>
-                        prev.filter((group) => group.id !== groupId),
-                    );
-                    console.log('✅ Cancelled new group creation');
+            }
+            
+            // Clear the modified records tracking after successful saves
+            if (completeModifiedRows.length > 0 && failedCount === 0) {
+                setModifiedExistingRecords(new Set());
+                console.log('✨ Cleared modified records tracking');
+            }
+            
+            if (savedCount > 0 && failedCount === 0) {
+                const newCount = completeTemporaryRows.length;
+                const updatedCount = completeModifiedRows.length;
+                const message = newCount > 0 && updatedCount > 0
+                    ? `Successfully saved ${newCount} new and ${updatedCount} updated entries.`
+                    : newCount > 0
+                    ? `Successfully saved ${newCount} new entries.`
+                    : `Successfully saved ${updatedCount} updated entries.`;
+                
+                showBlueNotification(message);
+                setShowValidationErrors(false); // Clear validation errors on successful save
+                setExternalFieldErrors({});
+                setIncompleteRows([]);
+                
+                // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
+                console.log('🔄 Reloading user groups after successful manual save to update IDs...');
+                await loadUserGroups({
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                });
+                
+                console.log('✅ Reload complete after manual save - checking state:', {
+                    autoSaveTimerRef: autoSaveTimerRef.current,
+                    modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                    userGroupsCount: userGroupsRef.current.length,
+                    hasTempRows: userGroupsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                });
+            } else if (duplicateDetectedRef.current && savedCount === 0 && failedCount === 0) {
+                // Only duplicate detected - modal already shown, no notification needed
+                console.log('ℹ️ Duplicate modal shown - skipping all notifications');
+            } else if (savedCount > 0 && failedCount > 0) {
+                // Don't show notification if duplicate modal was shown
+                if (!duplicateDetectedRef.current) {
+                    showBlueNotification(`Partially saved: ${savedCount} succeeded, ${failedCount} failed. Please check console for errors.`, 5000, false);
                 }
-                break;
-            default:
-                console.log('Unknown action:', action);
+            } else if (failedCount > 0 && !duplicateDetectedRef.current) {
+                // Only show error notification if duplicate modal was NOT shown
+                showBlueNotification(`Failed to save ${failedCount} entries. Please check console for errors.`, 5000, false);
+            } else if (savedCount === 0 && failedCount === 0 && !duplicateDetectedRef.current) {
+                // No failures and no duplicates - just nothing to save
+                showBlueNotification('No complete entries to save.', 3000, false);
+            }
+        } catch (error) {
+            console.error('Failed to save entries:', error);
+            showBlueNotification('Failed to save some entries. Please try again.', 3000, false);
         }
     };
 
-    // Toggle search visibility
-    const toggleSearch = () => {
-        setSearchVisible(!searchVisible);
-        if (searchVisible) {
-            setSearchTerm('');
-        }
+    // Filter form state
+    const [filterForm, setFilterForm] = useState({
+        groupName: '',
+        entity: '',
+        product: '',
+        service: '',
+    });
+
+    // Update filterFormRef whenever filterForm changes
+    useEffect(() => {
+        filterFormRef.current = filterForm;
+    }, [filterForm]);
+
+    // Track if Clear All was clicked to allow closing filter panel on outside click
+    const filterClearedRef = useRef(false);
+
+    // Filter dropdown suggestions state - exactly like Manage Users
+    const [showGroupNameSuggestions, setShowGroupNameSuggestions] = useState(false);
+    const [showEntitySuggestions, setShowEntitySuggestions] = useState(false);
+    const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+    const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
+    
+    const [filteredGroupNames, setFilteredGroupNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEntities, setFilteredEntities] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredProducts, setFilteredProducts] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredServices, setFilteredServices] = useState<Array<{id: string; name: string}>>([]);
+    
+    const [selectedGroupNameIndex, setSelectedGroupNameIndex] = useState(-1);
+    const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
+    const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
+    const [selectedServiceIndex, setSelectedServiceIndex] = useState(-1);
+
+    // Apply and clear filter handlers
+    const handleApplyFilters = () => {
+        const filters: Record<string, any> = {};
+        if (filterForm.groupName) filters.groupName = filterForm.groupName;
+        if (filterForm.entity) filters.entity = filterForm.entity;
+        if (filterForm.product) filters.product = filterForm.product;
+        if (filterForm.service) filters.service = filterForm.service;
+        
+        setActiveFilters(filters);
+        closeAllDialogs();
+        
+        // Reset the cleared flag when panel is closed via Apply
+        filterClearedRef.current = false;
     };
 
-    // Handle group by selection
-    const handleGroupByChange = (groupBy: string) => {
-        setSelectedGroupBy(groupBy);
+    const handleClearFilters = () => {
+        setFilterForm({
+            groupName: '',
+            entity: '',
+            product: '',
+            service: '',
+        });
+        setActiveFilters({});
+        
+        // Mark that filters were cleared - allow closing on outside click
+        filterClearedRef.current = true;
     };
 
-    // Enhanced Column Header Renderer with Icons
-    const renderColumnHeader = (column: any) => {
-        const getColumnIcon = (columnId: string) => {
-            const icons = {
-                groupName: (
-                    <svg
-                        width='12'
-                        height='12'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        className='cell-icon'
-                    >
-                        {/* Users/Group icon */}
-                        <path
-                            d='M17 21V19C17 15.1340 14.8660 12 11 12C7.13401 12 5 15.1340 5 19V21'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                        <circle
-                            cx='11'
-                            cy='7'
-                            r='4'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                        />
-                        <path
-                            d='M22 21V19C22 15.1340 19.8660 12 16 12C17.5 12 19 13.5 19 15.5'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                    </svg>
-                ),
-                description: (
-                    <svg
-                        width='12'
-                        height='12'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        className='cell-icon'
-                    >
-                        {/* Text/Description icon */}
-                        <path
-                            d='M4 7H20'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                        />
-                        <path
-                            d='M4 12H16'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                        />
-                        <path
-                            d='M4 17H12'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                        />
-                    </svg>
-                ),
-                entity: (
-                    <svg
-                        width='12'
-                        height='12'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        className='cell-icon'
-                    >
-                        {/* Building/Organization icon */}
-                        <path
-                            d='M3 21H21M5 21V7L12 3L19 7V21'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                        <path
-                            d='M9 9H11M9 12H11M9 15H11M13 9H15M13 12H15M13 15H15'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                        />
-                    </svg>
-                ),
-                service: (
-                    <svg
-                        width='12'
-                        height='12'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        className='cell-icon'
-                    >
-                        {/* Gear/Settings icon */}
-                        <circle
-                            cx='12'
-                            cy='12'
-                            r='3'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                        />
-                        <path
-                            d='M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                            strokeLinecap='round'
-                        />
-                    </svg>
-                ),
-                roles: (
-                    <svg
-                        width='12'
-                        height='12'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        className='cell-icon'
-                    >
-                        {/* Compact Document/Roles icon */}
-                        <path
-                            d='M4 4H16L20 8V20C20 20.5304 19.7893 21.0391 19.4142 21.4142C19.0391 21.7893 18.5304 22 18 22H6C5.46957 22 4.96086 21.7893 4.58579 21.4142C4.21071 21.0391 4 20.5304 4 20V4Z'
-                            stroke='#4ba3ff'
-                            strokeWidth='2'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                        <path
-                            d='M8 12H12M8 16H16'
-                            stroke='#4ba3ff'
-                            strokeWidth='2'
-                            strokeLinecap='round'
-                        />
-                        <circle
-                            cx='16'
-                            cy='18'
-                            r='2'
-                            stroke='#4ba3ff'
-                            strokeWidth='1.8'
-                        />
-                    </svg>
-                ),
-            };
-
-            return icons[columnId as keyof typeof icons] || null;
-        };
-
-        if (column.id === 'checkbox') {
-            return null; // No icon for checkbox column
-        }
-
-        return (
-            <div className='header-content modern-header'>
-                <div className='header-text-with-icon'>
-                    {getColumnIcon(column.id)}
-                    <span>{column.title}</span>
-                </div>
-            </div>
-        );
+    // Handler to show all columns
+    const handleShowAllColumns = () => {
+        setVisibleCols(allCols);
     };
 
     return (
-        <div className='min-h-screen bg-gray-50'>
-            {/* Page Header */}
-            <div className='bg-white border-b border-gray-200'>
-                <div className='px-6 py-4'>
-                    <div>
-                        <h1 className='text-2xl font-bold text-gray-900'>
-                            Manage User Groups
-                        </h1>
-                        <p className='mt-1 text-sm text-gray-500'>
-                            Create, edit, and manage user groups and their role
-                            assignments
-                        </p>
-                    </div>
+        <div className='h-full bg-secondary flex flex-col'>
+            {/* Header Section */}
+            <div className='bg-white px-3 py-4 border-b border-slate-200'>
+                <div className='w-full'>
+                    <h1 className='text-2xl font-bold text-slate-900'>
+                        Manage User Groups
+                    </h1>
+                    <p className='mt-2 text-sm text-slate-600 leading-relaxed'>
+                        Create, organize, and govern user groups through a unified access and permission framework.
+                    </p>
                 </div>
             </div>
 
-            {/* Actions Bar */}
-            <div className='bg-white border-b border-gray-200'>
-                <div className='px-6 py-4'>
-                    <div className='flex items-center space-x-4'>
-                        {/* Create button */}
+            {/* Toolbar Section */}
+            <div className='bg-sap-light-gray px-3 py-3 text-primary border-y border-light'>
+                <div className='flex items-center justify-between gap-3'>
+                    <div className='flex items-center gap-3 flex-wrap'>
+                        {/* Create New User Group Button */}
                         <button
-                            onClick={handleCreateUserGroup}
-                            className='inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                        >
-                            <svg
-                                className='w-4 h-4 mr-2'
-                                fill='none'
-                                viewBox='0 0 24 24'
-                                stroke='currentColor'
-                            >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M12 4v16m8-8H4'
-                                />
-                            </svg>
-                            Create New User Group
-                        </button>
-
-                        {/* Save Button with countdown timer */}
-                        <button
-                            onClick={handleSaveAll}
-                            disabled={isAutoSaving}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
-                                isAutoSaving
+                            onClick={handleAddNewRow}
+                            disabled={isLoading}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm ${
+                                isLoading
                                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                    : showAutoSaveSuccess
-                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
-                                    : autoSaveCountdown
-                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                                    : 'bg-primary-600 text-white hover:bg-primary-700'
                             }`}
                         >
-                            {/* Animated saving icon */}
-                            {isAutoSaving && (
+                            {isLoading ? (
+                                <div className='h-4 w-4 animate-spin'>
+                                    <svg
+                                        className='h-full w-full'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <circle
+                                            className='opacity-25'
+                                            cx='12'
+                                            cy='12'
+                                            r='10'
+                                            stroke='currentColor'
+                                            strokeWidth='4'
+                                        />
+                                        <path
+                                            className='opacity-75'
+                                            fill='currentColor'
+                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                        />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <PlusIcon className='h-4 w-4' />
+                            )}
+                            <span className='text-sm'>
+                                {isLoading ? 'Loading...' : 'Create New User Group'}
+                            </span>
+                        </button>
+
+                        {/* Search Input - Always Visible */}
+                        <div ref={searchRef} className='flex items-center'>
+                            <div className='relative w-60'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                                </div>
+                                <input
+                                    type='text'
+                                    placeholder='Global Search'
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setAppliedSearchTerm(e.target.value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            setAppliedSearchTerm(searchTerm);
+                                        }
+                                    }}
+                                    className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
+                                    style={{ fontSize: '14px' }}
+                                />
+                                {appliedSearchTerm && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setAppliedSearchTerm('');
+                                        }}
+                                        className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
+                                        title='Clear search'
+                                    >
+                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Filter Button */}
+                        <div ref={filterRef} className='relative'>
+                            <button
+                                onClick={() =>
+                                    filterVisible
+                                        ? closeAllDialogs()
+                                        : toggleDialog('filter')
+                                }
+                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    filterVisible ||
+                                    Object.keys(activeFilters).length > 0
+                                        ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
+                                }`}
+                            >
                                 <svg
-                                    className='animate-spin h-4 w-4 text-white'
-                                    xmlns='http://www.w3.org/2000/svg'
+                                    className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z'
+                                    />
+                                </svg>
+                                <span className='text-sm'>Filter</span>
+                                {Object.keys(activeFilters).length > 0 && (
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-bounce'></div>
+                                )}
+                            </button>
+
+                            {/* Filter Dropdown */}
+                            {filterVisible && (
+                                <div className='absolute top-full mt-2 left-0 bg-card text-primary shadow-xl border border-blue-200 rounded-lg z-50 min-w-80'>
+                                    <div className='flex items-center justify-between px-3 py-1.5 border-b border-blue-200'>
+                                        <div className='text-xs font-semibold'>
+                                            Filters
+                                        </div>
+                                        <div className='flex items-center gap-2'>
+                                            <button
+                                                onClick={handleClearFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear All
+                                            </button>
+                                            <button
+                                                onClick={handleApplyFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Apply
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className='p-2'>
+                                        <div className='space-y-2'>
+                                            {/* Group Name Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Group Name
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.groupName}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                groupName: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter group names
+                                                            const filtered = (dropdownOptions.groupNames || []).filter(groupName =>
+                                                                groupName.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredGroupNames(filtered);
+                                                            setShowGroupNameSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedGroupNameIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedGroupNameIndex(prev => 
+                                                                    prev < filteredGroupNames.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedGroupNameIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedGroupNameIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredGroupNames[selectedGroupNameIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    groupName: selected.name,
+                                                                });
+                                                                setShowGroupNameSuggestions(false);
+                                                                setSelectedGroupNameIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowGroupNameSuggestions(false);
+                                                                setSelectedGroupNameIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowGroupNameSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.groupName && filteredGroupNames.length > 0) {
+                                                                setShowGroupNameSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showGroupNameSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredGroupNames.map((groupName, index) => (
+                                                                <div
+                                                                    key={groupName.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedGroupNameIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            groupName: groupName.name,
+                                                                        });
+                                                                        setShowGroupNameSuggestions(false);
+                                                                        setSelectedGroupNameIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {groupName.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Entity Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Entity
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.entity}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                entity: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter entities
+                                                            const filtered = (dropdownOptions.entities || []).filter(entity =>
+                                                                entity.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredEntities(filtered);
+                                                            setShowEntitySuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedEntityIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => 
+                                                                    prev < filteredEntities.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedEntityIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredEntities[selectedEntityIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    entity: selected.name,
+                                                                });
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowEntitySuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.entity && filteredEntities.length > 0) {
+                                                                setShowEntitySuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showEntitySuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredEntities.map((entity, index) => (
+                                                                <div
+                                                                    key={entity.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedEntityIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            entity: entity.name,
+                                                                        });
+                                                                        setShowEntitySuggestions(false);
+                                                                        setSelectedEntityIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {entity.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Product Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Product
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.product}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                product: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter products
+                                                            const filtered = (dropdownOptions.products || []).filter(product =>
+                                                                product.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredProducts(filtered);
+                                                            setShowProductSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedProductIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedProductIndex(prev => 
+                                                                    prev < filteredProducts.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedProductIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedProductIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredProducts[selectedProductIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    product: selected.name,
+                                                                });
+                                                                setShowProductSuggestions(false);
+                                                                setSelectedProductIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowProductSuggestions(false);
+                                                                setSelectedProductIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowProductSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.product && filteredProducts.length > 0) {
+                                                                setShowProductSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showProductSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredProducts.map((product, index) => (
+                                                                <div
+                                                                    key={product.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedProductIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            product: product.name,
+                                                                        });
+                                                                        setShowProductSuggestions(false);
+                                                                        setSelectedProductIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {product.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Service Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Service
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.service}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                service: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter services
+                                                            const filtered = (dropdownOptions.services || []).filter(service =>
+                                                                service.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredServices(filtered);
+                                                            setShowServiceSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedServiceIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedServiceIndex(prev => 
+                                                                    prev < filteredServices.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedServiceIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedServiceIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredServices[selectedServiceIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    service: selected.name,
+                                                                });
+                                                                setShowServiceSuggestions(false);
+                                                                setSelectedServiceIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowServiceSuggestions(false);
+                                                                setSelectedServiceIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowServiceSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.service && filteredServices.length > 0) {
+                                                                setShowServiceSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showServiceSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredServices.map((service, index) => (
+                                                                <div
+                                                                    key={service.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedServiceIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            service: service.name,
+                                                                        });
+                                                                        setShowServiceSuggestions(false);
+                                                                        setSelectedServiceIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {service.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                    {/* Sort Button */}
+                    <div ref={sortRef} className='relative'>
+                        <button
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                sortOpen || sortColumn
+                                    ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                sortOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('sort')
+                            }
+                        >
+                            <ArrowsUpDownIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Sort</span>
+                            {sortColumn && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {sortOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Sort by
+                                    </div>
+                                    {sortColumn && (
+                                        <button
+                                            onClick={clearSort}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortColumn}
+                                                    onChange={(e) =>
+                                                        setSortColumn(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>
+                                                        Select column...
+                                                    </option>
+                                                    {sortableCols.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {columnLabels[c]}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Direction
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortDirection}
+                                                    onChange={(e) => {
+                                                        const newDirection = e.target.value as 'asc' | 'desc' | '';
+                                                        setSortDirection(newDirection);
+                                                        // Only apply sorting if both column and valid direction are selected
+                                                        if (sortColumn && (newDirection === 'asc' || newDirection === 'desc')) {
+                                                            applySorting(sortColumn, newDirection);
+                                                        }
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select direction...</option>
+                                                    <option value='asc'>
+                                                        Ascending (A-Z, 0-9)
+                                                    </option>
+                                                    <option value='desc'>
+                                                        Descending (Z-A, 9-0)
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Current Sort Display */}
+                                        {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
+                                            <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
+                                                <span className='font-medium text-blue-800'>
+                                                    {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Hide Columns Button */}
+                    <div ref={hideRef} className='relative'>
+                        <button
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                hideOpen || visibleCols.length < allCols.length
+                                    ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                hideOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('hide')
+                            }
+                        >
+                            <EyeSlashIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Show/Hide</span>
+                            {visibleCols.length < allCols.length && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {hideOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Displayed Columns
+                                    </div>
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <div className='relative'>
+                                                <input
+                                                    value={hideQuery}
+                                                    onChange={(e) =>
+                                                        setHideQuery(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Columns List */}
+                                    <div className='max-h-40 overflow-auto divide-y divide-light mt-2'>
+                                        {allCols
+                                            .filter((c) =>
+                                                c
+                                                    .toLowerCase()
+                                                    .includes(
+                                                        hideQuery.toLowerCase(),
+                                                    ),
+                                            )
+                                            .map((c) => (
+                                                <label
+                                                    key={c}
+                                                    className='flex items-center justify-between py-1.5 cursor-pointer hover:bg-blue-50'
+                                                >
+                                                    <span className='text-sm'>
+                                                        {columnLabels[c] || c}
+                                                    </span>
+                                                    <input
+                                                        type='checkbox'
+                                                        checked={visibleCols.includes(c as ColumnType)}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            setVisibleCols((prev) => {
+                                                                if (checked)
+                                                                    return Array.from(
+                                                                        new Set([
+                                                                            ...prev,
+                                                                            c as ColumnType,
+                                                                        ]),
+                                                                    );
+                                                                return prev.filter(
+                                                                    (x) => x !== c,
+                                                                );
+                                                            });
+                                                        }}
+                                                        className='rounded border-blue-300 text-blue-600 focus:ring-blue-500'
+                                                    />
+                                                </label>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Group By Button */}
+                    <div ref={groupRef} className='relative flex items-center'>
+                        <button
+                            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                groupOpen || ActiveGroupLabel !== 'None'
+                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                groupOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('group')
+                            }
+                        >
+                            <RectangleStackIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Group by</span>
+                            {ActiveGroupLabel !== 'None' && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {groupOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Group by
+                                    </div>
+                                    {ActiveGroupLabel !== 'None' && (
+                                        <button
+                                            onClick={clearGroupBy}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setGroupByFromLabel(value || 'None');
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select column...</option>
+                                                    <option value='Group Name'>Group Name</option>
+                                                    <option value='Entity'>Entity</option>
+                                                    <option value='Product'>Product</option>
+                                                    <option value='Service'>Service</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Current Group Display */}
+                                        {ActiveGroupLabel !== 'None' && (
+                                            <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
+                                                <span className='font-medium text-orange-800'>
+                                                    Grouped by: {ActiveGroupLabel}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                        onClick={handleSaveAll}
+                        disabled={isLoading || isAutoSaving}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                            isLoading || isAutoSaving
+                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                : showAutoSaveSuccess
+                                ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                : autoSaveCountdown
+                                ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                        }`}
+                        title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                    >
+                        {/* Progress bar animation for auto-save countdown */}
+                        {autoSaveCountdown && (
+                            <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
+                                    style={{
+                                        width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
+                                    }}
+                                ></div>
+                            </div>
+                        )}
+                        
+                        {/* Auto-save success wave animation */}
+                        {showAutoSaveSuccess && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
+                        )}
+                        
+                        {isAutoSaving ? (
+                            <div className='h-4 w-4 animate-spin'>
+                                <svg
+                                    className='h-full w-full'
                                     fill='none'
                                     viewBox='0 0 24 24'
                                 >
@@ -1675,151 +3068,280 @@ export default function ManageUserGroups() {
                                         r='10'
                                         stroke='currentColor'
                                         strokeWidth='4'
-                                    ></circle>
+                                    />
                                     <path
                                         className='opacity-75'
                                         fill='currentColor'
                                         d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                    ></path>
+                                    />
                                 </svg>
-                            )}
+                            </div>
+                        ) : (
+                            <BookmarkIcon className='h-4 w-4 relative z-10' />
+                        )}
+                        <span className='text-sm relative z-10'>
+                            {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                        </span>
+                    </button>
+                    </div>
+                </div>
+            </div>
 
-                            {/* Save icon or checkmark */}
-                            {!isAutoSaving && (
-                                <>
-                                    {showAutoSaveSuccess ? (
+            {/* Content Area */}
+            <div className='flex-1 p-3 overflow-hidden'>
+                <div className='h-full space-y-3'>
+                    {/* User Groups Table */}
+                    <div className='bg-card border border-light rounded-lg p-3 h-full flex flex-col'>
+                        {isLoading ? (
+                            // Loading State
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <div className='mx-auto h-12 w-12 text-primary-600 animate-spin'>
                                         <svg
-                                            className='h-4 w-4'
+                                            className='h-full w-full'
                                             fill='none'
-                                            stroke='currentColor'
                                             viewBox='0 0 24 24'
                                         >
+                                            <circle
+                                                className='opacity-25'
+                                                cx='12'
+                                                cy='12'
+                                                r='10'
+                                                stroke='currentColor'
+                                                strokeWidth='4'
+                                            />
                                             <path
-                                                strokeLinecap='round'
-                                                strokeLinejoin='round'
-                                                strokeWidth={2}
-                                                d='M5 13l4 4L19 7'
+                                                className='opacity-75'
+                                                fill='currentColor'
+                                                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                                             />
                                         </svg>
-                                    ) : (
-                                        <BookmarkIcon className='h-4 w-4' />
-                                    )}
-                                </>
-                            )}
-
-                            {/* Button text with countdown */}
-                            <span className='font-medium'>
-                                {isAutoSaving
-                                    ? 'Saving...'
-                                    : showAutoSaveSuccess
-                                    ? 'Saved!'
-                                    : autoSaveCountdown
-                                    ? `Auto-save in ${autoSaveCountdown}s`
-                                    : 'Save'}
-                            </span>
-                        </button>
-
-                        <ToolbarTrashButton onClick={() => {}} />
-
-                        {/* Search Input - appears when search is active */}
-                        {searchVisible && (
-                            <div className='flex items-center'>
-                                <input
-                                    type='text'
-                                    placeholder='Search user groups...'
-                                    value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
+                                    </div>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        Loading Manage User Groups configurations
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        Please wait while we fetch your
+                                        user group management data...
+                                    </p>
+                                </div>
+                            </div>
+                        ) : userGroups.length === 0 && !isLoading ? (
+                            // Empty State - No User Groups - exactly like AssignedUserGroupModal
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-6 4h6m-6 4h6'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        No User Groups Configured
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        No user groups have been created yet for the selected Account and Enterprise combination. Create a new user group to get started.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleAddNewRow}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <PlusIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Create New User Group
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : visibleCols.length === 0 ? (
+                            // Empty State for Hidden Columns
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        All Columns Hidden
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        All table columns are currently hidden. Click the button below to show all columns.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleShowAllColumns}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <EyeIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Show All Columns
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className='flex-1 overflow-auto'>
+                                <ManageUserGroupsTable
+                                    rows={processedConfigs}
+                                    onEdit={(id) => console.log('Edit group:', id)}
+                                    onDelete={handleDeleteClick}
+                                    highlightQuery={appliedSearchTerm}
+                                    compressingRowId={compressingRowId}
+                                    foldingRowId={foldingRowId}
+                                    groupByExternal={
+                                        ActiveGroupLabel === 'Group Name' ? 'groupName' :
+                                        ActiveGroupLabel === 'Entity' ? 'entity' :
+                                        ActiveGroupLabel === 'Product' ? 'product' :
+                                        ActiveGroupLabel === 'Service' ? 'service' :
+                                        'none'
                                     }
-                                    className='w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500'
-                                    autoFocus
+                                    onGroupByChange={(g) => {
+                                        setActiveGroupLabel(
+                                            g === 'groupName' ? 'Group Name' :
+                                            g === 'entity' ? 'Entity' :
+                                            g === 'product' ? 'Product' :
+                                            g === 'service' ? 'Service' :
+                                            'None'
+                                        );
+                                    }}
+                                    incompleteRowIds={showValidationErrors ? incompleteRows : []}
+                                    showValidationErrors={showValidationErrors}
+                                    externalFieldErrors={externalFieldErrors}
+                                    onAddNewRow={handleAddNewRow}
+                                    enableDropdownChips={true}
+                                    dropdownOptions={dropdownOptions}
+                                    onUpdateField={handleUpdateField}
+                                    onDuplicateDetected={(message: string) => {
+                                        duplicateDetectedRef.current = true;
+                                        setDuplicateMessage(message);
+                                        setShowDuplicateModal(true);
+                                    }}
+                                    visibleColumns={visibleCols}
+                                    externalSortColumn={sortColumn}
+                                    externalSortDirection={sortDirection}
+                                    onSortChange={(column, direction) => {
+                                        setSortColumn(column);
+                                        setSortDirection(direction);
+                                    }}
+                                    onShowAllColumns={handleShowAllColumns}
+                                    selectedEnterprise={selectedEnterprise}
+                                    selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
+                                    selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
+                                    selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
                                 />
                             </div>
                         )}
+                    </div>
+                </div>
+            </div>
 
-                        {/* Action Buttons - left-aligned after Create button */}
-                        <div className='flex items-center space-x-3'>
-                            {/* Search Button */}
-                            <button
-                                onClick={toggleSearch}
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    searchVisible
-                                        ? 'border-blue-300 bg-blue-50 text-blue-600 shadow-blue-200 shadow-lg'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 hover:shadow-lg'
-                                }`}
-                            >
-                                <svg
-                                    className={`w-4 h-4 transition-transform duration-300 ${
-                                        searchVisible
-                                            ? 'rotate-90'
-                                            : 'group-hover:scale-110'
-                                    }`}
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
-                                    />
-                                </svg>
-                                <span className='text-sm'>Search</span>
-                                {searchVisible && (
-                                    <div className='absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-blue-500 rounded-full animate-pulse'></div>
-                                )}
-                            </button>
-
-                            {/* Filter Button */}
-                            <div className='relative' ref={filterRef}>
-                                <button
-                                    onClick={() =>
-                                        setFilterVisible(!filterVisible)
-                                    }
-                                    className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                        Object.keys(activeFilters).length > 0
-                                            ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
-                                    }`}
-                                >
+            {/* Blue-themed Notification Component - Positioned above Save button - exactly like Manage Users */}
+            {showNotification && (
+                <motion.div
+                    initial={{opacity: 0, y: -50, scale: 0.9}}
+                    animate={{opacity: 1, y: 0, scale: 1}}
+                    exit={{opacity: 0, y: -50, scale: 0.9}}
+                    transition={{duration: 0.3, ease: 'easeOut'}}
+                    className={`fixed z-50 max-w-sm notification-above-save ${isAIPanelCollapsed ? 'ai-panel-collapsed' : ''}`}
+                    style={{
+                        // Position well above the toolbar with significant spacing
+                        // Header height (~80px) + more gap above toolbar (40px)
+                        top: '40px'
+                        // Right positioning handled by CSS classes for consistency
+                    }}
+                >
+                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
+                        {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
+                        <div className='absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-100'></div>
+                        <div className='p-4'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
                                     <svg
-                                        className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
-                                        fill='none'
-                                        viewBox='0 0 24 24'
-                                        stroke='currentColor'
+                                        className='h-5 w-5 text-blue-600'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
                                     >
                                         <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z'
+                                            fillRule='evenodd'
+                                            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+                                            clipRule='evenodd'
                                         />
                                     </svg>
-                                    <span className='text-sm'>Filter</span>
-                                    {Object.keys(activeFilters).length > 0 && (
-                                        <div className='absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-bounce'></div>
-                                    )}
-                                    <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
-                                </button>
+                                </div>
+                                <div className='ml-3 flex-1'>
+                                    <p className='text-sm font-medium text-blue-800'>
+                                        {notificationMessage}
+                                    </p>
+                                </div>
+                                <div className='ml-4 flex-shrink-0 flex'>
+                                    <button
+                                        className='inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors duration-200'
+                                        onClick={() =>
+                                            setShowNotification(false)
+                                        }
+                                    >
+                                        <svg
+                                            className='h-5 w-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                                                clipRule='evenodd'
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
+                        </div>
+                        {/* Animated progress bar */}
+                        <div className='bg-blue-200 h-1'>
+                            <motion.div
+                                initial={{width: '100%'}}
+                                animate={{width: '0%'}}
+                                transition={{duration: 3, ease: 'linear'}}
+                                className='bg-blue-500 h-full'
+                            />
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
-                            {/* Sort Button */}
-                            <div className='relative' ref={sortRef}>
-                                <button
-                                    onClick={() => handleSort('groupName')}
-                                    className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                        sortConfig
-                                            ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
-                                    }`}
-                                >
+            {/* Validation Modal - exactly like Manage Users */}
+            {showValidationModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowValidationModal(false);
+                                setShowValidationErrors(true);
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
                                     <svg
-                                        className={`w-4 h-4 transition-transform duration-300 ${
-                                            sortConfig
-                                                ? 'rotate-180'
-                                                : 'group-hover:rotate-180'
-                                        }`}
+                                        className='h-6 w-6 text-yellow-600'
                                         fill='none'
                                         viewBox='0 0 24 24'
                                         stroke='currentColor'
@@ -1828,74 +3350,153 @@ export default function ManageUserGroups() {
                                             strokeLinecap='round'
                                             strokeLinejoin='round'
                                             strokeWidth={2}
-                                            d='M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12'
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
                                         />
                                     </svg>
-                                    <span className='text-sm'>
-                                        Sort{' '}
-                                        {sortConfig &&
-                                            `(${sortConfig.direction})`}
-                                    </span>
-                                    {sortConfig && (
-                                        <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
-                                    )}
-                                    <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
-                                </button>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Fill Required Fields
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {validationMessage}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-
-                            {/* Group By Button */}
-                            <div className='relative' ref={groupByRef}>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
                                 <button
-                                    onClick={() =>
-                                        handleGroupByAction('entity')
-                                    }
-                                    className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                        selectedGroupBy
-                                            ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
-                                    }`}
+                                    type='button'
+                                    onClick={() => {
+                                        setShowValidationModal(false);
+                                        setShowValidationErrors(true);
+                                        // The incompleteRows state already contains the IDs of rows that failed validation
+                                        console.log('✅ Validation modal dismissed - enabling row highlighting for incomplete rows:', incompleteRows);
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
                                 >
-                                    <svg
-                                        className={`w-4 h-4 transition-transform duration-300 ${
-                                            selectedGroupBy
-                                                ? 'rotate-45'
-                                                : 'group-hover:scale-110'
-                                        }`}
-                                        fill='none'
-                                        viewBox='0 0 24 24'
-                                        stroke='currentColor'
-                                    >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M19 11H5m14-7H5m14 14H5'
-                                        />
-                                    </svg>
-                                    <span className='text-sm'>Group by</span>
-                                    {selectedGroupBy && (
-                                        <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
-                                    )}
-                                    <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-orange-400 to-red-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
+                                    OK
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Table Container */}
-            <div className='p-6'>
-                <div className='bg-white rounded-lg shadow'>
-                    <div className='max-w-[calc(100vw-450px)] overflow-x-auto'>
-                        <div className='w-full max-w-full'>
-                            {loading || entitiesLoading || servicesLoading ? (
-                                // Loading State
-                                <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
-                                    <div className='mx-auto max-w-md'>
-                                        <div className='mx-auto h-12 w-12 text-primary-600 animate-spin'>
+            {/* Duplicate Entry Modal - exactly like Validation Modal */}
+            {showDuplicateModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowDuplicateModal(false);
+                                duplicateDetectedRef.current = false; // Reset flag
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Duplicate Entry Detected
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {duplicateMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        setShowDuplicateModal(false);
+                                        duplicateDetectedRef.current = false; // Reset flag
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal - match Manage Users styling */}
+            {showDeleteConfirmation && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setPendingDeleteRowId(null);
+                                setShowDeleteConfirmation(false);
+                                setCompressingRowId(null);
+                                setFoldingRowId(null);
+                            }}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            Are you sure you want to delete this user group?
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    onClick={confirmDelete}
+                                >
+                                    {deletingRow ? (
+                                        <>
                                             <svg
-                                                className='h-full w-full'
+                                                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
                                                 fill='none'
                                                 viewBox='0 0 24 24'
                                             >
@@ -1906,174 +3507,90 @@ export default function ManageUserGroups() {
                                                     r='10'
                                                     stroke='currentColor'
                                                     strokeWidth='4'
-                                                />
+                                                ></circle>
                                                 <path
                                                     className='opacity-75'
                                                     fill='currentColor'
                                                     d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                                />
+                                                ></path>
                                             </svg>
-                                        </div>
-                                        <h3 className='mt-4 text-lg font-semibold text-slate-900'>
-                                            Loading User Groups
-                                        </h3>
-                                        <p className='mt-2 text-sm text-slate-500'>
-                                            Please wait while we fetch user
-                                            group data from the database...
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <ReusableTableComponent
-                                    config={
-                                        {
-                                            ...dynamicTableConfig,
-                                            initialData: processedTableData,
-                                            savingStates: savingStates,
-                                            customHeaderRenderer:
-                                                renderColumnHeader,
-
-                                            // FORCE ALL ADVANCED FEATURES ON
-                                            features: {
-                                                ...dynamicTableConfig.features,
-                                                dragAndDrop: true,
-                                                hoverControls: true,
-                                                inlineEditing: true,
-                                                compactRows: true,
-                                                modernMicroInteractions: true,
-                                                animatedTransitions: true,
-                                                sortableColumns: true,
-                                                rowHoverEffect: true,
-                                                selectionHighlight: true,
-                                                modernIcons: true,
-                                                svgIcons: true,
-                                                autoSave: true,
-                                                virtualScrolling: false,
-                                                optimizedRendering: true,
-                                            },
-
-                                            ui: {
-                                                ...dynamicTableConfig.ui,
-                                                enableAdvancedFeatures: true,
-                                                showDragHandles: true,
-                                                enableHoverControls: true,
-                                                enableSortableHeaders: true,
-                                                enableCompactMode: true,
-                                                showModernIcons: true,
-                                                enableMicroInteractions: true,
-                                                modernTableStyling: true,
-                                                editTrigger: 'doubleClick', // Double-click to edit cells
-                                            },
-
-                                            // Direct prop overrides
-                                            enableDragAndDrop: true,
-                                            enableHoverControls: true,
-                                            enableSortableHeaders: true,
-                                            enableCompactMode: true,
-                                            enableModernUI: true,
-                                            showAdvancedFeatures: true,
-                                            modernIcons: true,
-                                            svgIcons: true,
-                                            editTrigger: 'doubleClick', // Double-click to edit
-
-                                            // Pass current user context for API calls
-                                            currentUser: {
-                                                accountId: 1,
-                                                enterpriseId: 1,
-                                            },
-
-                                            actions: {
-                                                ...dynamicTableConfig.actions,
-                                                onDataChange: handleDataChange,
-                                                customRenderers: {
-                                                    rolesCount: (
-                                                        value: any,
-                                                        rowData: UserGroup,
-                                                    ) => (
-                                                        <RolesCountCell
-                                                            groupData={rowData}
-                                                            onManageRoles={
-                                                                handleManageRoles
-                                                            }
-                                                            roleCount={
-                                                                rowData.roles
-                                                                    ?.length ||
-                                                                0
-                                                            }
-                                                        />
-                                                    ),
-                                                    entity: (
-                                                        value: any,
-                                                        rowData: UserGroup,
-                                                    ) => {
-                                                        // For existing records, show as non-editable chip
-                                                        if (!rowData.isNew) {
-                                                            return (
-                                                                <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200'>
-                                                                    {value}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        // For new records, return null to use default dropdown
-                                                        return null;
-                                                    },
-                                                    service: (
-                                                        value: any,
-                                                        rowData: UserGroup,
-                                                    ) => {
-                                                        // For existing records, show as non-editable chip
-                                                        if (!rowData.isNew) {
-                                                            return (
-                                                                <div className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200'>
-                                                                    {value}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        // For new records, return null to use default dropdown
-                                                        return null;
-                                                    },
-                                                },
-                                            },
-
-                                            onAction: handleGroupAction,
-                                            loading:
-                                                loading ||
-                                                entitiesLoading ||
-                                                servicesLoading,
-                                            searchTerm: searchTerm,
-                                            groupBy: selectedGroupBy,
-                                        } as any
-                                    }
-                                    onGroupAssignment={() => {}}
-                                />
-                            )}
-                        </div>
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </button>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    onClick={() => {
+                                        setPendingDeleteRowId(null);
+                                        setShowDeleteConfirmation(false);
+                                        setCompressingRowId(null);
+                                        setFoldingRowId(null);
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </motion.div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Role Assignment Sliding Panel */}
-            {selectedGroupForRoles && showRolePanel && (
-                <SimpleSlidingPanels
-                    key={`role-panel-${selectedGroupForRoles.id}`}
-                    isOpen={showRolePanel}
-                    onClose={() => {
-                        setShowRolePanel(false);
-                        setSelectedGroupForRoles(null);
+            {/* Navigation Warning Modal - exactly like Manage Users */}
+            {showNavigationWarning && (
+                <ConfirmModal
+                    open={showNavigationWarning}
+                    title="Unsaved Changes"
+                    message="You have unsaved changes that will be lost if you leave. Are you sure you want to continue?"
+                    confirmText="Leave Anyway"
+                    cancelText="Stay Here"
+                    onConfirm={() => {
+                        console.log('🔄 User confirmed navigation - clearing states and executing navigation');
+                        setShowNavigationWarning(false);
+                        
+                        // Clear all unsaved states IMMEDIATELY
+                        setIncompleteRows([]);
+                        setHasUnsavedChanges(false);
+                        setPreventNavigation(false);
+                        setUserConfirmedLeave(true);
+                        
+                        // Execute navigation immediately after state update
+                        if (pendingNavigationUrl) {
+                            console.log('🔄 Executing pending navigation to:', pendingNavigationUrl);
+                            // Clear the pending URL first
+                            const targetUrl = pendingNavigationUrl;
+                            setPendingNavigationUrl(null);
+                            
+                            // Use setTimeout to ensure state updates are processed first
+                            setTimeout(() => {
+                                if (originalRouterRef.current) {
+                                    originalRouterRef.current.push(targetUrl);
+                                } else {
+                                    // Fallback: router should now allow navigation since userConfirmedLeave is true
+                                    router.push(targetUrl);
+                                }
+                            }, 0);
+                        } else if (pendingNavigation) {
+                            // Fallback for legacy navigation handling
+                            const navFn = pendingNavigation;
+                            setPendingNavigation(null);
+                            setTimeout(() => {
+                                navFn();
+                            }, 0);
+                        }
                     }}
-                    currentUser={{
-                        id: selectedGroupForRoles.id,
-                        name: selectedGroupForRoles.groupName,
-                        description: selectedGroupForRoles.description,
-                        assignedRoles: selectedGroupForRoles.roles || [],
+                    onCancel={() => {
+                        setShowNavigationWarning(false);
+                        setPendingNavigationUrl(null);
+                        setPendingNavigation(null);
+                        setPreventNavigation(false);
                     }}
-                    onAssignGroups={(roles) => {
-                        handleRoleAssignment(selectedGroupForRoles.id, roles);
-                    }}
-                    initialPanel='roles'
-                    visiblePanels={['roles']}
                 />
             )}
         </div>
     );
 }
+

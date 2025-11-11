@@ -27,6 +27,7 @@ interface AssignedUserGroupModalProps {
     userId?: string;
     initialUserGroups?: UserGroup[];
     selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
     selectedAccountId?: string;
     selectedAccountName?: string;
 }
@@ -41,6 +42,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
     userId,
     initialUserGroups = [],
     selectedEnterprise = '',
+    selectedEnterpriseId = '',
     selectedAccountId = '',
     selectedAccountName = ''
 }) => {
@@ -131,8 +133,18 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 if (shouldFetchFromAPI) { // Fetch from API on first open only
                     console.log('⚠️ initialUserGroups is empty, trying to fetch from API...');
                     try {
+                        // Build query parameters for fetching user groups
+                        const queryParams = new URLSearchParams();
+                        if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+                        if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+                        if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+                        if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+                        
+                        const apiUrl = `/api/user-management/users/${actualUserId}/groups${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+                        console.log('🌐 [API Call] Fetching user groups from:', apiUrl);
+                        
                         // Fetch assigned user groups for this user
-                        const response = await api.get<any>(`/api/users/${actualUserId}/groups`);
+                        const response = await api.get<any>(apiUrl);
                         console.log('📦 Loaded user groups from database:', response);
                         console.log('📦 Response type:', typeof response, 'Is array:', Array.isArray(response));
                         
@@ -215,14 +227,31 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
         }
         
         console.log('✅ loadUserGroups complete, data loaded successfully');
-    }, [isOpen, userId, emailAddress, initialUserGroups]);
+    }, [isOpen, userId, emailAddress, initialUserGroups, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise]);
 
-    // Load all available groups from database with whatever details the API provides
+    // Load all available groups from database filtered by account and enterprise
     const loadAllAvailableGroups = useCallback(async () => {
-        console.log('🔄 Loading all available groups from database...');
+        console.log('🔄 Loading available groups from database with filters...');
+        console.log('🔍 Account/Enterprise context:', {
+            selectedAccountId,
+            selectedAccountName,
+            selectedEnterprise,
+            selectedEnterpriseId
+        });
+        
         try {
-            const response = await api.get<any>('/api/user-management/groups');
-            console.log('📦 All groups response:', response);
+            // Build query parameters with account and enterprise filters - exactly like Manage User Groups
+            const queryParams = new URLSearchParams();
+            if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+            if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+            if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+            
+            const apiUrl = `/api/user-management/groups${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+            console.log('🌐 [API Call] Making request to:', apiUrl);
+            
+            const response = await api.get<any>(apiUrl);
+            console.log('📦 Filtered groups response:', response);
             
             // Handle response structure
             let groupsData = response;
@@ -262,7 +291,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
             setAvailableGroups([]);
             return [];
         }
-    }, []);
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId]);
 
     // Track modal open state to detect when it transitions from closed to open
     const prevIsOpenRef = useRef(false);
@@ -357,6 +386,14 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
         
         // Process each group to see if it matches a cached group
         const groupsWithAutoFill = updatedGroups.map((group) => {
+            console.log('🔍 Processing group in handleUpdateUserGroups:', {
+                id: group.id,
+                groupName: group.groupName,
+                isFromDatabase: group.isFromDatabase,
+                entity: group.entity,
+                product: group.product
+            });
+            
             // If groupName is empty, clear all auto-populated fields and mark as not auto-filled
             if (!group.groupName.trim()) {
                 console.log('🧹 Group name is empty, clearing all fields for group:', group.id);
@@ -375,7 +412,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
             
             // Skip if already marked as from database (don't re-process)
             if (group.isFromDatabase) {
-                console.log('⏭️ Skipping group (already from DB):', group.groupName);
+                console.log('⏭️ Skipping auto-fill for database group:', group.groupName, 'Returning as-is');
                 return group;
             }
             
@@ -581,15 +618,32 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 
                 for (const group of completeGroups) {
                     console.log('🔄 Processing group:', group.groupName, 'isFromDatabase:', group.isFromDatabase);
+                    console.log('📋 Group details:', {
+                        groupName: group.groupName,
+                        description: group.description || '(empty)',
+                        entity: group.entity || '(empty)',
+                        product: group.product || '(empty)',
+                        service: group.service || '(empty)',
+                        isFromDatabase: group.isFromDatabase
+                    });
                     try {
                         // For groups marked as from database, we just need to get their ID
                         // Don't create or update them as they already exist
                         let groupId: string | null = null;
                         
-                        // Check if group exists by name
+                        // Check if group exists by name (with account/enterprise context)
                         try {
                             console.log('🔍 Checking if group exists:', group.groupName);
-                            const existingGroups = await api.get<any[]>(`/api/user-management/groups?name=${encodeURIComponent(group.groupName)}`);
+                            
+                            // Build query with account/enterprise filters to find the right group
+                            const queryParams = new URLSearchParams();
+                            queryParams.append('name', group.groupName);
+                            if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+                            if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+                            if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+                            if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+                            
+                            const existingGroups = await api.get<any[]>(`/api/user-management/groups?${queryParams.toString()}`);
                             console.log('📦 Existing groups response:', existingGroups);
                             
                             // Handle response structure
@@ -619,19 +673,33 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                             // Group doesn't exist, will create
                         }
 
+                        // Determine save path based on groupId and isFromDatabase flag
+                        console.log('🔀 Save path decision:', {
+                            hasGroupId: !!groupId,
+                            isFromDatabase: group.isFromDatabase,
+                            path: !groupId && !group.isFromDatabase ? 'CREATE_NEW' : 
+                                  groupId && group.isFromDatabase ? 'DATABASE_GROUP' : 
+                                  groupId && !group.isFromDatabase ? 'UPDATE_EXISTING' : 'UNKNOWN'
+                        });
+                        
                         // Create group if it doesn't exist (only for new custom groups)
                         if (!groupId && !group.isFromDatabase) {
                             const newGroupData = {
                                 name: group.groupName,
+                                groupName: group.groupName,
                                 description: group.description || '',
                                 entity: group.entity || '',
                                 product: group.product || '',
                                 service: group.service || '',
-                                assignedRoles: group.roles ? group.roles.split(',').map(r => r.trim()).filter(Boolean) : []
+                                assignedRoles: group.roles ? group.roles.split(',').map(r => r.trim()).filter(Boolean) : [],
+                                accountId: selectedAccountId,
+                                accountName: selectedAccountName,
+                                enterpriseId: selectedEnterpriseId,
+                                enterpriseName: selectedEnterprise
                             };
                             
                             try {
-                                console.log('🆕 Creating new group with data:', newGroupData);
+                                console.log('🆕 Creating new group with data and account/enterprise context:', newGroupData);
                                 const createdGroup = await api.post<any>('/api/user-management/groups', newGroupData);
                                 console.log('📦 Created group response:', createdGroup);
                                 
@@ -651,20 +719,71 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                                 groupId = group.id;
                             }
                         } else if (groupId && group.isFromDatabase) {
-                            // Group is from database and already exists - just use its ID, don't update
-                            console.log('ℹ️ Group is from database, using existing ID without updating:', groupId);
+                            // Group is from database and already exists
+                            // Check if any fields are populated (user filled them in)
+                            const hasFilledFields = group.description || group.entity || group.product || group.service || group.roles;
+                            
+                            console.log('🔍 Database group check:', {
+                                groupId,
+                                groupName: group.groupName,
+                                hasFilledFields,
+                                description: group.description || '(empty)',
+                                entity: group.entity || '(empty)',
+                                product: group.product || '(empty)',
+                                service: group.service || '(empty)'
+                            });
+                            
+                            if (hasFilledFields) {
+                                // User filled in additional fields for a database group
+                                // Update the group with these values
+                                try {
+                                    console.log('🔄 Updating database group with user-filled values:', groupId);
+                                    console.log('📦 Update data:', {
+                                        description: group.description,
+                                        entity: group.entity,
+                                        product: group.product,
+                                        service: group.service
+                                    });
+                                    
+                                    const updateData = {
+                                        description: group.description || '',
+                                        entity: group.entity || '',
+                                        product: group.product || '',
+                                        service: group.service || '',
+                                        assignedRoles: group.roles ? group.roles.split(',').map(r => r.trim()).filter(Boolean) : [],
+                                        accountId: selectedAccountId,
+                                        accountName: selectedAccountName,
+                                        enterpriseId: selectedEnterpriseId,
+                                        enterpriseName: selectedEnterprise
+                                    };
+                                    
+                                    await api.put(`/api/user-management/groups/${groupId}`, updateData);
+                                    console.log('✅ Updated database group with user-filled fields:', groupId);
+                                } catch (updateError) {
+                                    console.warn('⚠️ Could not update group in database, continuing with existing data:', updateError);
+                                }
+                            } else {
+                                // Group is from database with no additional fields - just use its ID
+                                console.log('ℹ️ Group is from database with no changes, using existing ID:', groupId);
+                            }
                         } else if (groupId && !group.isFromDatabase) {
                             // This is a custom group that happens to match an existing group name
                             // Update it with the custom values
                             try {
                                 console.log('🔄 Updating existing group with custom values:', groupId);
-                                await api.put(`/api/user-management/groups/${groupId}`, {
+                                const updateData = {
                                     description: group.description || '',
                                     entity: group.entity || '',
                                     product: group.product || '',
                                     service: group.service || '',
-                                    assignedRoles: group.roles ? group.roles.split(',').map(r => r.trim()).filter(Boolean) : []
-                                });
+                                    assignedRoles: group.roles ? group.roles.split(',').map(r => r.trim()).filter(Boolean) : [],
+                                    accountId: selectedAccountId,
+                                    accountName: selectedAccountName,
+                                    enterpriseId: selectedEnterpriseId,
+                                    enterpriseName: selectedEnterprise
+                                };
+                                
+                                await api.put(`/api/user-management/groups/${groupId}`, updateData);
                                 console.log('✅ Updated existing group:', groupId);
                             } catch (updateError) {
                                 console.warn('⚠️ Could not update group in database, continuing with existing data:', updateError);
@@ -691,11 +810,21 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 console.log('📊 Final groupIds to assign:', groupIds);
                 console.log('📊 Total unique groups:', groupIds.length);
 
-                // CRITICAL: Always call assign-groups API to replace ALL assignments for this user
+                // CRITICAL: Always call POST API to replace ALL assignments for this user
                 // This ensures deletions are properly reflected (empty array removes all assignments)
                 try {
                     console.log(`🔄 Updating user group assignments for user ${actualUserId}`);
                     console.log(`📊 Assigning ${groupIds.length} groups:`, groupIds);
+                    
+                    // Build query parameters with account and enterprise context
+                    const queryParams = new URLSearchParams();
+                    if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+                    if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+                    if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+                    if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+                    
+                    const apiUrl = `/api/user-management/users/${actualUserId}/groups${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+                    console.log('🌐 [API Call] POSTing user groups to:', apiUrl);
                     
                     const assignPayload = {
                         groupIds: groupIds,
@@ -703,7 +832,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                     };
                     console.log('📦 Assign payload:', assignPayload);
                     
-                    const assignResponse = await api.post(`/api/users/${actualUserId}/assign-groups`, assignPayload);
+                    const assignResponse = await api.post(apiUrl, assignPayload);
                     console.log('📦 Assign response:', assignResponse);
                     console.log('✅ Successfully updated user group assignments in database');
                 } catch (assignError) {
@@ -918,7 +1047,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                         {/* Selected Groups Count */}
                         <div className="mt-3">
                             <div className="text-blue-100 text-sm">
-                                Assigned Groups: <span className="font-semibold text-white">{selectedUserGroups.length}</span>
+                                Assigned Groups: <span className="font-semibold text-white">{userGroups.filter(group => isGroupComplete(group)).length}</span>
                             </div>
                         </div>
                     </div>
@@ -1081,6 +1210,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                             compressingGroupId={compressingGroupId}
                             foldingGroupId={foldingGroupId}
                             selectedEnterprise={selectedEnterprise}
+                            selectedEnterpriseId={selectedEnterpriseId}
                             selectedAccountId={selectedAccountId}
                             selectedAccountName={selectedAccountName}
                             validationErrors={validationErrors}

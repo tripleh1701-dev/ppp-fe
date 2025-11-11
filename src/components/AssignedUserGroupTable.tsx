@@ -26,6 +26,7 @@ interface AssignedUserGroupTableProps {
     compressingGroupId?: string | null;
     foldingGroupId?: string | null;
     selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
     selectedAccountId?: string;
     selectedAccountName?: string;
     validationErrors?: Set<string>;
@@ -180,6 +181,11 @@ function AsyncChipSelectGroupName({
     placeholder = '',
     isError = false,
     userGroups = [],
+    availableGroups = [],
+    selectedAccountId = '',
+    selectedAccountName = '',
+    selectedEnterpriseId = '',
+    selectedEnterprise = '',
     onNewItemCreated,
 }: {
     value?: string;
@@ -187,6 +193,11 @@ function AsyncChipSelectGroupName({
     placeholder?: string;
     isError?: boolean;
     userGroups?: UserGroup[];
+    availableGroups?: UserGroup[];
+    selectedAccountId?: string;
+    selectedAccountName?: string;
+    selectedEnterpriseId?: string;
+    selectedEnterprise?: string;
     onNewItemCreated?: (item: {id: string; name: string}) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -205,32 +216,43 @@ function AsyncChipSelectGroupName({
         width: number;
     } | null>(null);
 
-    // Load options from database API - exactly like Enterprise field
+    // Load options from availableGroups prop (already filtered by account/enterprise)
     const loadAllOptions = useCallback(async () => {
         console.log('🔄 [GroupName] loadAllOptions called');
+        console.log('📦 [GroupName] Using availableGroups prop (filtered by account/enterprise), count:', availableGroups.length);
         setLoading(true);
         try {
-            console.log('📡 [GroupName] Calling API: /api/user-management/groups');
-            const allData = await api.get<Array<{id: string; name: string}>>(
-                '/api/user-management/groups',
-            ) || [];
-            console.log(`✅ [GroupName] API call successful, got ${allData.length} items:`, allData);
-            // Transform the data to match expected format if needed
-            const transformedData = allData.map((item: any) => ({
-                id: item.id || item.groupId || String(Math.random()),
-                name: item.name || item.groupName || item.group || ''
+            // Transform availableGroups to dropdown format
+            const transformedData = availableGroups.map((group: UserGroup) => ({
+                id: group.id || String(Math.random()),
+                name: group.groupName || ''
             })).filter((item: any) => item.name); // Filter out items without names
-            setAllOptions(transformedData);
+            
+            // Filter out group names that are already used in the current modal table
+            // This prevents duplicate group names within the same user's assigned groups
+            const usedGroupNames = new Set(
+                userGroups
+                    .map(ug => ug.groupName?.toLowerCase().trim())
+                    .filter(name => name) // Remove empty/null names
+            );
+            
+            const availableData = transformedData.filter(item => 
+                !usedGroupNames.has(item.name.toLowerCase().trim())
+            );
+            
+            console.log(`📋 [GroupName] Total available groups: ${transformedData.length}`);
+            console.log(`📋 [GroupName] Already used in modal table: ${usedGroupNames.size}`);
+            console.log(`📋 [GroupName] Available (unused) group names: ${availableData.length}`);
+            console.log(`📋 [GroupName] Available group names for dropdown:`, availableData.map(d => d.name));
+            setAllOptions(availableData);
         } catch (error) {
-            console.error('❌ [GroupName] API call failed:', error);
-            // Don't set empty array - keep previous data if any
-            // This way, if API fails but user types, showCreateNew will still be true
+            console.error('❌ [GroupName] Failed to load availableGroups:', error);
             setAllOptions([]);
         } finally {
             setLoading(false);
             console.log('🏁 [GroupName] loadAllOptions completed, loading set to false');
         }
-    }, []);
+    }, [availableGroups, userGroups]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -349,6 +371,17 @@ function AsyncChipSelectGroupName({
         const name = (query || '').trim();
         if (!name) return;
 
+        // Check if group name is already used in the current modal table (duplicate check)
+        const isDuplicateInTable = userGroups.some(
+            ug => ug.groupName?.toLowerCase().trim() === name.toLowerCase()
+        );
+        
+        if (isDuplicateInTable) {
+            console.log('❌ [GroupName] Duplicate group name detected in modal table:', name);
+            alert(`Group name "${name}" is already assigned to this user. Cannot assign the same group twice.`);
+            return;
+        }
+
         // Check for existing entries (case-insensitive) - exactly like Enterprise field
         const existingMatch = allOptions.find(
             (opt) => opt.name.toLowerCase() === name.toLowerCase(),
@@ -365,11 +398,30 @@ function AsyncChipSelectGroupName({
         }
 
         try {
-            // Create new user group in database via API - exactly like Enterprise field
+            // Create new user group in database via API with account/enterprise context
             console.log('➕ [GroupName] Creating new group:', name);
+            console.log('📦 [GroupName] Account/Enterprise context:', {
+                selectedAccountId,
+                selectedAccountName,
+                selectedEnterpriseId,
+                selectedEnterprise
+            });
+            
+            // Include account/enterprise context in request body - exactly like Manage User Groups Save All
+            const groupData = {
+                name,
+                groupName: name,
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise
+            };
+            
+            console.log('🌐 [GroupName] Creating group with context:', groupData);
+            
             const created = await api.post<{id: string; name: string} | any>(
                 '/api/user-management/groups',
-                {name, groupName: name}, // Send both formats in case API expects different field name
+                groupData
             );
             
             console.log('✅ [GroupName] Group created:', created);
@@ -549,11 +601,9 @@ function AsyncChipSelectGroupName({
                                 console.log('📍 [GroupName] Setting dropdown position:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            // Load options if not already loaded
-                            if (allOptions.length === 0) {
-                                console.log('📥 [GroupName] allOptions empty, calling loadAllOptions');
-                                loadAllOptions();
-                            }
+                            // Reload options to exclude already-used group names
+                            console.log('📥 [GroupName] Reloading options to filter out used group names');
+                            loadAllOptions();
                             // Clear current selection if user clears the input completely
                             if (newValue === '') {
                                 onChange('');
@@ -572,10 +622,9 @@ function AsyncChipSelectGroupName({
                                 console.log('📍 [GroupName] Setting dropdown position on focus:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            if (allOptions.length === 0) {
-                                console.log('📥 [GroupName] allOptions empty on focus, calling loadAllOptions');
-                                loadAllOptions();
-                            }
+                            // Always reload options on focus to exclude already-used group names
+                            console.log('📥 [GroupName] Reloading options on focus to filter out used group names');
+                            loadAllOptions();
                         }}
                         onKeyDown={async (e: any) => {
                             if (e.key === 'Enter' && query.trim()) {
@@ -588,6 +637,19 @@ function AsyncChipSelectGroupName({
                                 );
                                 
                                 if (exactMatch) {
+                                    // Double-check for duplicate (safeguard)
+                                    const isDuplicate = userGroups.some(
+                                        ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                    );
+                                    
+                                    if (isDuplicate) {
+                                        console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                        alert(`Group name "${exactMatch.name}" is already assigned to this user. Cannot assign the same group twice.`);
+                                        setQuery('');
+                                        setOpen(false);
+                                        return;
+                                    }
+                                    
                                     // Select existing value
                                     onChange(exactMatch.name);
                                     setCurrent(exactMatch.name);
@@ -645,6 +707,20 @@ function AsyncChipSelectGroupName({
                                         opt.name.toLowerCase() === query.toLowerCase().trim()
                                     );
                                     if (exactMatch) {
+                                        // Double-check for duplicate (safeguard)
+                                        const isDuplicate = userGroups.some(
+                                            ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                        );
+                                        
+                                        if (isDuplicate) {
+                                            console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                            alert(`Group name "${exactMatch.name}" is already assigned to this user. Cannot assign the same group twice.`);
+                                            e.preventDefault();
+                                            setQuery('');
+                                            setOpen(false);
+                                            return;
+                                        }
+                                        
                                         onChange(exactMatch.name);
                                         setCurrent(exactMatch.name);
                                         setQuery('');
@@ -887,6 +963,17 @@ function AsyncChipSelectGroupName({
                                                             className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                             style={{wordBreak: 'keep-all', whiteSpace: 'nowrap'}}
                                                             onClick={() => {
+                                                                // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
+                                                                const isDuplicate = userGroups.some(
+                                                                    ug => ug.groupName?.toLowerCase().trim() === opt.name.toLowerCase().trim()
+                                                                );
+                                                                
+                                                                if (isDuplicate) {
+                                                                    console.log('❌ [GroupName] Cannot select duplicate group name:', opt.name);
+                                                                    alert(`Group name "${opt.name}" is already assigned to this user. Cannot assign the same group twice.`);
+                                                                    return;
+                                                                }
+                                                                
                                                                 onChange(opt.name);
                                                                 setCurrent(opt.name);
                                                                 setQuery('');
@@ -964,6 +1051,7 @@ function AsyncChipSelectProduct({
     placeholder = '',
     isError = false,
     selectedEnterprise = '',
+    selectedAccountId = '',
     onNewItemCreated,
 }: {
     value?: string;
@@ -971,6 +1059,7 @@ function AsyncChipSelectProduct({
     placeholder?: string;
     isError?: boolean;
     selectedEnterprise?: string;
+    selectedAccountId?: string;
     onNewItemCreated?: (item: {id: string; name: string}) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -989,45 +1078,67 @@ function AsyncChipSelectProduct({
         width: number;
     } | null>(null);
 
-    // Load options from database API filtered by Enterprise
+    // Load options from account licenses filtered by Account and Enterprise - exactly like Manage User Groups
     const loadAllOptions = useCallback(async () => {
         setLoading(true);
         try {
-            if (!selectedEnterprise) {
+            if (!selectedAccountId) {
+                console.log('🔍 [Product] No account selected, clearing options');
                 setAllOptions([]);
                 setLoading(false);
                 return;
             }
 
-            // Get enterprise configuration data to find products for this enterprise
-            const enterpriseConfigs = await api.get<Array<{
-                enterprise: { name: string };
-                product: { name: string };
-                services: Array<{ name: string }>;
-            }>>('/api/enterprise-products-services') || [];
+            console.log('🔍 [Product] Loading products for account:', selectedAccountId, 'enterprise:', selectedEnterprise);
+
+            // Get account data with licenses to find products for this account and enterprise
+            const accountData = await api.get<{
+                id: string;
+                accountName: string;
+                licenses: Array<{
+                    id: string;
+                    enterprise: string;
+                    product: string;
+                    service: string;
+                }>;
+            }>(`/api/accounts/${selectedAccountId}`) || null;
             
-            // Extract unique product names for the selected enterprise
+            if (!accountData || !accountData.licenses) {
+                console.log('🔍 [Product] No account data or licenses found');
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            console.log('🔍 [Product] Account licenses:', accountData.licenses);
+            
+            // Extract unique product names from licenses that match the selected enterprise
             const uniqueProducts = Array.from(new Set(
-                enterpriseConfigs
-                    .filter(config => config.enterprise.name === selectedEnterprise)
-                    .map(config => config.product.name)
+                accountData.licenses
+                    .filter(license => {
+                        // Match by enterprise name if available, otherwise show all products for this account
+                        return !selectedEnterprise || license.enterprise === selectedEnterprise;
+                    })
+                    .map(license => license.product)
                     .filter(product => product && product.trim() !== '')
             ));
             
+            console.log('🔍 [Product] Filtered products:', uniqueProducts);
+            
             // Convert to the expected format
             const allData = uniqueProducts.map((product, index) => ({
-                id: `product-${index}`,
+                id: `product-${product}-${index}`,
                 name: product
             }));
             
             setAllOptions(allData);
         } catch (error) {
-            console.error('Failed to load products:', error);
+            console.error('❌ [Product] Failed to load products:', error);
             setAllOptions([]);
         } finally {
             setLoading(false);
         }
-    }, [selectedEnterprise]);
+    }, [selectedAccountId, selectedEnterprise]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -1068,10 +1179,21 @@ function AsyncChipSelectProduct({
     }, [open, calculateDropdownPosition]);
 
     useEffect(() => {
-        if (open && allOptions.length === 0 && selectedEnterprise) {
+        if (open && allOptions.length === 0 && selectedAccountId) {
             loadAllOptions();
         }
-    }, [open, allOptions.length, selectedEnterprise, loadAllOptions]);
+    }, [open, allOptions.length, selectedAccountId, loadAllOptions]);
+
+    // Reload options when account or enterprise changes - exactly like Manage User Groups
+    useEffect(() => {
+        if (selectedAccountId && selectedEnterprise) {
+            console.log('🔄 [Product] Account or Enterprise changed, clearing and reloading options');
+            setAllOptions([]);
+            if (open) {
+                loadAllOptions();
+            }
+        }
+    }, [selectedAccountId, selectedEnterprise, open, loadAllOptions]);
 
     useEffect(() => {
         setCurrent(value);
@@ -3050,11 +3172,13 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
     compressingGroupId = null,
     foldingGroupId = null,
     selectedEnterprise = '',
+    selectedEnterpriseId = '',
     selectedAccountId = '',
     selectedAccountName = '',
     validationErrors = new Set(),
     showValidationErrors = false,
     onAddNewRow,
+    availableGroups = [],
 }) => {
     
     // Helper function to check if a field is missing for a group
@@ -3075,12 +3199,12 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
 
     // Filter user groups based on search query
     const filteredUserGroups = userGroups.filter(group =>
-        group.groupName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.entity.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.roles.toLowerCase().includes(searchQuery.toLowerCase())
+        (group.groupName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.entity || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.product || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.service || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.roles || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     // Add new user group
@@ -3105,11 +3229,18 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
     // Update user group field
     const updateUserGroup = (id: string, field: keyof UserGroup, value: string) => {
         console.log('📝 [updateUserGroup] Updating group:', { id, field, value, currentGroups: userGroups.length });
-        const updatedGroups = userGroups.map(group => 
-            group.id === id ? { ...group, [field]: value } : group
-        );
+        const updatedGroups = userGroups.map(group => {
+            if (group.id === id) {
+                const updated = { ...group, [field]: value };
+                console.log('📝 [updateUserGroup] Group before update:', group);
+                console.log('📝 [updateUserGroup] Group after update:', updated);
+                console.log('📝 [updateUserGroup] isFromDatabase preserved?', group.isFromDatabase, '->', updated.isFromDatabase);
+                return updated;
+            }
+            return group;
+        });
         const updatedGroup = updatedGroups.find(g => g.id === id);
-        console.log('📝 [updateUserGroup] Updated group:', updatedGroup);
+        console.log('📝 [updateUserGroup] Final updated group:', updatedGroup);
         onUpdateUserGroups(updatedGroups);
     };
 
@@ -3257,6 +3388,11 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
                                                 onChange={(v) => updateUserGroup(group.id, 'groupName', v || '')}
                                                 placeholder=''
                                                 userGroups={userGroups}
+                                                availableGroups={availableGroups}
+                                                selectedAccountId={selectedAccountId}
+                                                selectedAccountName={selectedAccountName}
+                                                selectedEnterpriseId={selectedEnterpriseId}
+                                                selectedEnterprise={selectedEnterprise}
                                                 isError={isFieldMissing(group, 'groupName')}
                                             />
                                         )}
@@ -3364,6 +3500,7 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
                                                 }}
                                                 placeholder=''
                                                 selectedEnterprise={selectedEnterprise}
+                                                selectedAccountId={selectedAccountId}
                                                 isError={isFieldMissing(group, 'product')}
                                             />
                                         )}
@@ -3462,3 +3599,4 @@ const AssignedUserGroupTable: React.FC<AssignedUserGroupTableProps> = ({
 };
 
 export default AssignedUserGroupTable;
+
