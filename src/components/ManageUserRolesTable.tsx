@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, {useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
@@ -55,17 +55,18 @@ import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
 import DateChipSelect from './DateChipSelect';
+import ScopeConfigModal from './ScopeConfigModal';
 
-// Utility function to generate consistent colors for user group data across the application
-const getUserGroupColor = (userGroupName: string) => {
-    const key = userGroupName.toLowerCase();
+// Utility function to generate consistent colors for user role data across the application
+const getUserRoleColor = (userRoleName: string) => {
+    const key = userRoleName.toLowerCase();
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
     
-    // Blueish user group color palette - consistent across all components
-    const userGroupColors = [
+    // Blueish user role color palette - consistent across all components
+    const userRoleColors = [
         {
             bg: 'bg-blue-50',
             text: 'text-blue-800',
@@ -98,7 +99,7 @@ const getUserGroupColor = (userGroupName: string) => {
         },
     ];
     
-    return userGroupColors[hash % userGroupColors.length];
+    return userRoleColors[hash % userRoleColors.length];
 };
 
 // Simple dropdown component for predefined values (like cloudType)
@@ -430,27 +431,26 @@ const ChipDropdown = ({
     );
 };
 
-export interface UserGroup {
+export interface userRole {
     id: string;
-    groupName: string;
+    roleName: string;
     description: string;
     entity: string;
     product: string;
     service: string;
-    roles: string;
-    isFromDatabase?: boolean; // Flag to indicate if this is an existing group from database (fields should be read-only)
+    scope: string;
+    isFromDatabase?: boolean; // Flag to indicate if this is an existing role from database (fields should be read-only)
 }
 
-export interface UserGroupRow {
+export interface UserRoleRow {
     id: string;
-    // User Group fields
-    groupName: string;
+    // User Role fields
+    roleName: string;
     description?: string;
     entity: string;
     product: string;
     service: string;
-    roles?: string;
-    assignedRoles?: any[];
+    scope?: string;
 }
 
 // Validation functions for user group fields
@@ -950,7 +950,7 @@ function SimpleChipInput({
     );
 }
 
-type CatalogType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles';
+type CatalogType = 'roleName' | 'description' | 'entity' | 'product' | 'service' | 'scope';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -1230,16 +1230,16 @@ function UserGroupMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
-    accounts?: UserGroupRow[];
+    accounts?: UserRoleRow[];
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -1578,7 +1578,7 @@ function UserGroupMultiSelect({
                     .slice(0, visibleCount)
                     .map((service: string, index: number) => {
                         // Use consistent color function
-                        const colorTheme = getUserGroupColor(service);
+                        const colorTheme = getUserRoleColor(service);
                         
                         return (
                             <motion.span
@@ -1643,7 +1643,7 @@ function UserGroupMultiSelect({
                                         </div>
                                         <div className='space-y-1 max-h-32 overflow-y-auto'>
                                             {selectedUserGroups.slice(visibleCount).map((userGroup, idx) => {
-                                                const colorTheme = getUserGroupColor(userGroup);
+                                                const colorTheme = getUserRoleColor(userGroup);
                                                 return (
                                                     <div 
                                                         key={`additional-${idx}`}
@@ -2397,26 +2397,26 @@ function AsyncChipSelect({
     onFocus?: () => void;
     inputType?: 'text' | 'password';
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
-    accounts?: UserGroupRow[];
+    accounts?: UserRoleRow[];
     currentRowId?: string;
     currentRowEnterprise?: string;
     currentRowProduct?: string;
     dropdownOptions?: {
-        groupNames: Array<{id: string; name: string}>;
+        roleNames: Array<{id: string; name: string}>;
         descriptions: Array<{id: string; name: string}>;
         entities: Array<{id: string; name: string}>;
         products: Array<{id: string; name: string}>;
         services: Array<{id: string; name: string}>;
-        roles: Array<{id: string; name: string}>;
+        scope: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -2446,7 +2446,7 @@ function AsyncChipSelect({
                     return false;
                 }
 
-                if (type === 'groupName') {
+                if (type === 'roleName') {
                     // Never filter group names - show all options
                     return false;
                 } else if (type === 'entity') {
@@ -2509,7 +2509,7 @@ function AsyncChipSelect({
         // Prefer below if there's enough space, otherwise use above if there's really no space
         // For user group fields, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'entity' || type === 'product' || type === 'service' || type === 'description' || type === 'groupName' || type === 'roles';
+        const forceBelow = type === 'entity' || type === 'product' || type === 'service' || type === 'description' || type === 'roleName' || type === 'scope';
         
         if (forceBelow && spaceBelow >= 100) {
             // For status fields, show below if there's at least 100px space
@@ -2556,9 +2556,9 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
             
-            // Use dropdownOptions if available for groupName
-            if (type === 'groupName' && dropdownOptions?.groupNames) {
-                allData = dropdownOptions.groupNames;
+            // Use dropdownOptions if available for roleName
+            if (type === 'roleName' && dropdownOptions?.roleNames) {
+                allData = dropdownOptions.roleNames;
             } else if (type === 'description' && dropdownOptions?.descriptions) {
                 allData = dropdownOptions.descriptions;
             } else if (type === 'entity' && dropdownOptions?.entities) {
@@ -2567,9 +2567,9 @@ function AsyncChipSelect({
                 allData = dropdownOptions.products;
             } else if (type === 'service' && dropdownOptions?.services) {
                 allData = dropdownOptions.services;
-            } else if (type === 'roles' && dropdownOptions?.roles) {
-                allData = dropdownOptions.roles;
-            } else if (type === 'groupName') {
+            } else if (type === 'scope' && dropdownOptions?.scope) {
+                allData = dropdownOptions.scope;
+            } else if (type === 'roleName') {
                 // Build groups URL with account filter (enterprise filter makes backend too restrictive)
                 // Get values from localStorage
                 const selectedAccountId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null;
@@ -2577,18 +2577,18 @@ function AsyncChipSelect({
                 const selectedEnterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
                 const selectedEnterprise = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null;
                 
-                let groupsUrl = '/api/user-management/groups';
+                let rolesUrl = '/api/user-management/roles';
                 const params = new URLSearchParams();
                 if (selectedAccountId) params.append('accountId', selectedAccountId);
                 if (selectedAccountName) params.append('accountName', selectedAccountName);
                 if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
                 if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise);
-                if (params.toString()) groupsUrl += `?${params.toString()}`;
+                if (params.toString()) rolesUrl += `?${params.toString()}`;
 
-                const response = await api.get<Array<{id: string; name: string; groupName?: string}>>(groupsUrl) || [];
+                const response = await api.get<Array<{id: string; name: string; roleName?: string}>>(rolesUrl) || [];
                 allData = response.map((item: any) => ({
-                    id: item.id || item.groupId || String(Math.random()),
-                    name: item.name || item.groupName || ''
+                    id: item.id || item.roleId || String(Math.random()),
+                    name: item.name || item.roleName || ''
                 })).filter((item: any) => item.name);
             } else if (type === 'entity') {
                 allData = await api.get<Array<{id: string; name: string}>>(
@@ -2660,7 +2660,7 @@ function AsyncChipSelect({
 
     // Load groupName options immediately on mount if needed
     React.useEffect(() => {
-        if (type === 'groupName' && allOptions.length === 0) {
+        if (type === 'roleName' && allOptions.length === 0) {
             loadAllOptions();
         }
     }, [type, allOptions.length, loadAllOptions]);
@@ -2704,11 +2704,10 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'groupName') {
-                created = await api.post<{id: string; name: string}>(
-                    '/api/user-management/groups',
-                    {name, groupName: name},
-                );
+            if (type === 'roleName') {
+                // DON'T create database record immediately - just add to local dropdown options
+                // The actual database record will be created when Save button is clicked
+                created = { id: `temp-groupname-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name };
             } else if (type === 'description') {
                 // Description is free text, no API creation needed
                 onChange(name);
@@ -2732,7 +2731,7 @@ function AsyncChipSelect({
                     '/api/services',
                     {name},
                 );
-            } else if (type === 'roles') {
+            } else if (type === 'scope') {
                 // Roles are managed separately
                 return;
             } else {
@@ -2764,15 +2763,15 @@ function AsyncChipSelect({
                 // Notify parent component about the new item
                 if (onNewItemCreated && created) {
                     const typeMap: Record<string, string> = {
-                        'groupName': 'groupNames',
+                        'roleName': 'roleNames',
                         'description': 'descriptions',
                         'entity': 'entities',
                         'product': 'products',
                         'service': 'services',
-                        'roles': 'roles'
+                        'scope': 'scope'
                     };
                     
-                    const dropdownType = typeMap[type as string] || 'groupNames';
+                    const dropdownType = typeMap[type as string] || 'roleNames';
                     onNewItemCreated(dropdownType as any, created);
                 }
             }
@@ -2804,7 +2803,7 @@ function AsyncChipSelect({
 
     // Debug logging for groupName
     React.useEffect(() => {
-        if (type === 'groupName') {
+        if (type === 'roleName') {
         }
     }, [type, allOptions]);
 
@@ -3096,8 +3095,8 @@ function AsyncChipSelect({
     );
 }
 
-// AsyncChipSelect for Group Name with dropdown and + sign for new values
-function AsyncChipSelectGroupName({
+// AsyncChipSelect for Role Name with dropdown and + sign for new values
+function AsyncChipSelectRoleName({
     value,
     onChange,
     placeholder = '',
@@ -3113,7 +3112,7 @@ function AsyncChipSelectGroupName({
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    userGroups?: UserGroupRow[];
+    userGroups?: UserRoleRow[];
     onNewItemCreated?: (item: {id: string; name: string}) => void;
     selectedAccountId?: string;
     selectedAccountName?: string;
@@ -3138,62 +3137,62 @@ function AsyncChipSelectGroupName({
 
     // Load options from database API - exactly like AssignedUserGroupTable
     const loadAllOptions = useCallback(async () => {
-        console.log('🔄 [GroupName] loadAllOptions called');
+        console.log('🔄 [RoleName] loadAllOptions called');
         setLoading(true);
         try {
             // Build URL with account/enterprise filters when available
-            let groupsUrl = '/api/user-management/groups';
+            let rolesUrl = '/api/user-management/roles';
             const params = new URLSearchParams();
             if (selectedAccountId) params.append('accountId', selectedAccountId);
             if (selectedAccountName) params.append('accountName', selectedAccountName || '');
             if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
             if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise || '');
-            if (params.toString()) groupsUrl += `?${params.toString()}`;
+            if (params.toString()) rolesUrl += `?${params.toString()}`;
 
-            console.log('📡 [GroupName] Calling API:', groupsUrl);
-            const allData = await api.get<Array<{id: string; name: string}>>(groupsUrl) || [];
-            console.log(`✅ [GroupName] API call successful, got ${allData.length} items:`, allData);
+            console.log('📡 [RoleName] Calling API:', rolesUrl);
+            const allData = await api.get<Array<{id: string; name: string}>>(rolesUrl) || [];
+            console.log(`✅ [RoleName] API call successful, got ${allData.length} items:`, allData);
             // Transform the data to match expected format if needed
             const transformedData = allData.map((item: any) => ({
-                id: item.id || item.groupId || String(Math.random()),
-                name: item.name || item.groupName || item.group || ''
+                id: item.id || item.roleId || String(Math.random()),
+                name: item.name || item.roleName || item.role || ''
             })).filter((item: any) => item.name); // Filter out items without names
             
-            // Get distinct group names only (remove duplicates)
-            const uniqueGroupNames = new Map<string, {id: string; name: string}>();
+            // Get distinct role names only (remove duplicates)
+            const uniqueRoleNames = new Map<string, {id: string; name: string}>();
             transformedData.forEach((item: any) => {
                 const lowerName = item.name.toLowerCase();
-                if (!uniqueGroupNames.has(lowerName)) {
-                    uniqueGroupNames.set(lowerName, item);
+                if (!uniqueRoleNames.has(lowerName)) {
+                    uniqueRoleNames.set(lowerName, item);
                 }
             });
-            const distinctData = Array.from(uniqueGroupNames.values());
+            const distinctData = Array.from(uniqueRoleNames.values());
             
-            // Filter out group names that are already used in the current table
-            // This prevents duplicate group names within the same account/enterprise
-            const usedGroupNames = new Set(
+            // Filter out role names that are already used in the current table
+            // This prevents duplicate role names within the same account/enterprise
+            const usedRoleNames = new Set(
                 userGroups
-                    .map(ug => ug.groupName?.toLowerCase().trim())
+                    .map(ug => ug.roleName?.toLowerCase().trim())
                     .filter(name => name) // Remove empty/null names
             );
             
             const availableData = distinctData.filter(item => 
-                !usedGroupNames.has(item.name.toLowerCase().trim())
+                !usedRoleNames.has(item.name.toLowerCase().trim())
             );
             
-            console.log(`📋 [GroupName] Total groups: ${transformedData.length}, Distinct group names: ${distinctData.length}`);
-            console.log(`📋 [GroupName] Already used in table: ${usedGroupNames.size}`);
-            console.log(`📋 [GroupName] Available (unused) group names: ${availableData.length}`);
-            console.log(`📋 [GroupName] Available group names for dropdown:`, availableData.map(d => d.name));
+            console.log(`📋 [RoleName] Total roles: ${transformedData.length}, Distinct role names: ${distinctData.length}`);
+            console.log(`📋 [RoleName] Already used in table: ${usedRoleNames.size}`);
+            console.log(`📋 [RoleName] Available (unused) role names: ${availableData.length}`);
+            console.log(`📋 [RoleName] Available role names for dropdown:`, availableData.map(d => d.name));
             setAllOptions(availableData);
         } catch (error) {
-            console.error('❌ [GroupName] API call failed:', error);
+            console.error('❌ [RoleName] API call failed:', error);
             // Don't set empty array - keep previous data if any
             // This way, if API fails but user types, showCreateNew will still be true
             setAllOptions([]);
         } finally {
             setLoading(false);
-            console.log('🏁 [GroupName] loadAllOptions completed, loading set to false');
+            console.log('🏁 [RoleName] loadAllOptions completed, loading set to false');
         }
     }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, userGroups]);
 
@@ -3260,9 +3259,9 @@ function AsyncChipSelectGroupName({
 
     // Filter options - exactly like AssignedUserGroupTable
     const filterOptions = useCallback(() => {
-        console.log('🔍 [GroupName] filterOptions called', { allOptionsLength: allOptions.length, query });
+        console.log('🔍 [RoleName] filterOptions called', { allOptionsLength: allOptions.length, query });
         if (allOptions.length === 0) {
-            console.log('⚠️ [GroupName] allOptions is empty, setting options to []');
+            console.log('⚠️ [RoleName] allOptions is empty, setting options to []');
             setOptions([]);
             return;
         }
@@ -3270,7 +3269,7 @@ function AsyncChipSelectGroupName({
         
         // Don't filter out already selected group names - allow users to select existing group names
         // Duplicate prevention happens during save validation (checking Group Name + Entity + Product + Service)
-        console.log(`🔍 [GroupName] Starting with ${filtered.length} options from API`);
+        console.log(`🔍 [RoleName] Starting with ${filtered.length} options from API`);
         
         // Apply search filter
         if (query) {
@@ -3278,7 +3277,7 @@ function AsyncChipSelectGroupName({
             filtered = filtered.filter(opt => 
                 opt.name.toLowerCase().startsWith(queryLower)
             );
-            console.log(`🔍 [GroupName] After startsWith filter (${queryLower}): ${filtered.length} items`, filtered);
+            console.log(`🔍 [RoleName] After startsWith filter (${queryLower}): ${filtered.length} items`, filtered);
             
             // Sort filtered results: exact matches first, then alphabetical - exactly like AssignedUserGroupTable
             filtered = filtered.sort((a, b) => {
@@ -3294,7 +3293,7 @@ function AsyncChipSelectGroupName({
             });
         }
         
-        console.log(`✅ [GroupName] Setting options to ${filtered.length} filtered items`);
+        console.log(`✅ [RoleName] Setting options to ${filtered.length} filtered items`);
         setOptions(filtered);
     }, [allOptions, query]);
 
@@ -3306,14 +3305,14 @@ function AsyncChipSelectGroupName({
         const name = (query || '').trim();
         if (!name) return;
 
-        // Check if group name is already used in the current table (duplicate check)
+        // Check if role name is already used in the current table (duplicate check)
         const isDuplicateInTable = userGroups.some(
-            ug => ug.groupName?.toLowerCase().trim() === name.toLowerCase()
+            ug => ug.roleName?.toLowerCase().trim() === name.toLowerCase()
         );
         
         if (isDuplicateInTable) {
-            console.log('❌ [GroupName] Duplicate group name detected in table:', name);
-            alert(`Group name "${name}" already exists in the table. Please use a different name.`);
+            console.log('❌ [RoleName] Duplicate role name detected in table:', name);
+            alert(`Role name "${name}" already exists in the table. Please use a different name.`);
             return;
         }
 
@@ -3333,104 +3332,43 @@ function AsyncChipSelectGroupName({
         }
 
         try {
-            // Create new user group in database via API with account/enterprise context
-            console.log('➕ [GroupName] Creating new group:', name);
-            console.log('📦 [GroupName] Account/Enterprise context:', {
-                selectedAccountId,
-                selectedAccountName,
-                selectedEnterpriseId,
-                selectedEnterprise
-            });
+            // DO NOT create role in database immediately - just set the value locally
+            // The role will be created when the full row is saved (with all mandatory fields)
+            console.log('➕ [RoleName] Setting new role name (NOT creating in DB yet):', name);
+            console.log('📦 [RoleName] Role will be created when row is saved with all mandatory fields');
             
-            // Include account/enterprise context in request body - exactly like Save All
-            const groupData = {
-                name,
-                groupName: name,
-                accountId: selectedAccountId,
-                accountName: selectedAccountName,
-                enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterprise
-            };
+            // Just set the value locally without creating in database
+            onChange(name);
+            setCurrent(name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
             
-            console.log('🌐 [GroupName] Creating group with context:', groupData);
-            
-            const created = await api.post<{id: string; name: string} | any>(
-                '/api/user-management/groups',
-                groupData
-            );
-            
-            console.log('✅ [GroupName] Group created:', created);
-            
-            // Transform response to match expected format
-            const formattedCreated = {
-                id: created?.id || created?.groupId || String(Math.random()),
-                name: created?.name || created?.groupName || name
-            };
-            
-            if (formattedCreated) {
-                // Add newly created to the dropdown list and select it
-                setOptions((prev) => {
-                    const exists = prev.some((o) => o.id === formattedCreated.id);
-                    return exists ? prev : [...prev, formattedCreated];
-                });
-                // Also add to allOptions for future exact match checking
-                setAllOptions((prev) => {
-                    const exists = prev.some((o) => o.id === formattedCreated.id);
-                    return exists ? prev : [...prev, formattedCreated];
-                });
-                onChange(formattedCreated.name);
-                setCurrent(formattedCreated.name);
-                setQuery('');
-                setOpen(false);
-                setHasPendingNewValue(false);
-                
-                // Focus the chip after creating new value so Tab navigation works - exactly like AssignedUserGroupTable
-                setTimeout(() => {
-                    try {
-                        // Find the chip element (which now has tabIndex=0 and is focusable)
-                        if (inputRef.current) {
-                            // inputRef should now point to the chip (motion.span)
-                            if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
-                                inputRef.current.focus();
-                                console.log('🎯 [GroupName] Focused chip after creation');
-                            } else {
-                                // If inputRef is still the input, find the chip
-                                const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
-                                if (chipElement) {
-                                    chipElement.focus();
-                                    console.log('🎯 [GroupName] Focused chip after creation (found via querySelector)');
-                                }
+            // Focus the chip after setting value so Tab navigation works
+            setTimeout(() => {
+                try {
+                    // Find the chip element (which now has tabIndex=0 and is focusable)
+                    if (inputRef.current) {
+                        // inputRef should now point to the chip (motion.span)
+                        if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
+                            inputRef.current.focus();
+                            console.log('🎯 [RoleName] Focused chip after setting value');
+                        } else {
+                            // If inputRef is still the input, find the chip
+                            const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                            if (chipElement) {
+                                chipElement.focus();
+                                console.log('🎯 [RoleName] Focused chip after setting value (found via querySelector)');
                             }
                         }
-                    } catch (e) {
-                        console.log('🎯 [GroupName] Error focusing chip after creation:', e);
                     }
-                }, 100); // Small delay to ensure React state updates are complete
-                
-                // Notify parent component about the new item
-                if (onNewItemCreated) {
-                    onNewItemCreated(formattedCreated);
+                } catch (e) {
+                    console.log('🎯 [RoleName] Error focusing chip after setting value:', e);
                 }
-            }
+            }, 100); // Small delay to ensure React state updates are complete
         } catch (error: any) {
-            console.error('Failed to create userGroup:', error);
-            // Handle duplicate error from backend
-            if (
-                error?.message?.includes('already exists') ||
-                error?.message?.includes('duplicate')
-            ) {
-                // Try to find the existing item and select it
-                const existingItem = allOptions.find(
-                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
-                );
-                if (existingItem) {
-                    onChange(existingItem.name);
-                    setCurrent(existingItem.name);
-                    setQuery('');
-                    setOpen(false);
-                    setHasPendingNewValue(false);
-                }
-            }
+            console.error('❌ [RoleName] Failed to set role name:', error);
+            alert(`Failed to set role name: ${error.message || 'Unknown error'}`);
         }
     };
 
@@ -3522,10 +3460,10 @@ function AsyncChipSelectGroupName({
                         value={query}
                         onChange={(e: any) => {
                             const newValue = e.target.value;
-                            console.log('⌨️ [GroupName] onChange:', { newValue, allOptionsLength: allOptions.length, open });
+                            console.log('⌨️ [RoleName] onChange:', { newValue, allOptionsLength: allOptions.length, open });
                             setQuery(newValue);
                             // Always open dropdown when typing to show options or + button
-                            console.log('📂 [GroupName] Setting open to true');
+                            console.log('📂 [RoleName] Setting open to true');
                             setOpen(true);
                             // Calculate position immediately
                             if (containerRef.current) {
@@ -3533,11 +3471,11 @@ function AsyncChipSelectGroupName({
                                 const width = Math.max(140, Math.min(200, containerRect.width));
                                 const top = containerRect.bottom + 2;
                                 const left = containerRect.left;
-                                console.log('📍 [GroupName] Setting dropdown position:', { top, left, width });
+                                console.log('📍 [RoleName] Setting dropdown position:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
                             // Reload options to exclude already-used group names
-                            console.log('📥 [GroupName] Reloading options to filter out used group names');
+                            console.log('📥 [RoleName] Reloading options to filter out used group names');
                             loadAllOptions();
                             // Clear current selection if user clears the input completely
                             if (newValue === '') {
@@ -3546,7 +3484,7 @@ function AsyncChipSelectGroupName({
                             }
                         }}
                         onFocus={() => {
-                            console.log('👁️ [GroupName] onFocus:', { allOptionsLength: allOptions.length, open, query });
+                            console.log('👁️ [RoleName] onFocus:', { allOptionsLength: allOptions.length, open, query });
                             setOpen(true);
                             // Calculate position immediately on focus
                             if (containerRef.current) {
@@ -3554,11 +3492,11 @@ function AsyncChipSelectGroupName({
                                 const width = Math.max(140, Math.min(200, containerRect.width));
                                 const top = containerRect.bottom + 2;
                                 const left = containerRect.left;
-                                console.log('📍 [GroupName] Setting dropdown position on focus:', { top, left, width });
+                                console.log('📍 [RoleName] Setting dropdown position on focus:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
                             // Always reload options on focus to exclude already-used group names
-                            console.log('📥 [GroupName] Reloading options on focus to filter out used group names');
+                            console.log('📥 [RoleName] Reloading options on focus to filter out used group names');
                             loadAllOptions();
                         }}
                         onKeyDown={async (e: any) => {
@@ -3574,11 +3512,11 @@ function AsyncChipSelectGroupName({
                                 if (exactMatch) {
                                     // Double-check for duplicate (safeguard)
                                     const isDuplicate = userGroups.some(
-                                        ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                        ug => ug.roleName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
                                     );
                                     
                                     if (isDuplicate) {
-                                        console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                        console.log('❌ [RoleName] Cannot select duplicate role name:', exactMatch.name);
                                         alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
                                         setQuery('');
                                         setOpen(false);
@@ -3600,18 +3538,18 @@ function AsyncChipSelectGroupName({
                                                 // inputRef should now point to the chip (motion.span)
                                                 if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
                                                     inputRef.current.focus();
-                                                    console.log('🎯 [GroupName] Focused chip after Enter on existing value');
+                                                    console.log('🎯 [RoleName] Focused chip after Enter on existing value');
                                                 } else {
                                                     // If inputRef is still the input, find the chip
                                                     const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                     if (chipElement) {
                                                         chipElement.focus();
-                                                        console.log('🎯 [GroupName] Focused chip after Enter on existing value (found via querySelector)');
+                                                        console.log('🎯 [RoleName] Focused chip after Enter on existing value (found via querySelector)');
                                                     }
                                                 }
                                             }
                                         } catch (e) {
-                                            console.log('🎯 [GroupName] Error focusing chip after Enter on existing value:', e);
+                                            console.log('🎯 [RoleName] Error focusing chip after Enter on existing value:', e);
                                         }
                                     }, 100); // Small delay to ensure React state updates are complete
                                 } else {
@@ -3644,11 +3582,11 @@ function AsyncChipSelectGroupName({
                                     if (exactMatch) {
                                         // Double-check for duplicate (safeguard)
                                         const isDuplicate = userGroups.some(
-                                            ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                            ug => ug.roleName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
                                         );
                                         
                                         if (isDuplicate) {
-                                            console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                            console.log('❌ [RoleName] Cannot select duplicate role name:', exactMatch.name);
                                             alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
                                             e.preventDefault();
                                             setQuery('');
@@ -3669,7 +3607,7 @@ function AsyncChipSelectGroupName({
                                                 const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                 if (chipElement) {
                                                     chipElement.focus();
-                                                    console.log('🎯 [GroupName] Focused chip after Tab on existing value');
+                                                    console.log('🎯 [RoleName] Focused chip after Tab on existing value');
                                                     
                                                     // Now trigger Tab navigation to next field - exactly like AssignedUserGroupTable
                                                     setTimeout(() => {
@@ -3697,7 +3635,7 @@ function AsyncChipSelectGroupName({
                                                     }, 50);
                                                 }
                                             } catch (e) {
-                                                console.log('🎯 [GroupName] Error focusing chip after Tab on existing value:', e);
+                                                console.log('🎯 [RoleName] Error focusing chip after Tab on existing value:', e);
                                             }
                                         }, 100);
                                     }
@@ -3774,7 +3712,7 @@ function AsyncChipSelectGroupName({
                     <div className='relative z-10 flex flex-col'>
                         <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
                             {(() => {
-                                console.log('🎨 [GroupName] Rendering dropdown content', {
+                                console.log('🎨 [RoleName] Rendering dropdown content', {
                                     query: query.trim(),
                                     optionsLength: options.length,
                                     allOptionsLength: allOptions.length,
@@ -3802,14 +3740,14 @@ function AsyncChipSelectGroupName({
                                     })
                                     : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
                                 
-                                console.log('🔍 [GroupName] filteredOptions:', filteredOptions);
+                                console.log('🔍 [RoleName] filteredOptions:', filteredOptions);
                                 
                                 // Check if query exactly matches an existing option - always check allOptions when available (database source of truth)
                                 const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 ) : null;
                                 
-                                console.log('🎯 [GroupName] exactMatch check:', {
+                                console.log('🎯 [RoleName] exactMatch check:', {
                                     query: query.trim(),
                                     allOptionsLength: allOptions.length,
                                     exactMatch: exactMatch?.name || null,
@@ -3821,7 +3759,7 @@ function AsyncChipSelectGroupName({
                                 // 2. Either allOptions is empty (still loading) OR no exact match found in database
                                 const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
                                 
-                                console.log('➕ [GroupName] showCreateNew calculation:', {
+                                console.log('➕ [RoleName] showCreateNew calculation:', {
                                     queryTrimmed: query.trim(),
                                     queryHasValue: !!query.trim(),
                                     allOptionsEmpty: allOptions.length === 0,
@@ -3831,7 +3769,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Show loading only if loading AND no query entered yet
                                 if (loading && allOptions.length === 0 && !query.trim()) {
-                                    console.log('⏳ [GroupName] Showing loading message');
+                                    console.log('⏳ [RoleName] Showing loading message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             Loading…
@@ -3841,7 +3779,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Only show "No matches" if there are no filtered options AND no new value to create AND not loading AND allOptions is loaded
                                 if (filteredOptions.length === 0 && !showCreateNew && !loading && allOptions.length > 0) {
-                                    console.log('🚫 [GroupName] Showing "No matches" message');
+                                    console.log('🚫 [RoleName] Showing "No matches" message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             No matches
@@ -3851,7 +3789,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Show empty state when no values exist in database
                                 if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
-                                    console.log('📭 [GroupName] Showing "No value found" message');
+                                    console.log('📭 [RoleName] Showing "No value found" message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             No value found
@@ -3859,7 +3797,7 @@ function AsyncChipSelectGroupName({
                                     );
                                 }
                                 
-                                console.log('✅ [GroupName] Rendering dropdown items and + button', {
+                                console.log('✅ [RoleName] Rendering dropdown items and + button', {
                                     filteredOptionsCount: filteredOptions.length,
                                     showCreateNew,
                                     showCreateNewType: typeof showCreateNew,
@@ -3892,11 +3830,11 @@ function AsyncChipSelectGroupName({
                                                         onClick={() => {
                                                             // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
                                                             const isDuplicate = userGroups.some(
-                                                                ug => ug.groupName?.toLowerCase().trim() === opt.name.toLowerCase().trim()
+                                                                ug => ug.roleName?.toLowerCase().trim() === opt.name.toLowerCase().trim()
                                                             );
                                                             
                                                             if (isDuplicate) {
-                                                                console.log('❌ [GroupName] Cannot select duplicate group name:', opt.name);
+                                                                console.log('❌ [RoleName] Cannot select duplicate role name:', opt.name);
                                                                 alert(`Group name "${opt.name}" already exists in the table. Please use a different name.`);
                                                                 return;
                                                             }
@@ -3914,10 +3852,10 @@ function AsyncChipSelectGroupName({
                                                                     const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                                     if (chipElement) {
                                                                         chipElement.focus();
-                                                                        console.log('🎯 [GroupName] Focused chip after dropdown selection');
+                                                                        console.log('🎯 [RoleName] Focused chip after dropdown selection');
                                                                     }
                                                                 } catch (e) {
-                                                                    console.log('🎯 [GroupName] Error focusing chip after dropdown selection:', e);
+                                                                    console.log('🎯 [RoleName] Error focusing chip after dropdown selection:', e);
                                                                 }
                                                             }, 100); // Small delay to ensure React state updates are complete
                                                         }}
@@ -3940,7 +3878,7 @@ function AsyncChipSelectGroupName({
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
-                                                        console.log('🖱️ [GroupName] + button clicked for:', query.trim());
+                                                        console.log('🖱️ [RoleName] + button clicked for:', query.trim());
                                                         addNew();
                                                     }}
                                                     className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
@@ -3981,7 +3919,7 @@ function AsyncChipSelectEntity({
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    accounts?: UserGroupRow[];
+    accounts?: UserRoleRow[];
     onNewItemCreated?: (item: {id: string; name: string}) => void;
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -5998,35 +5936,35 @@ function AsyncChipSelectService({
     );
 }
 
-interface UserGroupsTableProps {
-    rows: UserGroupRow[];
+interface UserRolesTableProps {
+    rows: UserRoleRow[];
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'groupName' | 'entity' | 'product' | 'service';
+    groupByExternal?: 'none' | 'roleName' | 'entity' | 'product' | 'service';
     onGroupByChange?: (
-        g: 'none' | 'groupName' | 'entity' | 'product' | 'service',
+        g: 'none' | 'roleName' | 'entity' | 'product' | 'service',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'groupName'
+        | 'roleName'
         | 'description'
         | 'entity'
         | 'product'
         | 'service'
-        | 'roles'
+        | 'scope'
         | 'actions'
     >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
-        groupNames?: Array<{id: string; name: string}>;
+        roleNames?: Array<{id: string; name: string}>;
         descriptions?: Array<{id: string; name: string}>;
         entities?: Array<{id: string; name: string}>;
         products?: Array<{id: string; name: string}>;
         services?: Array<{id: string; name: string}>;
-        roles?: Array<{id: string; name: string}>;
+        scope?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -6036,13 +5974,13 @@ interface UserGroupsTableProps {
     hasBlankRow?: boolean;
     externalFieldErrors?: {[key: string]: Record<string, string>}; // Per-row field errors from parent
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -6064,14 +6002,14 @@ interface UserGroupsTableProps {
     onLicenseValidationChange?: (hasIncompleteLicenses: boolean, incompleteLicenseRows: string[]) => void; // Callback for license validation state
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
-    onOpenAddressModal?: (row: UserGroupRow) => void; // Callback to open address modal
-    onOpenUserGroupModal?: (row: UserGroupRow) => void; // Callback to open user group modal
+    onOpenAddressModal?: (row: UserRoleRow) => void; // Callback to open address modal
+    onOpenUserGroupModal?: (row: UserRoleRow) => void; // Callback to open user group modal
+    onOpenScopeModal?: (row: UserRoleRow) => void; // Callback to open scope config modal
     onShowStartDateProtectionModal?: (message: string) => void; // Callback to show start date protection modal
     onDuplicateDetected?: (message: string) => void; // Callback to show duplicate entry modal
-    onOpenRolesModal?: (row: UserGroupRow) => void; // Callback to open roles modal
 }
 
-function SortableUserGroupRow({
+function SortableUserRoleRow({
     row,
     index,
     onEdit,
@@ -6102,7 +6040,7 @@ function SortableUserGroupRow({
     onDeleteClick,
     onOpenAddressModal,
     onOpenUserGroupModal,
-    onOpenRolesModal,
+    onOpenScopeModal,
     onShowStartDateProtectionModal,
     selectedEnterprise = '',
     selectedEnterpriseId = '',
@@ -6110,7 +6048,7 @@ function SortableUserGroupRow({
     selectedAccountName = '',
     onShowGlobalValidationModal,
 }: {
-    row: UserGroupRow;
+    row: UserRoleRow;
     index: number;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
@@ -6121,10 +6059,10 @@ function SortableUserGroupRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (rowId: string, key: keyof UserGroupRow, value: any) => void;
+    onUpdateField: (rowId: string, key: keyof UserRoleRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onStartFill: (rowId: string, col: keyof UserGroupRow, value: string) => void;
+    onStartFill: (rowId: string, col: keyof UserRoleRow, value: string) => void;
     inFillRange: boolean;
     pinFirst?: boolean;
     firstColWidth?: string;
@@ -6132,23 +6070,23 @@ function SortableUserGroupRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    allRows?: UserGroupRow[];
+    allRows?: UserRoleRow[];
     onDeleteClick?: (rowId: string) => void;
-    onOpenAddressModal?: (row: UserGroupRow) => void;
-    onOpenUserGroupModal?: (row: UserGroupRow) => void;
-    onOpenRolesModal?: (row: UserGroupRow) => void;
+    onOpenAddressModal?: (row: UserRoleRow) => void;
+    onOpenUserGroupModal?: (row: UserRoleRow) => void;
+    onOpenScopeModal?: (row: UserRoleRow) => void;
     onShowStartDateProtectionModal?: (message: string) => void;
     onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
     selectedEnterprise?: string;
@@ -6228,7 +6166,7 @@ function SortableUserGroupRow({
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
         [
-            'groupName',
+            'roleName',
             'description',
             'entity',
             'product',
@@ -6493,7 +6431,7 @@ function SortableUserGroupRow({
                     </motion.button>
                 )}
             </div>
-            {cols.includes('groupName') && (
+            {cols.includes('roleName') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible ${
                         pinFirst && !shouldShowHorizontalScroll
@@ -6509,21 +6447,21 @@ function SortableUserGroupRow({
                     <div
                         className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='groupName'
+                        data-col='roleName'
                         style={{width: '100%', minWidth: '100%', maxWidth: '100%', overflow: 'visible'}}
                     >
                         {enableDropdownChips ? (
-                            <AsyncChipSelectGroupName
-                                value={row.groupName || ''}
+                            <AsyncChipSelectRoleName
+                                value={row.roleName || ''}
                                 onChange={(v) => {
-                                    onUpdateField(row.id, 'groupName' as any, v || '');
+                                    onUpdateField(row.id, 'roleName' as any, v || '');
                                 }}
                                 placeholder=''
-                                isError={isCellMissing(row.id, 'groupName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].groupName)}
+                                isError={isCellMissing(row.id, 'roleName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].groupName)}
                                 userGroups={allRows}
                                 onNewItemCreated={(item) => {
                                     if (onNewItemCreated) {
-                                        onNewItemCreated('groupNames', item);
+                                        onNewItemCreated('roleNames', item);
                                     }
                                 }}
                                 selectedAccountId={selectedAccountId}
@@ -6533,15 +6471,15 @@ function SortableUserGroupRow({
                             />
                         ) : (
                             <InlineEditableText
-                                value={row.groupName || ''}
+                                value={row.roleName || ''}
                                 onCommit={(v) =>
-                                    onUpdateField(row.id, 'groupName' as any, v)
+                                    onUpdateField(row.id, 'roleName' as any, v)
                                 }
                                 className='text-[12px]'
                                 dataAttr={`groupName-${row.id}`}
-                                isError={isCellMissing(row.id, 'groupName')}
+                                isError={isCellMissing(row.id, 'roleName')}
                                 placeholder='Enter group name'
-                                {...createTabNavigation('groupName')}
+                                {...createTabNavigation('roleName')}
                             />
                         )}
                     </div>
@@ -6735,7 +6673,7 @@ function SortableUserGroupRow({
             )}
 
             {/* Roles Column */}
-            {cols.includes('roles') && (
+            {cols.includes('scope') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -6747,36 +6685,21 @@ function SortableUserGroupRow({
                     <div
                         className='flex items-center justify-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='roles'
+                        data-col='scope'
                         style={{width: '100%', overflow: 'visible'}}
                     >
-                        {(() => {
-                            const roleCount = Array.isArray(row.assignedRoles)
-                                ? row.assignedRoles.length
-                                : (row.roles
-                                    ? row.roles.split(',').map((role) => role.trim()).filter(Boolean).length
-                                    : 0);
-                            return (
                         <button
-                            onClick={() => onOpenRolesModal?.(row)}
+                            onClick={() => {
+                                if (onOpenScopeModal) {
+                                    onOpenScopeModal(row);
+                                }
+                            }}
                             className="relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-colors duration-150 hover:bg-blue-200 hover:border-blue-400"
-                            title={`Manage roles for ${row.groupName || 'this group'}${roleCount ? ` (${roleCount})` : ''}`}
+                            title={`Configure scope for ${row.roleName || 'this role'}`}
                             tabIndex={-1}
                         >
-                            <Shield className="w-5 h-5 text-blue-600" />
-                            {roleCount > 0 && (
-                                <div
-                                    className="absolute w-3.5 h-3.5 bg-blue-700 rounded-full flex items-center justify-center shadow-md"
-                                    style={{ top: 0, right: 0, transform: 'translate(35%, -35%)' }}
-                                >
-                                    <span className="text-[9px] text-white font-semibold leading-none">
-                                        {roleCount}
-                                    </span>
-                                </div>
-                            )}
+                            <Settings className="w-4 h-4 text-blue-600" />
                         </button>
-                            );
-                        })()}
                     </div>
                 </div>
             )}
@@ -6788,7 +6711,7 @@ function SortableUserGroupRow({
     );
 }
 
-const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
+const ManageUserRolesTable = forwardRef<any, UserRolesTableProps>(({
     rows,
     onEdit,
     onDelete,
@@ -6831,9 +6754,9 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     onCompleteLicenseDeletion,
     onOpenAddressModal,
     onOpenUserGroupModal,
+    onOpenScopeModal,
     onShowStartDateProtectionModal,
     onDuplicateDetected,
-    onOpenRolesModal,
 }, ref) => {
     // Debug: Log received props
     console.log('🐛 [ManageUserGroupsTable] Props received:', {
@@ -6855,6 +6778,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         message: string;
         rowId: string;
     }>({ open: false, field: '', message: '', rowId: '' });
+
+    // Scope Config Modal state
+    const [showScopeModal, setShowScopeModal] = useState(false);
+    const [selectedRoleForScope, setSelectedRoleForScope] = useState<UserRoleRow | null>(null);
 
     // Global validation modal helper functions
     const showGlobalValidationModal = useCallback((rowId: string, field: string, message: string) => {
@@ -7034,11 +6961,11 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     // Validation state
 
     // Use refs to track previous values and avoid infinite loops
-    const prevRowsRef = useRef<UserGroupRow[]>([]);
+    const prevRowsRef = useRef<UserRoleRow[]>([]);
     const orderRef = useRef<string[]>([]);
     
     // Keep local state for editing, but initialize it safely
-    const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserGroupRow>>>({});
+    const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserRoleRow>>>({});
     
     // Use useMemo for base derived state with stable comparison
     const { baseLocalRows, order } = useMemo(() => {
@@ -7096,10 +7023,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     };
     
     // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (row: UserGroupRow, field: string): boolean => {
+    const isFieldMissing = (row: UserRoleRow, field: string): boolean => {
         switch (field) {
-            case 'groupName':
-                return !row.groupName || row.groupName.trim() === '';
+            case 'roleName':
+                return !row.roleName || row.roleName.trim() === '';
             case 'entity':
                 return !row.entity || row.entity.trim() === '';
             case 'product':
@@ -7138,7 +7065,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         
         localRows.forEach(row => {
             // Check if any required field is missing
-            if (isFieldMissing(row, 'groupName') ||
+            if (isFieldMissing(row, 'roleName') ||
                 isFieldMissing(row, 'entity') ||
                 isFieldMissing(row, 'product') ||
                 isFieldMissing(row, 'service')) {
@@ -7159,7 +7086,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
                 // Check if any required field is missing
-                if (isFieldMissing(row, 'groupName') ||
+                if (isFieldMissing(row, 'roleName') ||
                     isFieldMissing(row, 'entity') ||
                     isFieldMissing(row, 'product') ||
                     isFieldMissing(row, 'service')) {
@@ -7229,22 +7156,22 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         () =>
             order
                 .map((id) => localRows.find((r) => r.id === id))
-                .filter(Boolean) as UserGroupRow[],
+                .filter(Boolean) as UserRoleRow[],
         [order, localRows],
     );
 
     // Persist helpers
     // Debounced autosave per-row to avoid excessive API traffic
     const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, UserGroupRow>>({});
-    function schedulePersist(row: UserGroupRow, delay = 600) {
+    const latestRowRef = useRef<Record<string, UserRoleRow>>({});
+    function schedulePersist(row: UserRoleRow, delay = 600) {
         const rowId = String(row.id);
         latestRowRef.current[rowId] = row;
         if (saveTimersRef.current[rowId])
             clearTimeout(saveTimersRef.current[rowId]);
         saveTimersRef.current[rowId] = setTimeout(() => {
             const latest = latestRowRef.current[rowId];
-            if (latest) void persistUserGroupRow(latest);
+            if (latest) void persistUserRoleRow(latest);
         }, delay);
     }
     useEffect(() => {
@@ -7257,7 +7184,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         };
     }, []);
 
-    async function persistUserGroupRow(row: UserGroupRow) {
+    async function persistUserRoleRow(row: UserRoleRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
             if (String(row.id || '').startsWith('tmp-')) {
@@ -7265,7 +7192,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             }
             const core = {
                 // Core fields for user group management
-                groupName: row.groupName,
+                groupName: row.roleName,
                 description: row.description,
                 entity: row.entity,
                 product: row.product,
@@ -7273,13 +7200,13 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
-                // User group specific fields
-                groupName: row.groupName || '',
+                // User role specific fields
+                roleName: row.roleName || '',
                 description: row.description || '',
                 entity: row.entity || '',
                 product: row.product || '',
                 service: row.service || '',
-                roles: row.roles || '',
+                scope: row.scope || '',
             } as any;
             // Handle existing (non-temporary) rows
             // Check if we're on user group management page
@@ -7300,16 +7227,16 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }
 
     // Helper function to check for duplicate combinations
-    const checkForDuplicate = (rowId: string, updatedRow: UserGroupRow): boolean => {
-        // Check if combination of groupName + entity + product + service already exists in another row
+    const checkForDuplicate = (rowId: string, updatedRow: UserRoleRow): boolean => {
+        // Check if combination of roleName + entity + product + service already exists in another row
         const duplicateRow = localRows.find(row => 
             row.id !== rowId && // Exclude current row
-            row.groupName?.trim().toLowerCase() === updatedRow.groupName?.trim().toLowerCase() &&
+            row.roleName?.trim().toLowerCase() === updatedRow.roleName?.trim().toLowerCase() &&
             row.entity?.trim().toLowerCase() === updatedRow.entity?.trim().toLowerCase() &&
             row.product?.trim().toLowerCase() === updatedRow.product?.trim().toLowerCase() &&
             row.service?.trim().toLowerCase() === updatedRow.service?.trim().toLowerCase() &&
             // Only check for duplicates if all key fields are filled
-            updatedRow.groupName?.trim() && 
+            updatedRow.roleName?.trim() && 
             updatedRow.entity?.trim() && 
             updatedRow.product?.trim() && 
             updatedRow.service?.trim()
@@ -7318,8 +7245,8 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         return !!duplicateRow;
     };
 
-    function updateRowField(rowId: string, key: keyof UserGroupRow, value: any) {
-        let changed: UserGroupRow | null = null;
+    function updateRowField(rowId: string, key: keyof UserRoleRow, value: any) {
+        let changed: UserRoleRow | null = null;
         
         // Update local edits instead of directly modifying localRows
         setLocalEdits(prev => {
@@ -7328,7 +7255,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             if (baseRow) {
                 const currentEdits = prev[rowId] || {};
                 const currentRow = { ...baseRow, ...currentEdits };
-                const next = {...currentRow, [key]: value} as UserGroupRow;
+                const next = {...currentRow, [key]: value} as UserRoleRow;
                 
                 // If product field is being cleared, also clear the service field
                 if (key === 'product' && (!value || value.trim() === '')) {
@@ -7336,11 +7263,11 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                 }
                 
                 // Check for duplicates only for key fields
-                if (['groupName', 'entity', 'product', 'service'].includes(key as string)) {
+                if (['roleName', 'entity', 'product', 'service'].includes(key as string)) {
                     const isDuplicate = checkForDuplicate(rowId, next);
                     if (isDuplicate) {
                         // Show duplicate modal via callback instead of browser alert
-                        const message = `This combination of Group Name (${next.groupName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
+                        const message = `This combination of Role Name (${next.roleName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
                         if (onDuplicateDetected) {
                             onDuplicateDetected(message);
                         } else {
@@ -7380,8 +7307,8 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }
 
     // Helper function to check if main row fields are complete
-    const isMainRowComplete = (row: UserGroupRow): boolean => {
-        return !!(row.groupName && row.groupName.trim() && 
+    const isMainRowComplete = (row: UserRoleRow): boolean => {
+        return !!(row.roleName && row.roleName.trim() && 
                  row.entity && row.entity.trim() && 
                  row.product && row.product.trim() &&
                  row.service && row.service.trim());
@@ -7389,7 +7316,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
 
     // State for grouping
     const [groupBy, setGroupBy] = useState<
-        'none' | 'groupName' | 'entity' | 'product' | 'service'
+        'none' | 'roleName' | 'entity' | 'product' | 'service'
     >('none');
     
     // sync external groupBy
@@ -7398,15 +7325,15 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }, [groupByExternal]);
 
     // Clean break - license management removed
-    const columnOrder: UserGroupsTableProps['visibleColumns'] = useMemo(
+    const columnOrder: UserRolesTableProps['visibleColumns'] = useMemo(
         () => [
             // User group columns
-            'groupName',
+            'roleName',
             'description',
             'entity',
             'product',
             'service',
-            'roles',
+            'scope',
         ],
         [],
     );
@@ -7795,14 +7722,14 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             return { 'All Records': displayItems };
         }
 
-        const groups: Record<string, UserGroupRow[]> = {};
+        const groups: Record<string, UserRoleRow[]> = {};
         
         displayItems.forEach((item) => {
             let groupKey = '';
             
             switch (groupBy) {
-                case 'groupName':
-                    groupKey = item.groupName || '(No Group Name)';
+                case 'roleName':
+                    groupKey = item.roleName || '(No Role Name)';
                     break;
                 case 'entity':
                     groupKey = item.entity || '(No Entity)';
@@ -7824,7 +7751,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         });
 
         // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-        const sortedGroups: Record<string, UserGroupRow[]> = {};
+        const sortedGroups: Record<string, UserRoleRow[]> = {};
         const sortedKeys = Object.keys(groups).sort((a, b) => {
             const aIsEmpty = a.startsWith('(No ');
             const bIsEmpty = b.startsWith('(No ');
@@ -8228,12 +8155,12 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
-                            groupName: 'Group Name',
+                            roleName: 'Role Name',
                             description: 'Description',
                             entity: 'Entity',
                             product: 'Product',
                             service: 'Service',
-                            roles: 'Roles',
+                            scope: 'Scope',
                         };
 
                         // Merge custom labels with defaults
@@ -8295,22 +8222,22 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
                                             } ${
-                                                c === 'roles' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
+                                                c === 'scope' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'roles' ? { minWidth: '100px' } : undefined} // Width for roles icon
+                                            style={c === 'scope' ? { minWidth: '100px' } : undefined} // Width for roles icon
                                         >
                                             <div className='flex items-center gap-2'>
                                                 {iconFor[c] && iconFor[c]}
                                                 <span>{labelFor[c] || c}</span>
                                             </div>
                                             {[
-                                                'groupName',
+                                                'roleName',
                                                 'description',
                                                 'entity',
                                                 'product',
                                                 'service',
                                             ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'roles' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
+                                                <div className={`inline-flex items-center ml-4 ${c === 'scope' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
                                                     <button
                                                         onClick={() => toggleSort(c as any, 'asc')}
                                                         className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
@@ -8330,7 +8257,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                 </div>
                                             )}
                                             {/* Show resize handle for resizable columns but not for last column */}
-                                            {['groupName', 'description', 'entity', 'product', 'service'].includes(c) && (
+                                            {['roleName', 'description', 'entity', 'product', 'service'].includes(c) && (
                                                 <div
                                                     onMouseDown={(e: any) =>
                                                         startResize(c, e)
@@ -8341,7 +8268,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
-                                            {c === 'groupName' && (
+                                            {c === 'roleName' && (
                                                 <span
                                                     aria-hidden
                                                     className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
@@ -8366,7 +8293,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                         <div className='space-y-1 pt-2'>
                             {displayItems.map((r, idx) => (
                                 <div key={r.id}>
-                                    <SortableUserGroupRow
+                                    <SortableUserRoleRow
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -8401,7 +8328,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                         onOpenAddressModal={onOpenAddressModal}
                                         onOpenUserGroupModal={onOpenUserGroupModal}
-                                        onOpenRolesModal={onOpenRolesModal}
+                                        onOpenScopeModal={(row: UserRoleRow) => {
+                                            setSelectedRoleForScope(row);
+                                            setShowScopeModal(true);
+                                        }}
                                         onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                         onShowGlobalValidationModal={showGlobalValidationModal}
                                         selectedEnterprise={selectedEnterprise}
@@ -8457,7 +8387,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                     <div className='border-b border-slate-200 overflow-visible'>
                                         {groupRows.map((r, idx) => (
                                             <div key={r.id}>
-                                                <SortableUserGroupRow
+                                                <SortableUserRoleRow
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
@@ -8492,7 +8422,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
                                                     onOpenAddressModal={onOpenAddressModal}
                                                     onOpenUserGroupModal={onOpenUserGroupModal}
-                                        onOpenRolesModal={onOpenRolesModal}
+                                                    onOpenScopeModal={(row: UserRoleRow) => {
+                                                        setSelectedRoleForScope(row);
+                                                        setShowScopeModal(true);
+                                                    }}
                                                     onShowStartDateProtectionModal={onShowStartDateProtectionModal}
                                                     onShowGlobalValidationModal={showGlobalValidationModal}
                                                     selectedEnterprise={selectedEnterprise}
@@ -8590,11 +8523,31 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                     </div>
                 </div>
             )}
+
+            {/* Scope Config Modal */}
+            <ScopeConfigModal
+                isOpen={showScopeModal}
+                onClose={() => {
+                    setShowScopeModal(false);
+                    setSelectedRoleForScope(null);
+                }}
+                roleName={selectedRoleForScope?.roleName || ''}
+                roleDescription={selectedRoleForScope?.description || ''}
+                currentScope={selectedRoleForScope?.scope}
+                onSave={async (scopeConfig: any) => {
+                    console.log('💾 Scope config saved:', scopeConfig);
+                    if (selectedRoleForScope) {
+                        // Update the row with the new scope configuration
+                        updateRowField(selectedRoleForScope.id, 'scope', JSON.stringify(scopeConfig));
+                    }
+                    // Don't close modal here - let the modal's handleSave close it after successful save
+                }}
+            />
         </div>
     );
 });
 
 // Set the display name for debugging
-ManageUserGroupsTable.displayName = 'ManageUserGroupsTable';
+ManageUserRolesTable.displayName = 'ManageUserRolesTable';
 
-export default ManageUserGroupsTable;
+export default ManageUserRolesTable;

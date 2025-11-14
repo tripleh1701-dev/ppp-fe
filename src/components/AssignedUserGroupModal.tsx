@@ -5,15 +5,73 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { generateId } from '@/utils/id-generator';
 import { api } from '@/utils/api';
 import AssignedUserGroupTable from './AssignedUserGroupTable';
+import AssignedUserRoleModal, { UserRole } from './AssignedUserRoleModal';
+
+const normalizeAssignedRolesInput = (assignedRoles: any, rolesString?: string) => {
+    if (Array.isArray(assignedRoles) && assignedRoles.length > 0) {
+        return assignedRoles;
+    }
+    if (typeof assignedRoles === 'string') {
+        rolesString = assignedRoles;
+    }
+    if (rolesString) {
+        return rolesString
+            .split(',')
+            .map((name) => ({ roleName: name.trim() }))
+            .filter((role) => role.roleName);
+    }
+    return [];
+};
+
+const transformAssignedRoles = (rolesData: any): UserRole[] => {
+    if (!Array.isArray(rolesData)) return [];
+    return rolesData
+        .map((role: any) => {
+            const normalized = typeof role === 'string' ? { roleName: role } : role || {};
+            const roleName = normalized.name || normalized.roleName || '';
+            if (!roleName.trim()) {
+                return null;
+            }
+            return {
+                id: normalized.id?.toString() || normalized.roleAssignmentId?.toString() || generateId(),
+                roleId: normalized.roleId?.toString() || normalized.id?.toString(),
+                roleName: roleName.trim(),
+                description: normalized.description || '',
+                entity: normalized.entity || '',
+                product: normalized.product || '',
+                service: normalized.service || '',
+                scope: normalized.scope || '',
+                isFromDatabase: normalized.isFromDatabase ?? true
+            };
+        })
+        .filter(Boolean) as UserRole[];
+};
+
+const normalizeUserGroupData = (group: UserGroup | any): UserGroup => {
+    const assignedRolesInput = normalizeAssignedRolesInput(group.assignedRoles, group.roles);
+    const assignedRoles = transformAssignedRoles(assignedRolesInput);
+    const rolesDisplay = assignedRoles.length > 0
+        ? assignedRoles.map((role) => role.roleName).filter(Boolean).join(', ')
+        : (group.roles || '');
+
+    return {
+        ...group,
+        roles: rolesDisplay,
+        assignedRoles,
+        groupId: group.groupId,
+    };
+};
 
 export interface UserGroup {
     id: string;
+    groupId?: string;
     groupName: string;
     description: string;
     entity: string;
     product: string;
     service: string;
     roles: string;
+    assignedRoles?: UserRole[];
     isFromDatabase?: boolean; // Flag to indicate if this is an existing group from database (fields should be read-only)
 }
 
@@ -21,6 +79,7 @@ interface AssignedUserGroupModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (userGroups: UserGroup[]) => void;
+    onRolesUpdated?: (updatedGroups: UserGroup[]) => void;
     firstName: string;
     lastName: string;
     emailAddress: string;
@@ -30,12 +89,14 @@ interface AssignedUserGroupModalProps {
     selectedEnterpriseId?: string;
     selectedAccountId?: string;
     selectedAccountName?: string;
+    stackLevel?: number;
 }
 
 const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
     isOpen,
     onClose,
     onSave,
+    onRolesUpdated,
     firstName,
     lastName,
     emailAddress,
@@ -44,7 +105,8 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
     selectedEnterprise = '',
     selectedEnterpriseId = '',
     selectedAccountId = '',
-    selectedAccountName = ''
+    selectedAccountName = '',
+    stackLevel = 0
 }) => {
     // State management
     const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
@@ -59,6 +121,8 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
     const [isSaving, setIsSaving] = useState(false); // For save operation
     const [availableGroups, setAvailableGroups] = useState<UserGroup[]>([]); // All available groups from database with full details
     const [isLoadingData, setIsLoadingData] = useState(false); // For initial data load
+    const [showRolesModal, setShowRolesModal] = useState(false);
+    const [selectedGroupForRoles, setSelectedGroupForRoles] = useState<UserGroup | null>(null);
     
     // Track if data has been loaded for this modal session
     const dataLoadedRef = useRef(false);
@@ -97,9 +161,10 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
             if (isTemporaryUser) {
                 // For temporary users, use initialUserGroups from parent state
                 console.log('📦 Using initialUserGroups for temporary user:', initialUserGroups);
-                setUserGroups(initialUserGroups);
-                setSelectedUserGroups(initialUserGroups);
-                setOriginalUserGroups(JSON.parse(JSON.stringify(initialUserGroups)));
+                const normalizedInitial = initialUserGroups.map(normalizeUserGroupData);
+                setUserGroups(normalizedInitial);
+                setSelectedUserGroups(normalizedInitial);
+                setOriginalUserGroups(JSON.parse(JSON.stringify(normalizedInitial)));
                 return;
             }
             
@@ -167,16 +232,30 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                             // Convert API response to UserGroup format
                             // IMPORTANT: Always generate a new unique ID for each user-group assignment
                             // to avoid duplicate key issues (user can have same group assigned multiple times)
-                            const loadedGroups: UserGroup[] = groupsData.map((group: any) => ({
-                                id: generateId(), // Always generate unique ID for this assignment
-                                groupName: group.name || group.groupName || '',
-                                description: group.description || '',
-                                entity: group.entity || '',
-                                product: group.product || '',
-                                service: group.service || '',
-                                roles: Array.isArray(group.assignedRoles) ? group.assignedRoles.join(', ') : (group.roles || ''),
-                                isFromDatabase: true // Mark as from database since it's an existing assignment
-                            }));
+                            const loadedGroups: UserGroup[] = groupsData.map((group: any) => {
+                                const parsedAssignedRoles = transformAssignedRoles(group.assignedRoles);
+                                const rolesDisplay = parsedAssignedRoles.length > 0
+                                    ? parsedAssignedRoles
+                                        .map((role) => role.roleName)
+                                        .filter(Boolean)
+                                        .join(', ')
+                                    : (Array.isArray(group.assignedRoles)
+                                        ? group.assignedRoles.join(', ')
+                                        : (group.roles || ''));
+
+                                return {
+                                    id: generateId(), // Always generate unique ID for this assignment
+                                    groupId: group.id?.toString() || group.groupId?.toString(),
+                                    groupName: group.name || group.groupName || '',
+                                    description: group.description || '',
+                                    entity: group.entity || '',
+                                    product: group.product || '',
+                                    service: group.service || '',
+                                    roles: rolesDisplay,
+                                    assignedRoles: parsedAssignedRoles,
+                                    isFromDatabase: true // Mark as from database since it's an existing assignment
+                                };
+                            });
                             
                             console.log('✅ Loaded and parsed user groups from API:', loadedGroups);
                             console.log('✅ Unique IDs generated:', loadedGroups.map(g => g.id));
@@ -205,22 +284,25 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 }
                 
                 // Set the final groups
-                console.log('💾 Setting userGroups to finalGroups (length:', finalGroups.length, '):', finalGroups);
-                setUserGroups(finalGroups);
-                setSelectedUserGroups(finalGroups);
-                setOriginalUserGroups(JSON.parse(JSON.stringify(finalGroups)));
+                const normalizedFinalGroups = finalGroups.map(normalizeUserGroupData);
+                console.log('💾 Setting userGroups to normalized finalGroups (length:', normalizedFinalGroups.length, '):', normalizedFinalGroups);
+                setUserGroups(normalizedFinalGroups);
+                setSelectedUserGroups(normalizedFinalGroups);
+                setOriginalUserGroups(JSON.parse(JSON.stringify(normalizedFinalGroups)));
             } else {
                 // No userId or temporary user, use initialUserGroups
                 console.log('📦 No valid user ID, using initialUserGroups');
-                setUserGroups(initialUserGroups);
-                setSelectedUserGroups(initialUserGroups);
-                setOriginalUserGroups(JSON.parse(JSON.stringify(initialUserGroups)));
+                const normalizedInitial = initialUserGroups.map(normalizeUserGroupData);
+                setUserGroups(normalizedInitial);
+                setSelectedUserGroups(normalizedInitial);
+                setOriginalUserGroups(JSON.parse(JSON.stringify(normalizedInitial)));
             }
         } catch (error) {
             console.error('Error loading user groups:', error);
-            setUserGroups(initialUserGroups);
-            setSelectedUserGroups(initialUserGroups);
-            setOriginalUserGroups(JSON.parse(JSON.stringify(initialUserGroups)));
+            const normalizedInitial = initialUserGroups.map(normalizeUserGroupData);
+            setUserGroups(normalizedInitial);
+            setSelectedUserGroups(normalizedInitial);
+            setOriginalUserGroups(JSON.parse(JSON.stringify(normalizedInitial)));
         } finally {
             // Clear loading state
             setIsLoadingData(false);
@@ -264,14 +346,23 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
             
             if (groupsData && Array.isArray(groupsData)) {
                 const formattedGroups: UserGroup[] = groupsData.map((group: any) => {
+                    const parsedAssignedRoles = transformAssignedRoles(group.assignedRoles);
+                    const rolesDisplay = parsedAssignedRoles.length > 0
+                        ? parsedAssignedRoles.map((role) => role.roleName).filter(Boolean).join(', ')
+                        : (Array.isArray(group.assignedRoles)
+                            ? group.assignedRoles.join(', ')
+                            : (group.roles || ''));
+
                     const formatted: UserGroup = {
                         id: group.id?.toString() || generateId(),
+                        groupId: group.id?.toString() || group.groupId?.toString(),
                         groupName: group.name || group.groupName || '',
                         description: group.description || '',
                         entity: group.entity || '',
                         product: group.product || '',
                         service: group.service || '',
-                        roles: Array.isArray(group.assignedRoles) ? group.assignedRoles.join(', ') : (group.roles || ''),
+                        roles: rolesDisplay,
+                        assignedRoles: parsedAssignedRoles,
                         isFromDatabase: true // Mark as from database
                     };
                     console.log('📋 Formatted group:', formatted);
@@ -406,6 +497,8 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                     product: '',
                     service: '',
                     roles: '',
+                    groupId: undefined,
+                    assignedRoles: [],
                     isFromDatabase: false // Mark as not from database (editable)
                 };
             }
@@ -464,6 +557,8 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                     product: cachedGroup.product,
                     service: cachedGroup.service,
                     roles: cachedGroup.roles,
+                    groupId: cachedGroup.groupId || group.groupId,
+                    assignedRoles: cachedGroup.assignedRoles || [],
                     // Mark as from database ONLY if all mandatory fields are complete
                     // If incomplete, keep editable so user can fill in the missing fields
                     isFromDatabase: isCachedGroupComplete
@@ -477,6 +572,50 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
         
         setUserGroups(groupsWithAutoFill);
     }, [availableGroups]);
+
+    const handleOpenRolesModal = useCallback((group: UserGroup) => {
+        if (!group.groupId) {
+            alert('Please save this user group before managing roles.');
+            return;
+        }
+        setSelectedGroupForRoles(group);
+        setShowRolesModal(true);
+    }, []);
+
+    const handleCloseRolesModal = useCallback(() => {
+        setShowRolesModal(false);
+        setSelectedGroupForRoles(null);
+    }, []);
+
+    const handleSaveRolesFromModal = useCallback((updatedRoles: UserRole[]) => {
+        if (!selectedGroupForRoles) return;
+
+        const rolesDisplay = updatedRoles
+            .map((role) => role.roleName)
+            .filter(Boolean)
+            .join(', ');
+
+        let updatedGroupsState: UserGroup[] = [];
+        setUserGroups((prev) => {
+            updatedGroupsState = prev.map((group) =>
+                group.id === selectedGroupForRoles.id
+                    ? {
+                        ...group,
+                        roles: rolesDisplay,
+                        assignedRoles: updatedRoles,
+                        isFromDatabase: true
+                    }
+                    : group
+            );
+            return updatedGroupsState;
+        });
+
+        setSelectedUserGroups(updatedGroupsState);
+        onRolesUpdated?.(updatedGroupsState);
+
+        setShowRolesModal(false);
+        setSelectedGroupForRoles(null);
+    }, [selectedGroupForRoles, onRolesUpdated]);
 
     // Add new user group - called from toolbar button or Add New Row button
     const addNewUserGroup = () => {
@@ -506,12 +645,14 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
         console.log('✅ Adding new user group row');
         const newGroup: UserGroup = {
             id: generateId(),
+            groupId: undefined,
             groupName: '',
             description: '',
             entity: '',
             product: '',
             service: '',
-            roles: ''
+            roles: '',
+            assignedRoles: []
         };
         console.log('🆕 New group created:', newGroup);
         setUserGroups(prev => {
@@ -605,6 +746,8 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
             const isTemporaryUser = actualUserId?.startsWith('tmp-');
             console.log('🔍 User ID check:', { actualUserId, isTemporaryUser });
 
+            const groupIdByLocalId = new Map<string, string>();
+
             if (actualUserId && !isTemporaryUser) {
                 // Save user groups to database
                 // First, get or create user groups, then assign them to user
@@ -629,7 +772,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                     try {
                         // For groups marked as from database, we just need to get their ID
                         // Don't create or update them as they already exist
-                        let groupId: string | null = null;
+                        let groupId: string | null = group.groupId ? group.groupId.toString() : null;
                         
                         // Check if group exists by name (with account/enterprise context)
                         try {
@@ -791,6 +934,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                         }
 
                         if (groupId) {
+                            groupIdByLocalId.set(group.id, groupId);
                             // Prevent duplicate group IDs
                             if (groupIds.includes(groupId)) {
                                 console.warn('⚠️ Duplicate group ID detected:', groupId, 'for group:', group.groupName);
@@ -852,6 +996,7 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 .filter(group => isGroupComplete(group))
                 .map(group => ({
                     ...group,
+                    groupId: groupIdByLocalId.get(group.id) || group.groupId,
                     isFromDatabase: true // Mark as from database after save
                 }));
             console.log('📤 Calling onSave with complete groups (all marked as isFromDatabase: true):', completeGroups);
@@ -966,12 +1111,27 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
 
     if (!isOpen) return null;
 
+    const handleGroupPanelClick = () => {
+        if (showRolesModal) {
+            handleCloseRolesModal();
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-[9999] overflow-hidden">
+        <div
+            className="fixed inset-0 overflow-hidden"
+            style={{ zIndex: 9999 + stackLevel }}
+        >
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black bg-opacity-50"
-                onClick={handleClose}
+                onClick={() => {
+                    if (showRolesModal) {
+                        handleCloseRolesModal();
+                    } else {
+                        handleClose();
+                    }
+                }}
             />
             
             {/* Modal Panel */}
@@ -988,7 +1148,11 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Left Panel - Sidebar Image */}
-                <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
+                <div
+                    className={`w-10 bg-slate-800 text-white flex flex-col relative h-screen ${showRolesModal ? 'cursor-pointer hover:brightness-110' : ''}`}
+                    onClick={handleGroupPanelClick}
+                    title={showRolesModal ? 'Click to return to Assign User Groups' : undefined}
+                >
                     <img 
                         src="/images/logos/sidebar.png" 
                         alt="Sidebar" 
@@ -1217,10 +1381,28 @@ const AssignedUserGroupModal: React.FC<AssignedUserGroupModalProps> = ({
                             showValidationErrors={showValidationErrors}
                             onAddNewRow={addNewUserGroup}
                             availableGroups={availableGroups}
+                            onOpenRolesModal={handleOpenRolesModal}
                         />
                     )}
                 </div>
             </motion.div>
+
+            {selectedGroupForRoles && (
+                <AssignedUserRoleModal
+                    stackLevel={stackLevel + 1}
+                    isOpen={showRolesModal}
+                    onClose={handleCloseRolesModal}
+                    onSave={handleSaveRolesFromModal}
+                    groupName={selectedGroupForRoles.groupName}
+                    groupDescription={selectedGroupForRoles.description || ''}
+                    groupId={selectedGroupForRoles.groupId}
+                    initialUserRoles={selectedGroupForRoles.assignedRoles || []}
+                    selectedEnterprise={selectedEnterprise}
+                    selectedEnterpriseId={selectedEnterpriseId}
+                    selectedAccountId={selectedAccountId}
+                    selectedAccountName={selectedAccountName}
+                />
+            )}
 
             {/* Unsaved Changes Confirmation Dialog */}
             <AnimatePresence>
