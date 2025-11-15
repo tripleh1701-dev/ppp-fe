@@ -23,9 +23,50 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ManageUsersTable, {AccountRow} from '@/components/ManageUsersTable';
 import AddressModal from '@/components/AddressModal';
 import AssignedUserGroupModal, { UserGroup } from '@/components/AssignedUserGroupModal';
+import { UserRole } from '@/components/AssignedUserRoleModal';
 import TechnicalUserModal, { TechnicalUser } from '@/components/TechnicalUserModal';
 import {api} from '@/utils/api';
 import {generateId} from '@/utils/id-generator';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const looksLikeUuid = (value?: string | null) =>
+    typeof value === 'string' && UUID_REGEX.test(value.trim());
+
+const mapApiRoleToUserRole = (role: any): UserRole => {
+    const normalizedRoleId = role?.roleId ?? role?.id ?? role?.roleID;
+    return {
+        id: role?.id?.toString() || role?.roleAssignmentId?.toString() || generateId(),
+        roleId: normalizedRoleId ? normalizedRoleId.toString() : undefined,
+        roleName: role?.name || role?.roleName || '',
+        description: role?.description || '',
+        entity: role?.entity || '',
+        product: role?.product || '',
+        service: role?.service || '',
+        scope: role?.scope || '',
+        isFromDatabase: role?.isFromDatabase ?? true,
+    };
+};
+
+const rolesNeedHydration = (roles: UserRole[]) => {
+    return roles.some((role) => {
+        if (!role) {
+            return true;
+        }
+
+        const trimmedName = role.roleName?.trim() || '';
+        const matchesRoleId =
+            trimmedName.length > 0 &&
+            role.roleId &&
+            trimmedName.toLowerCase() === role.roleId.toLowerCase();
+
+        const missingName = trimmedName.length === 0;
+        const looksLikeId = looksLikeUuid(trimmedName);
+        const missingDetails = !role.description && !role.entity && !role.product && !role.service;
+
+        return missingName || looksLikeId || matchesRoleId || missingDetails;
+    });
+};
 
 
 
@@ -427,9 +468,109 @@ export default function ManageUsers() {
             console.log('📊 Loaded users from database:', response?.length || 0);
             console.log('🔍 Raw API response:', response);
 
+            const groupRoleCache = new Map<string, UserRole[]>();
+
+            const fetchAssignedRolesForGroup = async (groupId?: string): Promise<UserRole[]> => {
+                if (!groupId) {
+                    return [];
+                }
+
+                if (groupRoleCache.has(groupId)) {
+                    return groupRoleCache.get(groupId)!;
+                }
+
+                try {
+                    const params = new URLSearchParams({
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise,
+                    });
+
+                    const apiUrl = `/api/user-management/groups/${groupId}/roles?${params.toString()}`;
+                    const response = await api.get<any>(apiUrl);
+
+                    let rolesData = response;
+                    if (rolesData && typeof rolesData === 'object' && 'data' in rolesData) {
+                        rolesData = rolesData.data;
+                        if (rolesData && typeof rolesData === 'object' && 'roles' in rolesData) {
+                            rolesData = rolesData.roles;
+                        }
+                    }
+
+                    if (Array.isArray(rolesData)) {
+                        const formattedRoles: UserRole[] = rolesData.map((role: any) => mapApiRoleToUserRole(role));
+                        groupRoleCache.set(groupId, formattedRoles);
+                        return formattedRoles;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to load assigned roles for group:', groupId, error);
+                }
+
+                groupRoleCache.set(groupId, []);
+                return [];
+            };
+
+            const normalizeUserGroup = async (group: any): Promise<UserGroup> => {
+                if (typeof group === 'object' && group !== null) {
+                    const hasInlineRoleObjects =
+                        Array.isArray(group.assignedRoles) &&
+                        group.assignedRoles.length > 0;
+
+                    const inlineAssignedRoles: UserRole[] = hasInlineRoleObjects
+                        ? (group.assignedRoles as any[]).map((role: any) => mapApiRoleToUserRole(role))
+                        : [];
+
+                    const normalized: UserGroup = {
+                        id: group.id || group.groupId || generateId(),
+                        groupId: group.groupId || group.id,
+                        groupName: group.groupName || group.name || '',
+                        description: group.description || '',
+                        entity: group.entity || '',
+                        product: group.product || '',
+                        service: group.service || '',
+                        roles: typeof group.roles === 'string' ? group.roles : '',
+                        assignedRoles: inlineAssignedRoles,
+                        isFromDatabase: group.isFromDatabase ?? true,
+                    };
+
+                    const requiresHydration = rolesNeedHydration(inlineAssignedRoles);
+                    if (requiresHydration) {
+                        console.log('⚠️ Inline assigned roles missing metadata, hydrating from API for group:', normalized.groupName || normalized.groupId);
+                    }
+
+                    const assignedRoles = (!inlineAssignedRoles.length || requiresHydration)
+                        ? await fetchAssignedRolesForGroup(normalized.groupId)
+                        : inlineAssignedRoles;
+
+                    return {
+                        ...normalized,
+                        assignedRoles,
+                        roles: assignedRoles.length > 0
+                            ? assignedRoles.map((role) => role.roleName).join(', ')
+                            : normalized.roles,
+                    };
+                }
+
+                // Legacy string format
+                const fallbackGroup: UserGroup = {
+                    id: generateId(),
+                    groupId: undefined,
+                    groupName: typeof group === 'string' ? group : '',
+                    description: '',
+                    entity: '',
+                    product: '',
+                    service: '',
+                    roles: '',
+                    assignedRoles: [],
+                };
+
+                return fallbackGroup;
+            };
+
             if (response && Array.isArray(response)) {
                 // Transform the data to match the component's expected format
-                const transformedData = response.map((item: any, index: number) => {
+                const transformedData = await Promise.all(response.map(async (item: any, index: number) => {
                     const displayOrder = Date.now() + index;
                     displayOrderRef.current.set(item.id, displayOrder);
                     
@@ -442,6 +583,10 @@ export default function ManageUsers() {
                         assignedUserGroupsLength: item.assignedUserGroups?.length
                     });
                     
+                    const normalizedGroups = await Promise.all(
+                        (item.assignedUserGroups || []).map((group: any) => normalizeUserGroup(group)),
+                    );
+
                     return {
                         id: item.id || `user-${Date.now()}-${index}`,
                         firstName: item.firstName || '',
@@ -454,11 +599,11 @@ export default function ManageUsers() {
                         // Display actual password from database
                         password: item.password || '',
                         technicalUser: item.technicalUser || false,
-                        assignedUserGroups: item.assignedUserGroups || [],
+                        assignedUserGroups: normalizedGroups,
                         createdAt: item.createdAt,
                         updatedAt: item.updatedAt
                     };
-                });
+                }));
 
                 console.log('✅ Users loaded and transformed:', transformedData.length);
 
@@ -2707,6 +2852,23 @@ export default function ManageUsers() {
         setSelectedUserForGroups(null);
     };
 
+    const handleRolesUpdated = useCallback((updatedGroups: UserGroup[]) => {
+        if (!selectedUserForGroups) return;
+
+        setAccounts(prevAccounts => {
+            const updated = prevAccounts.map(account =>
+                account.id === selectedUserForGroups.id
+                    ? { ...account, assignedUserGroups: updatedGroups as any }
+                    : account
+            );
+            return sortConfigsByDisplayOrder(updated);
+        });
+
+        setSelectedUserForGroups(prev =>
+            prev ? ({ ...prev, assignedUserGroups: updatedGroups as any } as AccountRow) : prev
+        );
+    }, [selectedUserForGroups, sortConfigsByDisplayOrder]);
+
     const handleSaveUserGroups = (selectedUserGroups: UserGroup[]) => {
         console.log('💾 handleSaveUserGroups called with:', selectedUserGroups);
         if (selectedUserForGroups) {
@@ -2726,15 +2888,19 @@ export default function ManageUsers() {
                 return sortConfigsByDisplayOrder(updated);
             });
             
-            // Mark as modified for auto-save
-            if (selectedUserForGroups.id !== 'new') {
-                setModifiedExistingRecords(prev => {
-                    const newSet = new Set(prev);
-                    newSet.add(selectedUserForGroups.id);
-                    return newSet;
-                });
-                modifiedExistingRecordsRef.current.add(selectedUserForGroups.id);
-            }
+            // DO NOT mark as modified - the modal already saved changes to the database
+            // Marking as modified would trigger the unsaved changes navigation guard incorrectly
+            console.log('ℹ️ User groups saved via modal (already in DB) - not marking as modified');
+            
+            // REMOVED: Don't mark as modified for auto-save since modal already saved to DB
+            // if (selectedUserForGroups.id !== 'new') {
+            //     setModifiedExistingRecords(prev => {
+            //         const newSet = new Set(prev);
+            //         newSet.add(selectedUserForGroups.id);
+            //         return newSet;
+            //     });
+            //     modifiedExistingRecordsRef.current.add(selectedUserForGroups.id);
+            // }
             
             handleCloseUserGroupModal();
         }
@@ -4369,9 +4535,11 @@ export default function ManageUsers() {
             {/* Assigned User Group Modal */}
             {showUserGroupModal && selectedUserForGroups && (
                 <AssignedUserGroupModal
+                    stackLevel={0}
                     isOpen={showUserGroupModal}
                     onClose={handleCloseUserGroupModal}
                     onSave={handleSaveUserGroups}
+                    onRolesUpdated={handleRolesUpdated}
                     firstName={selectedUserForGroups.firstName || ''}
                     lastName={selectedUserForGroups.lastName || ''}
                     emailAddress={selectedUserForGroups.emailAddress || ''}
@@ -4388,13 +4556,15 @@ export default function ManageUsers() {
                                 // Backend might return 'name' instead of 'groupName', so normalize it
                                 // Since this is loaded from database, mark as isFromDatabase: true
                                 return {
-                                    id: item.id,
+                                    id: item.id || generateId(),
+                                    groupId: item.groupId || item.id,
                                     groupName: item.groupName || item.name || '',
                                     description: item.description || '',
                                     entity: item.entity || '',
                                     product: item.product || '',
                                     service: item.service || '',
                                     roles: item.roles || '',
+                                    assignedRoles: Array.isArray(item.assignedRoles) ? item.assignedRoles : [],
                                     isFromDatabase: true // Always true for groups loaded from saved user
                                 } as UserGroup;
                             }
@@ -4402,14 +4572,17 @@ export default function ManageUsers() {
                             // If it's an object without id, add one
                             if (typeof item === 'object' && item !== null) {
                                 console.log('⚙️ Adding id to UserGroup object:', item);
+                                const normalizedId = item.id || generateId();
                                 return {
-                                    id: item.id || generateId(),
+                                    id: normalizedId,
+                                    groupId: item.groupId || normalizedId,
                                     groupName: item.groupName || item.name || '',
                                     description: item.description || '',
                                     entity: item.entity || '',
                                     product: item.product || '',
                                     service: item.service || '',
-                                    roles: item.roles || ''
+                                    roles: item.roles || '',
+                                    assignedRoles: Array.isArray(item.assignedRoles) ? item.assignedRoles : []
                                 } as UserGroup;
                             }
                             
@@ -4417,12 +4590,14 @@ export default function ManageUsers() {
                             console.log('🔄 Converting string to UserGroup:', item);
                             return {
                                 id: generateId(),
+                                groupId: undefined,
                                 groupName: typeof item === 'string' ? item : '',
                                 description: '',
                                 entity: '',
                                 product: '',
                                 service: '',
-                                roles: ''
+                                roles: '',
+                                assignedRoles: []
                             } as UserGroup;
                         });
                         

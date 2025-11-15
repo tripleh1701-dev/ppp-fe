@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ConfirmModal from '@/components/ConfirmModal';
 import ManageUserGroupsTable, { UserGroupRow } from '@/components/ManageUserGroupsTable';
+import AssignedUserRoleModal, { UserRole } from '@/components/AssignedUserRoleModal';
 import { api, API_BASE } from '@/utils/api';
 import { generateId } from '@/utils/id-generator';
 
@@ -60,6 +61,10 @@ export default function ManageUserGroups() {
     const [showDuplicateModal, setShowDuplicateModal] = useState(false);
     const [duplicateMessage, setDuplicateMessage] = useState('');
     const duplicateDetectedRef = useRef(false); // Track if duplicate was detected during autosave
+
+    // Assigned roles modal state
+    const [selectedGroupForRoles, setSelectedGroupForRoles] = useState<UserGroupRow | null>(null);
+    const [showRolesModal, setShowRolesModal] = useState(false);
     
     // Navigation warning state - exactly like Manage Users
     const [showNavigationWarning, setShowNavigationWarning] = useState(false);
@@ -232,6 +237,7 @@ export default function ManageUserGroups() {
         services: [] as Array<{id: string; name: string}>,
         roles: [] as Array<{id: string; name: string}>,
     });
+    const [availableModalRoles, setAvailableModalRoles] = useState<UserRole[]>([]);
 
     // Toolbar controls state
     const [showSearchBar, setShowSearchBar] = useState(true); // Always show search
@@ -280,16 +286,28 @@ export default function ManageUserGroups() {
     // Load dropdown options from API
     const loadDropdownOptions = useCallback(async () => {
         try {
-            const [groupsRes, productsRes, servicesRes] =
+            const queryParams = new URLSearchParams();
+            if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+            if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+            if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+
+            const rolesUrl = `/api/user-management/roles${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+            const [groupsRes, productsRes, servicesRes, rolesRes] =
                 await Promise.all([
                     api.get<Array<{id: string; name: string; groupName?: string}>>(
                         '/api/user-management/groups',
                     ),
                     api.get<Array<{id: string; name: string}>>('/api/products'),
                     api.get<Array<{id: string; name: string}>>('/api/services'),
+                    api.get<Array<{id: string; name: string; roleName?: string}>>(rolesUrl).catch(error => {
+                        console.warn('Failed to load roles for dropdown:', error);
+                        return [];
+                    }),
                 ]).catch(errors => {
                     console.warn('Some API endpoints failed:', errors);
-                    return [[], [], []];
+                    return [[], [], [], []];
                 });
 
             // Extract unique group names from current user groups
@@ -310,6 +328,27 @@ export default function ManageUserGroups() {
                 name: name
             }));
 
+            const formattedRoles: UserRole[] = (rolesRes || []).reduce(
+                (acc: UserRole[], role: any) => {
+                    const roleName = role.name || role.roleName || '';
+                    if (!roleName) return acc;
+                    acc.push({
+                        id: role.id?.toString() || generateId(),
+                        roleId: role.id?.toString() || role.roleId?.toString(),
+                        roleName,
+                        description: role.description || '',
+                        entity: role.entity || '',
+                        product: role.product || '',
+                        service: role.service || '',
+                        scope: role.scope || '',
+                        isFromDatabase: role.isFromDatabase ?? true,
+                    });
+                    return acc;
+                },
+                [],
+            );
+            setAvailableModalRoles(formattedRoles);
+
             setDropdownOptions({
                 groupNames: [...uniqueGroupNames, ...(groupsRes?.map((g: any) => ({
                     id: g.id || g.groupId || String(Math.random()),
@@ -319,7 +358,10 @@ export default function ManageUserGroups() {
                 entities: uniqueEntities,
                 products: productsRes || [],
                 services: servicesRes || [],
-                roles: [],
+                roles: formattedRoles.map(role => ({
+                    id: role.id,
+                    name: role.roleName,
+                })),
             });
         } catch (error) {
             console.error('Failed to load dropdown options:', error);
@@ -332,8 +374,9 @@ export default function ManageUserGroups() {
                 services: [],
                 roles: [],
             });
+            setAvailableModalRoles([]);
         }
-    }, [userGroups]);
+    }, [userGroups, selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId]);
 
     // Helper function to close all dialogs
     const closeAllDialogs = () => {
@@ -640,25 +683,96 @@ export default function ManageUserGroups() {
             console.log('🔄 [API Processing] groupsData is array?', Array.isArray(groupsData));
             console.log('🔄 [API Processing] groupsData length:', Array.isArray(groupsData) ? groupsData.length : 'N/A');
 
+            const fetchAssignedRolesForGroup = async (groupId?: string): Promise<UserRole[]> => {
+                if (!groupId) {
+                    return [];
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    if (filters?.accountId) params.append('accountId', filters.accountId);
+                    if (filters?.accountName) params.append('accountName', filters.accountName);
+                    if (filters?.enterpriseId) params.append('enterpriseId', filters.enterpriseId);
+                    if (filters?.enterpriseName) params.append('enterpriseName', filters.enterpriseName);
+
+                    const apiUrl = `/api/user-management/groups/${groupId}/roles${params.toString() ? `?${params.toString()}` : ''}`;
+                    const response = await api.get<any>(apiUrl);
+
+                    let rolesData = response;
+                    if (rolesData && typeof rolesData === 'object' && 'data' in rolesData) {
+                        rolesData = rolesData.data;
+                        if (rolesData && typeof rolesData === 'object' && 'roles' in rolesData) {
+                            rolesData = rolesData.roles;
+                        }
+                    }
+
+                    if (Array.isArray(rolesData)) {
+                        return rolesData.map((role: any) => ({
+                            id: role.id?.toString() || generateId(),
+                            roleId: role.id?.toString() || role.roleId?.toString(),
+                            roleName: role.name || role.roleName || '',
+                            description: role.description || '',
+                            entity: role.entity || '',
+                            product: role.product || '',
+                            service: role.service || '',
+                            scope: role.scope || '',
+                            isFromDatabase: true,
+                        }));
+                    }
+                } catch (error) {
+                    console.warn('Failed to fetch assigned roles for group:', groupId, error);
+                }
+
+                return [];
+            };
+
             if (groupsData && Array.isArray(groupsData)) {
-                const formattedGroups: UserGroupRow[] = groupsData.map((group: any, index: number) => {
-                    const newGroup: UserGroupRow = {
-                        id: group.id?.toString() || generateId(),
-                        groupName: group.name || group.groupName || '',
-                        description: group.description || '',
-                        entity: group.entity || '',
-                        product: group.product || '',
-                        service: group.service || '',
-                        roles: Array.isArray(group.assignedRoles) 
-                            ? group.assignedRoles.join(', ') 
-                            : (group.roles || ''),
-                    };
+                const formattedGroups: UserGroupRow[] = await Promise.all(
+                    groupsData.map(async (group: any, index: number) => {
+                        const baseGroup: UserGroupRow = {
+                            id: group.id?.toString() || generateId(),
+                            groupName: group.name || group.groupName || '',
+                            description: group.description || '',
+                            entity: group.entity || '',
+                            product: group.product || '',
+                            service: group.service || '',
+                            roles: '',
+                            assignedRoles: [],
+                        };
 
-                    // Track display order
-                    displayOrderRef.current.set(newGroup.id, index);
+                        let assignedRoles: UserRole[] = [];
+                        const groupAssignedRoles = Array.isArray(group.assignedRoles) ? group.assignedRoles : [];
 
-                    return newGroup;
-                });
+                        if (groupAssignedRoles.length > 0 && typeof groupAssignedRoles[0] === 'object') {
+                            assignedRoles = groupAssignedRoles.map((role: any) => ({
+                                id: role.id?.toString() || generateId(),
+                                roleId: role.id?.toString() || role.roleId?.toString(),
+                                roleName: role.name || role.roleName || '',
+                                description: role.description || '',
+                                entity: role.entity || '',
+                                product: role.product || '',
+                                service: role.service || '',
+                                scope: role.scope || '',
+                                isFromDatabase: true,
+                            }));
+                        } else if (groupAssignedRoles.length > 0 || group.roles) {
+                            assignedRoles = await fetchAssignedRolesForGroup(baseGroup.id);
+                        }
+
+                        const finalRoles = assignedRoles ?? [];
+
+                        // Track display order
+                        displayOrderRef.current.set(baseGroup.id, index);
+
+                        return {
+                            ...baseGroup,
+                            assignedRoles: finalRoles,
+                            roles: finalRoles.length > 0
+                                ? finalRoles.map((role) => role.roleName).join(', ')
+                                : (typeof group.roles === 'string' ? group.roles : ''),
+                        };
+                    }),
+                );
 
                 console.log('✅ [API Processing] Setting user groups:', formattedGroups);
                 setUserGroups(formattedGroups);
@@ -756,6 +870,13 @@ export default function ManageUserGroups() {
             loadDropdownOptions();
         }
     }, [userGroups.length, loadDropdownOptions, isLoading]);
+
+    // Ensure dropdown data loads at least once when context is ready even if no rows yet
+    useEffect(() => {
+        if (!isLoading && selectedAccountId && (selectedEnterprise || selectedEnterpriseId)) {
+            loadDropdownOptions();
+        }
+    }, [isLoading, selectedAccountId, selectedEnterprise, selectedEnterpriseId, loadDropdownOptions]);
     
     // Clear auto-save timer on component unmount - exactly like Manage Users
     useEffect(() => {
@@ -1075,6 +1196,60 @@ export default function ManageUserGroups() {
     const handleDeleteClick = (groupId: string) => {
         startRowCompressionAnimation(groupId);
     };
+
+    const handleOpenRolesModal = useCallback((group: UserGroupRow) => {
+        setSelectedGroupForRoles(group);
+        setShowRolesModal(true);
+    }, []);
+
+    const handleCloseRolesModal = useCallback(() => {
+        setShowRolesModal(false);
+        setSelectedGroupForRoles(null);
+    }, []);
+
+    const handleSaveRoles = useCallback(
+        async (updatedRoles: UserRole[]) => {
+            if (!selectedGroupForRoles) {
+                return;
+            }
+
+            setUserGroups((prevGroups) => {
+                const updated = prevGroups.map((group) =>
+                    group.id === selectedGroupForRoles.id
+                        ? {
+                              ...group,
+                              roles: updatedRoles.map((role) => role.roleName).join(', '),
+                              assignedRoles: updatedRoles,
+                          }
+                        : group,
+                );
+                return sortConfigsByDisplayOrder(updated);
+            });
+
+            try {
+                await loadUserGroups({
+                    accountId: selectedAccountId || undefined,
+                    accountName: selectedAccountName || undefined,
+                    enterpriseId: selectedEnterpriseId || undefined,
+                    enterpriseName: selectedEnterprise || undefined,
+                });
+            } catch (error) {
+                console.error('Failed to refresh user groups after saving roles:', error);
+            } finally {
+                handleCloseRolesModal();
+            }
+        },
+        [
+            selectedGroupForRoles,
+            sortConfigsByDisplayOrder,
+            loadUserGroups,
+            selectedAccountId,
+            selectedAccountName,
+            selectedEnterpriseId,
+            selectedEnterprise,
+            handleCloseRolesModal,
+        ],
+    );
 
     const confirmDelete = async () => {
         if (!pendingDeleteRowId) return;
@@ -3245,12 +3420,31 @@ export default function ManageUserGroups() {
                                     selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
                                     selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
                                     selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
+                                    onOpenRolesModal={handleOpenRolesModal}
                                 />
                             </div>
                         )}
                     </div>
                 </div>
             </div>
+
+            {selectedGroupForRoles && (
+                <AssignedUserRoleModal
+                    stackLevel={0}
+                    isOpen={showRolesModal}
+                    onClose={handleCloseRolesModal}
+                    onSave={handleSaveRoles}
+                    groupName={selectedGroupForRoles.groupName}
+                    groupDescription={selectedGroupForRoles.description || ''}
+                    groupId={selectedGroupForRoles.id}
+                    initialUserRoles={selectedGroupForRoles.assignedRoles || []}
+                    selectedEnterprise={selectedEnterprise}
+                    selectedEnterpriseId={selectedEnterpriseId || ''}
+                    selectedAccountId={selectedAccountId || ''}
+                    selectedAccountName={selectedAccountName || ''}
+                    availableRoles={availableModalRoles}
+                />
+            )}
 
             {/* Blue-themed Notification Component - Positioned above Save button - exactly like Manage Users */}
             {showNotification && (
