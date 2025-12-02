@@ -21,7 +21,28 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         throw new Error(`API ${res.status}: ${text}`);
     }
     if (res.status === 204) return undefined as unknown as T;
-    return (await res.json()) as T;
+    
+    // Check if response has content before trying to parse JSON
+    const contentType = res.headers.get('content-type');
+    const text = await res.text();
+    
+    // If response is empty or not JSON, return undefined
+    if (!text || !text.trim()) {
+        return undefined as unknown as T;
+    }
+    
+    // If content-type is not JSON, return the text as-is
+    if (contentType && !contentType.includes('application/json')) {
+        return text as unknown as T;
+    }
+    
+    try {
+        return JSON.parse(text) as T;
+    } catch (e) {
+        // If JSON parsing fails, return undefined instead of throwing
+        console.warn('Failed to parse JSON response, returning undefined:', e);
+        return undefined as unknown as T;
+    }
 }
 
 export const api = {

@@ -1767,7 +1767,7 @@ function AsyncChipSelectProduct({
     );
 }
 
-// AsyncChipSelect for Service with dropdown filtered by Product
+// AsyncChipSelect for Service with dropdown filtered by Account, Enterprise, and Product
 function AsyncChipSelectService({
     value,
     onChange,
@@ -1775,6 +1775,8 @@ function AsyncChipSelectService({
     isError = false,
     selectedEnterprise = '',
     selectedProduct = '',
+    selectedAccountId = '',
+    selectedEnterpriseId = '',
     onNewItemCreated,
 }: {
     value?: string;
@@ -1783,6 +1785,8 @@ function AsyncChipSelectService({
     isError?: boolean;
     selectedEnterprise?: string;
     selectedProduct?: string;
+    selectedAccountId?: string;
+    selectedEnterpriseId?: string;
     onNewItemCreated?: (item: {id: string; name: string}) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -1800,6 +1804,9 @@ function AsyncChipSelectService({
         left: number;
         width: number;
     } | null>(null);
+    
+    // Track previous product to detect changes
+    const prevProductRef = useRef<string>(selectedProduct);
 
     // Load options from database API filtered by Product
     const loadAllOptions = useCallback(async (overrideProduct?: string) => {
@@ -1814,8 +1821,10 @@ function AsyncChipSelectService({
         });
         setLoading(true);
         try {
-            if (!selectedEnterprise || !productToUse) {
+            // Service field is disabled until Product is selected and Account/Enterprise are available
+            if (!selectedAccountId || !selectedEnterprise || !productToUse) {
                 console.log('⚠️ [Service] Missing dependencies, clearing options', {
+                    hasAccountId: !!selectedAccountId,
                     hasEnterprise: !!selectedEnterprise,
                     hasProduct: !!productToUse
                 });
@@ -1824,28 +1833,30 @@ function AsyncChipSelectService({
                 return;
             }
 
-            // Get enterprise configuration data to find services for this enterprise/product combination
-            console.log('📡 [Service] Calling API: /api/enterprise-products-services');
-            const enterpriseConfigs = await api.get<Array<{
-                enterprise: { name: string };
-                product: { name: string };
-                services: Array<{ name: string }>;
-            }>>('/api/enterprise-products-services') || [];
+            // Get account data to find services from licenses (same as ManageUserGroupsTable)
+            console.log('📡 [Service] Calling API: /api/accounts/' + selectedAccountId);
+            const accountData = await api.get<{
+                licenses: Array<{
+                    enterprise: string;
+                    product: string;
+                    service: string;
+                }>;
+            }>(`/api/accounts/${selectedAccountId}`) || { licenses: [] };
             
-            console.log('📦 [Service] API response:', enterpriseConfigs);
+            console.log('📦 [Service] Account licenses:', accountData.licenses);
             
-            // Extract unique service names for the selected enterprise/product combination
+            // Extract unique service names from licenses that match selected enterprise and product
             const uniqueServices = Array.from(new Set(
-                enterpriseConfigs
-                    .filter(config => 
-                        config.enterprise.name === selectedEnterprise &&
-                        config.product.name === productToUse
+                accountData.licenses
+                    .filter(license => 
+                        license.enterprise === selectedEnterprise &&
+                        license.product === productToUse &&
+                        license.service && license.service.trim() !== ''
                     )
-                    .flatMap(config => config.services.map(s => s.name))
-                    .filter(service => service && service.trim() !== '')
+                    .map(license => license.service.trim())
             ));
             
-            console.log('✅ [Service] Filtered unique services:', uniqueServices);
+            console.log('✅ [Service] Filtered unique services for account/enterprise/product:', uniqueServices);
             
             // Convert to the expected format
             const allData = uniqueServices.map((service, index) => ({
@@ -1862,7 +1873,7 @@ function AsyncChipSelectService({
             console.log('🏁 [Service] loadAllOptions completed, loading set to false');
             setLoading(false);
         }
-    }, [selectedEnterprise, selectedProduct]);
+    }, [selectedEnterprise, selectedProduct, selectedAccountId]);
 
     const isNewValuePending = useCallback((queryValue: string): boolean => {
         if (!queryValue.trim()) return false;
@@ -1923,33 +1934,42 @@ function AsyncChipSelectService({
         }
     }, [open, calculateDropdownPosition]);
 
+    // Reload options when product changes - this is critical for showing correct services
     useEffect(() => {
-        console.log('🔄 [Service] useEffect triggered:', {
-            open,
-            allOptionsLength: allOptions.length,
-            selectedEnterprise,
-            selectedProduct,
-            shouldLoad: open && allOptions.length === 0 && selectedEnterprise && selectedProduct
-        });
-        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct) {
-            console.log('🔄 [Service] useEffect: Loading options');
+        const productChanged = prevProductRef.current !== selectedProduct;
+        
+        if (productChanged && selectedEnterprise && selectedProduct && selectedAccountId) {
+            console.log('🔄 [Service] Product changed from', prevProductRef.current, 'to', selectedProduct, '- reloading services');
+            // Update the ref
+            prevProductRef.current = selectedProduct;
+            // Clear existing options first
+            setAllOptions([]);
+            setOptions([]);
+            // Clear the current value when product changes since services are product-specific
+            if (value) {
+                onChange('');
+            }
+            // Reload options for the new product
             loadAllOptions();
+        } else if (!productChanged && selectedEnterprise && selectedProduct && selectedAccountId && allOptions.length === 0) {
+            // Initial load when product is first selected (no previous product)
+            loadAllOptions();
+        } else if (!selectedProduct || !selectedAccountId) {
+            // Clear options if product or account is cleared
+            prevProductRef.current = '';
+            setAllOptions([]);
+            setOptions([]);
+        } else {
+            // Update ref even if no reload needed
+            prevProductRef.current = selectedProduct;
         }
-    }, [open, allOptions.length, selectedEnterprise, selectedProduct, loadAllOptions]);
+    }, [selectedProduct, selectedEnterprise, selectedAccountId, loadAllOptions, value, onChange, allOptions.length]);
     
-    // Also reload when selectedProduct changes from empty to a value while component is mounted
     useEffect(() => {
-        console.log('🔄 [Service] selectedProduct dependency changed:', {
-            selectedEnterprise,
-            selectedProduct,
-            allOptionsLength: allOptions.length,
-            shouldLoad: selectedEnterprise && selectedProduct && allOptions.length === 0
-        });
-        if (selectedEnterprise && selectedProduct && allOptions.length === 0) {
-            console.log('🔄 [Service] selectedProduct changed effect: Loading options for product:', selectedProduct);
+        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct && selectedAccountId) {
             loadAllOptions();
         }
-    }, [selectedProduct, selectedEnterprise, allOptions.length, loadAllOptions]);
+    }, [open, allOptions.length, selectedEnterprise, selectedProduct, selectedAccountId, loadAllOptions]);
 
     useEffect(() => {
         setCurrent(value);
@@ -2621,6 +2641,7 @@ function AsyncChipSelectEntity({
     selectedAccountId = '',
     selectedAccountName = '',
     selectedEnterprise = '',
+    selectedEnterpriseId = '',
     onNewItemCreated,
 }: {
     value?: string;
@@ -2630,6 +2651,7 @@ function AsyncChipSelectEntity({
     selectedAccountId?: string;
     selectedAccountName?: string;
     selectedEnterprise?: string;
+    selectedEnterpriseId?: string;
     onNewItemCreated?: (item: {id: string; name: string}) => void;
 }) {
     
@@ -2664,10 +2686,10 @@ function AsyncChipSelectEntity({
                 return;
             }
             
-            // Get enterpriseId from localStorage
-            const enterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            // Get enterpriseId from props or localStorage
+            const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
             if (!enterpriseId) {
-                console.log('⚠️ [Entity] No enterpriseId in localStorage');
+                console.log('⚠️ [Entity] No enterpriseId available');
                 setAllOptions([]);
                 setLoading(false);
                 return;
@@ -2678,6 +2700,10 @@ function AsyncChipSelectEntity({
                 id?: string;
                 entityName: string;
                 enterprise?: string;
+                accountId?: string;
+                enterpriseId?: string;
+                accountName?: string;
+                enterpriseName?: string;
             }>>(
                 `/api/global-settings?accountId=${selectedAccountId}&accountName=${encodeURIComponent(selectedAccountName)}&enterpriseId=${enterpriseId}`
             ) || [];
@@ -2685,13 +2711,34 @@ function AsyncChipSelectEntity({
             console.log('📦 [Entity] API response:', response);
             
             // Extract unique entity names filtered by Account and Enterprise
+            // First filter by matching accountId and enterpriseId to ensure we only get entities for the selected account/enterprise
+            const filteredByAccountAndEnterprise = response.filter(item => {
+                const matchesAccount = item.accountId === selectedAccountId;
+                const matchesEnterprise = item.enterpriseId === enterpriseId;
+                const hasEntityName = item.entityName && item.entityName.trim() !== '';
+                
+                if (!matchesAccount || !matchesEnterprise) {
+                    console.log('🔍 [Entity] Filtering out item - does not match account/enterprise:', {
+                        entityName: item.entityName,
+                        itemAccountId: item.accountId,
+                        itemEnterpriseId: item.enterpriseId,
+                        expectedAccountId: selectedAccountId,
+                        expectedEnterpriseId: enterpriseId,
+                        matchesAccount,
+                        matchesEnterprise
+                    });
+                }
+                
+                return matchesAccount && matchesEnterprise && hasEntityName;
+            });
+            
+            // Then extract unique entity names
             const uniqueEntities = Array.from(new Set(
-                response
-                    .filter(item => item.entityName && item.entityName.trim() !== '')
-                    .map(item => item.entityName)
+                filteredByAccountAndEnterprise.map(item => item.entityName)
             ));
             
-            console.log('✅ [Entity] Filtered unique entities:', uniqueEntities);
+            console.log('✅ [Entity] Filtered unique entities for account/enterprise:', uniqueEntities);
+            console.log('🔍 [Entity] Filtered from', response.length, 'total items to', filteredByAccountAndEnterprise.length, 'matching items');
             
             const allData = uniqueEntities.map((entity, index) => ({
                 id: `entity-${index}`,
@@ -2707,7 +2754,7 @@ function AsyncChipSelectEntity({
             console.log('🏁 [Entity] loadAllOptions completed, loading set to false');
             setLoading(false);
         }
-    }, [selectedAccountId, selectedAccountName, selectedEnterprise]);
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId]);
 
     useEffect(() => {
         if (open && allOptions.length === 0 && selectedAccountId && selectedAccountName && selectedEnterprise) {
@@ -3297,7 +3344,7 @@ const AssignedUserRoleTable: React.FC<AssignedUserRoleTableProps> = ({
                         </div>
                         <div className="relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden border-r border-slate-200">
                             <div className='flex items-center gap-2'>
-                                <span>Entity</span>
+                                <span>Workstream</span>
                             </div>
                         </div>
                         <div className="relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden border-r border-slate-200">
@@ -3473,6 +3520,7 @@ const AssignedUserRoleTable: React.FC<AssignedUserRoleTableProps> = ({
                                                 selectedAccountId={selectedAccountId}
                                                 selectedAccountName={selectedAccountName}
                                                 selectedEnterprise={selectedEnterprise}
+                                                selectedEnterpriseId={selectedEnterpriseId}
                                                 isError={isFieldMissing(group, 'entity')}
                                             />
                                         )}
@@ -3551,6 +3599,8 @@ const AssignedUserRoleTable: React.FC<AssignedUserRoleTableProps> = ({
                                                 placeholder=''
                                                 selectedEnterprise={selectedEnterprise}
                                                 selectedProduct={group.product || ''}
+                                                selectedAccountId={selectedAccountId}
+                                                selectedEnterpriseId={selectedEnterpriseId}
                                                 key={`service-${group.id}-${group.product || ''}`}
                                                 isError={isFieldMissing(group, 'service')}
                                             />

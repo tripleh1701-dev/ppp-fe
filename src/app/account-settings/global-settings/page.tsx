@@ -1,928 +1,299 @@
 'use client';
 
-import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    useCallback,
-    useImperativeHandle,
-    forwardRef,
-} from 'react';
-import {createPortal} from 'react-dom';
-import {api} from '@/utils/api';
-import {Icon} from '@/components/Icons';
-import ConfirmModal from '@/components/ConfirmModal';
-import TrashButton from '@/components/TrashButton';
-import SearchSelect from '@/components/SearchSelect';
-import Link from 'next/link';
-import {useRouter} from 'next/navigation';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import {
     PlusIcon,
     MagnifyingGlassIcon,
     ArrowsUpDownIcon,
     EyeSlashIcon,
+    EyeIcon,
     RectangleStackIcon,
     BookmarkIcon,
-    XMarkIcon,
 } from '@heroicons/react/24/outline';
-import {
-    CATEGORY_TOOLS,
-    TOOLS_CONFIG,
-    CATEGORY_COLORS as SHARED_CATEGORY_COLORS,
-    CATEGORY_ORDER,
-} from '@/config/toolsConfig';
-import GlobalSettingsTableV2, {
-    GlobalSettingsRow,
-} from '@/components/GlobalSettingsTableV2';
+import { X, Settings, XCircle } from 'lucide-react';
+import ConfirmModal from '@/components/ConfirmModal';
+import GlobalSettingsTable, { GlobalSettingsRow } from '@/components/GlobalSettingsTable';
+import { api, API_BASE } from '@/utils/api';
+import { generateId } from '@/utils/id-generator';
+import { Icon } from '@/components/Icons';
+import { AnimatePresence } from 'framer-motion';
 
-interface GlobalSetting {
-    id: string;
-    accountId: string;
-    accountName: string;
-    enterpriseName: string;
-    entities: string[]; // selected entities like Finance, Payroll, People
-    categories: {
-        plan: string[];
-        code: string[];
-        build: string[];
-        test: string[];
-        release: string[];
-        deploy: string[];
-    };
-}
-
-const STORAGE_KEY = 'global-settings';
-
-const DEFAULT_ACCOUNTS: {id: string; accountName: string}[] = [
-    {id: 'acc-1001', accountName: 'Systiva Corp'},
-    {id: 'acc-1002', accountName: 'Globex Ltd'},
-    {id: 'acc-1003', accountName: 'Initech'},
-];
-
-// Color palette for entity chips; deterministic by entity name
-const ENTITY_CHIP_PALETTE: Array<{bg: string; text: string; border: string}> = [
-    {
-        bg: 'bg-emerald-50',
-        text: 'text-emerald-700',
-        border: 'border-emerald-200',
-    },
-    {bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200'},
-    {bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200'},
-    {bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200'},
-    {bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200'},
-    {bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200'},
-    {bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200'},
-    {
-        bg: 'bg-fuchsia-50',
-        text: 'text-fuchsia-700',
-        border: 'border-fuchsia-200',
-    },
-];
-function getEntityChipClasses(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++)
-        hash = (hash * 31 + name.charCodeAt(i)) | 0;
-    const idx = Math.abs(hash) % ENTITY_CHIP_PALETTE.length;
-    const c = ENTITY_CHIP_PALETTE[idx];
-    return `${c.bg} ${c.text} ${c.border}`;
-}
-
-export default function GlobalSettingsPage() {
+export default function ManageGlobalSettings() {
+    // Router for navigation interception
     const router = useRouter();
-    const [items, setItems] = useState<GlobalSetting[]>([]);
-    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-    const inlineEntitiesRef = useRef<{reload: () => void}>(null);
-    // Inline create panel state
-    // HARDCODED TEST DATA - Set to true to show entities by default
-    const [inlineOpen, setInlineOpen] = useState(true);
-    const [accounts, setAccounts] = useState<
-        Array<{id: string; accountName: string}>
-    >([]);
-    const [enterprises, setEnterprises] = useState<
-        Array<{id: string; name: string}>
-    >([]);
-    // Load account and enterprise from breadcrumb selections
-    const [accountId, setAccountId] = useState('');
-    const [accountName, setAccountName] = useState('');
-    const [enterpriseId, setEnterpriseId] = useState('');
-    const [enterpriseName, setEnterpriseName] = useState('');
-    const [entityOptions, setEntityOptions] = useState<string[]>([]);
-    const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
-    const [entitiesLoading, setEntitiesLoading] = useState(false);
+    
+    // Debug: Track re-renders
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
 
-    // Load account and enterprise from localStorage and API
-    const [selectionResolving, setSelectionResolving] = useState(true);
-    useEffect(() => {
-        (async () => {
-            try {
-                const savedAccId =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem('selectedAccountId') || ''
-                        : '';
-                const savedEntId =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem('selectedEnterpriseId') ||
-                          ''
-                        : '';
-                const savedAccName =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem('selectedAccountName') ||
-                          ''
-                        : '';
-                const savedEntName =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem(
-                              'selectedEnterpriseName',
-                          ) || ''
-                        : '';
+    // Global Settings data state
+    const [globalSettings, setGlobalSettings] = useState<GlobalSettingsRow[]>([]);
+    
+    // Client-side display order tracking - independent of API timestamps
+    const displayOrderRef = useRef<Map<string, number>>(new Map());
 
-                const [accs, ents] = await Promise.all([
-                    api
-                        .get<Array<{id: string; accountName: string}>>(
-                            '/api/accounts',
-                        )
-                        .catch(() => [] as any),
-                    api
-                        .get<Array<{id: string; name: string}>>(
-                            '/api/enterprises',
-                        )
-                        .catch(() => [] as any),
-                ]);
-
-                const accountsList = accs || [];
-                const enterprisesList = ents || [];
-
-                const resolvedAccId =
-                    savedAccId ||
-                    (savedAccName
-                        ? String(
-                              (
-                                  accountsList.find(
-                                      (a: any) =>
-                                          a.accountName === savedAccName,
-                                  ) || {id: ''}
-                              ).id,
-                          )
-                        : '') ||
-                    (accountsList.length === 1
-                        ? String(accountsList[0].id)
-                        : '');
-
-                const resolvedEntId =
-                    savedEntId ||
-                    (savedEntName
-                        ? String(
-                              (
-                                  enterprisesList.find(
-                                      (e: any) => e.name === savedEntName,
-                                  ) || {id: ''}
-                              ).id,
-                          )
-                        : '') ||
-                    (enterprisesList.length === 1
-                        ? String(enterprisesList[0].id)
-                        : '');
-
-                const acc = accountsList.find(
-                    (a: any) => String(a.id) === String(resolvedAccId),
-                );
-                const ent = enterprisesList.find(
-                    (e: any) => String(e.id) === String(resolvedEntId),
-                );
-
-                setAccountId(resolvedAccId);
-                setAccountName(acc?.accountName || savedAccName || '');
-                setEnterpriseId(resolvedEntId);
-                setEnterpriseName(ent?.name || savedEntName || '');
-                setAccounts(accountsList);
-                setEnterprises(enterprisesList);
-
-                // Auto-open inline panel if account and enterprise are selected
-                if (resolvedAccId && resolvedEntId) {
-                    setInlineOpen(true);
-                }
-            } catch {
-            } finally {
-                setSelectionResolving(false);
-            }
-        })();
+    // Function to sort configs by client-side display order for stable UI
+    const sortConfigsByDisplayOrder = useCallback((configs: GlobalSettingsRow[]) => {
+        return [...configs].sort((a, b) => {
+            const orderA = displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderB = displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return orderA - orderB;
+        });
     }, []);
+    
+    const [isLoading, setIsLoading] = useState(true);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
 
-    // Hoverable configuration pill for main list rows
-    const LIST_CATEGORY_COLORS = SHARED_CATEGORY_COLORS;
-    const LIST_CATEGORY_ORDER = CATEGORY_ORDER;
-    function GSPill({
-        categories,
-        label,
-    }: {
-        categories: GlobalSetting['categories'];
-        label: string;
-    }) {
-        const total = LIST_CATEGORY_ORDER.reduce(
-            (acc, key) =>
-                acc +
-                (categories?.[key as keyof typeof categories]?.length || 0),
-            0,
-        );
-        const stateLabel = total === 0 ? 'Pending' : 'Configured';
-        const stateClass =
-            total === 0
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        const [open, setOpen] = useState(false);
-        const [coords, setCoords] = useState<{
-            top: number;
-            left: number;
-        } | null>(null);
-        const closeTimer = useRef<number | null>(null);
-        const clearCloseTimer = () => {
-            if (closeTimer.current !== null) {
-                window.clearTimeout(closeTimer.current);
-                closeTimer.current = null;
-            }
-        };
-        const scheduleClose = () => {
-            clearCloseTimer();
-            closeTimer.current = window.setTimeout(() => setOpen(false), 180);
-        };
-        const entries = LIST_CATEGORY_ORDER.map((cat) => ({
-            cat,
-            count: categories?.[cat as keyof typeof categories]?.length || 0,
-        }));
-        const sum = entries.reduce((a, b) => a + b.count, 0) || 1;
-        return (
-            <>
-                <span
-                    onMouseEnter={(e) => {
-                        clearCloseTimer();
-                        const left = Math.min(
-                            Math.max(12, e.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            e.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen(true);
-                    }}
-                    onMouseLeave={scheduleClose}
-                    onClick={(e) => {
-                        const left = Math.min(
-                            Math.max(12, e.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            e.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen((v) => !v);
-                    }}
-                    onTouchStart={(e) => {
-                        clearCloseTimer();
-                        const touch = e.touches[0];
-                        const left = Math.min(
-                            Math.max(12, touch.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            touch.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen(true);
-                    }}
-                    role='button'
-                    aria-expanded={open}
-                    className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-medium border ${stateClass} cursor-pointer group-hover:ring-2 group-hover:ring-indigo-200 group-hover:border-indigo-300`}
-                >
-                    <span>{stateLabel}</span>
-                    <span className='inline-block h-1 w-1 rounded-full bg-slate-300'></span>
-                    <span>{total} selected</span>
-                </span>
-                {open && coords && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: coords.top,
-                            left: coords.left,
-                            zIndex: 1000,
-                        }}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl p-4 w-[360px] whitespace-normal break-words'
-                        onMouseEnter={clearCloseTimer}
-                        onMouseLeave={scheduleClose}
-                    >
-                        <div className='mb-2 text-xs font-semibold text-secondary'>
-                            Selections for {label}
-                        </div>
-                        {total === 0 ? (
-                            <div className='rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm leading-relaxed whitespace-normal break-words p-3'>
-                                No settings configured yet. Click Configure to
-                                select tools per category.
-                            </div>
-                        ) : (
-                            <>
-                                <div className='mb-3 h-2 w-full overflow-hidden rounded-full bg-slate-100'>
-                                    <div className='flex h-full w-full'>
-                                        {entries.map(({cat, count}) => {
-                                            const width = `${Math.max(
-                                                0,
-                                                Math.round((count / sum) * 100),
-                                            )}%`;
-                                            return (
-                                                <div
-                                                    key={cat}
-                                                    title={`${cat}: ${count}`}
-                                                    style={{
-                                                        width,
-                                                        backgroundColor:
-                                                            LIST_CATEGORY_COLORS[
-                                                                cat
-                                                            ],
-                                                    }}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className='grid grid-cols-2 gap-3'>
-                                    {entries.map(({cat, count}) => (
-                                        <div
-                                            key={cat}
-                                            className='rounded-lg border border-slate-200 p-2'
-                                        >
-                                            <div className='mb-1 flex items-center justify-between'>
-                                                <div className='text-xs font-semibold capitalize text-primary'>
-                                                    {cat}
-                                                </div>
-                                                <div className='text-[10px] text-secondary'>
-                                                    {count}
-                                                </div>
-                                            </div>
-                                            {count === 0 ? (
-                                                <div className='text-[11px] text-secondary'>
-                                                    None
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-            </>
-        );
-    }
+    // Notification state
+    const [notificationMessage, setNotificationMessage] = useState<string>('');
+    const [showNotification, setShowNotification] = useState(false);
 
-    return (
-        <div className='h-full bg-secondary flex flex-col'>
-            <style jsx global>{`
-                @keyframes modal-fade {
-                    from {
-                        opacity: 0;
-                    }
-                    to {
-                        opacity: 1;
-                    }
-                }
-                @keyframes modal-slide {
-                    from {
-                        transform: translateX(24px);
-                        opacity: 0.98;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-                .animate-modal-fade {
-                    animation: modal-fade 180ms ease-out both;
-                }
-                .animate-modal-slide {
-                    animation: modal-slide 220ms cubic-bezier(0.2, 0.8, 0.2, 1)
-                        both;
-                }
-                @keyframes row-enter {
-                    from {
-                        opacity: 0;
-                        transform: translateY(6px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                .animate-row {
-                    animation: row-enter 220ms ease-out both;
-                }
-                @keyframes curlFold {
-                    0% {
-                        opacity: 0;
-                        transform: translate(4px, -4px) rotate(45deg) scale(0.6);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: translate(0, 0) rotate(45deg) scale(1);
-                    }
-                }
-                .gs-chip {
-                    position: relative;
-                    overflow: hidden;
-                }
-                .gs-chip::after {
-                    content: '';
-                    position: absolute;
-                    inset: -30% auto auto -30%;
-                    right: -30%;
-                    bottom: auto;
-                    background: radial-gradient(
-                        ellipse at center,
-                        rgba(79, 70, 229, 0.16),
-                        rgba(79, 70, 229, 0) 60%
-                    );
-                    opacity: 0;
-                    transform: scale(0.2);
-                    transition: opacity 220ms ease, transform 220ms ease;
-                    pointer-events: none;
-                }
-                .gs-chip:hover::after {
-                    opacity: 1;
-                    transform: scale(1);
-                }
-                .gs-chip-selected {
-                    box-shadow: 0 14px 36px -16px rgba(79, 70, 229, 0.45),
-                        0 1px 3px rgba(2, 6, 23, 0.12);
-                }
-                /* Top-right corner tick ribbon */
-                .gs-corner-check {
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    width: 24px;
-                    height: 24px;
-                    background: #1d4ed8; /* blue-700 */
-                    clip-path: polygon(100% 0, 100% 100%, 0 0);
-                    pointer-events: none;
-                    z-index: 2;
-                    overflow: hidden;
-                }
-                .gs-corner-check svg {
-                    position: absolute;
-                    top: 10px;
-                    right: 6px;
-                    width: 9px;
-                    height: 9px;
-                    color: #fff;
-                }
-                .gs-corner-check-svg {
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    width: 24px;
-                    height: 24px;
-                    pointer-events: none;
-                    z-index: 2;
-                    display: block;
-                }
-                .gs-curl {
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    width: 18px;
-                    height: 18px;
-                    background: linear-gradient(
-                        135deg,
-                        rgba(255, 255, 255, 0) 0%,
-                        rgba(99, 102, 241, 0.35) 55%,
-                        rgba(79, 70, 229, 0.7) 100%
-                    );
-                    clip-path: polygon(0 0, 100% 0, 100% 100%);
-                    border-top-right-radius: 10px;
-                    box-shadow: 0 1px 2px rgba(2, 6, 23, 0.18);
-                    border-left: 1px solid rgba(79, 70, 229, 0.2);
-                    border-top: 1px solid rgba(79, 70, 229, 0.2);
-                    animation: curlFold 420ms ease-out;
-                    pointer-events: none;
-                }
-                .gs-tilt {
-                    transform: translateY(-1px) scale(1.02) rotate(-0.6deg);
-                }
-                @keyframes rippleScale {
-                    from {
-                        opacity: 0.35;
-                        transform: translate(-50%, -50%) scale(0.2);
-                    }
-                    to {
-                        opacity: 0;
-                        transform: translate(-50%, -50%) scale(2.4);
-                    }
-                }
-                .gs-ripple {
-                    position: absolute;
-                    left: 50%;
-                    top: 50%;
-                    width: 46px;
-                    height: 46px;
-                    border-radius: 9999px;
-                    background: radial-gradient(
-                        circle,
-                        rgba(99, 102, 241, 0.25) 0%,
-                        rgba(99, 102, 241, 0.15) 40%,
-                        rgba(99, 102, 241, 0) 60%
-                    );
-                    transform: translate(-50%, -50%) scale(0.2);
-                    animation: rippleScale 520ms ease-out forwards;
-                    pointer-events: none;
-                }
-            `}</style>
-            <style>{`
-                /* Compact table tweaks to mirror Accounts/Monday-like grid */
-                .compact-table table { border-spacing: 0; width: 100%; }
-                .compact-table thead th { background: #fff; }
-                .compact-table th, .compact-table td { border-right: 1px solid #e2e8f0; }
-                .compact-table th:last-child, .compact-table td:last-child { border-right: none; }
-                .header-cell { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-                .header-ellipsis { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:9999px; color:#64748B; }
-                .header-ellipsis:hover { background:#eef2ff; color:#4338ca; }
-                .add-inline-row { color:#64748B; }
-                .add-inline-row:hover { color:#0f172a; }
-            `}</style>
-            <style>{`
-                /* Row hover color without overlay so dropdown stays on top */
-                .row-hover-safe { position: relative; }
-                .row-hover-safe:hover { background-color: rgba(99,102,241,0.08); }
-                .row-hover-safe .actions-cell { position: relative; z-index: 20; }
-            `}</style>
-            <div className='bg-card border-b border-light px-3 py-2'>
-                <div className='flex items-center justify-between'>
-                    <div>
-                        <h1 className='text-xl font-bold text-primary'>
-                            Global Settings
-                        </h1>
-                        <p className='text-sm text-secondary mt-1'>
-                            System-wide configuration
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Inline entity view uses account/enterprise from breadcrumb automatically */}
-            <div className='mt-2 mb-2 px-3'>
-                {selectionResolving ? (
-                    <div className='text-sm text-secondary'>
-                        Loading selection from breadcrumb…
-                    </div>
-                ) : accountId && enterpriseName ? (
-                    <div>
-                        <label className='block text-sm font-semibold text-primary mb-2'>
-                            Entities
-                        </label>
-                        <InlineEntities
-                            ref={inlineEntitiesRef}
-                            accountId={accountId}
-                            accountName={accountName}
-                            enterpriseId={enterpriseId}
-                            enterpriseName={enterpriseName}
-                            onCreated={async () => {
-                                const data = await api.get<GlobalSetting[]>(
-                                    `/api/global-settings?accountId=${encodeURIComponent(
-                                        accountId,
-                                    )}&accountName=${encodeURIComponent(
-                                        accountName,
-                                    )}&enterpriseId=${encodeURIComponent(
-                                        enterpriseId,
-                                    )}`,
-                                );
-                                setItems(Array.isArray(data) ? data : []);
-                            }}
-                            onRequestDelete={(entity) =>
-                                setPendingDeleteId(entity)
-                            }
-                        />
-                    </div>
-                ) : (
-                    <div className='text-sm text-secondary'>
-                        Missing account/enterprise selection. Please pick them
-                        in the breadcrumb.
-                    </div>
-                )}
-            </div>
-
-            <div className='flex-1 p-6'>
-                {items.length === 0 ? null : (
-                    <div className='overflow-x-auto bg-white border border-slate-200 rounded-2xl shadow-sm'>
-                        <table className='min-w-full divide-y divide-slate-100'>
-                            <thead className='bg-tertiary/40'>
-                                <tr>
-                                    <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                        Enterprise
-                                    </th>
-                                    <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                        Account
-                                    </th>
-                                    <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                        Entities
-                                    </th>
-                                    <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                        Configuration
-                                    </th>
-                                    <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className='divide-y divide-slate-100'>
-                                {items.map((item: GlobalSetting) => (
-                                    <tr
-                                        key={item.id}
-                                        className='group transition-all duration-200 row-hover-safe'
-                                    >
-                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
-                                            {item.enterpriseName}
-                                        </td>
-                                        <td className='px-6 py-4 whitespace-nowrap text-sm text-primary'>
-                                            {item.accountName}
-                                        </td>
-                                        <td className='px-6 py-4'>
-                                            <div className='flex flex-wrap gap-2'>
-                                                {item.entities.map(
-                                                    (
-                                                        e: string,
-                                                        idx: number,
-                                                    ) => (
-                                                        <span
-                                                            key={idx}
-                                                            className='inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200'
-                                                        >
-                                                            {e}
-                                                        </span>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className='px-6 py-4 whitespace-nowrap text-sm'>
-                                            <GSPill
-                                                categories={item.categories}
-                                                label={item.enterpriseName}
-                                            />
-                                        </td>
-                                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm'>
-                                            <RowActions
-                                                onConfigure={() =>
-                                                    router.push(
-                                                        `/account-settings/global-settings/${item.id}`,
-                                                    )
-                                                }
-                                                onDelete={() =>
-                                                    setPendingDeleteId(item.id)
-                                                }
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-            <ConfirmModal
-                open={pendingDeleteId !== null}
-                title='Confirm delete'
-                message={`Delete entity "${
-                    pendingDeleteId || ''
-                }"?\n\nThis action can't be undone.`}
-                onCancel={() => setPendingDeleteId(null)}
-                onConfirm={async () => {
-                    if (
-                        !pendingDeleteId ||
-                        !accountId ||
-                        !accountName ||
-                        !enterpriseId
-                    )
-                        return;
-                    try {
-                        console.log(`🗑️ Deleting entity: ${pendingDeleteId}`);
-
-                        // Delete from DynamoDB
-                        await api.del(
-                            `/api/global-settings/${encodeURIComponent(
-                                pendingDeleteId,
-                            )}?accountId=${encodeURIComponent(
-                                accountId,
-                            )}&accountName=${encodeURIComponent(
-                                accountName,
-                            )}&enterpriseId=${encodeURIComponent(
-                                enterpriseId,
-                            )}`,
-                        );
-
-                        console.log('✅ Entity deleted successfully');
-
-                        // Refresh the entities display by calling the reload method
-                        if (inlineEntitiesRef.current) {
-                            inlineEntitiesRef.current.reload();
-                        }
-                    } catch (error) {
-                        console.error('❌ Error deleting entity:', error);
-                        alert('Failed to delete entity. Please try again.');
-                    }
-                    setPendingDeleteId(null);
-                }}
-            />
-        </div>
-    );
-}
-
-function RowActions({
-    onConfigure,
-    onDelete,
-}: {
-    onConfigure: () => void;
-    onDelete: () => void;
-}) {
-    const [open, setOpen] = useState(false);
-    const buttonRef = useRef<HTMLButtonElement | null>(null);
-    const menuRef = useRef<HTMLDivElement | null>(null);
-    const [coords, setCoords] = useState<{
-        top: number;
-        left: number;
-        openUp: boolean;
-    } | null>(null);
-
-    useEffect(() => {
-        if (!open) return;
-        const handleGlobal = (e: MouseEvent) => {
-            const target = e.target as Node;
-            if (buttonRef.current && buttonRef.current.contains(target)) return;
-            if (menuRef.current && menuRef.current.contains(target)) return;
-            setOpen(false);
-        };
-        const handleScrollResize = () => setOpen(false);
-        window.addEventListener('click', handleGlobal);
-        window.addEventListener('scroll', handleScrollResize, true);
-        window.addEventListener('resize', handleScrollResize);
-        return () => {
-            window.removeEventListener('click', handleGlobal);
-            window.removeEventListener('scroll', handleScrollResize, true);
-            window.removeEventListener('resize', handleScrollResize);
-        };
-    }, [open]);
-
-    return (
-        <div
-            className={`relative inline-block text-left ${
-                open ? 'z-[9999]' : ''
-            }`}
-        >
-            <button
-                ref={buttonRef}
-                onClick={() => setOpen((v) => !v)}
-                className='h-9 w-9 inline-flex items-center justify-center rounded-full border border-indigo-200 text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 shadow-sm'
-                aria-label='Row actions'
-            >
-                <svg
-                    className='w-5 h-5'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                >
-                    <circle cx='12' cy='5' r='1.6' />
-                    <circle cx='12' cy='12' r='1.6' />
-                    <circle cx='12' cy='19' r='1.6' />
-                </svg>
-            </button>
-            {open && (
-                <div
-                    ref={menuRef}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    className='absolute right-0 top-full mt-2 w-44 rounded-xl shadow-2xl bg-white border border-slate-200 ring-1 ring-black/5 focus:outline-none p-1 z-[100000] pointer-events-auto'
-                >
-                    <div className='py-2'>
-                        <button
-                            onClick={() => {
-                                setOpen(false);
-                                onConfigure();
-                            }}
-                            className='w-full px-4 py-2 text-left text-sm text-primary hover:bg-slate-50 flex items-center gap-3'
-                        >
-                            <svg
-                                className='w-5 h-5 text-slate-600'
-                                viewBox='0 0 24 24'
-                                fill='none'
-                                stroke='currentColor'
-                            >
-                                <path d='M4 13h16' strokeWidth='2' />
-                                <path d='M12 3v18' strokeWidth='2' />
-                            </svg>
-                            Configure
-                        </button>
-                        <button
-                            onClick={() => {
-                                setOpen(false);
-                                onDelete();
-                            }}
-                            className='w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3'
-                        >
-                            <svg
-                                className='w-5 h-5 text-red-600'
-                                viewBox='0 0 24 24'
-                                fill='none'
-                                stroke='currentColor'
-                            >
-                                <path d='M3 6h18' strokeWidth='2' />
-                                <path
-                                    d='M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6'
-                                    strokeWidth='2'
-                                />
-                                <path d='M10 11v6M14 11v6' strokeWidth='2' />
-                            </svg>
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-const InlineEntities = forwardRef<
-    {reload: () => void},
-    {
+    // Delete confirmation modal state
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
+    const [validationMessage, setValidationMessage] = useState('');
+    const [incompleteRows, setIncompleteRows] = useState<string[]>([]);
+    const [externalFieldErrors, setExternalFieldErrors] = useState<{[key:string]: Record<string,string>}>({});
+    
+    // Duplicate entry modal state
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    const [duplicateMessage, setDuplicateMessage] = useState('');
+    const duplicateDetectedRef = useRef(false); // Track if duplicate was detected during autosave
+    
+    // Navigation warning state - exactly like Manage Users
+    const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+    const [pendingNavigation, setPendingNavigation] = useState<
+        (() => void) | null
+    >(null);
+    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [preventNavigation, setPreventNavigation] = useState(false);
+    const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
+    
+    // Configuration panel state
+    const [isConfigurationPanelOpen, setIsConfigurationPanelOpen] = useState(false);
+    const [configPanelEntity, setConfigPanelEntity] = useState<GlobalSettingsRow | null>(null);
+    const [accounts, setAccounts] = useState<Array<{id: string; accountName: string}>>([]);
+    const [enterprises, setEnterprises] = useState<Array<{id: string; name: string}>>([]);
+    const [configForm, setConfigForm] = useState<{
         accountId: string;
         accountName: string;
         enterpriseId: string;
         enterpriseName: string;
-        onCreated: () => void;
-        onRequestDelete: (entity: string) => void;
-    }
->(function InlineEntities(
-    {
-        accountId,
-        accountName,
-        enterpriseId,
-        enterpriseName,
-        onCreated,
-        onRequestDelete,
-    },
-    ref,
-) {
-    // Advanced configuration constants
-    type CategorySelections = Record<string, string[]>;
-    // Use shared configuration from toolsConfig
-    const CATEGORY_OPTIONS = CATEGORY_TOOLS;
-    // Generate OPTION_ICON from shared TOOLS_CONFIG
-    const OPTION_ICON: Record<string, {name: string}> = Object.entries(
-        TOOLS_CONFIG,
-    ).reduce((acc, [toolName, config]) => {
-        acc[toolName] = {name: config.iconName};
-        return acc;
-    }, {} as Record<string, {name: string}>);
-
-    // Use shared category colors
-    const CATEGORY_COLORS = SHARED_CATEGORY_COLORS;
-
-    // Entities loaded from DynamoDB
-    const [options, setOptions] = useState<string[]>([]);
-    const [picked, setPicked] = useState<Record<string, boolean>>({});
-    const [loading, setLoading] = useState(false);
-    const [dragIndex, setDragIndex] = useState<number | null>(null);
-    // Advanced UI state
-    const [configureEntity, setConfigureEntity] = useState<string | null>(null);
-    const [showConfigurePanel, setShowConfigurePanel] = useState(false);
-    const [selectionsByEntity, setSelectionsByEntity] = useState<
-        Record<string, CategorySelections>
-    >({});
-    const [copyOpen, setCopyOpen] = useState(false);
-    const [copyFrom, setCopyFrom] = useState<string>('');
-    const [copyTargets, setCopyTargets] = useState<Record<string, boolean>>({});
-    const [newEntity, setNewEntity] = useState('');
-    const [savingEntity, setSavingEntity] = useState(false);
-    const defaultKey = `gs_virtual_default_${accountId}_${enterpriseId}`;
-    const [hasVirtualDefault, setHasVirtualDefault] = useState<boolean>(() => {
+        entities: string[];
+        selections: Record<string, string[]>;
+    }>({
+        accountId: '',
+        accountName: '',
+        enterpriseId: '',
+        enterpriseName: '',
+        entities: [],
+        selections: {},
+    });
+    // Track if panel data has been loaded to prevent reloading when globalSettings changes
+    const configPanelDataLoadedRef = useRef<string | null>(null);
+    // Track unsaved changes in configuration panel (using ref for async callbacks)
+    const hasConfigUnsavedChangesRef = useRef(false);
+    const [hasConfigUnsavedChanges, setHasConfigUnsavedChangesState] = useState(false);
+    // Wrapper to update both state and ref
+    const setHasConfigUnsavedChanges = (value: boolean) => {
+        hasConfigUnsavedChangesRef.current = value;
+        setHasConfigUnsavedChangesState(value);
+    };
+    const [showConfigUnsavedChangesDialog, setShowConfigUnsavedChangesDialog] = useState(false);
+    const [originalConfigSelections, setOriginalConfigSelections] = useState<Record<string, string[]>>({});
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
+    // Global search for configuration panel
+    const [configSearchTerm, setConfigSearchTerm] = useState('');
+    const [appliedConfigSearchTerm, setAppliedConfigSearchTerm] = useState('');
+    
+    // Initialize state with localStorage values to prevent initial empty state
+    const initializeFromLocalStorage = () => {
+        if (typeof window === 'undefined') return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
+        
         try {
-            return window.localStorage.getItem(defaultKey) === '1';
-        } catch {
-            return false;
+            const savedName = window.localStorage.getItem('selectedEnterpriseName');
+            const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            const savedAccountId = window.localStorage.getItem('selectedAccountId');
+            const savedAccountName = window.localStorage.getItem('selectedAccountName');
+            
+            return {
+                enterprise: savedName || '',
+                enterpriseId: (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '',
+                accountId: (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '',
+                accountName: (savedAccountName && savedAccountName !== 'null') ? savedAccountName : ''
+            };
+        } catch (error) {
+            console.warn('Failed to initialize from localStorage:', error);
+            return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
         }
+    };
+
+    const initialValues = initializeFromLocalStorage();
+    
+    // Selected Enterprise from top right corner
+    const [selectedEnterprise, setSelectedEnterprise] = useState<string>(initialValues.enterprise);
+    const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>(initialValues.enterpriseId);
+    
+    // Selected Account from top right corner
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(initialValues.accountId);
+    const [selectedAccountName, setSelectedAccountName] = useState<string>(initialValues.accountName);
+    
+    // Track if we've completed initial localStorage loading to prevent premature auto-refresh
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    
+    // Load selected enterprise from localStorage and listen for changes
+    useEffect(() => {
+        const loadSelectedEnterprise = () => {
+            try {
+                console.log('🐛 [ManageglobalSettings Page] Loading localStorage values...');
+                
+                const savedName = window.localStorage.getItem('selectedEnterpriseName');
+                const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+                const savedAccountId = window.localStorage.getItem('selectedAccountId');
+                const savedAccountName = window.localStorage.getItem('selectedAccountName');
+                
+                console.log('🐛 [ManageglobalSettings Page] localStorage values:', {
+                    selectedEnterpriseName: savedName,
+                    selectedEnterpriseId: savedEnterpriseId,
+                    selectedAccountId: savedAccountId,
+                    selectedAccountName: savedAccountName
+                });
+                
+                // Use functional updates to avoid dependency on current state values
+                setSelectedEnterprise((prev) => {
+                    const newValue = savedName || '';
+                    if (newValue !== prev) {
+                        return newValue;
+                    }
+                    return prev;
+                });
+                
+                const newEnterpriseId = (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '';
+                setSelectedEnterpriseId((prev) => {
+                    if (newEnterpriseId !== prev) {
+                        return newEnterpriseId;
+                    }
+                    return prev;
+                });
+                
+                const newAccountId = (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '';
+                setSelectedAccountId((prev) => {
+                    if (newAccountId !== prev) {
+                        return newAccountId;
+                    }
+                    return prev;
+                });
+                
+                const newAccountName = (savedAccountName && savedAccountName !== 'null') ? savedAccountName : '';
+                setSelectedAccountName((prev) => {
+                    if (newAccountName !== prev) {
+                        return newAccountName;
+                    }
+                    return prev;
+                });
+                
+                console.log('🐛 [ManageglobalSettings Page] Setting state values:', {
+                    enterprise: savedName || '',
+                    enterpriseId: newEnterpriseId,
+                    accountId: newAccountId,
+                    accountName: newAccountName
+                });
+                
+                // Mark as initialized after first load
+                setIsInitialized(true);
+            } catch (error) {
+                console.warn('Failed to load selected enterprise/account:', error);
+                setIsInitialized(true); // Still mark as initialized even on error
+            }
+        };
+
+        // Load on mount
+        loadSelectedEnterprise();
+
+        // Listen for enterprise and account changes
+        const handleEnterpriseChange = () => {
+            loadSelectedEnterprise();
+        };
+
+        const handleAccountChange = () => {
+            loadSelectedEnterprise(); // This function loads both account and enterprise values
+        };
+
+        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
+        window.addEventListener('accountChanged', handleAccountChange);
+        window.addEventListener('storage', handleEnterpriseChange);
+
+        return () => {
+            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
+            window.removeEventListener('accountChanged', handleAccountChange);
+            window.removeEventListener('storage', handleEnterpriseChange);
+        };
+    }, []); // Empty dependency array - only run on mount and when events fire
+
+    // Debug: Log current state values
+    useEffect(() => {
+        console.log('🐛 [ManageglobalSettings Page] State updated:', {
+            selectedEnterprise,
+            selectedEnterpriseId,
+            selectedAccountId,
+            selectedAccountName
+        });
+    }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
+    
+    const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+    const [deletingRow, setDeletingRow] = useState(false);
+
+    // Auto-save related state - use useRef to persist through re-renders
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const globalSettingsRef = useRef<GlobalSettingsRow[]>([]);
+    const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
+    const originalRouterRef = useRef<any>(null); // Store original router for navigation after confirmation
+    // Track original entity names for existing records to enable proper updates when entity name is changed
+    const originalEntityNamesRef = useRef<Map<string, string>>(new Map());
+    // Track last loaded account+enterprise combination to prevent duplicate API calls
+    const lastLoadedCombinationRef = useRef<string>('');
+    const loadDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
+    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<Set<string>>(new Set());
+
+    // Update ref to track current globalSettings state
+    useEffect(() => {
+        globalSettingsRef.current = globalSettings;
+    }, [globalSettings]);
+
+    // Update ref to track current modifiedExistingRecords state
+    useEffect(() => {
+        modifiedExistingRecordsRef.current = modifiedExistingRecords;
+    }, [modifiedExistingRecords]);
+
+    // State to track AI panel collapse state for notification positioning
+    const [isAIPanelCollapsed, setIsAIPanelCollapsed] = useState(false);
+
+    // Row animation states
+    const [compressingRowId, setCompressingRowId] = useState<string | null>(null);
+    const [foldingRowId, setFoldingRowId] = useState<string | null>(null);
+
+    // Dropdown options for chips and filters
+    const [dropdownOptions, setDropdownOptions] = useState({
+        accounts: [] as Array<{id: string; name: string}>,
+        enterprises: [] as Array<{id: string; name: string}>,
+        entities: [] as Array<{id: string; name: string}>,
     });
 
     // Toolbar controls state
-    type ColumnType = 'account' | 'enterprise' | 'entity' | 'configuration';
-    const [showSearchBar, setShowSearchBar] = useState(true);
+    const [showSearchBar, setShowSearchBar] = useState(true); // Always show search
     const [searchTerm, setSearchTerm] = useState('');
-    const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+    const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Applied search term
     const [filterVisible, setFilterVisible] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
-    const [filterForm, setFilterForm] = useState({
-        account: '',
-        enterprise: '',
-        entity: '',
-        configuration: '',
-    });
     const [sortOpen, setSortOpen] = useState(false);
     const [sortColumn, setSortColumn] = useState('');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
@@ -930,33 +301,20 @@ const InlineEntities = forwardRef<
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'Account' | 'Enterprise' | 'Entity' | 'Configuration'
+        'None' | 'Workstream Name' | 'Configuration'
     >('None');
+    const [groupBySelectedTools, setGroupBySelectedTools] = useState<string[]>([]);
+    const [showGroupByToolsDropdown, setShowGroupByToolsDropdown] = useState(false);
+    const [groupByToolsQuery, setGroupByToolsQuery] = useState('');
+    
+    type ColumnType = 'account' | 'enterprise' | 'entity' | 'configuration' | 'actions';
+    
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
+        'entity',
         'account',
         'enterprise',
-        'entity',
         'configuration',
     ]);
-
-    // Track configured entities
-    const [configuredEntities, setConfiguredEntities] = useState<Set<string>>(
-        new Set(),
-    );
-
-    // Delete animation states
-    const [compressingRowId, setCompressingRowId] = useState<string | null>(
-        null,
-    );
-    const [foldingRowId, setFoldingRowId] = useState<string | null>(null);
-
-    // Auto-save state
-    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const [isAutoSaving, setIsAutoSaving] = useState(false);
-    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
-    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
-        null,
-    );
 
     // Refs for dropdowns
     const searchRef = useRef<HTMLDivElement>(null);
@@ -965,121 +323,56 @@ const InlineEntities = forwardRef<
     const hideRef = useRef<HTMLDivElement>(null);
     const groupRef = useRef<HTMLDivElement>(null);
 
-    const allCols: ColumnType[] = [
-        'account',
-        'enterprise',
-        'entity',
-        'configuration',
-    ];
-    const columnLabels: Record<string, string> = {
-        account: 'Account',
-        enterprise: 'Enterprise',
-        entity: 'Entity',
-        configuration: 'Configuration',
+    // Helper function to show notifications
+    const showBlueNotification = (message: string, duration: number = 3000, showCheckmark: boolean = true) => {
+        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
+        setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
     };
 
-    const loadEntities = async () => {
-        if (!accountId || !accountName || !enterpriseId) {
-            console.log('⚠️ Missing account or enterprise info, skipping load');
-            setOptions([]);
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
+    // Load dropdown options from API
+    const loadDropdownOptions = useCallback(async () => {
         try {
-            console.log(
-                `📋 Loading global settings entities for account: ${accountId}, enterprise: ${enterpriseId}`,
-            );
+            const [rolesRes, productsRes, servicesRes] =
+                await Promise.all([
+                    api.get<Array<{id: string; name: string; roleName?: string}>>(
+                        '/api/user-management/roles',
+                    ),
+                    api.get<Array<{id: string; name: string}>>('/api/products'),
+                    api.get<Array<{id: string; name: string}>>('/api/services'),
+                ]).catch(errors => {
+                    console.warn('Some API endpoints failed:', errors);
+                    return [[], [], []];
+                });
 
-            // Load entities from DynamoDB via the new API
-            const entities = await api.get<
-                Array<{
-                    id: string;
-                    accountId: string;
-                    accountName: string;
-                    enterpriseId: string;
-                    enterpriseName: string;
-                    entityName: string;
-                    configuration: {
-                        plan: string[];
-                        code: string[];
-                        build: string[];
-                        test: string[];
-                        release: string[];
-                        deploy: string[];
-                    };
-                }>
-            >(
-                `/api/global-settings?accountId=${encodeURIComponent(
-                    accountId,
-                )}&accountName=${encodeURIComponent(
-                    accountName,
-                )}&enterpriseId=${encodeURIComponent(enterpriseId)}`,
-            );
+            // Extract unique entities from current Global Settings
+            const uniqueEntities = Array.from(new Set(globalSettings.map(setting => setting.entity)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `entity-${name}-${index}`,
+                name: name
+            }));
 
-            console.log(`✅ Loaded ${entities.length} entities from DynamoDB`);
-
-            if (!entities || entities.length === 0) {
-                console.log('ℹ️ No entities found, showing empty state');
-                setOptions([]);
-                setPicked({});
-                setSelectionsByEntity({});
-                setLoading(false);
-                return;
-            }
-
-            // Extract entity names and configurations
-            const entityNames = entities.map((e) => e.entityName);
-            const selections: Record<string, CategorySelections> = {};
-            const picked: Record<string, boolean> = {};
-
-            entities.forEach((entity) => {
-                selections[entity.entityName] = entity.configuration;
-                picked[entity.entityName] = true;
+            setDropdownOptions({
+                accounts: [],
+                enterprises: [],
+                entities: uniqueEntities,
             });
-
-            setOptions(entityNames);
-            setPicked(picked);
-            setSelectionsByEntity(selections);
-
-            // Mark configured entities
-            const configured = new Set<string>();
-            entities.forEach((entity) => {
-                const toolCount = Object.values(entity.configuration).reduce(
-                    (sum, arr) => sum + arr.length,
-                    0,
-                );
-                if (toolCount > 0) {
-                    configured.add(entity.entityName);
-                }
-            });
-            setConfiguredEntities(configured);
         } catch (error) {
-            console.error('❌ Error loading entities:', error);
-            setOptions([]);
-            setPicked({});
-            setSelectionsByEntity({});
-        } finally {
-            setLoading(false);
+            console.error('Failed to load dropdown options:', error);
+            // Set empty dropdown options on error to prevent infinite loops
+            setDropdownOptions({
+                accounts: [],
+                enterprises: [],
+                entities: [],
+            });
         }
-    };
+    }, [globalSettings]);
 
-    useEffect(() => {
-        if (accountId && enterpriseId) {
-            loadEntities().catch(() => {});
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accountId, enterpriseId, enterpriseName]);
-
-    // Expose reload method to parent via ref
-    useImperativeHandle(ref, () => ({
-        reload: () => {
-            loadEntities().catch(() => {});
-        },
-    }));
-
-    // Toolbar handlers
+    // Helper function to close all dialogs
     const closeAllDialogs = () => {
         setFilterVisible(false);
         setSortOpen(false);
@@ -1087,58 +380,804 @@ const InlineEntities = forwardRef<
         setGroupOpen(false);
     };
 
-    const toggleDialog = (dialog: 'filter' | 'sort' | 'hide' | 'group') => {
+    // Function to toggle dialogs
+    const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'role') => {
         closeAllDialogs();
-        switch (dialog) {
-            case 'filter':
-                setFilterVisible(true);
-                break;
-            case 'sort':
-                setSortOpen(true);
-                break;
-            case 'hide':
-                setHideOpen(true);
-                break;
-            case 'group':
-                setGroupOpen(true);
-                break;
-        }
+        setTimeout(() => {
+            switch (dialogType) {
+                case 'filter':
+                    setFilterVisible(true);
+                    break;
+                case 'sort':
+                    setSortOpen(true);
+                    break;
+                case 'hide':
+                    setHideOpen(true);
+                    break;
+                case 'role':
+                    setGroupOpen(true);
+                    break;
+            }
+        }, 10);
     };
 
-    const handleClearFilters = () => {
-        setFilterForm({
-            account: '',
-            enterprise: '',
-            entity: '',
-            configuration: '',
-        });
+    // Ref to track current filter form values for outside click handler
+    const filterFormRef = useRef({
+        account: '',
+        enterprise: '',
+        entity: '',
+        selectedTools: [] as string[],
+    });
+
+    // Filter dropdown suggestions state (declared early for use in useEffect)
+    const [showSelectedToolsDropdown, setShowSelectedToolsDropdown] = useState(false);
+
+    // Click outside handler to close toolbar dialogs
+    // Filter panel closes on outside click if: all fields are empty OR Clear All was clicked
+    // Filter panel stays open if any field has a value (to prevent accidental closure while typing)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            
+            // Check if any dialog is open
+            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
+                return; // No dialog is open
+            }
+            
+            // Check if click is outside dialog containers
+            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
+            
+            // Close Filter panel if:
+            // 1. Clear All was clicked, OR
+            // 2. All filter fields are empty (no values entered)
+            if (filterVisible && isOutsideFilter) {
+                const currentForm = filterFormRef.current;
+                const isFilterEmpty = !currentForm.account && !currentForm.enterprise && !currentForm.entity && (!currentForm.selectedTools || currentForm.selectedTools.length === 0);
+                
+                if (filterClearedRef.current || isFilterEmpty) {
+                    setFilterVisible(false);
+                    filterClearedRef.current = false; // Reset flag
+                }
+            }
+            
+            // Close tools dropdown on outside click
+            if (showSelectedToolsDropdown && isOutsideFilter) {
+                setShowSelectedToolsDropdown(false);
+                setSelectedToolsQuery(''); // Clear search when closing
+            }
+            
+            // Close Sort, Hide, role panels immediately on outside click
+            if (sortOpen && isOutsideSort) {
+                setSortOpen(false);
+            }
+            if (hideOpen && isOutsideHide) {
+                setHideOpen(false);
+            }
+            if (groupOpen && isOutsideGroup) {
+                setGroupOpen(false);
+                setShowGroupByToolsDropdown(false);
+                setGroupByToolsQuery('');
+            }
+            // Close group by tools dropdown on outside click
+            if (showGroupByToolsDropdown && isOutsideGroup) {
+                setShowGroupByToolsDropdown(false);
+                setGroupByToolsQuery('');
+            }
+        };
+
+        // Add event listener
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [filterVisible, sortOpen, hideOpen, groupOpen, showSelectedToolsDropdown, showGroupByToolsDropdown]);
+
+    // All available columns
+    const allCols: ColumnType[] = ['entity', 'account', 'enterprise', 'configuration'];
+    
+    // Columns available for sorting
+    const sortableCols: ColumnType[] = ['entity'];
+
+    // Column label mapping
+    const columnLabels: Record<string, string> = {
+        account: 'Account',
+        enterprise: 'Enterprise',
+        entity: 'Workstream Name',
+        configuration: 'Configuration'
+    };
+
+    // Process Global Settings data with filtering, sorting, and search
+    const processedConfigs = React.useMemo(() => {
+        // Ensure all rows have account and enterprise prepopulated from selected values
+        let filtered = globalSettings.map(setting => ({
+            ...setting,
+            account: setting.account || selectedAccountName || '',
+            enterprise: setting.enterprise || selectedEnterprise || '',
+        }));
+
+        // Apply search filter
+        if (appliedSearchTerm.trim()) {
+            filtered = filtered.filter((config) => {
+                const searchLower = appliedSearchTerm.toLowerCase();
+                return (
+                    config.account?.toLowerCase().includes(searchLower) ||
+                    config.enterprise?.toLowerCase().includes(searchLower) ||
+                    config.entity?.toLowerCase().includes(searchLower) ||
+                    config.configuration?.toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        // Apply filters
+        if (activeFilters.account) {
+            filtered = filtered.filter(
+                (config) => config.account?.toLowerCase().includes(activeFilters.account.toLowerCase()),
+            );
+        }
+        if (activeFilters.enterprise) {
+            filtered = filtered.filter(
+                (config) => config.enterprise?.toLowerCase().includes(activeFilters.enterprise.toLowerCase()),
+            );
+        }
+        if (activeFilters.entity) {
+            filtered = filtered.filter(
+                (config) => config.entity?.toLowerCase().includes(activeFilters.entity.toLowerCase()),
+            );
+        }
+        if (activeFilters.selectedTools && Array.isArray(activeFilters.selectedTools) && activeFilters.selectedTools.length > 0) {
+            filtered = filtered.filter((config) => {
+                // Get the configuration details from the row
+                const configDetails = config.configurationDetails || (config as any).categories || {};
+                // Flatten all selected tools from all categories
+                const allSelectedTools = Object.values(configDetails).flat() as string[];
+                // Check if any of the selected filter tools match any tool in the configuration
+                return activeFilters.selectedTools.some((filterTool: string) =>
+                    allSelectedTools.some((configTool: string) =>
+                        configTool.toLowerCase() === filterTool.toLowerCase()
+                    )
+                );
+            });
+        }
+
+        // Apply sorting only when both column and direction are explicitly set
+        if (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc')) {
+            filtered.sort((a, b) => {
+                let valueA = '';
+                let valueB = '';
+
+                switch (sortColumn) {
+                    case 'account':
+                        valueA = (a.account || '').toString().toLowerCase();
+                        valueB = (b.account || '').toString().toLowerCase();
+                        break;
+                    case 'enterprise':
+                        valueA = (a.enterprise || '').toString().toLowerCase();
+                        valueB = (b.enterprise || '').toString().toLowerCase();
+                        break;
+                    case 'entity':
+                        valueA = (a.entity || '').toString().toLowerCase();
+                        valueB = (b.entity || '').toString().toLowerCase();
+                        break;
+                    case 'configuration':
+                        valueA = (a.configuration || '').toString().toLowerCase();
+                        valueB = (b.configuration || '').toString().toLowerCase();
+                        break;
+                    default:
+                        valueA = '';
+                        valueB = '';
+                        break;
+                }
+
+                if (valueA < valueB) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (valueA > valueB) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [
+        globalSettings, 
+        appliedSearchTerm, 
+        activeFilters, 
+        sortColumn,
+        sortDirection,
+        selectedAccountName,
+        selectedEnterprise
+    ]);
+
+    // Helper functions for filter management
+    const applyFilters = (filters: Record<string, any>) => {
+        setActiveFilters(filters);
+        closeAllDialogs();
+    };
+
+    const clearFilters = () => {
         setActiveFilters({});
     };
 
-    const handleApplyFilters = () => {
-        setActiveFilters({...filterForm});
-        setFilterVisible(false);
+    const applySort = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
     };
 
     const applySorting = (column: string, direction: 'asc' | 'desc') => {
-        // Sort logic will be handled in the component
-        setSortOpen(false);
+        setSortColumn(column);
+        setSortDirection(direction);
+        // Don't close dialog to allow multiple adjustments
+    };
+
+    const applySortAndClose = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        closeAllDialogs();
     };
 
     const clearSorting = () => {
         setSortColumn('');
         setSortDirection('');
+        
+        // Dispatch custom event to clear table sorting
+        const clearEvent = new CustomEvent('clearTableSorting');
+        window.dispatchEvent(clearEvent);
+    };
+
+    const clearSort = () => {
+        clearSorting();
     };
 
     const setGroupByFromLabel = (label: string) => {
-        setActiveGroupLabel(label as any);
-        setGroupOpen(false);
+        if (label === 'Workstream Name' || label === 'None' || label === 'Configuration') {
+            setActiveGroupLabel(label as 'Workstream Name' | 'None' | 'Configuration');
+            if (label === 'Configuration' && groupBySelectedTools.length === 0) {
+                // Don't close if no tools selected yet
+                return;
+            }
+        } else {
+            setActiveGroupLabel('None');
+        }
+        closeAllDialogs();
     };
 
-    // Row squeeze animation sequence for delete
-    const startRowCompressionAnimation = async (entityName: string) => {
-        console.log('🎬 Starting squeeze animation for entity:', entityName);
-        const rowId = `entity-${entityName}`;
+    const clearGroupBy = () => {
+        setActiveGroupLabel('None');
+        setGroupBySelectedTools([]);
+        setGroupByToolsQuery('');
+    };
+
+    // Load User Roles from database. Accept optional filters so we can request groups
+    // for a specific account/enterprise combination: { accountId, accountName, enterpriseId, enterpriseName }
+    const loadGlobalSettings = useCallback(async (filters?: {
+        accountId?: string | null;
+        accountName?: string | null;
+        enterpriseId?: string | null;
+        enterpriseName?: string | null;
+    }) => {
+        setIsLoading(true);
+        try {
+            let url = '/api/global-settings';
+            
+            // Add account/enterprise filtering parameters if provided
+            if (filters && (filters.accountId || filters.accountName || filters.enterpriseId || filters.enterpriseName)) {
+                const params = new URLSearchParams();
+                
+                if (filters.accountId) {
+                    params.append('accountId', filters.accountId);
+                }
+                if (filters.accountName) {
+                    params.append('accountName', filters.accountName);
+                }
+                if (filters.enterpriseId) {
+                    params.append('enterpriseId', filters.enterpriseId);
+                }
+                if (filters.enterpriseName) {
+                    params.append('enterpriseName', filters.enterpriseName);
+                }
+                
+                url += `?${params.toString()}`;
+            }
+
+            console.log('🌐 [API Call] Making request to:', url);
+            console.log('🔍 [API Call] Filters applied:', filters);
+            console.log('🌐 [API Call] Full URL being called:', `${API_BASE || 'http://localhost:3000'}${url}`);
+            
+            // Clear original entity names ref when loading new data to avoid stale entries
+            originalEntityNamesRef.current.clear();
+            
+            const response = await api.get<any>(url);
+            
+            console.log('📥 [API Response] Raw response:', response);
+            console.log('📥 [API Response] Response type:', typeof response);
+            console.log('📥 [API Response] Response keys:', response ? Object.keys(response) : 'null');
+            
+            let settingsData = response;
+            console.log('🔄 [API Processing] Initial settingsData:', settingsData);
+            
+            if (response && typeof response === 'object' && 'data' in response) {
+                settingsData = response.data;
+                console.log('🔄 [API Processing] Extracted data property:', settingsData);
+                if (settingsData && typeof settingsData === 'object' && 'settings' in settingsData) {
+                    settingsData = settingsData.settings;
+                    console.log('🔄 [API Processing] Extracted settings property:', settingsData);
+                }
+            }
+
+            console.log('🔄 [API Processing] Final settingsData:', settingsData);
+            console.log('🔄 [API Processing] settingsData is array?', Array.isArray(settingsData));
+            console.log('🔄 [API Processing] settingsData length:', Array.isArray(settingsData) ? settingsData.length : 'N/A');
+
+            if (settingsData && Array.isArray(settingsData)) {
+                console.log('🔍 [API Processing] Raw settings data from API:', JSON.stringify(settingsData, null, 2));
+                
+                const formattedSettings: GlobalSettingsRow[] = settingsData.map((setting: any, index: number) => {
+                    console.log(`🔍 [API Processing] Processing setting ${index}:`, {
+                        id: setting.id,
+                        account: setting.account || setting.accountName,
+                        enterprise: setting.enterprise || setting.enterpriseName,
+                        entity: setting.entity || setting.entityName,
+                        configuration: setting.configuration,
+                        configurationDetails: setting.configurationDetails,
+                        rawSetting: setting
+                    });
+                    
+                    // Calculate configuration field value from configurationDetails (matching backup file logic)
+                    // API may return configuration as an object (categories) or as a string, or as categories/configurationDetails
+                    const configurationDetails = setting.configurationDetails || setting.categories || 
+                        (typeof setting.configuration === 'object' && setting.configuration !== null ? setting.configuration : {});
+                    const toolCount = Object.values(configurationDetails).reduce(
+                        (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0),
+                        0
+                    );
+                    const configuration = toolCount > 0
+                        ? `${toolCount} tools selected`
+                        : 'Not configured';
+                    
+                    const newSetting: GlobalSettingsRow = {
+                        id: setting.id?.toString() || generateId(),
+                        account: setting.account || setting.accountName || filters?.accountName || selectedAccountName || '',
+                        enterprise: setting.enterprise || setting.enterpriseName || filters?.enterpriseName || selectedEnterprise || '',
+                        entity: setting.entity || setting.entityName || '',
+                        configuration: configuration,
+                        configurationDetails: configurationDetails,
+                        isConfigured: toolCount > 0 || setting.isConfigured || false,
+                    };
+
+                    console.log(`✅ [API Processing] Formatted setting ${index}:`, newSetting);
+
+                    // Track display order
+                    displayOrderRef.current.set(newSetting.id, index);
+                    
+                    // Store original entity name for existing records (not temporary ones)
+                    if (!String(newSetting.id).startsWith('tmp-') && !String(newSetting.id).startsWith('setting-')) {
+                        originalEntityNamesRef.current.set(newSetting.id, newSetting.entity);
+                    }
+
+                    return newSetting;
+                });
+
+                console.log('✅ [API Processing] Setting Global Settings:', formattedSettings);
+                setGlobalSettings(formattedSettings);
+            } else {
+                console.log('❌ [API Processing] No valid settings data found - setting empty array');
+                setGlobalSettings([]);
+            }
+        } catch (error) {
+            console.error('Failed to load Global Settings:', error);
+            setGlobalSettings([]);
+            
+            // Provide specific error feedback based on error type
+            let errorMessage = 'Failed to load Global Settings';
+            if (error && typeof error === 'object') {
+                const err = error as any;
+                if (err.response?.status === 500) {
+                    errorMessage = 'Server error: Unable to load Global Settings. Please try again or contact support.';
+                } else if (err.response?.status === 404) {
+                    errorMessage = 'No Global Settings found for the selected Account and Enterprise combination.';
+                } else if (err.response?.status === 403) {
+                    errorMessage = 'Access denied: You do not have permission to view Global Settings for this Account and Enterprise.';
+                } else if (err.message) {
+                    errorMessage = `Failed to load Global Settings: ${err.message}`;
+                }
+            }
+            
+            // Only show notification on first load failure. Use ref to get latest value.
+            if ((globalSettingsRef.current?.length || 0) === 0) {
+                showBlueNotification(errorMessage, 5000, false);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Load Global Settings on mount and whenever the selected account/enterprise changes.
+    // This ensures that when the top-right account dropdown changes (and the enterprise
+    // selection remains), the table refreshes automatically for that Account+Enterprise.
+    // ALWAYS requires both Account and Enterprise to be selected.
+    useEffect(() => {
+        // Clear any pending timeout
+        if (loadDataTimeoutRef.current) {
+            clearTimeout(loadDataTimeoutRef.current);
+            loadDataTimeoutRef.current = null;
+        }
+
+        // Don't run auto-refresh until localStorage initialization is complete
+        if (!isInitialized) {
+            console.log('🔄 [ManageGlobalSettings] Waiting for initialization...');
+            return;
+        }
+
+        // Debounce the load to handle rapid state updates from multiple events
+        loadDataTimeoutRef.current = setTimeout(() => {
+            // Read enterpriseId from localStorage (some other components keep the id there)
+            const enterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
+
+            // Create a unique key for the current account+enterprise combination
+            const currentCombination = `${selectedAccountId || ''}_${enterpriseId || selectedEnterpriseId || ''}`;
+            
+            // Skip if this combination was already loaded (prevents duplicate API calls)
+            if (currentCombination === lastLoadedCombinationRef.current && currentCombination !== '') {
+                console.log('⏭️ [ManageGlobalSettings] Skipping duplicate load for combination:', currentCombination);
+                return;
+            }
+
+            console.log('🔄 [ManageGlobalSettings] Loading Global Settings with context:', {
+                selectedAccountId,
+                selectedAccountName,
+                selectedEnterprise,
+                enterpriseId,
+                hasAccountId: !!selectedAccountId,
+                hasEnterprise: !!(selectedEnterprise || enterpriseId),
+                isInitialized,
+                currentCombination,
+                lastLoaded: lastLoadedCombinationRef.current
+            });
+
+            // Clear existing data immediately when enterprise/account changes to prevent stale data
+            setGlobalSettings([]);
+
+            // ONLY load data if both account id and enterprise selection exist
+            if (selectedAccountId && (selectedEnterprise || enterpriseId)) {
+                console.log('✅ [ManageGlobalSettings] Both Account and Enterprise selected, loading filtered data');
+                
+                // Update the last loaded combination before making the API call
+                lastLoadedCombinationRef.current = currentCombination;
+                
+                loadGlobalSettings({
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName || null,
+                    enterpriseId: enterpriseId || null,
+                    enterpriseName: selectedEnterprise || null,
+                });
+                return;
+            }
+
+            // Clear table and show message when required context is missing
+            console.log('⚠️ [ManageGlobalSettings] Missing Account or Enterprise selection, clearing table');
+            setGlobalSettings([]);
+            setIsLoading(false);
+            
+            // Reset the last loaded combination when clearing
+            lastLoadedCombinationRef.current = '';
+            
+            // Show a notification to guide user (only after initialization to avoid false warnings)
+            if (!selectedAccountId) {
+                showBlueNotification('Please select an Account from the top-right dropdown to view User Roles', 5000, false);
+            }
+            // Enterprise notification removed - enterprise is now auto-selected based on account licenses
+        }, 100); // 100ms debounce to batch rapid state updates
+
+        // Cleanup timeout on unmount or when dependencies change
+        return () => {
+            if (loadDataTimeoutRef.current) {
+                clearTimeout(loadDataTimeoutRef.current);
+                loadDataTimeoutRef.current = null;
+            }
+        };
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, isInitialized, loadGlobalSettings]);
+    
+    // Load dropdown options whenever globalSettings changes - use a ref to prevent infinite loops
+    const dropdownOptionsLoadedRef = useRef(false);
+    const globalSettingsCountRef = useRef(0);
+    useEffect(() => {
+        if (!isLoading && globalSettings.length > 0 && 
+            (globalSettings.length !== globalSettingsCountRef.current || !dropdownOptionsLoadedRef.current)) {
+            globalSettingsCountRef.current = globalSettings.length;
+            dropdownOptionsLoadedRef.current = true;
+            loadDropdownOptions();
+        }
+    }, [globalSettings.length, loadDropdownOptions, isLoading]);
+    
+    // Clear auto-save timer on component unmount - exactly like Manage Users
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // Effect to detect AI panel collapse state by observing its width - exactly like Manage Users
+    useEffect(() => {
+        const detectAIPanelState = () => {
+            // Look for the AI panel by finding the motion.div with width animations
+            const aiPanel = document.querySelector('[class*="w-\\[300px\\]"], [class*="w-16"]') as HTMLElement;
+            if (aiPanel) {
+                const computedStyle = window.getComputedStyle(aiPanel);
+                const width = parseInt(computedStyle.width);
+                const isCollapsed = width <= 80; // 64px + some margin for safety
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel width detected:', width, 'Collapsed:', isCollapsed);
+            }
+        };
+
+        // Create a ResizeObserver to watch for AI panel width changes
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                const isCollapsed = width <= 80;
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel resized to:', width, 'Collapsed:', isCollapsed);
+            }
+        });
+
+        // Find and observe the AI panel
+        const findAndObserveAIPanel = () => {
+            // Look for the AI panel container
+            const aiPanelContainer = document.querySelector('.order-1.lg\\:order-2') as HTMLElement;
+            if (aiPanelContainer) {
+                const aiPanel = aiPanelContainer.querySelector('div') as HTMLElement;
+                if (aiPanel) {
+                    resizeObserver.observe(aiPanel);
+                    detectAIPanelState(); // Initial detection
+                    console.log('🤖 AI Panel observer attached');
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Try to find the panel immediately
+        if (!findAndObserveAIPanel()) {
+            // If not found, try again after a short delay
+            const timeoutId = setTimeout(() => {
+                findAndObserveAIPanel();
+            }, 500);
+
+            return () => {
+                clearTimeout(timeoutId);
+                resizeObserver.disconnect();
+            };
+        }
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, []);
+
+    // Function to check if there's a blank row - exactly like Manage Users
+    const hasBlankRow = () => {
+        return globalSettings.some((setting) => {
+            const isTemporary = String(setting.id).startsWith('tmp-');
+            const isEmpty = !setting.entity;
+            return isTemporary && isEmpty;
+        });
+    };
+
+    // Function to validate incomplete rows and return validation details - exactly like Manage Users
+    const validateIncompleteRows = () => {
+        // Get all temporary (unsaved) rows
+        const temporaryRows = globalSettings.filter((role: any) => 
+            String(role.id).startsWith('tmp-')
+        );
+
+        // Get all existing rows
+        const existingRows = globalSettings.filter((role: any) => 
+            !String(role.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows
+        // In Global Settings, Entity Name is the only mandatory field
+        // A row is incomplete if Entity Name is missing
+        // Note: We want to catch ALL temporary rows without Entity Name, including completely blank ones
+        // because hasBlankRow() only prevents adding if there's ONE blank row, but we want to prevent
+        // adding if there are ANY incomplete rows (including multiple blank rows)
+        const incompleteTemporaryRows = temporaryRows.filter((setting: any) => {
+            const hasEntity = setting.entity?.trim();
+            // Any temporary row without Entity Name is incomplete
+            return !hasEntity;
+        });
+
+        // Check for incomplete existing rows
+        // Existing rows should always have Entity Name, but check anyway
+        const incompleteExistingRows = existingRows.filter((setting: any) => {
+            const hasEntity = setting.entity?.trim();
+            // If Entity Name is missing, it's incomplete
+            return !hasEntity;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        if (incompleteRows.length > 0) {
+            const missingFields = new Set<string>();
+            incompleteRows.forEach((setting) => {
+                if (!setting.entity?.trim()) missingFields.add('Workstream Name');
+            });
+            
+            const incompleteCount = incompleteRows.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
+            
+            return {
+                hasIncomplete: true,
+                incompleteRows,
+                message
+            };
+        }
+        
+        return {
+            hasIncomplete: false,
+            incompleteRows: [],
+            message: ''
+        };
+    };
+
+    // Handle adding new User Role row
+    const handleAddNewRow = () => {
+        console.log('➕ Add new row requested');
+        
+        // Clear any pending autosave to prevent blank rows from being saved
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setAutoSaveCountdown(null);
+        setIsAutoSaving(false);
+        
+        // Check if there's already a blank row
+        if (hasBlankRow()) {
+            showBlueNotification(
+                'Please complete the existing blank row before adding a new one.',
+                3000,
+                false // No checkmark for error message
+            );
+            return;
+        }
+
+        // Check for incomplete rows before adding new row
+        const validation = validateIncompleteRows();
+        if (validation.hasIncomplete) {
+            // Show validation modal - exactly like Manage User Roles
+            setValidationMessage(validation.message);
+            setShowValidationErrors(true);
+            setIncompleteRows(validation.incompleteRows.map((r: any) => r.id));
+            setShowValidationModal(true);
+            
+            return;
+        }
+        
+        const newRole: GlobalSettingsRow = {
+            id: `tmp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            account: selectedAccountName || '',
+            enterprise: selectedEnterprise || '',
+            entity: '',
+            configuration: '',
+            configurationDetails: {},
+            isConfigured: false,
+        };
+        
+        // Add to end of array with display order
+        displayOrderRef.current.set(newRole.id, Date.now());
+        
+        setGlobalSettings([...globalSettings, newRole]);
+        
+        // Clear validation errors when adding a new row to ensure new rows start with normal styling
+        if (showValidationErrors) {
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
+        }
+        
+        console.log('➕ Added new blank row:', newRole.id);
+    };
+
+    // Ref to store the autosave function
+    const debouncedAutoSaveRef = useRef<(() => void) | null>(null);
+
+    // Handle field updates
+    const handleUpdateField = useCallback((rowId: string, field: string, value: any) => {
+        console.log('🔄 handleUpdateField called:', { rowId, field, value });
+        
+        // First, update the state
+        let updatedGroup: GlobalSettingsRow | null = null;
+        setGlobalSettings(prev => {
+            // Always create new array and new objects for React to detect changes
+            return prev.map(setting => {
+                if (setting.id === rowId) {
+                    // Track if this is an existing record (not temporary)
+                    if (!String(rowId).startsWith('tmp-')) {
+                        setModifiedExistingRecords((prevModified) => {
+                            const newSet = new Set(prevModified);
+                            newSet.add(String(rowId));
+                            return newSet;
+                        });
+                    }
+                    
+                    // Create new object with updated field
+                    updatedGroup = { ...setting, [field]: value };
+                    
+                    // If configurationDetails was updated, recalculate configuration field (matching backup file logic)
+                    if (field === 'configurationDetails' && updatedGroup) {
+                        const configurationDetails = value || {};
+                        const toolCount = Object.values(configurationDetails).reduce(
+                            (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0),
+                            0
+                        );
+                        updatedGroup.configuration = toolCount > 0
+                            ? `${toolCount} tools selected`
+                            : 'Not configured';
+                        updatedGroup.isConfigured = toolCount > 0;
+                    }
+                    
+                    return updatedGroup;
+                }
+                return setting; // Return same reference for unchanged rows
+            });
+        });
+        
+        // Check if all mandatory fields are now filled for this row
+        if (updatedGroup) {
+            // For global settings, only Entity Name is mandatory
+            const hasEntity = (updatedGroup as any).entity?.trim() && (updatedGroup as any).entity.trim().length > 0;
+            
+            const isComplete = hasEntity;
+            
+            console.log('🔍 Checking if row is complete after update:', {
+                rowId,
+                field,
+                value,
+                hasEntity,
+                isComplete
+            });
+            
+            // Don't trigger autosave when entity name is entered
+            // Autosave will be triggered only after:
+            // 1. Saving configuration in the modal (coming back to main screen)
+            // 2. Manually clicking save button
+            // Clear autosave timer if row becomes incomplete
+            if (!isComplete) {
+                console.log('⏸️ Not all mandatory fields filled - clearing autosave timer if exists');
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                    autoSaveTimerRef.current = null;
+                    setAutoSaveCountdown(null);
+                    if (countdownIntervalRef.current) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownIntervalRef.current = null;
+                    }
+                }
+            } else {
+                console.log('✅ All mandatory fields filled - autosave will trigger after saving configuration in modal');
+            }
+        }
+    }, []);
+
+    // Row squeeze animation sequence - exactly like Manage Users
+    const startRowCompressionAnimation = async (rowId: string) => {
+        console.log('🎬 Starting squeeze animation for row:', rowId);
 
         // Step 1: Squeeze the row horizontally with animation
         setCompressingRowId(rowId);
@@ -1154,455 +1193,1311 @@ const InlineEntities = forwardRef<
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Step 3: Show confirmation modal
-        onRequestDelete(entityName);
+        setPendingDeleteRowId(rowId);
+        setShowDeleteConfirmation(true);
         setFoldingRowId(null);
     };
 
-    const handleSaveAll = async () => {
-        if (
-            isAutoSaving ||
-            !accountId ||
-            !accountName ||
-            !enterpriseId ||
-            !enterpriseName
-        ) {
-            console.log('⚠️ Missing account/enterprise info or already saving');
+    // Handle delete confirmation
+    const handleDeleteClick = (groupId: string) => {
+        startRowCompressionAnimation(groupId);
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingDeleteRowId) return;
+        
+        setDeletingRow(true);
+        try {
+            console.log('🗑️ Deleting User Role:', pendingDeleteRowId);
+            
+            // Add a small delay to show the loading state
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Find the role to be deleted for debugging
+            const settingToDelete = globalSettings.find(s => s.id === pendingDeleteRowId);
+            console.log('📄 Global Setting data to delete:', settingToDelete);
+
+            // Delete from database via API (only if not a temporary row)
+            if (!String(pendingDeleteRowId).startsWith('tmp-') && settingToDelete) {
+                try {
+                    // Build delete URL with query parameters
+                    const deleteParams = new URLSearchParams();
+                    if (selectedAccountId) deleteParams.append('accountId', selectedAccountId);
+                    if (selectedAccountName) deleteParams.append('accountName', selectedAccountName);
+                    if (selectedEnterpriseId) deleteParams.append('enterpriseId', selectedEnterpriseId);
+                    if (selectedEnterprise) deleteParams.append('enterpriseName', selectedEnterprise);
+                    
+                    const deleteUrl = `/api/global-settings/${settingToDelete.entity}?${deleteParams.toString()}`;
+                    console.log('🗑️ Deleting Global Setting with URL:', deleteUrl);
+                    
+                    await api.del(deleteUrl);
+                    console.log('✅ Global Setting deleted from database via API');
+                } catch (error) {
+                    console.error('❌ Error deleting Global Setting from database:', error);
+                    throw new Error('Failed to delete Global Setting from database');
+                }
+            } else {
+                console.log('ℹ️ Temporary row - only removing from frontend state and localStorage');
+                // Remove temporary row from localStorage if needed
+                const storedGroups = localStorage.getItem('user-groups-data');
+                if (storedGroups) {
+                    try {
+                        const groupsData = JSON.parse(storedGroups);
+                        const updatedGroupsData = groupsData.filter((g: any) => g.id !== pendingDeleteRowId);
+                        localStorage.setItem('user-groups-data', JSON.stringify(updatedGroupsData));
+                        console.log('✅ Temporary User Role deleted from localStorage');
+                    } catch (error) {
+                        console.error('Error updating localStorage:', error);
+                    }
+                }
+            }
+
+            // Remove from local state
+            setGlobalSettings((prev) => {
+                const updated = prev.filter((role) => role.id !== pendingDeleteRowId);
+                // Apply stable sorting to maintain display order
+                return sortConfigsByDisplayOrder(updated);
+            });
+
+            console.log('✅ Global Setting deleted successfully');
+            
+            // Show success notification
+            showBlueNotification('Successfully deleted 1 entries.');
+
+            // Close modal and reset state
+            setShowDeleteConfirmation(false);
+            setPendingDeleteRowId(null);
+            setCompressingRowId(null);
+            setFoldingRowId(null);
+        } catch (error) {
+            console.error('❌ Failed to delete Global Setting:', error);
+            console.error('❌ Full error details:', {
+                error,
+                pendingDeleteRowId,
+                storageType: 'database'
+            });
+            
+            // Log the specific error message if available
+            if (error instanceof Error) {
+                console.error('❌ Error message:', error.message);
+            }
+            
+            // Show error notification
+            showBlueNotification('Failed to delete Global Setting. Please try again.', 5000, false);
+        } finally {
+            setDeletingRow(false);
+        }
+    };
+
+    // Auto-save new User Role when all required fields are filled - exactly like Manage Users
+    const autoSaveNewGlobalSetting = async (tempRowId: string, updatedSetting?: any) => {
+        console.log('🚀 autoSaveNewGlobalSetting function called with tempRowId:', tempRowId);
+
+        // Mark row as saving
+        setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
+
+        // Use the provided updated setting or find it from current ref state
+        const setting = updatedSetting || globalSettingsRef.current.find((g) => g.id === tempRowId);
+        if (!setting) {
+            console.error('❌ Global Setting not found for auto-save:', tempRowId);
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
             return;
         }
 
-        setIsAutoSaving(true);
-        setAutoSaveCountdown(null);
+        console.log('💾 Auto-saving new Global Setting:', setting);
 
-        try {
-            console.log('💾 Saving all entities to DynamoDB...');
+        // Check for duplicate entry (same entity name for the same account and enterprise)
+        const isDuplicate = globalSettingsRef.current.some((existingSetting) => {
+            // Skip the current temporary row being saved
+            if (existingSetting.id === tempRowId) return false;
+            
+            // Check if entity name matches for the same account and enterprise
+            return existingSetting.entity?.toLowerCase().trim() === setting.entity?.toLowerCase().trim() &&
+                   existingSetting.account?.toLowerCase().trim() === setting.account?.toLowerCase().trim() &&
+                   existingSetting.enterprise?.toLowerCase().trim() === setting.enterprise?.toLowerCase().trim();
+        });
 
-            // Prepare entities for batch save
-            const entitiesToSave = options.map((entityName) => ({
-                entityName,
-                configuration: selectionsByEntity[entityName] || {
-                    plan: [],
-                    code: [],
-                    build: [],
-                    test: [],
-                    release: [],
-                    deploy: [],
-                },
-            }));
-
-            // Call batch-save API
-            await api.post('/api/global-settings/batch-save', {
-                accountId,
-                accountName,
-                enterpriseId,
-                enterpriseName,
-                entities: entitiesToSave,
-            });
-
-            console.log('✅ All entities saved successfully');
-
-            // Show success animation
-            setShowAutoSaveSuccess(true);
-            setTimeout(() => {
-                setShowAutoSaveSuccess(false);
-            }, 2000);
-
-            // Reload entities to ensure consistency
-            await loadEntities();
-        } catch (error) {
-            console.error('❌ Error saving:', error);
-            alert('Failed to save entities. Please try again.');
-        } finally {
+        if (isDuplicate) {
+            console.error('❌ Duplicate entry detected - Global Setting with same Entity Name, Account, and Enterprise already exists');
+            
+            // Mark that duplicate was detected (to suppress generic error notification)
+            duplicateDetectedRef.current = true;
+            
+            // Clear autosave timer and countdown
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+            setAutoSaveCountdown(null);
             setIsAutoSaving(false);
+            
+            // Show duplicate modal
+            setDuplicateMessage(
+                `This combination of Workstream Name (${setting.entity}), Account (${setting.account}), and Enterprise (${setting.enterprise}) already exists in another row. Please use a different combination.`
+            );
+            setShowDuplicateModal(true);
+            
+            // Don't save the duplicate - return early instead of throwing error
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+            return; // Exit early without saving
+        }
+
+        // Check if a setting with this entity name already exists in the database (created via + Add button)
+        console.log('🔍 [AutoSave] Checking if setting exists in database:', setting.entity);
+        const checkQueryParams = new URLSearchParams();
+        checkQueryParams.append('entityName', setting.entity);
+        if (selectedAccountId) checkQueryParams.append('accountId', selectedAccountId);
+        if (selectedAccountName) checkQueryParams.append('accountName', selectedAccountName);
+        if (selectedEnterpriseId) checkQueryParams.append('enterpriseId', selectedEnterpriseId);
+        if (selectedEnterprise) checkQueryParams.append('enterpriseName', selectedEnterprise);
+        
+        try {
+            const existingSettingsResponse = await api.get<any[]>(`/api/global-settings?${checkQueryParams.toString()}`);
+            console.log('📦 [AutoSave] Existing settings response:', existingSettingsResponse);
+            
+            const existingSettingsArray = Array.isArray(existingSettingsResponse) ? existingSettingsResponse : [];
+            const exactMatch = existingSettingsArray.find(
+                (s: any) => (s.entityName || s.entity)?.toLowerCase().trim() === setting.entity.toLowerCase().trim()
+            );
+            
+            if (exactMatch) {
+                // setting already exists (created via + Add button), UPDATE it with the filled fields
+                console.log('✅ [AutoSave] Found existing setting created via + Add, updating with fields:', exactMatch.id);
+                // API stores categories in 'configuration' field as an object
+                const categoriesData = setting.configurationDetails || setting.categories || 
+                    (typeof setting.configuration === 'object' && setting.configuration !== null ? setting.configuration : {});
+                const updateData = {
+                    entityName: setting.entity, // Send entity name
+                    entities: [setting.entity], // Also send as entities array (like detail page does)
+                    configuration: categoriesData, // API stores categories in 'configuration' field as object
+                    configurationDetails: categoriesData,
+                    categories: categoriesData, // Also save as categories for compatibility
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                };
+                
+                console.log('📦 [AutoSave] Updating setting with data:', updateData);
+                try {
+                    // Use record ID in the URL path (like the detail page does) to allow entity name updates
+                    await api.put(`/api/global-settings/${exactMatch.id}`, updateData);
+                } catch (error: any) {
+                    // Backend may return empty response - this is okay if the error is JSON parsing related
+                    if (error?.message?.includes('Unexpected end of JSON input')) {
+                        console.log('⚠️ [AutoSave] Backend returned empty response - treating as success');
+                    } else {
+                        throw error; // Re-throw if it's a different error
+                    }
+                }
+                
+                // Get the display order before updating
+                const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+                
+                // Update the row ID in state to use the real database ID
+                setGlobalSettings((prev) => {
+                    const updated = prev.map((g) =>
+                        g.id === tempRowId
+                            ? {...g, id: exactMatch.id, updatedAt: new Date().toISOString()}
+                            : g,
+                    );
+                    // Apply stable sorting to maintain display order
+                    return sortConfigsByDisplayOrder(updated);
+                });
+                
+                // Update display order reference with the new ID
+                if (oldDisplayOrder !== undefined) {
+                    displayOrderRef.current.delete(tempRowId); // Remove old reference
+                    displayOrderRef.current.set(exactMatch.id, oldDisplayOrder); // Add new reference
+                    console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for updated setting ID ${exactMatch.id}`);
+                }
+                
+                // Store original entity name for the updated record
+                originalEntityNamesRef.current.set(exactMatch.id, setting.entity);
+                console.log(`📍 [AutoSave] Stored original entity name for updated record ${exactMatch.id}:`, setting.entity);
+                
+                console.log('✅ [AutoSave] Updated existing setting with filled fields:', exactMatch.id);
+                
+                // Clean up after successful update
+                setSavingRows((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tempRowId);
+                    return newSet;
+                });
+            } else {
+                // setting doesn't exist, CREATE it
+                const newId = `setting-${Date.now()}-${Math.random()}`;
+                // API stores categories in 'configuration' field as an object
+                const categoriesData = setting.configurationDetails || setting.categories || 
+                    (typeof setting.configuration === 'object' && setting.configuration !== null ? setting.configuration : {});
+                const settingData = {
+                    entityName: setting.entity, // API expects entityName, not entity
+                    configuration: categoriesData, // API stores categories in 'configuration' field as object
+                    configurationDetails: categoriesData,
+                    categories: categoriesData, // Also save as categories for compatibility
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                };
+
+                console.log('📡 [AutoSave] Calling API POST /api/global-settings with data:', settingData);
+                const savedSetting = await api.post('/api/global-settings', settingData) as any;
+                console.log('📥 [AutoSave] API Response received:', savedSetting);
+                console.log('📥 [AutoSave] API Response type:', typeof savedSetting);
+                console.log('📥 [AutoSave] API Response has id?', savedSetting?.id);
+                
+                const savedSettingId = savedSetting?.id || newId;
+                console.log('🆔 [AutoSave] Using saved setting ID:', savedSettingId);
+
+                // Verify the API actually returned a real ID from the database
+                if (!savedSetting?.id) {
+                    console.error('⚠️ [AutoSave] WARNING: API did not return an ID. Response:', savedSetting);
+                    showBlueNotification('Failed to save Global Setting - API did not return a valid ID. Please try again.', 5000, false);
+                    setSavingRows((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(tempRowId);
+                        return newSet;
+                    });
+                    return;
+                }
+
+                // Get the display order before updating
+                const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+
+                // Update the accounts state with the new ID
+                setGlobalSettings((prev) => {
+                    const updated = prev.map((s) =>
+                        s.id === tempRowId
+                            ? {...s, id: savedSettingId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                            : s,
+                    );
+                    // Apply stable sorting to maintain display order
+                    return sortConfigsByDisplayOrder(updated);
+                });
+
+                // Update display order reference with the new ID
+                if (oldDisplayOrder !== undefined) {
+                    displayOrderRef.current.delete(tempRowId); // Remove old reference
+                    displayOrderRef.current.set(savedSettingId, oldDisplayOrder); // Add new reference
+                    console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for new Global Setting ID ${savedSettingId}`);
+                }
+                
+                // Store original entity name for the newly created record
+                originalEntityNamesRef.current.set(savedSettingId, setting.entity);
+                console.log(`📍 [AutoSave] Stored original entity name for new record ${savedSettingId}:`, setting.entity);
+
+                console.log('🎉 [AutoSave] New Global Setting saved successfully to database with ID:', savedSettingId);
+                
+                // Clean up after successful save
+                setSavingRows((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(tempRowId);
+                    return newSet;
+                });
+            }
+        } catch (apiError) {
+            console.error('❌ [AutoSave] Failed to save Global Setting to database:', apiError);
+            console.error('❌ [AutoSave] Error details:', JSON.stringify(apiError, null, 2));
+            
+            // Show error notification instead of throwing
+            showBlueNotification('Failed to auto-save Global Setting. Please try saving manually.', 5000, false);
+            
+            // Clean up saving state
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
         }
     };
 
-    // Close dropdowns when clicking outside
+    // Debounced auto-save function with countdown - exactly like Manage Users
+    const debouncedAutoSave = useCallback(async () => {
+        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
+        
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            clearInterval(countdownIntervalRef.current!);
+        }
+
+        // Clear validation errors when auto-save timer starts (user is actively editing)
+        if (showValidationErrors) {
+            console.log('🧹 Clearing validation errors as user is actively editing');
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
+        }
+
+        // Start countdown
+        setAutoSaveCountdown(10);
+        
+        // Countdown interval
+        const countdownInterval = setInterval(() => {
+            setAutoSaveCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(countdownInterval);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        const timer = setTimeout(async () => {
+            try {
+                console.log('🔥 10-second timer triggered - starting auto-save process');
+                
+                // Clear the timer ref immediately since it's now executing - prevents navigation warning
+                autoSaveTimerRef.current = null;
+                console.log('✅ Cleared autoSaveTimerRef - navigation should be allowed during autosave execution');
+                
+                // Reset duplicate detection flag at the start of each autosave
+                duplicateDetectedRef.current = false;
+                
+                setIsAutoSaving(true);
+                setAutoSaveCountdown(null);
+                clearInterval(countdownIntervalRef.current!);
+                countdownIntervalRef.current = null;
+                
+                // Get all temporary (unsaved) rows that are complete using current ref
+                const temporaryRows = globalSettingsRef.current.filter((setting) => {
+                    const isTemp = String(setting.id).startsWith('tmp-');
+                    if (!isTemp) return false;
+                    
+                    // Check if Global Setting row is complete (has Entity Name)
+                    const hasEntity = setting.entity?.trim() && setting.entity.trim().length > 0;
+                    
+                    const isComplete = hasEntity;
+                    
+                    if (isTemp && !isComplete) {
+                        console.log(`🚫 Skipping incomplete temporary Global Setting ${setting.id}:`, {
+                            hasEntity: !!hasEntity,
+                            entityValue: setting.entity
+                        });
+                    }
+                    
+                    return isComplete;
+                });
+                
+                // Get all modified existing records that are still complete
+                const modifiedRows = globalSettingsRef.current.filter((setting) => {
+                    const isExisting = !String(setting.id).startsWith('tmp-');
+                    const isModified = modifiedExistingRecordsRef.current.has(String(setting.id));
+                    
+                    if (isExisting && isModified) {
+                        // Double-check that the record still has all required fields
+                        const hasEntity = setting.entity?.trim();
+                        
+                        const isComplete = hasEntity;
+                        
+                        console.log(`🔍 Checking modified Global Setting ${setting.id}: isComplete=${isComplete}`, {
+                            hasEntity: !!hasEntity,
+                            entityValue: setting.entity
+                        });
+                        
+                        return isComplete;
+                    }
+                    
+                    console.log(`🔍 Checking Global Setting ${setting.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                    return false;
+                });
+                
+            console.log(`📊 Found ${temporaryRows.length} complete temporary Global Settings to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing Global Settings to auto-save`);
+            
+            // Check for orphaned records in modifiedExistingRecords
+            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
+                !globalSettingsRef.current.find(setting => String(setting.id) === recordId)
+            );
+            if (orphanedRecords.length > 0) {
+                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
+                console.log('🧹 Cleaning up orphaned records from modified set');
+                setModifiedExistingRecords(prev => {
+                    const newSet = new Set(prev);
+                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
+                    return newSet;
+                });
+                // Update the ref immediately for this operation
+                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
+                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
+                modifiedExistingRecordsRef.current = cleanedSet;
+            }
+            
+            const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+            if (totalRowsToSave > 0) {
+                console.log('💾 Auto-saving Global Settings after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
+                
+                let successCount = 0;
+                let failureCount = 0;
+                
+                // Save new temporary Global Settings
+                for (const tempRow of temporaryRows) {
+                    console.log(`💾 Auto-saving Global Setting: ${tempRow.id}`);
+                    
+                    // Reset duplicate flag before each save attempt
+                    const duplicateFlagBefore = duplicateDetectedRef.current;
+                    
+                    try {
+                        await autoSaveNewGlobalSetting(tempRow.id);
+                        
+                        // Check if duplicate was detected during save
+                        if (!duplicateDetectedRef.current || duplicateFlagBefore === duplicateDetectedRef.current) {
+                            // Only count as success if no duplicate was detected
+                            successCount++;
+                        } else {
+                            // Duplicate detected - don't count as success or failure
+                            console.log('ℹ️ Duplicate detected - not counting as success or failure');
+                        }
+                    } catch (error) {
+                        console.error(`❌ Failed to auto-save new Global Setting ${tempRow.id}:`, error);
+                        // Only count as failure if not a duplicate (duplicate modal already shown)
+                        if (!duplicateDetectedRef.current) {
+                            failureCount++;
+                        }
+                    }
+                }
+                
+                // Save modified existing User Roles to database via API
+                for (const modifiedRow of modifiedRows) {
+                    console.log(`💾 Saving modified existing User Role: ${modifiedRow.id}`);
+                    try {
+                        // Check for duplicate entry (same roleName + entity + product + service as another record)
+                        const isDuplicate = globalSettingsRef.current.some((existingSetting) => {
+                            // Skip the current row being updated
+                            if (existingSetting.id === modifiedRow.id) return false;
+                            
+                            // Check if entity name matches for the same account and enterprise
+                            return existingSetting.entity?.toLowerCase().trim() === modifiedRow.entity?.toLowerCase().trim() &&
+                                   existingSetting.account?.toLowerCase().trim() === modifiedRow.account?.toLowerCase().trim() &&
+                                   existingSetting.enterprise?.toLowerCase().trim() === modifiedRow.enterprise?.toLowerCase().trim();
+                        });
+
+                        if (isDuplicate) {
+                            console.error(`❌ Duplicate entry detected for autosave update: ${modifiedRow.entity}`);
+                            
+                            // Mark that duplicate was detected (to suppress generic error notification)
+                            duplicateDetectedRef.current = true;
+                            
+                            // Show duplicate modal
+                            setDuplicateMessage(
+                                `This combination of Workstream Name (${modifiedRow.entity}), Account (${modifiedRow.account}), and Enterprise (${modifiedRow.enterprise}) already exists in another row. Please use a different combination.`
+                            );
+                            setShowDuplicateModal(true);
+                            
+                            failureCount++;
+                            continue; // Skip this row
+                        }
+                        
+                        // Get the original entity name for this record (before any edits)
+                        const originalEntityName = originalEntityNamesRef.current.get(modifiedRow.id) || modifiedRow.entity;
+                        const entityNameChanged = modifiedRow.entity !== originalEntityName;
+                        console.log('🔍 [AutoSave Update] Original entity name:', originalEntityName, 'New entity name:', modifiedRow.entity, 'Changed:', entityNameChanged);
+                        
+                        // API stores categories in 'configuration' field as an object
+                        const categoriesData = modifiedRow.configurationDetails || (modifiedRow as any).categories || 
+                            (typeof modifiedRow.configuration === 'object' && modifiedRow.configuration !== null ? modifiedRow.configuration : {});
+                        
+                        // Use record ID in the URL path (like the detail page does) to allow entity name updates
+                        // Send NEW entity name in the payload so the backend can update it
+                        await api.put(`/api/global-settings/${modifiedRow.id}`, {
+                            entityName: modifiedRow.entity, // Send NEW entity name
+                            entities: [modifiedRow.entity], // Also send as entities array (like detail page does)
+                            configuration: categoriesData, // API stores categories in 'configuration' field as object
+                            configurationDetails: categoriesData,
+                            categories: categoriesData, // Also save as categories for compatibility
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        });
+                        
+                        // Update the stored original entity name to the new one after successful update
+                        if (entityNameChanged) {
+                            originalEntityNamesRef.current.set(modifiedRow.id, modifiedRow.entity);
+                            console.log('✅ [AutoSave Update] Updated original entity name reference from', originalEntityName, 'to', modifiedRow.entity);
+                        }
+                        
+                        console.log(`✅ Modified Global Setting ${modifiedRow.id} saved successfully`);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`❌ Failed to save modified Global Setting ${modifiedRow.id}:`, error);
+                        failureCount++;
+                    }
+                }
+                
+                // Clear the modified records tracking only if all saves succeeded
+                if (failureCount === 0) {
+                    setModifiedExistingRecords(new Set());
+                    modifiedExistingRecordsRef.current = new Set();
+                    console.log('✅ Cleared modifiedExistingRecords - no more unsaved changes');
+                }
+                
+                // Show appropriate notification based on results
+                // Don't show any notification if duplicate modal was shown
+                if (duplicateDetectedRef.current && successCount === 0 && failureCount === 0) {
+                    // Only duplicate detected - modal already shown, no notification needed
+                    console.log('ℹ️ Duplicate detected - modal shown, skipping all notifications');
+                } else if (successCount > 0 && failureCount === 0 && !duplicateDetectedRef.current) {
+                    // All succeeded and no duplicates
+                    console.log('✨ Showing auto-save success animation for all entries');
+                    setShowAutoSaveSuccess(true);
+                    
+                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
+                        : temporaryRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new entries`
+                        : `Auto-saved ${modifiedRows.length} updated entries`;
+                    
+                    showBlueNotification(message);
+                    
+                    setTimeout(() => {
+                        console.log('✨ Hiding auto-save success animation');
+                        setShowAutoSaveSuccess(false);
+                    }, 3000);
+                    
+                    console.log(`✅ Auto-saved ${successCount} entries successfully`);
+                    
+                    // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
+                    console.log('🔄 Reloading User Roles after successful autosave to update IDs...');
+                    await loadGlobalSettings({
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    });
+                    
+                    console.log('✅ Reload complete after autosave - checking state:', {
+                        autoSaveTimerRef: autoSaveTimerRef.current,
+                        modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                        userGroupsCount: globalSettingsRef.current.length,
+                        hasTempRows: globalSettingsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                    });
+                } else if (successCount > 0 && failureCount > 0 && !duplicateDetectedRef.current) {
+                    // Partial success and no duplicates
+                    console.warn(`⚠️ Auto-save partial: ${successCount} succeeded, ${failureCount} failed`);
+                    showBlueNotification(`Partially saved: ${successCount} succeeded, ${failureCount} failed. Please try saving manually.`, 8000, false);
+                } else if (failureCount > 0 && !duplicateDetectedRef.current) {
+                    // All failed (but not due to duplicate)
+                    console.error(`❌ All auto-save attempts failed: ${failureCount} errors`);
+                    showBlueNotification(`Failed to auto-save changes. Please save manually.`, 8000, false);
+                }
+                
+                // Reload data immediately after autosave completes to reflect new changes
+                if (successCount > 0) {
+                    console.log('🔄 Reloading data immediately after autosave to reflect new changes...');
+                    loadGlobalSettings({
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    });
+                }
+            } else {
+                console.log('ℹ️ No complete rows to auto-save');
+            }
+            
+            setIsAutoSaving(false);
+            } catch (error) {
+                console.error('❌ Auto-save error:', error);
+                setIsAutoSaving(false);
+            }
+        }, 10000); // 10 seconds
+
+        autoSaveTimerRef.current = timer;
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, showValidationErrors, loadGlobalSettings]);
+
+    // Update the ref whenever debouncedAutoSave changes
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                searchRef.current &&
-                !searchRef.current.contains(event.target as Node) &&
-                filterRef.current &&
-                !filterRef.current.contains(event.target as Node) &&
-                sortRef.current &&
-                !sortRef.current.contains(event.target as Node) &&
-                hideRef.current &&
-                !hideRef.current.contains(event.target as Node) &&
-                groupRef.current &&
-                !groupRef.current.contains(event.target as Node)
-            ) {
-                closeAllDialogs();
+        debouncedAutoSaveRef.current = debouncedAutoSave;
+    }, [debouncedAutoSave]);
+
+    // Function to check for unsaved changes - exactly like Manage Users
+    const getUnsavedChanges = () => {
+        const hasActiveTimer = !!autoSaveTimerRef.current;
+        const hasModifiedRecords = modifiedExistingRecordsRef.current.size > 0;
+        const hasTempRows = globalSettingsRef.current.some((role: any) => 
+            String(role.id).startsWith('tmp-')
+        );
+        
+        const hasUnsavedChanges = hasActiveTimer || hasModifiedRecords || hasTempRows;
+        
+        console.log('🔍 [getUnsavedChanges] Check:', {
+            hasActiveTimer,
+            hasModifiedRecords,
+            modifiedRecordsCount: modifiedExistingRecordsRef.current.size,
+            hasTempRows,
+            tempRowsIds: globalSettingsRef.current.filter(g => String(g.id).startsWith('tmp-')).map(g => g.id),
+            totalGroups: globalSettingsRef.current.length,
+            hasUnsavedChanges
+        });
+        
+        return hasUnsavedChanges;
+    };
+
+    // Function to check for incomplete rows - exactly like Manage Users
+    const getIncompleteRows = () => {
+        const incompleteRows = globalSettings
+            .filter((role: any) => {
+            const hasEntity = role.entity?.trim();
+
+            // Include completely blank rows only when validation is explicitly shown
+            const isCompletelyBlank = !hasEntity;
+            if (isCompletelyBlank && !showValidationErrors) return false;
+
+            // Row is incomplete if any required field is missing
+            const isIncomplete = !hasEntity;
+            
+            console.log('🔍 Row validation check:', {
+                id: role.id,
+                hasEntity,
+                isIncomplete
+            });
+                
+                return isIncomplete;
+            })
+            .map((role: any) => role.id);
+            
+        // Only log when showValidationErrors is true to prevent infinite loops
+        if (showValidationErrors && incompleteRows.length > 0) {
+            console.log('🔍 getIncompleteRows result:', {
+                incompleteRowIds: incompleteRows,
+                totalGroups: globalSettings.length,
+                showValidationErrors,
+                sampleGroupIds: globalSettings.slice(0, 3).map(g => g.id)
+            });
+        }
+        
+        return incompleteRows;
+    };
+
+    // Router interception for navigation prevention - exactly like Manage Users
+    useEffect(() => {
+        // Store reference to original methods
+        const originalPush = router.push;
+        const originalReplace = router.replace;
+        
+        // Store original router for use in navigation confirmation
+        originalRouterRef.current = { push: originalPush, replace: originalReplace };
+
+        // Override router.push to intercept navigation
+        router.push = (href: string, options?: any) => {
+            // Allow navigation to configuration detail page without showing unsaved changes modal
+            if (typeof href === 'string' && href.includes('/account-settings/global-settings/') && href.includes('?edit=1')) {
+                return originalPush(href, options);
+            }
+            
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - push method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+
+            return originalPush(href, options);
+        };
+
+        router.replace = (href: string, options?: any) => {
+            // Allow navigation to configuration detail page without showing unsaved changes modal
+            if (typeof href === 'string' && href.includes('/account-settings/global-settings/') && href.includes('?edit=1')) {
+                return originalReplace(href, options);
+            }
+            
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - replace method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+            return originalReplace(href, options);
+        };
+
+        // Handle browser history navigation (back/forward buttons)
+        const handlePopState = (event: PopStateEvent) => {
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if ((currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                event.preventDefault();
+                // Push current state back to prevent navigation
+                window.history.pushState(null, '', window.location.href);
+                setIncompleteRows(currentIncompleteRows);
+                setShowNavigationWarning(true);
             }
         };
 
-        document.addEventListener('mousedown', handleClickOutside);
+        // Add history listener for browser navigation
+        window.addEventListener('popstate', handlePopState);
+
+        // Cleanup on unmount
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            router.push = originalPush;
+            router.replace = originalReplace;
+            window.removeEventListener('popstate', handlePopState);
         };
-    }, []);
+    }, [router, userConfirmedLeave]);
 
-    const toggle = (name: string) =>
-        setPicked((p) => ({...p, [name]: !p[name]}));
-
-    const toggleEntitySelection = (
-        entity: string,
-        category: string,
-        option: string,
-    ) => {
-        setSelectionsByEntity((prev) => {
-            const byEntity = {...prev};
-            const current = byEntity[entity]?.[category] || [];
-            const exists = current.includes(option);
-            const next = exists
-                ? current.filter((o) => o !== option)
-                : [...current, option];
-            byEntity[entity] = {
-                ...(byEntity[entity] || {}),
-                [category]: next,
-            };
-            return byEntity;
-        });
+    // Handle search
+    const handleSearch = () => {
+        setAppliedSearchTerm(searchTerm);
     };
 
-    // Hoverable summary pill for Pending/Configured state
-    const SelectionPill = ({entity}: {entity: string}) => {
-        const s = selectionsByEntity[entity] || {};
-        const total = Object.values(s).reduce(
-            (acc, arr) => acc + ((arr as unknown as string[])?.length || 0),
-            0,
-        );
-        const entries = Object.entries(CATEGORY_OPTIONS).map(([cat]) => ({
-            cat,
-            count: ((s as any)[cat] || []).length,
-        }));
-        const sum = entries.reduce((a, b) => a + b.count, 0) || 1;
-        const [open, setOpen] = useState(false);
-        const [coords, setCoords] = useState<{
-            top: number;
-            left: number;
-        } | null>(null);
-        const closeTimer = useRef<number | null>(null);
-        const clearCloseTimer = () => {
-            if (closeTimer.current !== null) {
-                window.clearTimeout(closeTimer.current);
-                closeTimer.current = null;
+    const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
+
+    // Handle save all - exactly like Manage Users
+    const handleSaveAll = async () => {
+        console.log('💾 Save all clicked - validating and saving User Roles...');
+        
+        // Reset duplicate detection flag at the start of manual save
+        duplicateDetectedRef.current = false;
+        
+        // Clear auto-save timer since user is manually saving
+        if (autoSaveTimerRef.current) {
+            console.log('🛑 Manual save clicked - clearing auto-save timer');
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            setAutoSaveCountdown(null);
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
             }
-        };
-        const scheduleClose = () => {
-            clearCloseTimer();
-            closeTimer.current = window.setTimeout(() => setOpen(false), 180);
-        };
-        const stateLabel = total === 0 ? 'Pending' : 'Configured';
-        const stateClass =
-            total === 0
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        return (
-            <>
-                <span
-                    onMouseEnter={(e) => {
-                        clearCloseTimer();
-                        const left = Math.min(
-                            Math.max(12, e.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            e.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen(true);
-                    }}
-                    onMouseLeave={scheduleClose}
-                    onClick={(e) => {
-                        const left = Math.min(
-                            Math.max(12, e.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            e.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen((v) => !v);
-                    }}
-                    onTouchStart={(e) => {
-                        clearCloseTimer();
-                        const touch = e.touches[0];
-                        const left = Math.min(
-                            Math.max(12, touch.clientX + 8),
-                            window.innerWidth - 380,
-                        );
-                        const top = Math.min(
-                            touch.clientY + 12,
-                            window.innerHeight - 220,
-                        );
-                        setCoords({top, left});
-                        setOpen(true);
-                    }}
-                    role='button'
-                    aria-expanded={open}
-                    className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-medium border ${stateClass} cursor-pointer`}
-                >
-                    <span>{stateLabel}</span>
-                    <span className='inline-block h-1 w-1 rounded-full bg-slate-300'></span>
-                    <span>{total} selected</span>
-                    <button
-                        type='button'
-                        aria-label='View selections'
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const left = Math.min(
-                                Math.max(12, e.clientX + 8),
-                                window.innerWidth - 380,
-                            );
-                            const top = Math.min(
-                                e.clientY + 12,
-                                window.innerHeight - 220,
-                            );
-                            setCoords({top, left});
-                            setOpen(true);
-                        }}
-                        className='ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-300'
-                        title='View selections'
-                    >
-                        <svg
-                            className='h-3.5 w-3.5'
-                            viewBox='0 0 24 24'
-                            fill='none'
-                            stroke='currentColor'
-                            strokeWidth='2'
-                        >
-                            <circle cx='12' cy='12' r='9' />
-                            <path d='M12 8v.01M11 12h1v4h1' />
-                        </svg>
-                    </button>
-                </span>
-                {open &&
-                    coords &&
-                    createPortal(
-                        <div
-                            style={{
-                                position: 'fixed',
-                                top: coords.top,
-                                left: coords.left,
-                                zIndex: 10000,
-                            }}
-                            className='rounded-xl border border-slate-200 bg-white shadow-2xl p-4 w-auto min-w-[360px] max-w-[500px] whitespace-normal break-words'
-                            onMouseEnter={clearCloseTimer}
-                            onMouseLeave={scheduleClose}
-                        >
-                            <div className='mb-2 text-xs font-semibold text-secondary'>
-                                Selections for {entity}
-                            </div>
-                            {total === 0 ? (
-                                <div className='rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm leading-relaxed whitespace-normal break-words p-3'>
-                                    No settings configured yet for {entity}.
-                                    Click Configure to select tools per
-                                    category.
-                                </div>
-                            ) : (
-                                <>
-                                    <div className='mb-3 h-2 w-full overflow-hidden rounded-full bg-slate-100'>
-                                        <div className='flex h-full w-full'>
-                                            {entries.map(({cat, count}) => {
-                                                const width = `${Math.max(
-                                                    0,
-                                                    Math.round(
-                                                        (count / sum) * 100,
-                                                    ),
-                                                )}%`;
-                                                return (
-                                                    <div
-                                                        key={cat}
-                                                        title={`${cat}: ${count}`}
-                                                        style={{
-                                                            width,
-                                                            backgroundColor:
-                                                                CATEGORY_COLORS[
-                                                                    cat as keyof typeof CATEGORY_COLORS
-                                                                ],
-                                                        }}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div className='grid grid-cols-2 gap-3'>
-                                        {Object.entries(CATEGORY_OPTIONS).map(
-                                            ([cat]) => {
-                                                const list =
-                                                    (s as any)[cat] || [];
-                                                return (
-                                                    <div
-                                                        key={cat}
-                                                        className='rounded-lg border border-slate-200 p-2'
-                                                    >
-                                                        <div className='mb-1 flex items-center justify-between'>
-                                                            <div className='text-xs font-semibold capitalize text-primary'>
-                                                                {cat}
-                                                            </div>
-                                                            <div className='text-[10px] text-secondary'>
-                                                                {list.length}
-                                                            </div>
-                                                        </div>
-                                                        {list.length === 0 ? (
-                                                            <div className='text-[11px] text-secondary'>
-                                                                None
-                                                            </div>
-                                                        ) : (
-                                                            <div className='flex flex-wrap gap-1'>
-                                                                {list.map(
-                                                                    (
-                                                                        tool: string,
-                                                                    ) => (
-                                                                        <span
-                                                                            key={
-                                                                                tool
-                                                                            }
-                                                                            className='inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-primary'
-                                                                        >
-                                                                            <Icon
-                                                                                name={
-                                                                                    OPTION_ICON[
-                                                                                        tool
-                                                                                    ]
-                                                                                        ?.name ||
-                                                                                    'git'
-                                                                                }
-                                                                                size={
-                                                                                    12
-                                                                                }
-                                                                            />
-                                                                            {
-                                                                                tool
-                                                                            }
-                                                                        </span>
-                                                                    ),
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            },
-                                        )}
-                                    </div>
-                                </>
-                            )}
-                        </div>,
-                        document.body,
-                    )}
-            </>
+        }
+        
+        // Get temporary (unsaved) and existing rows
+        const temporaryRows = globalSettings.filter((role: any) => 
+            String(role.id).startsWith('tmp-')
         );
-    };
-    const save = async () => {
-        const entities = Object.entries(picked)
-            .filter(([, v]) => v)
-            .map(([k]) => k);
-        if (!accountId || !enterpriseName || entities.length === 0) return;
-        await api.post('/api/global-settings', {
-            accountId,
-            accountName,
-            enterpriseName,
-            entities,
-            categories: {
-                plan: [],
-                code: [],
-                build: [],
-                test: [],
-                release: [],
-                deploy: [],
-            },
+        const existingRows = globalSettings.filter((role: any) => 
+            !String(role.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows (including completely blank rows) - exactly like Manage User Roles
+        const incompleteTemporaryRows = temporaryRows.filter((setting: any) => {
+            const hasEntity = setting.entity?.trim();
+
+            // Row is incomplete if Entity Name (mandatory field) is missing (including completely blank rows)
+            return !hasEntity;
         });
-        onCreated();
+
+        // Check for incomplete existing rows (including completely blank rows) - exactly like Manage User Roles
+        const incompleteExistingRows = existingRows.filter((setting: any) => {
+            const hasEntity = setting.entity?.trim();
+
+            // Row is incomplete if Entity Name (mandatory field) is missing (including completely blank rows)
+            return !hasEntity;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRowsData = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        // Get count of modified existing rows
+        const modifiedExistingRowsCount = existingRows.filter((role: any) => 
+            modifiedExistingRecords.has(role.id)
+        ).length;
+        
+        if (temporaryRows.length === 0 && modifiedExistingRowsCount === 0) {
+            showBlueNotification('No unsaved entries to save.', 3000, false);
+            return;
+        }
+
+        if (incompleteRowsData.length > 0) {
+            const allMissingFields = new Set<string>();
+            
+            console.log('🔍 Checking missing fields for incomplete rows:', incompleteRowsData);
+            incompleteRowsData.forEach((setting) => {
+                console.log('📋 Checking setting:', {
+                    id: setting.id,
+                    entity: setting.entity || '(empty)'
+                });
+                
+                // Check for missing fields
+                if (!setting.entity?.trim()) allMissingFields.add('Workstream Name');
+            });
+            
+            console.log('📝 All missing fields:', Array.from(allMissingFields));
+            
+            const incompleteCount = incompleteRowsData.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
+            
+            setValidationMessage(message);
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
+            
+            // Set incomplete row IDs for highlighting
+            const incompleteRowIds = incompleteRowsData.map(r => r.id);
+            console.log('🎯 Setting incomplete row IDs for highlighting:', incompleteRowIds);
+            setIncompleteRows(incompleteRowIds); // Store incomplete row IDs for highlighting
+            
+            setShowValidationModal(true);
+            return;
+        }
+
+        // Save all complete temporary rows
+        try {
+            let savedCount = 0;
+            const completeTemporaryRows = temporaryRows.filter((setting: any) => {
+                const hasEntity = setting.entity?.trim();
+                return hasEntity;
+            });
+            
+            console.log('✅ Complete temporary rows to save:', completeTemporaryRows.length, completeTemporaryRows);
+            
+            // Get complete modified existing rows
+            const completeModifiedRows = existingRows.filter((setting: any) => {
+                const hasEntity = setting.entity?.trim();
+                const isModified = modifiedExistingRecords.has(setting.id);
+                return hasEntity && isModified;
+            });
+            
+            console.log('✅ Complete modified rows to save:', completeModifiedRows.length, completeModifiedRows);
+            
+            let failedCount = 0;
+            
+            // Save temporary rows to database
+            for (const tempGroup of completeTemporaryRows) {
+                try {
+                    // Check for duplicate entry (same entity + account + enterprise)
+                    const isDuplicate = globalSettings.some((existingSetting: any) => {
+                        // Skip the current temporary row being saved
+                        if (existingSetting.id === tempGroup.id) return false;
+                        
+                        // Check if entity name matches for the same account and enterprise
+                        return existingSetting.entity?.toLowerCase().trim() === tempGroup.entity?.toLowerCase().trim() &&
+                               existingSetting.account?.toLowerCase().trim() === tempGroup.account?.toLowerCase().trim() &&
+                               existingSetting.enterprise?.toLowerCase().trim() === tempGroup.enterprise?.toLowerCase().trim();
+                    });
+
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for:', tempGroup.entity);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Workstream Name (${tempGroup.entity}), Account (${tempGroup.account}), and Enterprise (${tempGroup.enterprise}) already exists in another row. Please use a different combination.`
+                        );
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
+                    }
+                    
+                    // Check if a setting with this entity name already exists in the database (created via + Add button)
+                    console.log('🔍 Checking if setting exists in database:', tempGroup.entity);
+                    const queryParams = new URLSearchParams();
+                    queryParams.append('entityName', tempGroup.entity);
+                    if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
+                    if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
+                    if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
+                    if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
+                    
+                    const existingSettingsResponse = await api.get<any[]>(`/api/global-settings?${queryParams.toString()}`);
+                    console.log('📦 Existing settings response:', existingSettingsResponse);
+                    
+                    const existingSettingsArray = Array.isArray(existingSettingsResponse) ? existingSettingsResponse : [];
+                    const exactMatch = existingSettingsArray.find(
+                        (s: any) => (s.entityName || s.entity)?.toLowerCase().trim() === tempGroup.entity.toLowerCase().trim()
+                    );
+                    
+                    if (exactMatch) {
+                        // setting already exists (created via + Add button), UPDATE it with the filled fields
+                        console.log('✅ Found existing setting created via + Add, updating with fields:', exactMatch.id);
+                        
+                        // Preserve existing configuration from database if local state doesn't have it
+                        // API stores categories in 'configuration' field as an object
+                        const existingCategories = (exactMatch as any).categories || exactMatch.configurationDetails || 
+                            (typeof exactMatch.configuration === 'object' && exactMatch.configuration !== null && !Array.isArray(exactMatch.configuration) ? exactMatch.configuration : {});
+                        const localCategories = tempGroup.configurationDetails || (tempGroup as any).categories ||
+                            (typeof tempGroup.configuration === 'object' && tempGroup.configuration !== null && !Array.isArray(tempGroup.configuration) ? tempGroup.configuration : {});
+                        
+                        // Use local configuration if it exists and has data, otherwise preserve existing from database
+                        const categoriesToSave = Object.keys(localCategories).length > 0 ? localCategories : existingCategories;
+                        
+                        const updateData = {
+                            entityName: tempGroup.entity, // Send entity name
+                            entities: [tempGroup.entity], // Also send as entities array (like detail page does)
+                            configuration: categoriesToSave, // API stores categories in 'configuration' field as object
+                            configurationDetails: categoriesToSave,
+                            categories: categoriesToSave, // Also save as categories for compatibility
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        };
+                        
+                        console.log('📦 Updating setting with data (preserving existing configuration):', updateData);
+                        // Use record ID in the URL path (like the detail page does) to allow entity name updates
+                        await api.put(`/api/global-settings/${exactMatch.id}`, updateData);
+                        
+                        // Update the row ID in state to use the real database ID
+                        setGlobalSettings((prev) =>
+                            prev.map((g) =>
+                                g.id === tempGroup.id
+                                    ? {...g, id: exactMatch.id, updatedAt: new Date().toISOString()}
+                                    : g,
+                            ),
+                        );
+                        
+                        // Store original entity name for the updated record
+                        originalEntityNamesRef.current.set(exactMatch.id, tempGroup.entity);
+                        console.log(`📍 [Manual Save] Stored original entity name for updated record ${exactMatch.id}:`, tempGroup.entity);
+                        
+                        savedCount++;
+                        console.log('✅ Updated existing setting with filled fields:', exactMatch.id);
+                    } else {
+                        // setting doesn't exist, CREATE it
+                        const newId = `setting-${Date.now()}-${Math.random()}`;
+                        // API stores categories in 'configuration' field as an object
+                        const categoriesData = tempGroup.configurationDetails || (tempGroup as any).categories ||
+                            (typeof tempGroup.configuration === 'object' && tempGroup.configuration !== null && !Array.isArray(tempGroup.configuration) ? tempGroup.configuration : {});
+                        const settingData = {
+                            entityName: tempGroup.entity, // API expects entityName
+                            configuration: categoriesData, // API stores categories in 'configuration' field as object
+                            configurationDetails: categoriesData,
+                            categories: categoriesData, // Also save as categories for compatibility
+                            accountId: selectedAccountId,
+                            accountName: selectedAccountName,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: selectedEnterprise
+                        };
+                        
+                        console.log('💾 Creating new Global Setting:', settingData);
+                        const savedSetting = await api.post('/api/global-settings', settingData) as any;
+                        const savedSettingId = savedSetting?.id || newId;
+                        
+                        // Update the row ID in state
+                        setGlobalSettings((prev) =>
+                            prev.map((g) =>
+                                g.id === tempGroup.id
+                                    ? {...g, id: savedSettingId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                                    : g,
+                            ),
+                        );
+                        
+                        // Store original entity name for the newly created record
+                        originalEntityNamesRef.current.set(savedSettingId, tempGroup.entity);
+                        console.log(`📍 [Manual Save] Stored original entity name for new record ${savedSettingId}:`, tempGroup.entity);
+                        
+                        savedCount++;
+                        console.log('🎉 New Global Setting saved successfully!');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to save new Global Setting:', error);
+                    failedCount++;
+                }
+            }
+            
+            // Save modified existing rows to database
+            for (const modifiedSetting of completeModifiedRows) {
+                try {
+                    // Check for duplicate entry (same entity + account + enterprise as another record)
+                    const isDuplicate = globalSettings.some((existingSetting: any) => {
+                        // Skip the current row being updated
+                        if (existingSetting.id === modifiedSetting.id) return false;
+                        
+                        // Check if entity name matches for the same account and enterprise
+                        return existingSetting.entity?.toLowerCase().trim() === modifiedSetting.entity?.toLowerCase().trim() &&
+                               existingSetting.account?.toLowerCase().trim() === modifiedSetting.account?.toLowerCase().trim() &&
+                               existingSetting.enterprise?.toLowerCase().trim() === modifiedSetting.enterprise?.toLowerCase().trim();
+                    });
+
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for update:', modifiedSetting.entity);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Workstream Name (${modifiedSetting.entity}), Account (${modifiedSetting.account}), and Enterprise (${modifiedSetting.enterprise}) already exists in another row. Please use a different combination.`
+                        );
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
+                    }
+                    
+                    // Get the original entity name for this record (before any edits)
+                    const originalEntityName = originalEntityNamesRef.current.get(modifiedSetting.id) || modifiedSetting.entity;
+                    const entityNameChanged = modifiedSetting.entity !== originalEntityName;
+                    console.log('🔍 [Update] Original entity name:', originalEntityName, 'New entity name:', modifiedSetting.entity, 'Changed:', entityNameChanged);
+                    
+                    // Preserve existing configuration from database if local state doesn't have it
+                    // First, fetch the current setting from database using record ID to preserve its configuration
+                    let existingConfig = {};
+                    try {
+                        const currentSetting = await api.get<any>(`/api/global-settings/${modifiedSetting.id}?accountId=${selectedAccountId || ''}&accountName=${selectedAccountName || ''}&enterpriseId=${selectedEnterpriseId || ''}&enterpriseName=${selectedEnterprise || ''}`);
+                        if (currentSetting) {
+                            existingConfig = (currentSetting as any).categories || currentSetting.configurationDetails || 
+                                (typeof currentSetting.configuration === 'object' && currentSetting.configuration !== null && !Array.isArray(currentSetting.configuration) ? currentSetting.configuration : {});
+                        }
+                    } catch (error) {
+                        console.log('⚠️ Could not fetch existing configuration using ID, trying with entity name...');
+                        // Fallback to using entity name if ID-based fetch fails
+                        try {
+                            const currentSetting = await api.get<any>(`/api/global-settings/${encodeURIComponent(originalEntityName)}?accountId=${selectedAccountId || ''}&accountName=${selectedAccountName || ''}&enterpriseId=${selectedEnterpriseId || ''}&enterpriseName=${selectedEnterprise || ''}`);
+                            if (currentSetting) {
+                                existingConfig = (currentSetting as any).categories || currentSetting.configurationDetails || 
+                                    (typeof currentSetting.configuration === 'object' && currentSetting.configuration !== null && !Array.isArray(currentSetting.configuration) ? currentSetting.configuration : {});
+                            }
+                        } catch (fallbackError) {
+                            console.log('⚠️ Could not fetch existing configuration, will use local state');
+                        }
+                    }
+                    
+                    // API stores categories in 'configuration' field as an object
+                    const localCategories = modifiedSetting.configurationDetails || (modifiedSetting as any).categories ||
+                        (typeof modifiedSetting.configuration === 'object' && modifiedSetting.configuration !== null && !Array.isArray(modifiedSetting.configuration) ? modifiedSetting.configuration : {});
+                    
+                    // Use local configuration if it exists and has data, otherwise preserve existing from database
+                    const categoriesToSave = Object.keys(localCategories).length > 0 ? localCategories : existingConfig;
+                    
+                    const settingData = {
+                        entityName: modifiedSetting.entity, // Send NEW entity name
+                        entities: [modifiedSetting.entity], // Also send as entities array (like detail page does)
+                        configuration: categoriesToSave, // API stores categories in 'configuration' field as object
+                        configurationDetails: categoriesToSave,
+                        categories: categoriesToSave, // Also save as categories for compatibility
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    };
+                    
+                    console.log('💾 Updating existing Global Setting using record ID:', modifiedSetting.id, 'with new entity name in payload:', modifiedSetting.entity);
+                    // Use record ID in the URL path (like the detail page does) to allow entity name updates
+                    // Send NEW entity name in the payload so the backend can update it
+                    await api.put(`/api/global-settings/${modifiedSetting.id}`, settingData);
+                    
+                    // Update the stored original entity name to the new one after successful update
+                    if (entityNameChanged) {
+                        originalEntityNamesRef.current.set(modifiedSetting.id, modifiedSetting.entity);
+                        console.log('✅ [Update] Updated original entity name reference from', originalEntityName, 'to', modifiedSetting.entity);
+                    }
+                    
+                    // Update the row's updatedAt timestamp in state
+                    setGlobalSettings((prev) =>
+                        prev.map((s) =>
+                            s.id === modifiedSetting.id
+                                ? {...s, updatedAt: new Date().toISOString()}
+                                : s,
+                        ),
+                    );
+                    
+                    savedCount++;
+                    console.log('🎉 Existing Global Setting updated successfully!');
+                } catch (error) {
+                    console.error('❌ Failed to update Global Setting:', error);
+                    console.error('❌ Error details:', error instanceof Error ? error.message : JSON.stringify(error, null, 2));
+                    failedCount++;
+                }
+            }
+            
+            // Clear the modified records tracking after successful saves
+            if (completeModifiedRows.length > 0 && failedCount === 0) {
+                setModifiedExistingRecords(new Set());
+                console.log('✨ Cleared modified records tracking');
+            }
+            
+            if (savedCount > 0 && failedCount === 0) {
+                const newCount = completeTemporaryRows.length;
+                const updatedCount = completeModifiedRows.length;
+                const message = newCount > 0 && updatedCount > 0
+                    ? `Successfully saved ${newCount} new and ${updatedCount} updated entries.`
+                    : newCount > 0
+                    ? `Successfully saved ${newCount} new entries.`
+                    : `Successfully saved ${updatedCount} updated entries.`;
+                
+                showBlueNotification(message);
+                setShowValidationErrors(false); // Clear validation errors on successful save
+                setExternalFieldErrors({});
+                setIncompleteRows([]);
+                
+                // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
+                console.log('🔄 Reloading User Roles after successful manual save to update IDs...');
+                await loadGlobalSettings({
+                    accountId: selectedAccountId,
+                    accountName: selectedAccountName,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: selectedEnterprise
+                });
+                
+                console.log('✅ Reload complete after manual save - checking state:', {
+                    autoSaveTimerRef: autoSaveTimerRef.current,
+                    modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                    userGroupsCount: globalSettingsRef.current.length,
+                    hasTempRows: globalSettingsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                });
+            } else if (duplicateDetectedRef.current && savedCount === 0 && failedCount === 0) {
+                // Only duplicate detected - modal already shown, no notification needed
+                console.log('ℹ️ Duplicate modal shown - skipping all notifications');
+            } else if (savedCount > 0 && failedCount > 0) {
+                // Don't show notification if duplicate modal was shown
+                if (!duplicateDetectedRef.current) {
+                    showBlueNotification(`Partially saved: ${savedCount} succeeded, ${failedCount} failed. Please check console for errors.`, 5000, false);
+                }
+            } else if (failedCount > 0 && !duplicateDetectedRef.current) {
+                // Only show error notification if duplicate modal was NOT shown
+                showBlueNotification(`Failed to save ${failedCount} entries. Please check console for errors.`, 5000, false);
+            } else if (savedCount === 0 && failedCount === 0 && !duplicateDetectedRef.current) {
+                // No failures and no duplicates - just nothing to save
+                showBlueNotification('No complete entries to save.', 3000, false);
+            }
+        } catch (error) {
+            console.error('Failed to save entries:', error);
+            showBlueNotification('Failed to save some entries. Please try again.', 3000, false);
+        }
     };
 
-    if (loading)
-        return <div className='text-sm text-secondary'>Loading entities…</div>;
+    // Filter form state
+    const [filterForm, setFilterForm] = useState({
+        account: '',
+        enterprise: '',
+        entity: '',
+        selectedTools: [] as string[],
+    });
+
+    // Get all available tools from all categories
+    const getAllTools = () => {
+        const toolCategories = {
+            plan: ['Jira', 'Azure DevOps', 'Trello', 'Asana', 'Other'],
+            code: ['GitHub', 'GitLab', 'Azure Repos', 'Bitbucket', 'SonarQube', 'Other'],
+            build: ['Jenkins', 'GitHub Actions', 'CircleCI', 'AWS CodeBuild', 'Google Cloud Build', 'Azure DevOps', 'Other'],
+            test: ['Cypress', 'Selenium', 'Jest', 'Tricentis Tosca', 'Other'],
+            release: ['Argo CD', 'ServiceNow', 'Azure DevOps', 'Other'],
+            deploy: ['Kubernetes', 'Helm', 'Terraform', 'Ansible', 'Docker', 'AWS CodePipeline', 'Cloud Foundry', 'Other'],
+            others: ['Prometheus', 'Grafana', 'Slack', 'Other'],
+        };
+        // Flatten, remove duplicates, and sort
+        const allTools = Array.from(new Set(Object.values(toolCategories).flat()));
+        return allTools.sort();
+    };
+
+    // Update filterFormRef whenever filterForm changes
+    useEffect(() => {
+        filterFormRef.current = filterForm;
+    }, [filterForm]);
+
+    // Track if Clear All was clicked to allow closing filter panel on outside click
+    const filterClearedRef = useRef(false);
+
+    // Filter dropdown suggestions state
+    const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
+    const [showEnterpriseSuggestions, setShowEnterpriseSuggestions] = useState(false);
+    const [showEntitySuggestions, setShowEntitySuggestions] = useState(false);
+    const [selectedToolsQuery, setSelectedToolsQuery] = useState('');
+    
+    const [filteredAccounts, setFilteredAccounts] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEnterprises, setFilteredEnterprises] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEntities, setFilteredEntities] = useState<Array<{id: string; name: string}>>([]);
+    
+    const [selectedAccountIndex, setSelectedAccountIndex] = useState(-1);
+    const [selectedEnterpriseIndex, setSelectedEnterpriseIndex] = useState(-1);
+    const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
+
+    // Apply and clear filter handlers
+    const handleApplyFilters = () => {
+        const filters: Record<string, any> = {};
+        if (filterForm.account) filters.account = filterForm.account;
+        if (filterForm.enterprise) filters.enterprise = filterForm.enterprise;
+        if (filterForm.entity) filters.entity = filterForm.entity;
+        if (filterForm.selectedTools && filterForm.selectedTools.length > 0) filters.selectedTools = filterForm.selectedTools;
+        
+        setActiveFilters(filters);
+        closeAllDialogs();
+        
+        // Reset the cleared flag when panel is closed via Apply
+        filterClearedRef.current = false;
+    };
+
+    const handleClearFilters = () => {
+        setFilterForm({
+            account: '',
+            enterprise: '',
+            entity: '',
+            selectedTools: [],
+        });
+        setActiveFilters({});
+        
+        // Mark that filters were cleared - allow closing on outside click
+        filterClearedRef.current = true;
+    };
+
+    // Handler to show all columns
+    const handleShowAllColumns = () => {
+        setVisibleCols(allCols);
+    };
 
     return (
-        <>
-            {/* Toolbar with all action buttons */}
-            <div className='bg-card border-b border-light py-2'>
-                <div className='flex items-center justify-between'>
-                    <div className='flex items-center gap-2'>
+        <div className='h-full bg-secondary flex flex-col'>
+            {/* Header Section */}
+            <div className='bg-white px-3 py-4 border-b border-slate-200'>
+                <div className='w-full'>
+                    <h1 className='text-2xl font-bold text-slate-900'>
+                        Global Settings
+                    </h1>
+                    <p className='mt-2 text-sm text-slate-600 leading-relaxed'>
+                        Configure system-wide settings and tool selections for accounts, enterprises, and workstreams.
+                    </p>
+                </div>
+            </div>
+
+            {/* Toolbar Section */}
+            <div className='bg-sap-light-gray px-3 py-3 text-primary border-y border-light'>
+                <div className='flex items-center justify-between gap-3'>
+                    <div className='flex items-center gap-3 flex-wrap'>
                         {/* Create New Entity Button */}
                         <button
-                            onClick={async () => {
-                                if (
-                                    !accountId ||
-                                    !accountName ||
-                                    !enterpriseId ||
-                                    !enterpriseName
-                                ) {
-                                    alert(
-                                        'Please select an account and enterprise first',
-                                    );
-                                    return;
-                                }
-
-                                const entityName = prompt('Enter entity name:');
-                                if (!entityName || !entityName.trim()) return;
-
-                                const trimmedName = entityName.trim();
-
-                                // Check if entity already exists
-                                if (options.includes(trimmedName)) {
-                                    alert(
-                                        'Entity with this name already exists',
-                                    );
-                                    return;
-                                }
-
-                                try {
-                                    setLoading(true);
-                                    console.log(
-                                        `🆕 Creating new entity: ${trimmedName}`,
-                                    );
-
-                                    // Create entity in DynamoDB
-                                    await api.post('/api/global-settings', {
-                                        accountId,
-                                        accountName,
-                                        enterpriseId,
-                                        enterpriseName,
-                                        entityName: trimmedName,
-                                        configuration: {
-                                            plan: [],
-                                            code: [],
-                                            build: [],
-                                            test: [],
-                                            release: [],
-                                            deploy: [],
-                                        },
-                                    });
-
-                                    console.log(
-                                        '✅ Entity created successfully',
-                                    );
-
-                                    // Reload entities to reflect the change
-                                    await loadEntities();
-                                } catch (error) {
-                                    console.error(
-                                        '❌ Error creating entity:',
-                                        error,
-                                    );
-                                    alert(
-                                        'Failed to create entity. Please try again.',
-                                    );
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }}
-                            disabled={loading}
+                            onClick={handleAddNewRow}
+                            disabled={isLoading}
                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm ${
-                                loading
+                                isLoading
                                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                     : 'bg-primary-600 text-white hover:bg-primary-700'
                             }`}
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <div className='h-4 w-4 animate-spin'>
                                     <svg
                                         className='h-full w-full'
@@ -1628,7 +2523,7 @@ const InlineEntities = forwardRef<
                                 <PlusIcon className='h-4 w-4' />
                             )}
                             <span className='text-sm'>
-                                {loading ? 'Loading...' : 'Create New Entity'}
+                                {isLoading ? 'Loading...' : 'Create New Workstream'}
                             </span>
                         </button>
 
@@ -1652,7 +2547,7 @@ const InlineEntities = forwardRef<
                                         }
                                     }}
                                     className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
-                                    style={{fontSize: '14px'}}
+                                    style={{ fontSize: '14px' }}
                                 />
                                 {appliedSearchTerm && (
                                     <button
@@ -1663,18 +2558,8 @@ const InlineEntities = forwardRef<
                                         className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
                                         title='Clear search'
                                     >
-                                        <svg
-                                            className='h-4 w-4'
-                                            fill='none'
-                                            viewBox='0 0 24 24'
-                                            stroke='currentColor'
-                                        >
-                                            <path
-                                                strokeLinecap='round'
-                                                strokeLinejoin='round'
-                                                strokeWidth={2}
-                                                d='M6 18L18 6M6 6l12 12'
-                                            />
+                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
                                         </svg>
                                     </button>
                                 )}
@@ -1689,7 +2574,7 @@ const InlineEntities = forwardRef<
                                         ? closeAllDialogs()
                                         : toggleDialog('filter')
                                 }
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
                                     filterVisible ||
                                     Object.keys(activeFilters).length > 0
                                         ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
@@ -1742,423 +2627,207 @@ const InlineEntities = forwardRef<
                                             {/* Account Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Account
+                                                    Workstream
                                                 </label>
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={
-                                                            filterForm.account
-                                                        }
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                account:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Enterprise Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Enterprise
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={
-                                                            filterForm.enterprise
-                                                        }
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                enterprise:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Entity Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Entity
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={
-                                                            filterForm.entity
-                                                        }
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                entity: e.target
-                                                                    .value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Configuration Filter */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Configuration
-                                                </label>
-                                                <div className='relative'>
-                                                    <input
-                                                        type='text'
-                                                        value={
-                                                            filterForm.configuration
-                                                        }
-                                                        onChange={(e) =>
-                                                            setFilterForm({
-                                                                ...filterForm,
-                                                                configuration:
-                                                                    e.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Sort Button */}
-                        <div ref={sortRef} className='relative'>
-                            <button
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    sortOpen ||
-                                    (sortColumn &&
-                                        sortDirection &&
-                                        (sortDirection === 'asc' ||
-                                            sortDirection === 'desc'))
-                                        ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
-                                        : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
-                                }`}
-                                title='Sort'
-                                onClick={() =>
-                                    sortOpen
-                                        ? closeAllDialogs()
-                                        : toggleDialog('sort')
-                                }
-                            >
-                                <ArrowsUpDownIcon
-                                    className={`h-4 w-4 transition-transform duration-300 ${
-                                        sortOpen
-                                            ? 'rotate-180'
-                                            : 'group-hover:rotate-180'
-                                    }`}
-                                />
-                                <span className='text-sm'>Sort</span>
-                                {sortColumn &&
-                                    sortDirection &&
-                                    (sortDirection === 'asc' ||
-                                        sortDirection === 'desc') && (
-                                        <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
-                                    )}
-                                <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
-                            </button>
-                            {sortOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
-                                        <div className='text-xs font-semibold'>
-                                            Sort
-                                        </div>
-                                        {sortColumn && (
-                                            <button
-                                                onClick={clearSorting}
-                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
-                                            >
-                                                Clear
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className='p-3'>
-                                        <div className='space-y-3'>
-                                            {/* Column Selection */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Column
-                                                </label>
-                                                <div className='relative'>
-                                                    <select
-                                                        value={sortColumn}
+                                                        value={filterForm.entity}
                                                         onChange={(e) => {
-                                                            const newColumn =
-                                                                e.target.value;
-                                                            setSortColumn(
-                                                                newColumn,
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                entity: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter entities
+                                                            const filtered = (dropdownOptions.entities || []).filter(entity =>
+                                                                entity.name.toLowerCase().includes(value.toLowerCase())
                                                             );
+                                                            setFilteredEntities(filtered);
+                                                            setShowEntitySuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedEntityIndex(-1);
                                                         }}
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    >
-                                                        <option value=''>
-                                                            Select column...
-                                                        </option>
-                                                        {allCols.map((col) => (
-                                                            <option
-                                                                key={col}
-                                                                value={col}
-                                                            >
-                                                                {
-                                                                    columnLabels[
-                                                                        col
-                                                                    ]
-                                                                }
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Direction Selection */}
-                                            <div>
-                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Direction
-                                                </label>
-                                                <div className='relative'>
-                                                    <select
-                                                        value={sortDirection}
-                                                        onChange={(e) => {
-                                                            const newDirection =
-                                                                e.target
-                                                                    .value as
-                                                                    | 'asc'
-                                                                    | 'desc'
-                                                                    | '';
-                                                            setSortDirection(
-                                                                newDirection,
-                                                            );
-                                                            if (
-                                                                sortColumn &&
-                                                                (newDirection ===
-                                                                    'asc' ||
-                                                                    newDirection ===
-                                                                        'desc')
-                                                            ) {
-                                                                applySorting(
-                                                                    sortColumn,
-                                                                    newDirection,
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => 
+                                                                    prev < filteredEntities.length - 1 ? prev + 1 : prev
                                                                 );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedEntityIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredEntities[selectedEntityIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    entity: selected.name,
+                                                                });
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
                                                             }
                                                         }}
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                    >
-                                                        <option value=''>
-                                                            Select direction...
-                                                        </option>
-                                                        <option value='asc'>
-                                                            Ascending
-                                                        </option>
-                                                        <option value='desc'>
-                                                            Descending
-                                                        </option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Current Sort Display */}
-                                            {sortColumn &&
-                                                sortDirection &&
-                                                (sortDirection === 'asc' ||
-                                                    sortDirection ===
-                                                        'desc') && (
-                                                    <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
-                                                        <span className='font-medium text-blue-800'>
-                                                            {
-                                                                columnLabels[
-                                                                    sortColumn
-                                                                ]
-                                                            }{' '}
-                                                            (
-                                                            {sortDirection ===
-                                                            'asc'
-                                                                ? 'Asc'
-                                                                : 'Desc'}
-                                                            )
-                                                        </span>
-                                                    </div>
-                                                )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Hide Columns Button */}
-                        <div ref={hideRef} className='relative'>
-                            <button
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    hideOpen ||
-                                    visibleCols.length < allCols.length
-                                        ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
-                                        : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
-                                }`}
-                                onClick={() =>
-                                    hideOpen
-                                        ? closeAllDialogs()
-                                        : toggleDialog('hide')
-                                }
-                            >
-                                <EyeSlashIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
-                                <span className='text-sm'>Show/Hide</span>
-                                {visibleCols.length < allCols.length && (
-                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
-                                )}
-                            </button>
-                            {hideOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
-                                        <div className='text-xs font-semibold'>
-                                            Displayed Columns
-                                        </div>
-                                    </div>
-                                    <div className='p-3'>
-                                        <div className='space-y-3'>
-                                            <div>
-                                                <div className='relative'>
-                                                    <input
-                                                        value={hideQuery}
-                                                        onChange={(e) =>
-                                                            setHideQuery(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
-                                                        placeholder='Search columns...'
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowEntitySuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.entity && filteredEntities.length > 0) {
+                                                                setShowEntitySuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
+                                                    {showEntitySuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredEntities.map((entity, index) => (
+                                                                <div
+                                                                    key={entity.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedEntityIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            entity: entity.name,
+                                                                        });
+                                                                        setShowEntitySuggestions(false);
+                                                                        setSelectedEntityIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {entity.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* Columns List */}
-                                        <div className='max-h-40 overflow-auto divide-y divide-light'>
-                                            {allCols
-                                                .filter((c) =>
-                                                    c
-                                                        .toLowerCase()
-                                                        .includes(
-                                                            hideQuery.toLowerCase(),
-                                                        ),
-                                                )
-                                                .map((c) => (
-                                                    <label
-                                                        key={c}
-                                                        className='flex items-center justify-between py-1.5'
-                                                    >
-                                                        <span className='text-sm capitalize'>
-                                                            {columnLabels[c]}
-                                                        </span>
-                                                        <input
-                                                            type='checkbox'
-                                                            checked={visibleCols.includes(
-                                                                c as ColumnType,
-                                                            )}
-                                                            onChange={(e) => {
-                                                                const checked =
-                                                                    e.target
-                                                                        .checked;
-                                                                setVisibleCols(
-                                                                    (prev) => {
-                                                                        if (
-                                                                            checked
-                                                                        )
-                                                                            return Array.from(
-                                                                                new Set(
-                                                                                    [
-                                                                                        ...prev,
-                                                                                        c as ColumnType,
-                                                                                    ],
-                                                                                ),
-                                                                            );
-                                                                        return prev.filter(
-                                                                            (
-                                                                                x,
-                                                                            ) =>
-                                                                                x !==
-                                                                                c,
-                                                                        );
-                                                                    },
-                                                                );
-                                                            }}
-                                                        />
-                                                    </label>
-                                                ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Group By Button */}
-                        <div
-                            ref={groupRef}
-                            className='relative flex items-center'
-                        >
-                            <button
-                                className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    groupOpen || ActiveGroupLabel !== 'None'
-                                        ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
-                                        : 'border-blue-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
-                                }`}
-                                onClick={() =>
-                                    groupOpen
-                                        ? closeAllDialogs()
-                                        : toggleDialog('group')
-                                }
-                            >
-                                <RectangleStackIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
-                                <span className='text-sm'>Group by</span>
-                                {ActiveGroupLabel !== 'None' && (
-                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
-                                )}
-                            </button>
-                            {groupOpen && (
-                                <div className='absolute left-0 top-full z-50 mt-2 w-[240px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
-                                    <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
-                                        <div className='text-xs font-semibold'>
-                                            Group by
-                                        </div>
-                                    </div>
-                                    <div className='p-3'>
-                                        <div className='space-y-3'>
+                                            {/* Selected Tools Filter */}
                                             <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Selected Tools
+                                                </label>
                                                 <div className='relative'>
-                                                    <select
-                                                        value={ActiveGroupLabel}
-                                                        onChange={(e) =>
-                                                            setGroupByFromLabel(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    <div
+                                                        onClick={() => {
+                                                            setShowSelectedToolsDropdown(!showSelectedToolsDropdown);
+                                                            if (!showSelectedToolsDropdown) {
+                                                                setSelectedToolsQuery(''); // Clear search when opening
+                                                            }
+                                                            filterClearedRef.current = false;
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white cursor-pointer min-h-[32px] flex items-center flex-wrap gap-1'
                                                     >
-                                                        <option>None</option>
-                                                        <option>Account</option>
-                                                        <option>
-                                                            Enterprise
-                                                        </option>
-                                                        <option>Entity</option>
-                                                        <option>
-                                                            Configuration
-                                                        </option>
-                                                    </select>
+                                                        {filterForm.selectedTools && filterForm.selectedTools.length > 0 ? (
+                                                            filterForm.selectedTools.map((tool) => (
+                                                                <span
+                                                                    key={tool}
+                                                                    className='inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs'
+                                                                >
+                                                                    {tool}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setFilterForm({
+                                                                                ...filterForm,
+                                                                                selectedTools: filterForm.selectedTools.filter(t => t !== tool),
+                                                                            });
+                                                                        }}
+                                                                        className='hover:text-blue-600'
+                                                                    >
+                                                                        <X className='h-3 w-3' />
+                                                                    </button>
+                                                                </span>
+                                                            ))
+                                                        ) : (
+                                                            <span className='text-gray-400'>Select tools...</span>
+                                                        )}
+                                                    </div>
+                                                    {showSelectedToolsDropdown && (
+                                                        <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                                            <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                                                <div className='text-xs font-semibold'>
+                                                                    Selected Tools
+                                                                </div>
+                                                            </div>
+                                                            <div className='p-3'>
+                                                                <div className='space-y-3'>
+                                                                    <div>
+                                                                        <div className='relative'>
+                                                                            <input
+                                                                                value={selectedToolsQuery}
+                                                                                onChange={(e) =>
+                                                                                    setSelectedToolsQuery(e.target.value)
+                                                                                }
+                                                                                className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                                                placeholder='Search tools...'
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Tools List */}
+                                                                <div className='max-h-40 overflow-auto divide-y divide-light mt-2'>
+                                                                    {getAllTools()
+                                                                        .filter((tool) =>
+                                                                            tool
+                                                                                .toLowerCase()
+                                                                                .includes(
+                                                                                    selectedToolsQuery.toLowerCase(),
+                                                                                ),
+                                                                        )
+                                                                        .map((tool) => {
+                                                                            const isSelected = filterForm.selectedTools?.includes(tool) || false;
+                                                                            return (
+                                                                                <label
+                                                                                    key={tool}
+                                                                                    className='flex items-center justify-between py-1.5 cursor-pointer hover:bg-blue-50'
+                                                                                >
+                                                                                    <span className='text-sm'>
+                                                                                        {tool}
+                                                                                    </span>
+                                                                                    <input
+                                                                                        type='checkbox'
+                                                                                        checked={isSelected}
+                                                                                        onChange={(e) => {
+                                                                                            const checked = e.target.checked;
+                                                                                            const currentTools = filterForm.selectedTools || [];
+                                                                                            if (checked) {
+                                                                                                setFilterForm({
+                                                                                                    ...filterForm,
+                                                                                                    selectedTools: Array.from(
+                                                                                                        new Set([
+                                                                                                            ...currentTools,
+                                                                                                            tool,
+                                                                                                        ]),
+                                                                                                    ),
+                                                                                                });
+                                                                                            } else {
+                                                                                                setFilterForm({
+                                                                                                    ...filterForm,
+                                                                                                    selectedTools: currentTools.filter(
+                                                                                                        (t) => t !== tool,
+                                                                                                    ),
+                                                                                                });
+                                                                                            }
+                                                                                        }}
+                                                                                        className='rounded border-blue-300 text-blue-600 focus:ring-blue-500'
+                                                                                    />
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -2167,1258 +2836,1656 @@ const InlineEntities = forwardRef<
                             )}
                         </div>
 
-                        {/* Save Button */}
+                    {/* Sort Button */}
+                    <div ref={sortRef} className='relative'>
                         <button
-                            onClick={handleSaveAll}
-                            disabled={loading || isAutoSaving}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
-                                loading || isAutoSaving
-                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                    : showAutoSaveSuccess
-                                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
-                                    : autoSaveCountdown
-                                    ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                sortOpen || sortColumn
+                                    ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
                             }`}
-                            title={
-                                isAutoSaving
-                                    ? 'Auto-saving...'
-                                    : autoSaveCountdown
-                                    ? `Auto-saving in ${autoSaveCountdown}s`
-                                    : 'Save all unsaved entries'
+                            onClick={() =>
+                                sortOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('sort')
                             }
                         >
-                            {/* Progress bar animation for auto-save countdown */}
-                            {autoSaveCountdown && (
-                                <div className='absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden'>
-                                    <div
-                                        className='h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear'
-                                        style={{
-                                            width: autoSaveCountdown
-                                                ? `${
-                                                      ((10 -
-                                                          autoSaveCountdown) /
-                                                          10) *
-                                                      100
-                                                  }%`
-                                                : '0%',
-                                        }}
-                                    ></div>
-                                </div>
+                            <ArrowsUpDownIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Sort</span>
+                            {sortColumn && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
                             )}
-
-                            {/* Auto-save success wave animation */}
-                            {showAutoSaveSuccess && (
-                                <div className='absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping'></div>
-                            )}
-
-                            {isAutoSaving ? (
-                                <div className='h-4 w-4 animate-spin'>
-                                    <svg
-                                        className='h-full w-full'
-                                        fill='none'
-                                        viewBox='0 0 24 24'
-                                    >
-                                        <circle
-                                            className='opacity-25'
-                                            cx='12'
-                                            cy='12'
-                                            r='10'
-                                            stroke='currentColor'
-                                            strokeWidth='4'
-                                        />
-                                        <path
-                                            className='opacity-75'
-                                            fill='currentColor'
-                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                                        />
-                                    </svg>
-                                </div>
-                            ) : (
-                                <BookmarkIcon className='h-4 w-4 relative z-10' />
-                            )}
-                            <span className='text-sm relative z-10'>
-                                {isAutoSaving
-                                    ? 'Auto-saving...'
-                                    : autoSaveCountdown
-                                    ? `Save (${autoSaveCountdown}s)`
-                                    : 'Save'}
-                            </span>
                         </button>
+                        {sortOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Sort by
+                                    </div>
+                                    {sortColumn && (
+                                        <button
+                                            onClick={clearSort}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortColumn}
+                                                    onChange={(e) =>
+                                                        setSortColumn(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>
+                                                        Select column...
+                                                    </option>
+                                                    {sortableCols.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {columnLabels[c]}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
 
-                        {/* Copy Settings Button */}
-                        {options.length > 1 && (
-                            <button
-                                onClick={() => {
-                                    if (options.length <= 1) return;
-                                    setCopyFrom(options[0]);
-                                    const targets: Record<string, boolean> = {};
-                                    options
-                                        .filter((x) => x !== options[0])
-                                        .forEach((x) => (targets[x] = true));
-                                    setCopyTargets(targets);
-                                    setCopyOpen(true);
-                                }}
-                                className='inline-flex items-center gap-2 px-3 py-2 rounded-md shadow-sm bg-white hover:bg-slate-50 border border-slate-300 hover:border-blue-400 text-slate-700 hover:text-blue-700 transition-all duration-200'
-                            >
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Direction
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortDirection}
+                                                    onChange={(e) => {
+                                                        const newDirection = e.target.value as 'asc' | 'desc' | '';
+                                                        setSortDirection(newDirection);
+                                                        // Only apply sorting if both column and valid direction are selected
+                                                        if (sortColumn && (newDirection === 'asc' || newDirection === 'desc')) {
+                                                            applySorting(sortColumn, newDirection);
+                                                        }
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select direction...</option>
+                                                    <option value='asc'>
+                                                        Ascending (A-Z, 0-9)
+                                                    </option>
+                                                    <option value='desc'>
+                                                        Descending (Z-A, 9-0)
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Current Sort Display */}
+                                        {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
+                                            <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
+                                                <span className='font-medium text-blue-800'>
+                                                    {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Hide Columns Button */}
+                    <div ref={hideRef} className='relative'>
+                        <button
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                hideOpen || visibleCols.length < allCols.length
+                                    ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                hideOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('hide')
+                            }
+                        >
+                            <EyeSlashIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Show/Hide</span>
+                            {visibleCols.length < allCols.length && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {hideOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Displayed Columns
+                                    </div>
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <div className='relative'>
+                                                <input
+                                                    value={hideQuery}
+                                                    onChange={(e) =>
+                                                        setHideQuery(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Columns List */}
+                                    <div className='max-h-40 overflow-auto divide-y divide-light mt-2'>
+                                        {allCols
+                                            .filter((c) =>
+                                                c
+                                                    .toLowerCase()
+                                                    .includes(
+                                                        hideQuery.toLowerCase(),
+                                                    ),
+                                            )
+                                            .map((c) => (
+                                                <label
+                                                    key={c}
+                                                    className='flex items-center justify-between py-1.5 cursor-pointer hover:bg-blue-50'
+                                                >
+                                                    <span className='text-sm'>
+                                                        {columnLabels[c] || c}
+                                                    </span>
+                                                    <input
+                                                        type='checkbox'
+                                                        checked={visibleCols.includes(c as ColumnType)}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            setVisibleCols((prev) => {
+                                                                if (checked)
+                                                                    return Array.from(
+                                                                        new Set([
+                                                                            ...prev,
+                                                                            c as ColumnType,
+                                                                        ]),
+                                                                    );
+                                                                return prev.filter(
+                                                                    (x) => x !== c,
+                                                                );
+                                                            });
+                                                        }}
+                                                        className='rounded border-blue-300 text-blue-600 focus:ring-blue-500'
+                                                    />
+                                                </label>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Group By Button */}
+                    <div ref={groupRef} className='relative flex items-center'>
+                        <button
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                groupOpen || ActiveGroupLabel !== 'None'
+                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                groupOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('role')
+                            }
+                        >
+                            <RectangleStackIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Group by</span>
+                            {ActiveGroupLabel !== 'None' && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {groupOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Group by
+                                    </div>
+                                    {ActiveGroupLabel !== 'None' && (
+                                        <button
+                                            onClick={clearGroupBy}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (value === 'Configuration') {
+                                                            setActiveGroupLabel('Configuration');
+                                                        } else {
+                                                            setGroupByFromLabel(value || 'None');
+                                                        }
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select column...</option>
+                                                    <option value='Workstream Name'>Workstream Name</option>
+                                                    <option value='Configuration'>Configuration</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Selected Tools Filter - shown when Configuration is chosen */}
+                                        {ActiveGroupLabel === 'Configuration' && (
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Selected Tools
+                                                </label>
+                                                <div className='relative'>
+                                                    <div
+                                                        onClick={() => {
+                                                            setShowGroupByToolsDropdown(!showGroupByToolsDropdown);
+                                                            if (!showGroupByToolsDropdown) {
+                                                                setGroupByToolsQuery('');
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white cursor-pointer min-h-[32px] flex items-center flex-wrap gap-1'
+                                                    >
+                                                        {groupBySelectedTools && groupBySelectedTools.length > 0 ? (
+                                                            groupBySelectedTools.map((tool) => (
+                                                                <span
+                                                                    key={tool}
+                                                                    className='inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs'
+                                                                >
+                                                                    {tool}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setGroupBySelectedTools(groupBySelectedTools.filter(t => t !== tool));
+                                                                        }}
+                                                                        className='hover:text-blue-600'
+                                                                    >
+                                                                        <X className='h-3 w-3' />
+                                                                    </button>
+                                                                </span>
+                                                            ))
+                                                        ) : (
+                                                            <span className='text-gray-400'>Select tools...</span>
+                                                        )}
+                                                    </div>
+                                                    {showGroupByToolsDropdown && (
+                                                        <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                                            <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                                                <div className='text-xs font-semibold'>
+                                                                    Selected Tools
+                                                                </div>
+                                                            </div>
+                                                            <div className='p-3'>
+                                                                <div className='space-y-3'>
+                                                                    <div>
+                                                                        <div className='relative'>
+                                                                            <input
+                                                                                value={groupByToolsQuery}
+                                                                                onChange={(e) =>
+                                                                                    setGroupByToolsQuery(e.target.value)
+                                                                                }
+                                                                                className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                                                placeholder='Search tools...'
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Tools List */}
+                                                                <div className='max-h-40 overflow-auto divide-y divide-light mt-2'>
+                                                                    {getAllTools()
+                                                                        .filter((tool) =>
+                                                                            tool
+                                                                                .toLowerCase()
+                                                                                .includes(
+                                                                                    groupByToolsQuery.toLowerCase(),
+                                                                                ),
+                                                                        )
+                                                                        .map((tool) => {
+                                                                            const isSelected = groupBySelectedTools?.includes(tool) || false;
+                                                                            return (
+                                                                                <label
+                                                                                    key={tool}
+                                                                                    className='flex items-center justify-between py-1.5 cursor-pointer hover:bg-blue-50'
+                                                                                >
+                                                                                    <span className='text-sm'>
+                                                                                        {tool}
+                                                                                    </span>
+                                                                                    <input
+                                                                                        type='checkbox'
+                                                                                        checked={isSelected}
+                                                                                        onChange={(e) => {
+                                                                                            const checked = e.target.checked;
+                                                                                            const currentTools = groupBySelectedTools || [];
+                                                                                            if (checked) {
+                                                                                                setGroupBySelectedTools(Array.from(
+                                                                                                    new Set([
+                                                                                                        ...currentTools,
+                                                                                                        tool,
+                                                                                                    ]),
+                                                                                                ));
+                                                                                            } else {
+                                                                                                setGroupBySelectedTools(currentTools.filter(
+                                                                                                    (t) => t !== tool,
+                                                                                                ));
+                                                                                            }
+                                                                                        }}
+                                                                                        className='rounded border-blue-300 text-blue-600 focus:ring-blue-500'
+                                                                                    />
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Current role Display */}
+                                        {ActiveGroupLabel !== 'None' && (
+                                            <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
+                                                <span className='font-medium text-orange-800'>
+                                                    Grouped by: {ActiveGroupLabel === 'Configuration' && groupBySelectedTools.length > 0 
+                                                        ? `${ActiveGroupLabel} (${groupBySelectedTools.length} tool${groupBySelectedTools.length > 1 ? 's' : ''})`
+                                                        : ActiveGroupLabel}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                        onClick={handleSaveAll}
+                        disabled={isLoading || isAutoSaving}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                            isLoading || isAutoSaving
+                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                : showAutoSaveSuccess
+                                ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                : autoSaveCountdown
+                                ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                        }`}
+                        title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                    >
+                        {/* Progress bar animation for auto-save countdown */}
+                        {autoSaveCountdown && (
+                            <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
+                                    style={{
+                                        width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
+                                    }}
+                                ></div>
+                            </div>
+                        )}
+                        
+                        {/* Auto-save success wave animation */}
+                        {showAutoSaveSuccess && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
+                        )}
+                        
+                        {isAutoSaving ? (
+                            <div className='h-4 w-4 animate-spin'>
                                 <svg
-                                    className='w-4 h-4'
-                                    viewBox='0 0 24 24'
+                                    className='h-full w-full'
                                     fill='none'
-                                    stroke='currentColor'
-                                    strokeWidth='1.8'
+                                    viewBox='0 0 24 24'
                                 >
-                                    <rect
-                                        x='9'
-                                        y='9'
-                                        width='11'
-                                        height='11'
-                                        rx='2'
+                                    <circle
+                                        className='opacity-25'
+                                        cx='12'
+                                        cy='12'
+                                        r='10'
+                                        stroke='currentColor'
+                                        strokeWidth='4'
                                     />
-                                    <rect
-                                        x='4'
-                                        y='4'
-                                        width='11'
-                                        height='11'
-                                        rx='2'
+                                    <path
+                                        className='opacity-75'
+                                        fill='currentColor'
+                                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                                     />
                                 </svg>
-                                <span className='text-sm'>Copy settings</span>
-                            </button>
+                            </div>
+                        ) : (
+                            <BookmarkIcon className='h-4 w-4 relative z-10' />
+                        )}
+                        <span className='text-sm relative z-10'>
+                            {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                        </span>
+                    </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Area */}
+            <div className='flex-1 p-3 overflow-hidden'>
+                <div className='h-full space-y-3'>
+                    {/* User Roles Table */}
+                    <div className='bg-card border border-light rounded-lg p-3 h-full flex flex-col'>
+                        {isLoading ? (
+                            // Loading State
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <div className='mx-auto h-12 w-12 text-primary-600 animate-spin'>
+                                        <svg
+                                            className='h-full w-full'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <circle
+                                                className='opacity-25'
+                                                cx='12'
+                                                cy='12'
+                                                r='10'
+                                                stroke='currentColor'
+                                                strokeWidth='4'
+                                            />
+                                            <path
+                                                className='opacity-75'
+                                                fill='currentColor'
+                                                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                            />
+                                        </svg>
+                                    </div>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        Loading Global Settings configurations
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        Please wait while we fetch your
+                                        Global Settings data...
+                                    </p>
+                                </div>
+                            </div>
+                        ) : globalSettings.length === 0 && !isLoading ? (
+                            // Empty State - No User Roles - exactly like AssignedUserGroupModal
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-6 4h6m-6 4h6'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        No Entity Configured
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        No entities have been created yet for the selected Account and Enterprise combination. Create a new entity to get started.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleAddNewRow}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <PlusIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Create New Workstream
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : visibleCols.length === 0 ? (
+                            // Empty State for Hidden Columns
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        All Columns Hidden
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        All table columns are currently hidden. Click the button below to show all columns.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleShowAllColumns}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <EyeIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Show All Columns
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className='flex-1 overflow-auto'>
+                                <GlobalSettingsTable
+                                    rows={processedConfigs}
+                                    onEdit={(id: string) => console.log('Edit role:', id)}
+                                    onDelete={handleDeleteClick}
+                                    highlightQuery={appliedSearchTerm}
+                                    compressingRowId={compressingRowId}
+                                    foldingRowId={foldingRowId}
+                                    groupByExternal={
+                                        ActiveGroupLabel === 'Configuration' && groupBySelectedTools.length > 0 ? 'selectedTools' :
+                                        ActiveGroupLabel === 'Workstream Name' ? 'entityName' :
+                                        'none'
+                                    }
+                                    groupBySelectedTools={ActiveGroupLabel === 'Configuration' ? groupBySelectedTools : []}
+                                    onGroupByChange={(g: string) => {
+                                        setActiveGroupLabel(
+                                            g === 'selectedTools' ? 'Configuration' :
+                                            g === 'entityName' ? 'Workstream Name' :
+                                            'None'
+                                        );
+                                    }}
+                                    incompleteRowIds={showValidationErrors ? incompleteRows : []}
+                                    showValidationErrors={showValidationErrors}
+                                    externalFieldErrors={externalFieldErrors}
+                                    onAddNewRow={handleAddNewRow}
+                                    enableDropdownChips={true}
+                                    dropdownOptions={dropdownOptions}
+                                    onUpdateField={handleUpdateField}
+                                    onDuplicateDetected={(message: string) => {
+                                        duplicateDetectedRef.current = true;
+                                        setDuplicateMessage(message);
+                                        setShowDuplicateModal(true);
+                                    }}
+                                    visibleColumns={visibleCols}
+                                    externalSortColumn={sortColumn}
+                                    externalSortDirection={sortDirection}
+                                    onSortChange={(column: string, direction: string) => {
+                                        setSortColumn(column);
+                                        setSortDirection(direction as '' | 'asc' | 'desc');
+                                    }}
+                                    onShowAllColumns={handleShowAllColumns}
+                                    selectedEnterpriseName={selectedEnterprise}
+                                    selectedEnterpriseId={selectedEnterpriseId}
+                                    selectedAccountId={selectedAccountId}
+                                    selectedAccountName={selectedAccountName}
+                                    onOpenConfigurationModal={async (row) => {
+                                        // Open configuration panel
+                                        if (row.entity) {
+                                            // Cancel autosave timer when opening configuration panel
+                                            if (autoSaveTimerRef.current) {
+                                                console.log('🛑 Configuration panel opened - clearing auto-save timer');
+                                                clearTimeout(autoSaveTimerRef.current);
+                                                autoSaveTimerRef.current = null;
+                                                setAutoSaveCountdown(null);
+                                                if (countdownIntervalRef.current) {
+                                                    clearInterval(countdownIntervalRef.current);
+                                                    countdownIntervalRef.current = null;
+                                                }
+                                            }
+                                            
+                                            setConfigPanelEntity(row);
+                                            
+                                            // Mark that we're loading data for this entity
+                                            const currentEntityId = `${row.entity}-${row.id}`;
+                                            configPanelDataLoadedRef.current = currentEntityId;
+                                            
+                                            // Pre-populate form immediately with row's configurationDetails to show selections right away
+                                            const rowCategories = row.configurationDetails || 
+                                                (typeof row.configuration === 'object' && row.configuration !== null && !Array.isArray(row.configuration) ? row.configuration : {});
+                                            console.log('🔍 [Config Panel] Pre-populating with row categories:', rowCategories);
+                                            setConfigForm({
+                                                accountId: selectedAccountId || '',
+                                                accountName: selectedAccountName || '',
+                                                enterpriseId: selectedEnterpriseId || '',
+                                                enterpriseName: selectedEnterprise || '',
+                                                entities: [row.entity],
+                                                selections: rowCategories,
+                                            });
+                                            // Set original selections to track changes
+                                            setOriginalConfigSelections(JSON.parse(JSON.stringify(rowCategories)));
+                                            setHasConfigUnsavedChanges(false);
+                                            
+                                            // Open panel after pre-populating
+                                            setIsConfigurationPanelOpen(true);
+                                            
+                                            // Load accounts and enterprises
+                                            try {
+                                                const [accs, ents] = await Promise.all([
+                                                    api.get<Array<{id: string; accountName: string}>>('/api/accounts'),
+                                                    api.get<Array<{id: string; name: string}>>('/api/enterprises'),
+                                                ]);
+                                                setAccounts(accs || []);
+                                                setEnterprises(ents || []);
+                                                
+                                                // Try to load existing configuration
+                                                try {
+                                                    // Use original entity name from ref if available (for edited but unsaved entity names)
+                                                    // This ensures we fetch the correct configuration even if the entity name was changed locally
+                                                    const originalEntityName = originalEntityNamesRef.current.get(row.id);
+                                                    const entityNameToUse = originalEntityName || row.entity;
+                                                    console.log('🔍 [Config Panel] Using entity name for API call:', {
+                                                        rowId: row.id,
+                                                        currentEntityName: row.entity,
+                                                        originalEntityName: originalEntityName,
+                                                        entityNameToUse: entityNameToUse
+                                                    });
+                                                    
+                                                    const entityName = encodeURIComponent(entityNameToUse);
+                                                    // Include filter parameters to ensure we get the correct data
+                                                    const filterParams = new URLSearchParams({
+                                                        accountId: selectedAccountId || '',
+                                                        accountName: selectedAccountName || '',
+                                                        enterpriseId: selectedEnterpriseId || '',
+                                                        enterpriseName: selectedEnterprise || '',
+                                                    });
+                                                    const response = await api.get<any>(`/api/global-settings/${entityName}?${filterParams.toString()}`);
+                                                    console.log('🔍 [Config Panel] Loading existing configuration response:', response);
+                                                    
+                                                    // Handle both array and object responses
+                                                    // Match by record ID first, then by entity name and account/enterprise
+                                                    const existing = Array.isArray(response) 
+                                                        ? response.find((item: any) => 
+                                                            item.id === row.id || // Match by ID first (most reliable)
+                                                            (item.entityName === entityNameToUse &&
+                                                            item.accountId === selectedAccountId &&
+                                                            item.enterpriseId === selectedEnterpriseId)
+                                                        ) || response[0]
+                                                        : response;
+                                                    
+                                                    console.log('🔍 [Config Panel] Using existing config:', existing);
+                                                    
+                                                    // Load categories from either categories, configurationDetails, or configuration field (API may return configuration as object)
+                                                    const loadedCategories = existing?.categories || existing?.configurationDetails || 
+                                                        (typeof existing?.configuration === 'object' && existing?.configuration !== null && !Array.isArray(existing?.configuration) ? existing.configuration : {});
+                                                    
+                                                    console.log('🔍 [Config Panel] Loaded categories:', loadedCategories);
+                                                    console.log('🔍 [Config Panel] Category keys:', Object.keys(loadedCategories));
+                                                    
+                                                    // Only update if we got valid data from API (existing is not undefined)
+                                                    // AND we're still loading for the same entity (prevent race conditions)
+                                                    // AND if the user hasn't made any unsaved changes yet (check ref for async safety)
+                                                    if (existing && Object.keys(loadedCategories).length > 0 && 
+                                                        configPanelDataLoadedRef.current === currentEntityId && 
+                                                        !hasConfigUnsavedChangesRef.current) {
+                                                        console.log('✅ [Config Panel] Setting form with loaded categories');
+                                                        setConfigForm({
+                                                            accountId: existing?.accountId || selectedAccountId || '',
+                                                            accountName: existing?.accountName || selectedAccountName || '',
+                                                            enterpriseId: existing?.enterpriseId || selectedEnterpriseId || '',
+                                                            enterpriseName: existing?.enterpriseName || selectedEnterprise || '',
+                                                            entities: existing?.entities || [row.entity],
+                                                            selections: loadedCategories,
+                                                        });
+                                                        // Set original selections to track changes
+                                                        setOriginalConfigSelections(JSON.parse(JSON.stringify(loadedCategories)));
+                                                        setHasConfigUnsavedChanges(false);
+                                                        console.log('✅ [Config Panel] Form state set, selections:', loadedCategories);
+                                                    } else if (!existing) {
+                                                        console.log('⚠️ [Config Panel] No existing config found in API, keeping pre-populated data');
+                                                        // Keep the pre-populated data from row (already set above)
+                                                    } else if (configPanelDataLoadedRef.current !== currentEntityId) {
+                                                        console.log('⚠️ [Config Panel] Skipping form update - entity ID mismatch');
+                                                    } else {
+                                                        console.log('⚠️ [Config Panel] Skipping form update - user has unsaved changes');
+                                                    }
+                                                } catch (error) {
+                                                    console.log('⚠️ [Config Panel] No existing config found in API, keeping pre-populated data:', error);
+                                                    // Keep the pre-populated data from row (already set above)
+                                                }
+                                            } catch (error) {
+                                                console.error('Error loading configuration data:', error);
+                                            }
+                                        } else {
+                                            showBlueNotification(
+                                                'Please enter a workstream name before configuring it.',
+                                                3000,
+                                                false
+                                            );
+                                        }
+                                    }}
+                                />
+                            </div>
                         )}
                     </div>
                 </div>
             </div>
-            <div className='flex-1 overflow-auto'>
-                {options.length === 0 ? (
-                    <div className='flex flex-col items-center justify-center py-16 px-4'>
-                        <div className='w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4'>
-                            <svg
-                                className='w-8 h-8 text-blue-500'
-                                fill='none'
-                                stroke='currentColor'
-                                viewBox='0 0 24 24'
-                            >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4'
-                                />
-                            </svg>
-                        </div>
-                        <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-                            No entities yet
-                        </h3>
-                        <p className='text-sm text-gray-600 text-center max-w-md mb-4'>
-                            Get started by creating your first entity. Entities
-                            help you organize and configure tools for different
-                            departments or business units.
-                        </p>
-                        <button
-                            onClick={async () => {
-                                if (
-                                    !accountId ||
-                                    !accountName ||
-                                    !enterpriseId ||
-                                    !enterpriseName
-                                ) {
-                                    alert(
-                                        'Please select an account and enterprise first',
-                                    );
-                                    return;
-                                }
 
-                                const entityName = prompt('Enter entity name:');
-                                if (!entityName || !entityName.trim()) return;
-
-                                const trimmedName = entityName.trim();
-
-                                try {
-                                    setLoading(true);
-                                    console.log(
-                                        `🆕 Creating new entity: ${trimmedName}`,
-                                    );
-
-                                    await api.post('/api/global-settings', {
-                                        accountId,
-                                        accountName,
-                                        enterpriseId,
-                                        enterpriseName,
-                                        entityName: trimmedName,
-                                        configuration: {
-                                            plan: [],
-                                            code: [],
-                                            build: [],
-                                            test: [],
-                                            release: [],
-                                            deploy: [],
-                                        },
-                                    });
-
-                                    console.log(
-                                        '✅ Entity created successfully',
-                                    );
-                                    await loadEntities();
-                                } catch (error) {
-                                    console.error(
-                                        '❌ Error creating entity:',
-                                        error,
-                                    );
-                                    alert(
-                                        'Failed to create entity. Please try again.',
-                                    );
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }}
-                            className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-                        >
-                            <svg
-                                className='w-5 h-5'
-                                fill='none'
-                                stroke='currentColor'
-                                viewBox='0 0 24 24'
-                            >
-                                <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    strokeWidth={2}
-                                    d='M12 4v16m8-8H4'
-                                />
-                            </svg>
-                            Create Your First Entity
-                        </button>
-                    </div>
-                ) : (
-                    <GlobalSettingsTableV2
-                        rows={options.map((entity) => {
-                            const entitySelections =
-                                selectionsByEntity[entity] || {};
-                            const toolCount = Object.values(
-                                entitySelections,
-                            ).reduce(
-                                (sum: number, arr: string[]) =>
-                                    sum + arr.length,
-                                0,
-                            );
-                            const isConfigured =
-                                toolCount > 0 || configuredEntities.has(entity);
-                            return {
-                                id: `entity-${entity}`,
-                                account: accountName,
-                                enterprise: enterpriseName,
-                                entity,
-                                configuration:
-                                    toolCount > 0
-                                        ? `${toolCount} tools selected`
-                                        : 'Not configured',
-                                configurationDetails: entitySelections,
-                                isConfigured,
-                            };
-                        })}
-                        onEdit={(rowId: string) => {
-                            const entity = options.find(
-                                (e) => `entity-${e}` === rowId,
-                            );
-                            if (entity) {
-                                setPicked((p) => ({
-                                    ...p,
-                                    [entity]: true,
-                                }));
-                                setSelectionsByEntity((prev) => ({
-                                    ...prev,
-                                    [entity]: prev[entity] || {},
-                                }));
-                                setConfigureEntity(entity);
-                                setShowConfigurePanel(true);
-                            }
-                        }}
-                        onDelete={(rowId: string) => {
-                            const entity = options.find(
-                                (e) => `entity-${e}` === rowId,
-                            );
-                            if (entity) {
-                                startRowCompressionAnimation(entity);
-                            }
-                        }}
-                        visibleColumns={visibleCols as any}
-                        hideRowExpansion={true}
-                        enableInlineEditing={false}
-                        externalSortColumn={sortColumn}
-                        externalSortDirection={
-                            sortDirection as 'asc' | 'desc' | ''
-                        }
-                        compressingRowId={compressingRowId}
-                        foldingRowId={foldingRowId}
-                    />
-                )}
-            </div>
-            <div className='mt-2 rounded-md border border-blue-200 bg-blue-50 p-2 text-[12px] text-blue-700'>
-                Tip: Configure one entity, then click &quot;Copy settings&quot;
-                to replicate its selections to other entities.
-            </div>
-            <ConfigureEntitySlidingPanel
-                isOpen={showConfigurePanel}
-                entityName={configureEntity || ''}
-                categoryOptions={CATEGORY_OPTIONS}
-                optionIcons={OPTION_ICON}
-                selectionsByEntity={selectionsByEntity}
-                setSelectionsByEntity={setSelectionsByEntity}
-                toggleEntitySelection={toggleEntitySelection}
-                setConfiguredEntities={setConfiguredEntities}
-                onClose={() => {
-                    setShowConfigurePanel(false);
-                    setConfigureEntity(null);
-                }}
-            />
-
-            {false && configureEntity && (
-                <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
-                    <div className='absolute inset-0 bg-black/50 animate-modal-fade'></div>
-                    <div className='relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-light overflow-hidden animate-modal-slide'>
-                        <div className='px-6 py-4 border-b border-light flex items-center justify-between'>
-                            <div>
-                                <div className='text-sm text-secondary'>
-                                    Configure entity
-                                </div>
-                                <h3 className='text-lg font-bold text-primary'>
-                                    {configureEntity}
-                                </h3>
-                            </div>
-                            <button
-                                onClick={() => setConfigureEntity(null)}
-                                className='h-10 w-10 inline-flex items-center justify-center rounded-full border border-light text-secondary hover:bg-slate-100'
-                                aria-label='Close'
-                            >
-                                <svg
-                                    className='w-5 h-5'
-                                    viewBox='0 0 24 24'
-                                    fill='none'
-                                    stroke='currentColor'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth='2'
-                                        d='M6 18L18 6M6 6l12 12'
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className='p-6 space-y-6 max-h-[70vh] overflow-y-auto'>
-                            <div className='rounded-2xl border border-slate-200 overflow-hidden bg-white'>
-                                <table className='min-w-full divide-y divide-slate-100'>
-                                    <thead className='bg-tertiary/40'>
-                                        <tr>
-                                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                                Category
-                                            </th>
-                                            <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                                Tools
-                                            </th>
-                                            <th className='px-6 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className='divide-y divide-slate-100'>
-                                        {Object.entries(CATEGORY_OPTIONS).map(
-                                            ([category, options]) => {
-                                                const selected =
-                                                    selectionsByEntity[
-                                                        configureEntity || ''
-                                                    ]?.[category] || [];
-                                                const isSelected = (
-                                                    opt: string,
-                                                ) => selected.includes(opt);
-                                                return (
-                                                    <tr
-                                                        key={category}
-                                                        className='align-top'
-                                                    >
-                                                        <td className='px-6 py-4 whitespace-nowrap text-sm font-semibold capitalize text-primary'>
-                                                            {category}
-                                                        </td>
-                                                        <td className='px-6 py-4'>
-                                                            <div className='flex flex-wrap gap-3'>
-                                                                {options.map(
-                                                                    (opt) => {
-                                                                        const Active =
-                                                                            isSelected(
-                                                                                opt,
-                                                                            );
-                                                                        return (
-                                                                            <button
-                                                                                key={
-                                                                                    opt
-                                                                                }
-                                                                                type='button'
-                                                                                onClick={(
-                                                                                    e,
-                                                                                ) => {
-                                                                                    const btn =
-                                                                                        e.currentTarget;
-                                                                                    const ripple =
-                                                                                        document.createElement(
-                                                                                            'span',
-                                                                                        );
-                                                                                    ripple.className =
-                                                                                        'gs-ripple';
-                                                                                    btn.appendChild(
-                                                                                        ripple,
-                                                                                    );
-                                                                                    setTimeout(
-                                                                                        () => {
-                                                                                            try {
-                                                                                                btn.removeChild(
-                                                                                                    ripple,
-                                                                                                );
-                                                                                            } catch {}
-                                                                                        },
-                                                                                        560,
-                                                                                    );
-                                                                                    toggleEntitySelection(
-                                                                                        configureEntity as string,
-                                                                                        category,
-                                                                                        opt,
-                                                                                    );
-                                                                                }}
-                                                                                className={`relative inline-flex items-center gap-2 rounded-none border px-3 py-2 text-sm transition-colors duration-150 ${
-                                                                                    Active
-                                                                                        ? 'bg-blue-50 text-primary border-blue-500'
-                                                                                        : 'bg-white text-primary border-slate-300 hover:border-blue-400 hover:bg-blue-50/30'
-                                                                                }`}
-                                                                            >
-                                                                                <div className='h-6 w-6 flex items-center justify-center'>
-                                                                                    <Icon
-                                                                                        name={
-                                                                                            OPTION_ICON[
-                                                                                                opt
-                                                                                            ]
-                                                                                                ?.name ||
-                                                                                            'git'
-                                                                                        }
-                                                                                        size={
-                                                                                            20
-                                                                                        }
-                                                                                        className='text-primary'
-                                                                                    />
-                                                                                </div>
-                                                                                <span>
-                                                                                    {
-                                                                                        opt
-                                                                                    }
-                                                                                </span>
-                                                                                {Active && (
-                                                                                    <svg
-                                                                                        className='gs-corner-check-svg'
-                                                                                        viewBox='0 0 24 24'
-                                                                                        aria-hidden='true'
-                                                                                    >
-                                                                                        <polygon
-                                                                                            points='24,0 24,24 8,0'
-                                                                                            fill='#1d4ed8'
-                                                                                        />
-                                                                                        <path
-                                                                                            d='M10 11 L13 14 L19 8'
-                                                                                            fill='none'
-                                                                                            stroke='white'
-                                                                                            strokeWidth='2.6'
-                                                                                            strokeLinecap='round'
-                                                                                            strokeLinejoin='round'
-                                                                                        />
-                                                                                    </svg>
-                                                                                )}
-                                                                            </button>
-                                                                        );
-                                                                    },
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className='px-6 py-4 whitespace-nowrap text-right'>
-                                                            <div className='inline-flex gap-2'>
-                                                                <button
-                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
-                                                                    onClick={() => {
-                                                                        options.forEach(
-                                                                            (
-                                                                                opt,
-                                                                            ) => {
-                                                                                if (
-                                                                                    !isSelected(
-                                                                                        opt,
-                                                                                    )
-                                                                                ) {
-                                                                                    toggleEntitySelection(
-                                                                                        configureEntity as string,
-                                                                                        category,
-                                                                                        opt,
-                                                                                    );
-                                                                                }
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    <svg
-                                                                        className='w-3.5 h-3.5'
-                                                                        viewBox='0 0 24 24'
-                                                                        fill='none'
-                                                                        stroke='currentColor'
-                                                                    >
-                                                                        <path d='M4 4h16v4H4z' />
-                                                                        <path d='M4 10h12v4H4z' />
-                                                                        <path d='M4 16h8v4H4z' />
-                                                                    </svg>
-                                                                    Select All
-                                                                </button>
-                                                                <button
-                                                                    className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-light bg-white hover:bg-slate-50'
-                                                                    onClick={() => {
-                                                                        options.forEach(
-                                                                            (
-                                                                                opt,
-                                                                            ) => {
-                                                                                if (
-                                                                                    isSelected(
-                                                                                        opt,
-                                                                                    )
-                                                                                ) {
-                                                                                    toggleEntitySelection(
-                                                                                        configureEntity as string,
-                                                                                        category,
-                                                                                        opt,
-                                                                                    );
-                                                                                }
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    <svg
-                                                                        className='w-3.5 h-3.5'
-                                                                        viewBox='0 0 24 24'
-                                                                        fill='none'
-                                                                        stroke='currentColor'
-                                                                    >
-                                                                        <path d='M3 6h18' />
-                                                                        <path d='M8 6l1-2h6l1 2' />
-                                                                        <path d='M6 10v7a2 2 0 002 2h8a2 2 0 002-2v-7' />
-                                                                        <path d='M10 12v5M14 12v5' />
-                                                                    </svg>
-                                                                    Clear
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            },
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
-                            <button
-                                onClick={() => {
-                                    if (configureEntity) {
-                                        setConfiguredEntities((prev) =>
-                                            new Set(prev).add(configureEntity),
-                                        );
-                                    }
-                                    setConfigureEntity(null);
-                                }}
-                                className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg transition-all duration-200'
-                            >
-                                Done
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {copyOpen && (
-                <div className='fixed inset-0 z-50 flex items-end md:items-center justify-center p-4'>
-                    <div className='absolute inset-0 bg-black/50'></div>
-                    <div className='relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-light overflow-hidden'>
-                        <div className='px-6 py-4 border-b border-light'>
-                            <h3 className='text-lg font-bold text-primary'>
-                                Copy settings across entities
-                            </h3>
-                            <p className='text-sm text-secondary mt-1'>
-                                Select a source entity and the target entities
-                                to receive the same settings.
-                            </p>
-                        </div>
-                        <div className='p-6 space-y-6'>
-                            <div>
-                                <label className='block text-sm font-semibold text-primary mb-2'>
-                                    Source entity
-                                </label>
-                                <select
-                                    value={copyFrom}
-                                    onChange={(ev) =>
-                                        setCopyFrom(ev.target.value)
-                                    }
-                                    className='block w-full px-3 py-2.5 border border-light rounded-lg bg-card text-primary'
-                                >
-                                    <option value=''>Select source</option>
-                                    {options.map((name) => (
-                                        <option key={name} value={name}>
-                                            {name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className='block text-sm font-semibold text-primary mb-2'>
-                                    Target entities
-                                </label>
-                                <div className='flex flex-wrap gap-3'>
-                                    {options
-                                        .filter((x) => x !== copyFrom)
-                                        .map((name) => (
-                                            <label
-                                                key={name}
-                                                className='inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-tertiary border-light text-primary'
-                                            >
-                                                <input
-                                                    type='checkbox'
-                                                    checked={
-                                                        !!copyTargets[name]
-                                                    }
-                                                    onChange={(ev) =>
-                                                        setCopyTargets((p) => ({
-                                                            ...p,
-                                                            [name]: ev.target
-                                                                .checked,
-                                                        }))
-                                                    }
-                                                />
-                                                <span className='text-sm'>
-                                                    {name}
-                                                </span>
-                                            </label>
-                                        ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className='px-6 py-4 border-t border-light flex items-center justify-end gap-3 bg-white'>
-                            <button
-                                onClick={() => setCopyOpen(false)}
-                                className='px-4 py-2 text-sm font-medium text-secondary bg-tertiary hover:bg-slate-200 rounded-lg'
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (!copyFrom) return;
-                                    setSelectionsByEntity((prev) => {
-                                        const src = prev[copyFrom] || {};
-                                        const next = {...prev};
-                                        Object.entries(copyTargets)
-                                            .filter(([, v]) => v)
-                                            .forEach(([target]) => {
-                                                if (target === copyFrom) return;
-                                                next[target] = JSON.parse(
-                                                    JSON.stringify(src),
-                                                );
-                                            });
-                                        return next;
-                                    });
-                                    setCopyOpen(false);
-                                    setCopyTargets({});
-                                }}
-                                disabled={
-                                    !copyFrom ||
-                                    !Object.values(copyTargets).some(Boolean)
-                                }
-                                className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark disabled:opacity-50 rounded-lg'
-                            >
-                                Copy
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-});
-
-// Configure Entity Sliding Panel Component
-interface ConfigureEntitySlidingPanelProps {
-    isOpen: boolean;
-    entityName: string;
-    categoryOptions: Record<string, string[]>;
-    optionIcons: Record<string, {name: string}>;
-    selectionsByEntity: Record<string, Record<string, string[]>>;
-    setSelectionsByEntity: React.Dispatch<
-        React.SetStateAction<Record<string, Record<string, string[]>>>
-    >;
-    toggleEntitySelection: (
-        entity: string,
-        category: string,
-        option: string,
-    ) => void;
-    setConfiguredEntities: React.Dispatch<React.SetStateAction<Set<string>>>;
-    onClose: () => void;
-}
-
-function ConfigureEntitySlidingPanel({
-    isOpen,
-    entityName,
-    categoryOptions,
-    optionIcons,
-    selectionsByEntity,
-    setSelectionsByEntity,
-    toggleEntitySelection,
-    setConfiguredEntities,
-    onClose,
-}: ConfigureEntitySlidingPanelProps) {
-    const [activeCategory, setActiveCategory] = useState<string | null>(null);
-
-    // Reset active category when panel opens/closes
-    useEffect(() => {
-        if (!isOpen) {
-            setActiveCategory(null);
-        }
-    }, [isOpen]);
-
-    if (!isOpen || !entityName) return null;
-
-    const handleDone = () => {
-        if (entityName) {
-            setConfiguredEntities((prev) => new Set(prev).add(entityName));
-        }
-        onClose();
-    };
-
-    const handleCategoryClick = (category: string) => {
-        setActiveCategory(category);
-        // Scroll to the category row in the table
-        const element = document.getElementById(`category-${category}`);
-        if (element) {
-            element.scrollIntoView({behavior: 'smooth', block: 'center'});
-        }
-    };
-
-    // Category icons mapping - SVG icons
-    const getCategoryIcon = (category: string) => {
-        const iconMap: Record<string, JSX.Element> = {
-            plan: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'
-                    />
-                </svg>
-            ),
-            code: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4'
-                    />
-                </svg>
-            ),
-            build: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z'
-                    />
-                </svg>
-            ),
-            test: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                    />
-                </svg>
-            ),
-            release: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M13 10V3L4 14h7v7l9-11h-7z'
-                    />
-                </svg>
-            ),
-            deploy: (
-                <svg
-                    className='w-full h-full'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z'
-                    />
-                </svg>
-            ),
-        };
-        return iconMap[category] || iconMap.plan;
-    };
-
-    return (
-        <>
-            <div
-                className='fixed inset-0 bg-black bg-opacity-50 z-40'
-                onClick={onClose}
-            />
-            <div className='fixed inset-y-0 right-0 w-[900px] bg-white shadow-2xl z-50 flex'>
-                {/* Left Sidebar - Dark Blue */}
-                <div
-                    className='w-[220px] relative flex flex-col'
+            {/* Blue-themed Notification Component - Positioned above Save button - exactly like Manage Users */}
+            {showNotification && (
+                <motion.div
+                    initial={{opacity: 0, y: -50, scale: 0.9}}
+                    animate={{opacity: 1, y: 0, scale: 1}}
+                    exit={{opacity: 0, y: -50, scale: 0.9}}
+                    transition={{duration: 0.3, ease: 'easeOut'}}
+                    className={`fixed z-50 max-w-sm notification-above-save ${isAIPanelCollapsed ? 'ai-panel-collapsed' : ''}`}
                     style={{
-                        backgroundImage: 'url(/images/logos/sidebar.png)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
+                        // Position well above the toolbar with significant spacing
+                        // Header height (~80px) + more gap above toolbar (40px)
+                        top: '40px'
+                        // Right positioning handled by CSS classes for consistency
                     }}
                 >
-                    {/* Title */}
-                    <div className='px-4 py-3 border-b border-white/10'>
-                        <h2 className='text-sm font-semibold text-white flex items-center gap-2'>
-                            <span>Configure Entity</span>
-                            <span className='text-blue-300'>·</span>
-                            <span className='text-blue-200 font-normal text-xs'>
-                                {entityName}
-                            </span>
-                        </h2>
-                    </div>
-
-                    {/* Info Section */}
-                    <div className='flex-1 px-4 py-4 overflow-y-auto'>
-                        <div className='space-y-2.5'>
-                            <div className='bg-white/5 border border-white/10 rounded-lg p-2.5'>
-                                <h3 className='text-[11px] font-semibold text-white mb-1'>
-                                    Configuration Guide
-                                </h3>
-                                <p className='text-[10px] text-slate-300 leading-relaxed'>
-                                    Select the tools and services for each
-                                    category that apply to this entity.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className='text-[11px] font-semibold text-white mb-1.5 px-0.5'>
-                                    Categories
-                                </h3>
-                                <div className='space-y-1'>
-                                    {Object.keys(categoryOptions).map(
-                                        (category) => {
-                                            const isActive =
-                                                activeCategory === category;
-                                            const selectedCount =
-                                                selectionsByEntity[
-                                                    entityName
-                                                ]?.[category]?.length || 0;
-                                            const totalCount =
-                                                categoryOptions[category]
-                                                    ?.length || 0;
-
-                                            return (
-                                                <button
-                                                    key={category}
-                                                    onClick={() =>
-                                                        handleCategoryClick(
-                                                            category,
-                                                        )
-                                                    }
-                                                    className={`w-full text-left rounded-md p-2 transition-all duration-200 ${
-                                                        isActive
-                                                            ? 'bg-blue-600/90 border-2 border-blue-400'
-                                                            : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
-                                                    }`}
-                                                >
-                                                    <div className='flex items-center gap-2'>
-                                                        <div
-                                                            className={`flex items-center justify-center ${
-                                                                isActive
-                                                                    ? 'text-white'
-                                                                    : 'text-slate-300'
-                                                            }`}
-                                                        >
-                                                            <div className='w-4 h-4'>
-                                                                {getCategoryIcon(
-                                                                    category,
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className='flex-1 min-w-0'>
-                                                            <div
-                                                                className={`text-xs font-medium capitalize ${
-                                                                    isActive
-                                                                        ? 'text-white'
-                                                                        : 'text-slate-200'
-                                                                }`}
-                                                            >
-                                                                {category}
-                                                            </div>
-                                                            <div
-                                                                className={`text-[10px] ${
-                                                                    isActive
-                                                                        ? 'text-blue-200'
-                                                                        : 'text-slate-400'
-                                                                }`}
-                                                            >
-                                                                {selectedCount}/
-                                                                {totalCount}
-                                                            </div>
-                                                        </div>
-                                                        {selectedCount > 0 && (
-                                                            <div className='flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white flex-shrink-0'>
-                                                                <svg
-                                                                    className='w-2.5 h-2.5'
-                                                                    fill='none'
-                                                                    viewBox='0 0 24 24'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth={
-                                                                        3
-                                                                    }
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap='round'
-                                                                        strokeLinejoin='round'
-                                                                        d='M5 13l4 4L19 7'
-                                                                    />
-                                                                </svg>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        },
-                                    )}
+                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
+                        {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
+                        <div className='absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-100'></div>
+                        <div className='p-4'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
+                                    <svg
+                                        className='h-5 w-5 text-blue-600'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
+                                    >
+                                        <path
+                                            fillRule='evenodd'
+                                            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+                                            clipRule='evenodd'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='ml-3 flex-1'>
+                                    <p className='text-sm font-medium text-blue-800'>
+                                        {notificationMessage}
+                                    </p>
+                                </div>
+                                <div className='ml-4 flex-shrink-0 flex'>
+                                    <button
+                                        className='inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors duration-200'
+                                        onClick={() =>
+                                            setShowNotification(false)
+                                        }
+                                    >
+                                        <svg
+                                            className='h-5 w-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                                                clipRule='evenodd'
+                                            />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                {/* Right Content Area - White */}
-                <div className='flex-1 flex flex-col'>
-                    {/* Close Button */}
-                    <div className='absolute top-5 right-5 z-10'>
-                        <button
-                            onClick={onClose}
-                            className='p-1.5 hover:bg-slate-100 rounded-lg transition-colors'
-                        >
-                            <XMarkIcon className='w-5 h-5 text-slate-600' />
-                        </button>
-                    </div>
-
-                    {/* Content */}
-                    <div className='flex-1 overflow-y-auto px-6 pt-12 pb-5'>
-                        {/* Categories Table */}
-                        <div className='rounded-2xl border border-slate-200 overflow-hidden bg-white'>
-                            <table className='min-w-full divide-y divide-slate-100'>
-                                <thead className='bg-tertiary/40'>
-                                    <tr>
-                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider w-32'>
-                                            Category
-                                        </th>
-                                        <th className='px-6 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider'>
-                                            Tools
-                                        </th>
-                                        <th className='px-4 py-3 text-right text-xs font-semibold text-secondary uppercase tracking-wider w-28'>
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className='divide-y divide-slate-100'>
-                                    {Object.entries(categoryOptions).map(
-                                        ([category, options]) => {
-                                            const selected =
-                                                selectionsByEntity[
-                                                    entityName
-                                                ]?.[category] || [];
-                                            const isSelected = (opt: string) =>
-                                                selected.includes(opt);
-                                            const isActive =
-                                                activeCategory === category;
-                                            return (
-                                                <tr
-                                                    key={category}
-                                                    id={`category-${category}`}
-                                                    className={`align-top transition-all duration-300 ${
-                                                        isActive
-                                                            ? 'bg-blue-50 border-l-4 border-blue-500'
-                                                            : ''
-                                                    }`}
-                                                >
-                                                    <td className='px-6 py-4 whitespace-nowrap text-sm font-semibold capitalize text-primary'>
-                                                        <div className='flex items-center gap-2.5'>
-                                                            <div className='text-slate-600 w-5 h-5'>
-                                                                {getCategoryIcon(
-                                                                    category,
-                                                                )}
-                                                            </div>
-                                                            <span>
-                                                                {category}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-6 py-4'>
-                                                        <div className='flex flex-wrap gap-3'>
-                                                            {options.map(
-                                                                (opt) => {
-                                                                    const Active =
-                                                                        isSelected(
-                                                                            opt,
-                                                                        );
-                                                                    return (
-                                                                        <button
-                                                                            key={
-                                                                                opt
-                                                                            }
-                                                                            type='button'
-                                                                            onClick={(
-                                                                                e,
-                                                                            ) => {
-                                                                                const btn =
-                                                                                    e.currentTarget;
-                                                                                const ripple =
-                                                                                    document.createElement(
-                                                                                        'span',
-                                                                                    );
-                                                                                ripple.className =
-                                                                                    'gs-ripple';
-                                                                                btn.appendChild(
-                                                                                    ripple,
-                                                                                );
-                                                                                setTimeout(
-                                                                                    () => {
-                                                                                        try {
-                                                                                            btn.removeChild(
-                                                                                                ripple,
-                                                                                            );
-                                                                                        } catch {}
-                                                                                    },
-                                                                                    560,
-                                                                                );
-                                                                                toggleEntitySelection(
-                                                                                    entityName,
-                                                                                    category,
-                                                                                    opt,
-                                                                                );
-                                                                            }}
-                                                                            className={`relative inline-flex items-center gap-2.5 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all duration-150 overflow-hidden ${
-                                                                                Active
-                                                                                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-900 border-blue-400 shadow-sm'
-                                                                                    : 'bg-white text-slate-700 border-slate-300 hover:border-blue-300 hover:bg-blue-50/40'
-                                                                            }`}
-                                                                        >
-                                                                            <div className='h-6 w-6 flex items-center justify-center'>
-                                                                                <Icon
-                                                                                    name={
-                                                                                        optionIcons[
-                                                                                            opt
-                                                                                        ]
-                                                                                            ?.name ||
-                                                                                        'git'
-                                                                                    }
-                                                                                    size={
-                                                                                        20
-                                                                                    }
-                                                                                    className={
-                                                                                        Active
-                                                                                            ? 'text-blue-700'
-                                                                                            : 'text-slate-600'
-                                                                                    }
-                                                                                />
-                                                                            </div>
-                                                                            <span
-                                                                                className={
-                                                                                    Active
-                                                                                        ? 'text-blue-900'
-                                                                                        : 'text-slate-700'
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    opt
-                                                                                }
-                                                                            </span>
-                                                                            {Active && (
-                                                                                <svg
-                                                                                    className='gs-corner-check-svg'
-                                                                                    viewBox='0 0 24 24'
-                                                                                    aria-hidden='true'
-                                                                                    style={{
-                                                                                        position:
-                                                                                            'absolute',
-                                                                                        top: '-1px',
-                                                                                        right: '-1px',
-                                                                                        width: '24px',
-                                                                                        height: '24px',
-                                                                                    }}
-                                                                                >
-                                                                                    <polygon
-                                                                                        points='24,0 24,24 0,0'
-                                                                                        fill='#3b82f6'
-                                                                                    />
-                                                                                    <path
-                                                                                        d='M13 7 L16 10 L21 5'
-                                                                                        fill='none'
-                                                                                        stroke='white'
-                                                                                        strokeWidth='2'
-                                                                                        strokeLinecap='round'
-                                                                                        strokeLinejoin='round'
-                                                                                    />
-                                                                                </svg>
-                                                                            )}
-                                                                        </button>
-                                                                    );
-                                                                },
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className='px-4 py-4 whitespace-nowrap text-right'>
-                                                        <div className='inline-flex flex-col gap-1.5'>
-                                                            <button
-                                                                className='inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-colors'
-                                                                onClick={() => {
-                                                                    options.forEach(
-                                                                        (
-                                                                            opt,
-                                                                        ) => {
-                                                                            if (
-                                                                                !isSelected(
-                                                                                    opt,
-                                                                                )
-                                                                            ) {
-                                                                                toggleEntitySelection(
-                                                                                    entityName,
-                                                                                    category,
-                                                                                    opt,
-                                                                                );
-                                                                            }
-                                                                        },
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <svg
-                                                                    className='w-3 h-3'
-                                                                    viewBox='0 0 24 24'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth={
-                                                                        2
-                                                                    }
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap='round'
-                                                                        strokeLinejoin='round'
-                                                                        d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                                                                    />
-                                                                </svg>
-                                                                Select All
-                                                            </button>
-                                                            <button
-                                                                className='inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded-md border border-slate-300 bg-white hover:bg-red-50 hover:border-red-300 text-slate-700 hover:text-red-700 transition-colors'
-                                                                onClick={() => {
-                                                                    options.forEach(
-                                                                        (
-                                                                            opt,
-                                                                        ) => {
-                                                                            if (
-                                                                                isSelected(
-                                                                                    opt,
-                                                                                )
-                                                                            ) {
-                                                                                toggleEntitySelection(
-                                                                                    entityName,
-                                                                                    category,
-                                                                                    opt,
-                                                                                );
-                                                                            }
-                                                                        },
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <svg
-                                                                    className='w-3 h-3'
-                                                                    viewBox='0 0 24 24'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth={
-                                                                        2
-                                                                    }
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap='round'
-                                                                        strokeLinejoin='round'
-                                                                        d='M6 18L18 6M6 6l12 12'
-                                                                    />
-                                                                </svg>
-                                                                Clear
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        },
-                                    )}
-                                </tbody>
-                            </table>
+                        {/* Animated progress bar */}
+                        <div className='bg-blue-200 h-1'>
+                            <motion.div
+                                initial={{width: '100%'}}
+                                animate={{width: '0%'}}
+                                transition={{duration: 3, ease: 'linear'}}
+                                className='bg-blue-500 h-full'
+                            />
                         </div>
                     </div>
+                </motion.div>
+            )}
 
-                    {/* Footer with Done Button */}
-                    <div className='px-6 py-3.5 border-t border-slate-200 flex items-center justify-end gap-2.5 bg-white'>
-                        <button
-                            onClick={onClose}
-                            className='px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-all duration-200'
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleDone}
-                            className='px-4 py-2 text-sm font-medium text-inverse bg-primary hover:bg-primary-dark rounded-lg transition-all duration-200'
-                        >
-                            Done
-                        </button>
+            {/* Validation Modal - exactly like Manage Users */}
+            {showValidationModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowValidationModal(false);
+                                setShowValidationErrors(true);
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Fill Required Fields
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {validationMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        setShowValidationModal(false);
+                                        setShowValidationErrors(true);
+                                        // The incompleteRows state already contains the IDs of rows that failed validation
+                                        console.log('✅ Validation modal dismissed - enabling row highlighting for incomplete rows:', incompleteRows);
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </>
+            )}
+
+            {/* Duplicate Entry Modal - exactly like Validation Modal */}
+            {showDuplicateModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowDuplicateModal(false);
+                                duplicateDetectedRef.current = false; // Reset flag
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Duplicate Entry Detected
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {duplicateMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        setShowDuplicateModal(false);
+                                        duplicateDetectedRef.current = false; // Reset flag
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal - match Manage Users styling */}
+            {showDeleteConfirmation && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setPendingDeleteRowId(null);
+                                setShowDeleteConfirmation(false);
+                                setCompressingRowId(null);
+                                setFoldingRowId(null);
+                            }}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            Are you sure you want to delete this Workstream?
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    onClick={confirmDelete}
+                                >
+                                    {deletingRow ? (
+                                        <>
+                                            <svg
+                                                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                            >
+                                                <circle
+                                                    className='opacity-25'
+                                                    cx='12'
+                                                    cy='12'
+                                                    r='10'
+                                                    stroke='currentColor'
+                                                    strokeWidth='4'
+                                                ></circle>
+                                                <path
+                                                    className='opacity-75'
+                                                    fill='currentColor'
+                                                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                                ></path>
+                                            </svg>
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </button>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    onClick={() => {
+                                        setPendingDeleteRowId(null);
+                                        setShowDeleteConfirmation(false);
+                                        setCompressingRowId(null);
+                                        setFoldingRowId(null);
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            )}
+
+            {/* Configuration Panel */}
+            <AnimatePresence>
+                {isConfigurationPanelOpen && configPanelEntity && (
+                    <div className="fixed inset-0 z-[9999] overflow-hidden">
+                        {/* Backdrop */}
+                        <div 
+                            className="absolute inset-0 bg-black bg-opacity-50"
+                            onClick={() => {
+                                if (hasConfigUnsavedChanges) {
+                                    setShowConfigUnsavedChangesDialog(true);
+                                } else {
+                                    setIsConfigurationPanelOpen(false);
+                                    configPanelDataLoadedRef.current = null;
+                                }
+                            }}
+                        />
+                        
+                        {/* Modal Panel */}
+                        <motion.div 
+                            className="absolute right-0 top-0 h-screen w-[920px] shadow-2xl border-l border-gray-200 flex overflow-hidden pointer-events-auto bg-white"
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ 
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 30
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Left Panel - Sidebar Image */}
+                            <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
+                                <img 
+                                    src="/images/logos/sidebar.png" 
+                                    alt="Sidebar" 
+                                    className="w-full h-full object-cover"
+                                />
+                                
+                                {/* Middle Text - Rotated and Bold */}
+                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
+                                    <div className="flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide">
+                                        <Settings className="h-4 w-4" />
+                                        <span>Configure Tools</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Main Content */}
+                            <div className="flex-1 flex flex-col bg-white overflow-auto">
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-blue-100 text-base">Configure Global Settings</p>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <button
+                            onClick={() => {
+                                if (hasConfigUnsavedChanges) {
+                                    setShowConfigUnsavedChangesDialog(true);
+                                } else {
+                                    setIsConfigurationPanelOpen(false);
+                                    configPanelDataLoadedRef.current = null;
+                                }
+                            }}
+                                                className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                                            >
+                                                <X className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Entity Info */}
+                                    <div className="mt-4 flex gap-3">
+                                        <div className="flex-1 max-w-xs">
+                                            <div className="text-blue-100 text-sm font-medium mb-1">Workstream Name</div>
+                                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                                <div className="text-white font-medium truncate text-xs">{configPanelEntity.entity || '\u00A0'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 max-w-xs">
+                                            <div className="text-blue-100 text-sm font-medium mb-1">Account</div>
+                                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                                <div className="text-white font-medium truncate text-xs">{configPanelEntity.account || '\u00A0'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="text-blue-100 text-sm font-medium mb-1">Enterprise</div>
+                                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
+                                                <div className="text-white font-medium truncate text-xs">{configPanelEntity.enterprise || '\u00A0'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Selected Tools Count */}
+                                    <div className="mt-3">
+                                        <div className="text-blue-100 text-sm">
+                                            Selected Tools: <span className="font-semibold text-white">
+                                                {Object.values(configForm.selections).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Toolbar - Global Search and Save Button at Top */}
+                                <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
+                                    <div className="flex items-center justify-between gap-4">
+                                        {/* Left side - Global Search */}
+                                        <div className='flex items-center'>
+                                            <div className='relative w-80'>
+                                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                                    <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                                                </div>
+                                                <input
+                                                    type='text'
+                                                    placeholder='Global Search'
+                                                    value={configSearchTerm}
+                                                    onChange={(e) => {
+                                                        setConfigSearchTerm(e.target.value);
+                                                        setAppliedConfigSearchTerm(e.target.value);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            setAppliedConfigSearchTerm(configSearchTerm);
+                                                        }
+                                                    }}
+                                                    className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
+                                                    style={{ fontSize: '14px' }}
+                                                />
+                                                {appliedConfigSearchTerm && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setConfigSearchTerm('');
+                                                            setAppliedConfigSearchTerm('');
+                                                        }}
+                                                        className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
+                                                        title='Clear search'
+                                                    >
+                                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Right side - Save Button */}
+                                        <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={async () => {
+                                                if (!configPanelEntity) return;
+                                                const entityName = configPanelEntity.entity;
+                                                const toolCount = Object.values(configForm.selections).reduce(
+                                                    (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0),
+                                                    0
+                                                );
+                                                // API stores categories in 'configuration' field as an object, not as 'categories'
+                                                const saveData = {
+                                                    entityName: entityName, // API expects entityName
+                                                    accountId: configForm.accountId,
+                                                    accountName: configForm.accountName || accounts.find((a) => a.id === configForm.accountId)?.accountName || '',
+                                                    enterpriseId: configForm.enterpriseId,
+                                                    enterpriseName: configForm.enterpriseName,
+                                                    entities: configForm.entities.includes(entityName) ? configForm.entities : [...configForm.entities, entityName],
+                                                    configuration: configForm.selections, // API stores categories in 'configuration' field as object
+                                                    categories: configForm.selections, // Also save as categories for compatibility
+                                                    configurationDetails: configForm.selections, // Also save as configurationDetails for compatibility
+                                                };
+                                                setIsSavingConfig(true);
+                                                try {
+                                                    // Use record ID if it exists and is not a temporary ID, otherwise use entity name
+                                                    const recordId = configPanelEntity.id && !String(configPanelEntity.id).startsWith('tmp-') 
+                                                        ? configPanelEntity.id 
+                                                        : null;
+                                                    
+                                                    let saveResult;
+                                                    if (recordId) {
+                                                        // Existing record - use ID in URL
+                                                        try {
+                                                            saveResult = await api.put(`/api/global-settings/${recordId}`, saveData);
+                                                        } catch (updateError: any) {
+                                                            // If PUT fails, try POST as fallback
+                                                            if (updateError?.message?.includes('404') || updateError?.message?.includes('not found')) {
+                                                                console.log('⚠️ Record not found with ID, creating new record');
+                                                                saveResult = await api.post('/api/global-settings', saveData);
+                                                            } else {
+                                                                throw updateError;
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // New record - try PUT with entity name first, fallback to POST
+                                                        try {
+                                                            saveResult = await api.put(`/api/global-settings/${encodeURIComponent(entityName)}`, saveData);
+                                                        } catch (updateError: any) {
+                                                            if (updateError?.message?.includes('404') || updateError?.message?.includes('not found')) {
+                                                                saveResult = await api.post('/api/global-settings', saveData);
+                                                            } else {
+                                                                throw updateError;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    // Handle empty response (some APIs return 200 OK with empty body)
+                                                    // The api utility should handle this, but we'll ensure we don't fail on undefined
+                                                    if (saveResult === undefined || saveResult === null) {
+                                                        console.log('✅ Save successful (empty response)');
+                                                    }
+                                                    
+                                                    // Extract the saved record ID from the response (if available)
+                                                    const savedRecordId = (saveResult && typeof saveResult === 'object' && 'id' in saveResult) 
+                                                        ? (saveResult as any).id 
+                                                        : null;
+                                                    const isNewRecord = configPanelEntity.id && String(configPanelEntity.id).startsWith('tmp-');
+                                                    
+                                                    // Update the local state IMMEDIATELY to reflect changes in hover panel
+                                                    // This ensures the configuration icon shows updated tools right away
+                                                    setGlobalSettings(prev => {
+                                                        const updated = prev.map(row => {
+                                                            if (row.id === configPanelEntity.id || row.entity === entityName) {
+                                                                // Update configuration details and configuration field
+                                                                const updatedRow = {
+                                                                    ...row,
+                                                                    configuration: toolCount > 0 ? `${toolCount} tools selected` : 'Not configured',
+                                                                    configurationDetails: configForm.selections, // This is what the hover panel reads
+                                                                    isConfigured: toolCount > 0,
+                                                                    account: configForm.accountName || row.account,
+                                                                    enterprise: configForm.enterpriseName || row.enterprise,
+                                                                };
+                                                                
+                                                                console.log('🔄 [Config Save] Updating row configuration immediately:', {
+                                                                    rowId: row.id,
+                                                                    entity: entityName,
+                                                                    toolCount,
+                                                                    configurationDetails: configForm.selections
+                                                                });
+                                                                
+                                                                // If this was a new record and we got an ID from the save, update the ID
+                                                                if (isNewRecord && savedRecordId) {
+                                                                    console.log('🔄 Updating temporary row ID from', configPanelEntity.id, 'to', savedRecordId);
+                                                                    // Update original entity names ref with new ID
+                                                                    originalEntityNamesRef.current.delete(configPanelEntity.id);
+                                                                    originalEntityNamesRef.current.set(savedRecordId, entityName);
+                                                                    return {
+                                                                        ...updatedRow,
+                                                                        id: savedRecordId,
+                                                                    };
+                                                                }
+                                                                
+                                                                return updatedRow;
+                                                            }
+                                                            return row;
+                                                        });
+                                                        
+                                                        // Update the ref immediately to keep it in sync with state
+                                                        // This ensures autosave and other functions see the updated configuration
+                                                        globalSettingsRef.current = updated;
+                                                        
+                                                        // Force a re-render by returning a new array reference
+                                                        return updated;
+                                                    });
+                                                    
+                                                    // The save has already been completed above (PUT/POST), so the record is in the database
+                                                    // For existing records, remove from modified records since we just saved it
+                                                    if (configPanelEntity.id && !String(configPanelEntity.id).startsWith('tmp-')) {
+                                                        // Remove from modified records since we just saved it
+                                                        setModifiedExistingRecords((prev) => {
+                                                            const newSet = new Set(prev);
+                                                            newSet.delete(String(configPanelEntity.id));
+                                                            return newSet;
+                                                        });
+                                                    } else if (isNewRecord && savedRecordId) {
+                                                        // For new records that were just saved, the record is already in the database
+                                                        // Remove the temporary ID from modified records
+                                                        setModifiedExistingRecords((prev) => {
+                                                            const newSet = new Set(prev);
+                                                            newSet.delete(String(configPanelEntity.id));
+                                                            return newSet;
+                                                        });
+                                                        // Note: The record is already saved, so autosave won't find it as a temporary row
+                                                        // This is expected and correct behavior
+                                                    }
+                                                    
+                                                    // Update original selections to reflect saved state
+                                                    setOriginalConfigSelections(JSON.parse(JSON.stringify(configForm.selections)));
+                                                    setHasConfigUnsavedChanges(false);
+                                                    
+                                                    showBlueNotification('Configuration saved successfully', 3000, true);
+                                                    
+                                                    // Small delay before closing modal to ensure state update propagates and hover panel updates
+                                                    // This ensures the configuration icon shows the updated tools immediately
+                                                    setTimeout(() => {
+                                                        // Close panel and clear the loaded entity ref
+                                                        setIsConfigurationPanelOpen(false);
+                                                        configPanelDataLoadedRef.current = null;
+                                                    }, 100); // Small delay to ensure React re-renders with updated state
+                                                    
+                                                    // After saving configuration, trigger autosave for both new and existing records
+                                                    // This ensures any additional changes (like entity name changes) are also saved
+                                                    // The configuration is already saved via PUT/POST, but autosave will handle other field changes
+                                                    setTimeout(() => {
+                                                        // Find the row to trigger autosave for
+                                                        setGlobalSettings(prev => {
+                                                            const rowToSave = prev.find(r => {
+                                                                if (!r.entity || !r.entity.trim()) return false;
+                                                                
+                                                                // For new records, look for saved ID or temp ID
+                                                                if (isNewRecord) {
+                                                                    if (savedRecordId && r.id === savedRecordId) return true;
+                                                                    if (!savedRecordId) {
+                                                                        return r.id === configPanelEntity.id || r.entity === entityName;
+                                                                    }
+                                                                } else {
+                                                                    // For existing records, look for the record ID or entity name
+                                                                    return r.id === configPanelEntity.id || r.entity === entityName;
+                                                                }
+                                                                
+                                                                return false;
+                                                            });
+                                                            
+                                                            if (rowToSave && debouncedAutoSaveRef.current) {
+                                                                console.log('🔄 Configuration saved - triggering autosave timer to save any additional changes:', rowToSave.entity);
+                                                                debouncedAutoSaveRef.current();
+                                                            }
+                                                            
+                                                            // Return unchanged state - we're just triggering autosave
+                                                            return prev;
+                                                        });
+                                                    }, 300);
+                                                    
+                                                    // Reload data after configuration save to reflect changes
+                                                    // For new records, wait for autosave to complete (which will save entity name)
+                                                    // For existing records, reload immediately
+                                                    if (isNewRecord) {
+                                                        // For new records, don't reload immediately - wait for autosave to complete
+                                                        // The autosave will save the entity name, and then reload after completion
+                                                        console.log('🔄 New record - skipping immediate reload, will reload after autosave completes');
+                                                    } else {
+                                                        // For existing records, reload immediately to show latest data
+                                                        console.log('🔄 Reloading data immediately after configuration save...');
+                                                        setTimeout(() => {
+                                                            loadGlobalSettings({
+                                                                accountId: configForm.accountId || selectedAccountId,
+                                                                accountName: configForm.accountName || selectedAccountName,
+                                                                enterpriseId: configForm.enterpriseId || selectedEnterpriseId,
+                                                                enterpriseName: configForm.enterpriseName || selectedEnterprise,
+                                                            });
+                                                        }, 500); // Small delay to ensure state update and modal close complete
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error saving configuration:', error);
+                                                    showBlueNotification('Failed to save configuration', 3000, false);
+                                                } finally {
+                                                    setIsSavingConfig(false);
+                                                }
+                                            }}
+                                            disabled={isSavingConfig}
+                                            className={`flex items-center space-x-2 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors shadow-sm ${
+                                                isSavingConfig 
+                                                    ? 'bg-blue-400 cursor-not-allowed' 
+                                                    : 'bg-blue-600 hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            <BookmarkIcon className="h-4 w-4" />
+                                            <span>{isSavingConfig ? 'Saving...' : 'Save'}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {/* Content */}
+                                <div className="flex-1 bg-gray-50 overflow-hidden">
+                                    <div className="h-full overflow-y-auto px-6 py-6">
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col gap-4">
+                                        {(() => {
+                                            // Debug: Log current selections when rendering
+                                            console.log('🔍 [Config Panel] Rendering with selections:', configForm.selections);
+                                            console.log('🔍 [Config Panel] Selections keys:', Object.keys(configForm.selections));
+                                            return null;
+                                        })()}
+                                        {Object.entries({
+                                            plan: ['Jira', 'Azure DevOps', 'Trello', 'Asana', 'Other'],
+                                            code: ['GitHub', 'GitLab', 'Azure Repos', 'Bitbucket', 'SonarQube', 'Other'],
+                                            build: ['Jenkins', 'GitHub Actions', 'CircleCI', 'AWS CodeBuild', 'Google Cloud Build', 'Azure DevOps', 'Other'],
+                                            test: ['Cypress', 'Selenium', 'Jest', 'Tricentis Tosca', 'Other'],
+                                            release: ['Argo CD', 'ServiceNow', 'Azure DevOps', 'Other'],
+                                            deploy: ['Kubernetes', 'Helm', 'Terraform', 'Ansible', 'Docker', 'AWS CodePipeline', 'Cloud Foundry', 'Other'],
+                                            others: ['Prometheus', 'Grafana', 'Slack', 'Other'],
+                                        })
+                                        .filter(([category, options]) => {
+                                            // Filter categories based on search term
+                                            if (!appliedConfigSearchTerm) return true;
+                                            const searchLower = appliedConfigSearchTerm.toLowerCase();
+                                            // Show category if category name or any tool name matches
+                                            return category.toLowerCase().includes(searchLower) ||
+                                                options.some(opt => opt.toLowerCase().includes(searchLower));
+                                        })
+                                        .map(([category, options]) => {
+                                            // Filter options within category based on search term
+                                            const filteredOptions = !appliedConfigSearchTerm 
+                                                ? options 
+                                                : options.filter(opt => 
+                                                    opt.toLowerCase().includes(appliedConfigSearchTerm.toLowerCase()) ||
+                                                    category.toLowerCase().includes(appliedConfigSearchTerm.toLowerCase())
+                                                );
+                                            
+                                            // Don't render category if no options match
+                                            if (filteredOptions.length === 0) return null;
+                                            
+                                            const OPTION_ICON: Record<string, {name: string}> = {
+                                                Jira: {name: 'jira'}, 'Azure DevOps': {name: 'azdo'}, Trello: {name: 'trello'}, Asana: {name: 'asana'},
+                                                GitHub: {name: 'github'}, 'GitHub Actions': {name: 'github'}, GitLab: {name: 'gitlab'}, 'Azure Repos': {name: 'azure'},
+                                                Bitbucket: {name: 'bitbucket'}, SonarQube: {name: 'sonarqube'}, Jenkins: {name: 'jenkins'}, CircleCI: {name: 'circleci'},
+                                                'AWS CodeBuild': {name: 'aws'}, 'Google Cloud Build': {name: 'cloudbuild'}, Cypress: {name: 'cypress'}, Selenium: {name: 'selenium'},
+                                                Jest: {name: 'jest'}, 'Tricentis Tosca': {name: 'jest'}, 'Argo CD': {name: 'argo'}, ServiceNow: {name: 'slack'},
+                                                Kubernetes: {name: 'kubernetes'}, Helm: {name: 'helm'}, Terraform: {name: 'terraform'}, Ansible: {name: 'ansible'},
+                                                Docker: {name: 'docker'}, 'AWS CodePipeline': {name: 'codepipeline'}, 'Cloud Foundry': {name: 'cloudfoundry'},
+                                                Prometheus: {name: 'prometheus'}, Grafana: {name: 'grafana'}, Slack: {name: 'slack'}, Other: {name: 'maven'},
+                                            };
+                                            
+                                            return (
+                                                <div
+                                                    key={category}
+                                                    className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-3 shadow-md"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <div className="text-sm font-semibold capitalize text-primary">
+                                                            {category}
+                                                        </div>
+                                                        <div className="text-xs text-secondary">
+                                                            {(configForm.selections[category] || []).length} selected
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-3">
+                                                        {options.map((opt) => {
+                                                            const categorySelections = configForm.selections[category] || [];
+                                                            const isSelected = categorySelections.includes(opt);
+                                                            // Debug: Log selection check for first option of each category
+                                                            if (opt === options[0]) {
+                                                                console.log(`🔍 [Config Panel] Category "${category}": selections=${JSON.stringify(categorySelections)}, checking "${opt}", isSelected=${isSelected}`);
+                                                            }
+                                                            return (
+                                                                <button
+                                                                    key={opt}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setConfigForm((prev) => {
+                                                                            const current = prev.selections[category] || [];
+                                                                            const next = current.includes(opt)
+                                                                                ? current.filter((x) => x !== opt)
+                                                                                : [...current, opt];
+                                                                            return {
+                                                                                ...prev,
+                                                                                selections: {...prev.selections, [category]: next},
+                                                                            };
+                                                                        });
+                                                                        // Mark as having unsaved changes
+                                                                        setHasConfigUnsavedChanges(true);
+                                                                    }}
+                                                                    className={`group relative flex flex-col items-center gap-1.5 rounded-xl border px-3 py-2 text-center transition-all duration-200 ${
+                                                                        isSelected
+                                                                            ? 'bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 text-blue-900 border-blue-400 shadow-md'
+                                                                            : 'bg-white/90 text-primary border-slate-200 hover:bg-white hover:shadow'
+                                                                    }`}
+                                                                >
+                                                                    {/* Checkmark icon in top right corner */}
+                                                                    {isSelected && (
+                                                                        <div className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-sm">
+                                                                            <svg
+                                                                                className="h-3 w-3 text-blue-600"
+                                                                                fill="none"
+                                                                                viewBox="0 0 24 24"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth={3}
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    d="M5 13l4 4L19 7"
+                                                                                />
+                                                                            </svg>
+                                                                        </div>
+                                                                    )}
+                                                                    <div
+                                                                        className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                                                                            isSelected ? 'bg-white/40' : 'bg-slate-50'
+                                                                        }`}
+                                                                    >
+                                                                        <Icon
+                                                                            name={OPTION_ICON[opt]?.name || 'git'}
+                                                                            size={24}
+                                                                            className={isSelected ? 'text-blue-700' : 'text-primary'}
+                                                                        />
+                                                                    </div>
+                                                                    <div className={`text-xs font-medium ${isSelected ? 'text-blue-900' : ''}`}>{opt}</div>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                        .filter(Boolean) // Remove null entries from filtered categories
+                                        }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Unsaved Changes Confirmation Dialog for Configuration Panel */}
+            <AnimatePresence>
+                {showConfigUnsavedChangesDialog && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-auto"
+                    >
+                        <div className="absolute inset-0 bg-black bg-opacity-60" />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+                        >
+                            <div className="flex items-center space-x-3 mb-4">
+                                <div className="p-2 bg-amber-100 rounded-full">
+                                    <XCircle className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-slate-900">Unsaved Changes</h3>
+                            </div>
+                            
+                            <p className="text-slate-600 mb-6">
+                                You have unsaved changes. Would you like to save them before closing?
+                            </p>
+                            
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setHasConfigUnsavedChanges(false);
+                                        setShowConfigUnsavedChangesDialog(false);
+                                        setIsConfigurationPanelOpen(false);
+                                        configPanelDataLoadedRef.current = null;
+                                    }}
+                                    className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                                >
+                                    No, Discard
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowConfigUnsavedChangesDialog(false);
+                                    }}
+                                    className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Yes, Keep Editing
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Navigation Warning Modal - exactly like Manage Users */}
+            {showNavigationWarning && (
+                <ConfirmModal
+                    open={showNavigationWarning}
+                    title="Unsaved Changes"
+                    message="You have unsaved changes that will be lost if you leave. Are you sure you want to continue?"
+                    confirmText="Leave Anyway"
+                    cancelText="Stay Here"
+                    onConfirm={() => {
+                        console.log('🔄 User confirmed navigation - clearing states and executing navigation');
+                        setShowNavigationWarning(false);
+                        
+                        // Clear all unsaved states IMMEDIATELY
+                        setIncompleteRows([]);
+                        setHasUnsavedChanges(false);
+                        setPreventNavigation(false);
+                        setUserConfirmedLeave(true);
+                        
+                        // Execute navigation immediately after state update
+                        if (pendingNavigationUrl) {
+                            console.log('🔄 Executing pending navigation to:', pendingNavigationUrl);
+                            // Clear the pending URL first
+                            const targetUrl = pendingNavigationUrl;
+                            setPendingNavigationUrl(null);
+                            
+                            // Use setTimeout to ensure state updates are processed first
+                            setTimeout(() => {
+                                if (originalRouterRef.current) {
+                                    originalRouterRef.current.push(targetUrl);
+                                } else {
+                                    // Fallback: router should now allow navigation since userConfirmedLeave is true
+                                    router.push(targetUrl);
+                                }
+                            }, 0);
+                        } else if (pendingNavigation) {
+                            // Fallback for legacy navigation handling
+                            const navFn = pendingNavigation;
+                            setPendingNavigation(null);
+                            setTimeout(() => {
+                                navFn();
+                            }, 0);
+                        }
+                    }}
+                    onCancel={() => {
+                        setShowNavigationWarning(false);
+                        setPendingNavigationUrl(null);
+                        setPendingNavigation(null);
+                        setPreventNavigation(false);
+                    }}
+                />
+            )}
+        </div>
     );
 }
+
