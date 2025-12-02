@@ -246,7 +246,7 @@ export default function ManageUserRoles() {
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'Role Name' | 'Entity' | 'Product' | 'Service'
+        'None' | 'Role Name' | 'Workstream' | 'Product' | 'Service'
     >('None');
     
     type ColumnType = 'roleName' | 'description' | 'entity' | 'product' | 'service' | 'scope' | 'actions';
@@ -432,7 +432,7 @@ export default function ManageUserRoles() {
     const columnLabels: Record<string, string> = {
         roleName: 'Role Name',
         description: 'Description',
-        entity: 'Entity',
+        entity: 'Workstream',
         product: 'Product',
         service: 'Service',
         scope: 'Scope'
@@ -904,7 +904,7 @@ export default function ManageUserRoles() {
             const missingFields = new Set<string>();
             incompleteRows.forEach((role) => {
                 if (!role.roleName?.trim()) missingFields.add('Role Name');
-                if (!role.entity?.trim()) missingFields.add('Entity');
+                if (!role.entity?.trim()) missingFields.add('Workstream');
                 if (!role.product?.trim()) missingFields.add('Product');
                 if (!role.service?.trim()) missingFields.add('Service');
             });
@@ -1211,7 +1211,7 @@ export default function ManageUserRoles() {
         });
 
         if (isDuplicate) {
-            console.error('❌ Duplicate entry detected - User Role with same role Name, Entity, Product, and Service already exists');
+            console.error('❌ Duplicate entry detected - User Role with same role Name, Workstream, Product, and Service already exists');
             
             // Mark that duplicate was detected (to suppress generic error notification)
             duplicateDetectedRef.current = true;
@@ -1229,7 +1229,7 @@ export default function ManageUserRoles() {
             
             // Show duplicate modal
             setDuplicateMessage(
-                `This combination of role Name (${role.roleName}), Entity (${role.entity}), Product (${role.product}), and Service (${role.service}) already exists in another row. Please use a different combination.`
+                `This combination of role Name (${role.roleName}), Workstream (${role.entity}), Product (${role.product}), and Service (${role.service}) already exists in another row. Please use a different combination.`
             );
             setShowDuplicateModal(true);
             
@@ -1590,7 +1590,7 @@ export default function ManageUserRoles() {
                             
                             // Show duplicate modal
                             setDuplicateMessage(
-                                `This combination of role Name (${modifiedRow.roleName}), Entity (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
+                                `This combination of role Name (${modifiedRow.roleName}), Workstream (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
                             );
                             setShowDuplicateModal(true);
                             
@@ -1927,7 +1927,7 @@ export default function ManageUserRoles() {
                 
                 // Check for missing fields
                 if (!role.roleName?.trim()) allMissingFields.add('Role Name');
-                if (!role.entity?.trim()) allMissingFields.add('Entity');
+                if (!role.entity?.trim()) allMissingFields.add('Workstream');
                 if (!role.product?.trim()) allMissingFields.add('Product');
                 if (!role.service?.trim()) allMissingFields.add('Service');
             });
@@ -1999,7 +1999,7 @@ export default function ManageUserRoles() {
                         
                         // Show duplicate modal
                         setDuplicateMessage(
-                            `This combination of role Name (${tempGroup.roleName}), Entity (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
+                            `This combination of role Name (${tempGroup.roleName}), Workstream (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
                         
@@ -2116,7 +2116,7 @@ export default function ManageUserRoles() {
                         
                         // Show duplicate modal
                         setDuplicateMessage(
-                            `This combination of role Name (${modifiedRole.roleName}), Entity (${modifiedRole.entity}), Product (${modifiedRole.product}), and Service (${modifiedRole.service}) already exists in another row. Please use a different combination.`
+                            `This combination of role Name (${modifiedRole.roleName}), Workstream (${modifiedRole.entity}), Product (${modifiedRole.product}), and Service (${modifiedRole.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
                         
@@ -2522,7 +2522,7 @@ export default function ManageUserRoles() {
                                             {/* Entity Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Entity
+                                                    Workstream
                                                 </label>
                                                 <div className='relative'>
                                                     <input
@@ -3025,7 +3025,7 @@ export default function ManageUserRoles() {
                                                 >
                                                     <option value=''>Select column...</option>
                                                     <option value='Role Name'>Role Name</option>
-                                                    <option value='Entity'>Entity</option>
+                                                    <option value='Workstream'>Workstream</option>
                                                     <option value='Product'>Product</option>
                                                     <option value='Service'>Service</option>
                                                 </select>
@@ -3231,7 +3231,7 @@ export default function ManageUserRoles() {
                                     foldingRowId={foldingRowId}
                                     groupByExternal={
                                         ActiveGroupLabel === 'Role Name' ? 'roleName' :
-                                        ActiveGroupLabel === 'Entity' ? 'entity' :
+                                        ActiveGroupLabel === 'Workstream' ? 'entity' :
                                         ActiveGroupLabel === 'Product' ? 'product' :
                                         ActiveGroupLabel === 'Service' ? 'service' :
                                         'none'
@@ -3239,7 +3239,7 @@ export default function ManageUserRoles() {
                                     onGroupByChange={(g: string) => {
                                         setActiveGroupLabel(
                                             g === 'roleName' ? 'Role Name' :
-                                            g === 'entity' ? 'Entity' :
+                                            g === 'entity' ? 'Workstream' :
                                             g === 'product' ? 'Product' :
                                             g === 'service' ? 'Service' :
                                             'None'
@@ -3265,6 +3265,7 @@ export default function ManageUserRoles() {
                                         setSortDirection(direction as '' | 'asc' | 'desc');
                                     }}
                                     onShowAllColumns={handleShowAllColumns}
+                                    customColumnLabels={columnLabels}
                                     selectedEnterprise={selectedEnterprise}
                                     selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
                                     selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}

@@ -3984,10 +3984,10 @@ function AsyncChipSelectEntity({
             const actualEnterprise = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
             const actualAccountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
             
-            // Get enterpriseId from localStorage
-            const enterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            // Get enterpriseId from props or localStorage
+            const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
             if (!enterpriseId) {
-                console.log('⚠️ [Entity] No enterpriseId in localStorage');
+                console.log('⚠️ [Entity] No enterpriseId available');
                 setAllOptions([]);
                 setLoading(false);
                 return;
@@ -4020,6 +4020,10 @@ function AsyncChipSelectEntity({
                 id?: string;
                 entityName: string;
                 enterprise?: string;
+                accountId?: string;
+                enterpriseId?: string;
+                accountName?: string;
+                enterpriseName?: string;
             }>>(apiUrl) || [];
             
             console.log('📦 [Entity] API response:', response);
@@ -4057,13 +4061,34 @@ function AsyncChipSelectEntity({
             }
             
             // Extract unique entity names filtered by Account and Enterprise
+            // First filter by matching accountId and enterpriseId to ensure we only get entities for the selected account/enterprise
+            const filteredByAccountAndEnterprise = response.filter(item => {
+                const matchesAccount = item.accountId === actualAccountId;
+                const matchesEnterprise = item.enterpriseId === enterpriseId;
+                const hasEntityName = item.entityName && item.entityName.trim() !== '';
+                
+                if (!matchesAccount || !matchesEnterprise) {
+                    console.log('🔍 [Entity] Filtering out item - does not match account/enterprise:', {
+                        entityName: item.entityName,
+                        itemAccountId: item.accountId,
+                        itemEnterpriseId: item.enterpriseId,
+                        expectedAccountId: actualAccountId,
+                        expectedEnterpriseId: enterpriseId,
+                        matchesAccount,
+                        matchesEnterprise
+                    });
+                }
+                
+                return matchesAccount && matchesEnterprise && hasEntityName;
+            });
+            
+            // Then extract unique entity names
             const uniqueEntities = Array.from(new Set(
-                response
-                    .filter(item => item.entityName && item.entityName.trim() !== '')
-                    .map(item => item.entityName)
+                filteredByAccountAndEnterprise.map(item => item.entityName)
             ));
             
-            console.log('✅ [Entity] Filtered unique entities:', uniqueEntities);
+            console.log('✅ [Entity] Filtered unique entities for account/enterprise:', uniqueEntities);
+            console.log('🔍 [Entity] Filtered from', response.length, 'total items to', filteredByAccountAndEnterprise.length, 'matching items');
             
             // Compare with expected result
             if (uniqueEntities.length === 0) {
@@ -4095,7 +4120,7 @@ function AsyncChipSelectEntity({
             console.log('🏁 [Entity] loadAllOptions completed, loading set to false');
             setLoading(false);
         }
-    }, [selectedEnterprise, selectedAccountId]);
+    }, [selectedEnterprise, selectedAccountId, selectedAccountName, selectedEnterpriseId]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -5343,6 +5368,9 @@ function AsyncChipSelectService({
         left: number;
         width: number;
     } | null>(null);
+    
+    // Track previous product to detect changes
+    const prevProductRef = useRef<string>(selectedProduct);
 
     // Load options from account licenses filtered by Account, Enterprise, and Product
     const loadAllOptions = useCallback(async (overrideProduct?: string) => {
@@ -5390,7 +5418,7 @@ function AsyncChipSelectService({
         } finally {
             setLoading(false);
         }
-    }, [selectedEnterprise, selectedProduct]);
+    }, [selectedEnterprise, selectedProduct, selectedAccountId]);
 
     const isNewValuePending = useCallback((queryValue: string): boolean => {
         if (!queryValue.trim()) return false;
@@ -5426,17 +5454,42 @@ function AsyncChipSelectService({
         }
     }, [open, calculateDropdownPosition]);
 
+    // Reload options when product changes - this is critical for showing correct services
     useEffect(() => {
-        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+        const productChanged = prevProductRef.current !== selectedProduct;
+        
+        if (productChanged && selectedEnterprise && selectedProduct && selectedAccountId) {
+            console.log('🔄 [Service] Product changed from', prevProductRef.current, 'to', selectedProduct, '- reloading services');
+            // Update the ref
+            prevProductRef.current = selectedProduct;
+            // Clear existing options first
+            setAllOptions([]);
+            setOptions([]);
+            // Clear the current value when product changes since services are product-specific
+            if (value) {
+                onChange('');
+            }
+            // Reload options for the new product
             loadAllOptions();
+        } else if (!productChanged && selectedEnterprise && selectedProduct && selectedAccountId && allOptions.length === 0) {
+            // Initial load when product is first selected (no previous product)
+            loadAllOptions();
+        } else if (!selectedProduct) {
+            // Clear options if product is cleared
+            prevProductRef.current = '';
+            setAllOptions([]);
+            setOptions([]);
+        } else {
+            // Update ref even if no reload needed
+            prevProductRef.current = selectedProduct;
         }
-    }, [open, allOptions.length, selectedEnterprise, selectedProduct, loadAllOptions]);
+    }, [selectedProduct, selectedEnterprise, selectedAccountId, loadAllOptions, value, onChange, allOptions.length]);
     
     useEffect(() => {
-        if (selectedEnterprise && selectedProduct && allOptions.length === 0) {
+        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct && selectedAccountId) {
             loadAllOptions();
         }
-    }, [selectedProduct, selectedEnterprise, allOptions.length, loadAllOptions]);
+    }, [open, allOptions.length, selectedEnterprise, selectedProduct, selectedAccountId, loadAllOptions]);
 
     useEffect(() => {
         setCurrent(value);
@@ -6538,7 +6591,7 @@ function SortableUserRoleRow({
                                 onChange={(v) => {
                                     onUpdateField(row.id, 'entity' as any, v || '');
                                 }}
-                                placeholder='Enter entity'
+                                placeholder='Enter workstream'
                                 isError={isCellMissing(row.id, 'entity') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].entity)}
                                 accounts={allRows}
                                 onNewItemCreated={(item) => {
@@ -6561,7 +6614,7 @@ function SortableUserRoleRow({
                                 className='text-[12px]'
                                 dataAttr={`entity-${row.id}`}
                                 isError={isCellMissing(row.id, 'entity')}
-                                placeholder='Enter entity'
+                                placeholder='Enter workstream'
                                 {...createTabNavigation('entity')}
                             />
                         )}
@@ -8157,7 +8210,7 @@ const ManageUserRolesTable = forwardRef<any, UserRolesTableProps>(({
                         const defaultLabels: Record<string, string> = {
                             roleName: 'Role Name',
                             description: 'Description',
-                            entity: 'Entity',
+                            entity: 'Workstream',
                             product: 'Product',
                             service: 'Service',
                             scope: 'Scope',

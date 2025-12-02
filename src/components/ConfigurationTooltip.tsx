@@ -1,5 +1,6 @@
 import React, {useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
+import { Icon } from '@/components/Icons';
 
 // Tooltip component for configuration details (matches original SelectionPill design)
 export function ConfigurationTooltip({
@@ -30,6 +31,17 @@ export function ConfigurationTooltip({
         monitor: '#64748B',
     };
 
+    const OPTION_ICON: Record<string, {name: string}> = {
+        Jira: {name: 'jira'}, 'Azure DevOps': {name: 'azdo'}, Trello: {name: 'trello'}, Asana: {name: 'asana'},
+        GitHub: {name: 'github'}, 'GitHub Actions': {name: 'github'}, GitLab: {name: 'gitlab'}, 'Azure Repos': {name: 'azure'},
+        Bitbucket: {name: 'bitbucket'}, SonarQube: {name: 'sonarqube'}, Jenkins: {name: 'jenkins'}, CircleCI: {name: 'circleci'},
+        'AWS CodeBuild': {name: 'aws'}, 'Google Cloud Build': {name: 'cloudbuild'}, Cypress: {name: 'cypress'}, Selenium: {name: 'selenium'},
+        Jest: {name: 'jest'}, 'Tricentis Tosca': {name: 'jest'}, 'Argo CD': {name: 'argo'}, ServiceNow: {name: 'slack'},
+        Kubernetes: {name: 'kubernetes'}, Helm: {name: 'helm'}, Terraform: {name: 'terraform'}, Ansible: {name: 'ansible'},
+        Docker: {name: 'docker'}, 'AWS CodePipeline': {name: 'codepipeline'}, 'Cloud Foundry': {name: 'cloudfoundry'},
+        Prometheus: {name: 'prometheus'}, Grafana: {name: 'grafana'}, Slack: {name: 'slack'}, Other: {name: 'maven'},
+    };
+
     const clearCloseTimer = () => {
         if (closeTimer.current !== null) {
             window.clearTimeout(closeTimer.current);
@@ -54,6 +66,10 @@ export function ConfigurationTooltip({
     );
     const sum = entries.reduce((a, b) => a + b.count, 0) || 1;
 
+    // Determine if configured based on hasDetails or isConfigured prop
+    const isActuallyConfigured = isConfigured || hasDetails;
+    const displayText = isActuallyConfigured ? 'Configured' : 'Not Configured';
+    
     return (
         <>
             <div className='flex items-center gap-2'>
@@ -62,7 +78,7 @@ export function ConfigurationTooltip({
                         clearCloseTimer();
                         const left = Math.min(
                             Math.max(12, e.clientX + 8),
-                            window.innerWidth - 380,
+                            window.innerWidth - 400,
                         );
                         const top = Math.min(
                             e.clientY + 12,
@@ -72,9 +88,13 @@ export function ConfigurationTooltip({
                         setOpen(true);
                     }}
                     onMouseLeave={scheduleClose}
-                    className='text-[12px] px-1 cursor-help text-slate-700 hover:text-blue-800 font-medium'
+                    className={`text-[12px] px-1 cursor-pointer font-medium ${
+                        isActuallyConfigured 
+                            ? 'text-green-700 hover:text-green-800' 
+                            : 'text-slate-700 hover:text-blue-800'
+                    }`}
                 >
-                    {configuration}
+                    {displayText}
                 </span>
                 <button
                     onClick={(e) => {
@@ -118,7 +138,7 @@ export function ConfigurationTooltip({
                             left: coords.left,
                             zIndex: 10000,
                         }}
-                        className='rounded-xl border border-slate-200 bg-white shadow-2xl p-4 w-auto min-w-[360px] max-w-[500px]'
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl p-4 w-auto min-w-[280px] max-w-[380px]'
                         onMouseEnter={clearCloseTimer}
                         onMouseLeave={scheduleClose}
                     >
@@ -163,20 +183,22 @@ export function ConfigurationTooltip({
                                                 key={cat}
                                                 className='rounded-lg border border-slate-200 p-2'
                                             >
-                                                <div className='mb-1 flex items-center justify-between'>
+                                                <div className='mb-1'>
                                                     <div className='text-xs font-semibold capitalize text-slate-700'>
                                                         {cat}
-                                                    </div>
-                                                    <div className='text-[10px] text-slate-500'>
-                                                        {list.length}
                                                     </div>
                                                 </div>
                                                 <div className='flex flex-wrap gap-1'>
                                                     {list.map((tool) => (
                                                         <span
                                                             key={tool}
-                                                            className='inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700'
+                                                            className='inline-flex items-center gap-1 rounded-md border border-blue-300 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 px-1.5 py-0.5 text-[10px] text-blue-800 shadow-sm'
                                                         >
+                                                            <Icon
+                                                                name={OPTION_ICON[tool]?.name || 'git'}
+                                                                size={12}
+                                                                className='text-blue-600'
+                                                            />
                                                             {tool}
                                                         </span>
                                                     ))}

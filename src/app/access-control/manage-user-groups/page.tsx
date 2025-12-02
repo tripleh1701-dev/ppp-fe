@@ -252,7 +252,7 @@ export default function ManageUserGroups() {
     const [hideQuery, setHideQuery] = useState('');
     const [groupOpen, setGroupOpen] = useState(false);
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
-        'None' | 'Group Name' | 'Entity' | 'Product' | 'Service'
+        'None' | 'Group Name' | 'Workstream' | 'Product' | 'Service'
     >('None');
     
     type ColumnType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles' | 'actions';
@@ -477,7 +477,7 @@ export default function ManageUserGroups() {
     const columnLabels: Record<string, string> = {
         groupName: 'Group Name',
         description: 'Description',
-        entity: 'Entity',
+        entity: 'Workstream',
         product: 'Product',
         service: 'Service',
         roles: 'Roles'
@@ -1010,7 +1010,7 @@ export default function ManageUserGroups() {
             const missingFields = new Set<string>();
             incompleteRows.forEach((group) => {
                 if (!group.groupName?.trim()) missingFields.add('Group Name');
-                if (!group.entity?.trim()) missingFields.add('Entity');
+                if (!group.entity?.trim()) missingFields.add('Workstream');
                 if (!group.product?.trim()) missingFields.add('Product');
                 if (!group.service?.trim()) missingFields.add('Service');
             });
@@ -1371,7 +1371,7 @@ export default function ManageUserGroups() {
         });
 
         if (isDuplicate) {
-            console.error('❌ Duplicate entry detected - User group with same Group Name, Entity, Product, and Service already exists');
+            console.error('❌ Duplicate entry detected - User group with same Group Name, Workstream, Product, and Service already exists');
             
             // Mark that duplicate was detected (to suppress generic error notification)
             duplicateDetectedRef.current = true;
@@ -1389,7 +1389,7 @@ export default function ManageUserGroups() {
             
             // Show duplicate modal
             setDuplicateMessage(
-                `This combination of Group Name (${group.groupName}), Entity (${group.entity}), Product (${group.product}), and Service (${group.service}) already exists in another row. Please use a different combination.`
+                `This combination of Group Name (${group.groupName}), Workstream (${group.entity}), Product (${group.product}), and Service (${group.service}) already exists in another row. Please use a different combination.`
             );
             setShowDuplicateModal(true);
             
@@ -1741,7 +1741,7 @@ export default function ManageUserGroups() {
                             
                             // Show duplicate modal
                             setDuplicateMessage(
-                                `This combination of Group Name (${modifiedRow.groupName}), Entity (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
+                                `This combination of Group Name (${modifiedRow.groupName}), Workstream (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
                             );
                             setShowDuplicateModal(true);
                             
@@ -2150,7 +2150,7 @@ export default function ManageUserGroups() {
                         
                         // Show duplicate modal
                         setDuplicateMessage(
-                            `This combination of Group Name (${tempGroup.groupName}), Entity (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
+                            `This combination of Group Name (${tempGroup.groupName}), Workstream (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
                         
@@ -2267,7 +2267,7 @@ export default function ManageUserGroups() {
                         
                         // Show duplicate modal
                         setDuplicateMessage(
-                            `This combination of Group Name (${modifiedGroup.groupName}), Entity (${modifiedGroup.entity}), Product (${modifiedGroup.product}), and Service (${modifiedGroup.service}) already exists in another row. Please use a different combination.`
+                            `This combination of Group Name (${modifiedGroup.groupName}), Workstream (${modifiedGroup.entity}), Product (${modifiedGroup.product}), and Service (${modifiedGroup.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
                         
@@ -2673,7 +2673,7 @@ export default function ManageUserGroups() {
                                             {/* Entity Filter */}
                                             <div>
                                                 <label className='block text-xs font-medium text-gray-700 mb-1'>
-                                                    Entity
+                                                    Workstream
                                                 </label>
                                                 <div className='relative'>
                                                     <input
@@ -3176,7 +3176,7 @@ export default function ManageUserGroups() {
                                                 >
                                                     <option value=''>Select column...</option>
                                                     <option value='Group Name'>Group Name</option>
-                                                    <option value='Entity'>Entity</option>
+                                                    <option value='Workstream'>Workstream</option>
                                                     <option value='Product'>Product</option>
                                                     <option value='Service'>Service</option>
                                                 </select>
@@ -3382,7 +3382,7 @@ export default function ManageUserGroups() {
                                     foldingRowId={foldingRowId}
                                     groupByExternal={
                                         ActiveGroupLabel === 'Group Name' ? 'groupName' :
-                                        ActiveGroupLabel === 'Entity' ? 'entity' :
+                                        ActiveGroupLabel === 'Workstream' ? 'entity' :
                                         ActiveGroupLabel === 'Product' ? 'product' :
                                         ActiveGroupLabel === 'Service' ? 'service' :
                                         'none'
@@ -3390,7 +3390,7 @@ export default function ManageUserGroups() {
                                     onGroupByChange={(g) => {
                                         setActiveGroupLabel(
                                             g === 'groupName' ? 'Group Name' :
-                                            g === 'entity' ? 'Entity' :
+                                            g === 'entity' ? 'Workstream' :
                                             g === 'product' ? 'Product' :
                                             g === 'service' ? 'Service' :
                                             'None'
@@ -3416,6 +3416,7 @@ export default function ManageUserGroups() {
                                         setSortDirection(direction);
                                     }}
                                     onShowAllColumns={handleShowAllColumns}
+                                    customColumnLabels={columnLabels}
                                     selectedEnterprise={selectedEnterprise}
                                     selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
                                     selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}

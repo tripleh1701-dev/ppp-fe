@@ -3,11 +3,10 @@
 import React, {useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import './Manage_User/TableComponent.css';
+import { ArrowsUpDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
 import { generateId } from '@/utils/id-generator';
 import {
-    ArrowUp,
-    ArrowDown,
     Trash2,
     Pencil,
     MoreVertical,
@@ -55,17 +54,19 @@ import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
 import {accessControlApi} from '../services/accessControlApi';
 import DateChipSelect from './DateChipSelect';
+import {ConfigurationTooltip} from './ConfigurationTooltip';
+// Configuration modal is handled by parent component
 
-// Utility function to generate consistent colors for user group data across the application
-const getUserGroupColor = (userGroupName: string) => {
-    const key = userGroupName.toLowerCase();
+// Utility function to generate consistent colors for user role data across the application
+const getUserRoleColor = (userRoleName: string) => {
+    const key = userRoleName.toLowerCase();
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
     
-    // Blueish user group color palette - consistent across all components
-    const userGroupColors = [
+    // Blueish user role color palette - consistent across all components
+    const userRoleColors = [
         {
             bg: 'bg-blue-50',
             text: 'text-blue-800',
@@ -98,7 +99,7 @@ const getUserGroupColor = (userGroupName: string) => {
         },
     ];
     
-    return userGroupColors[hash % userGroupColors.length];
+    return userRoleColors[hash % userRoleColors.length];
 };
 
 // Simple dropdown component for predefined values (like cloudType)
@@ -430,27 +431,26 @@ const ChipDropdown = ({
     );
 };
 
-export interface UserGroup {
+export interface userRole {
     id: string;
-    groupName: string;
+    roleName: string;
     description: string;
     entity: string;
     product: string;
     service: string;
-    roles: string;
-    isFromDatabase?: boolean; // Flag to indicate if this is an existing group from database (fields should be read-only)
+    scope: string;
+    isFromDatabase?: boolean; // Flag to indicate if this is an existing role from database (fields should be read-only)
 }
 
-export interface UserGroupRow {
+export interface GlobalSettingsRow {
     id: string;
-    // User Group fields
-    groupName: string;
-    description?: string;
-    entity: string;
-    product: string;
-    service: string;
-    roles?: string;
-    assignedRoles?: any[];
+    // Global Settings fields
+    account: string;
+    enterprise: string;
+    entity: string; // This will be the entity name (previously roleName)
+    configuration: string;
+    configurationDetails?: Record<string, string[]>; // Category -> tools mapping for tooltip
+    isConfigured?: boolean; // Track if entity has been configured
 }
 
 // Validation functions for user group fields
@@ -950,7 +950,7 @@ function SimpleChipInput({
     );
 }
 
-type CatalogType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles';
+type CatalogType = 'roleName' | 'description' | 'entity' | 'product' | 'service' | 'scope';
 
 // Modern dropdown option component with edit/delete functionality
 function DropdownOption({
@@ -1230,16 +1230,16 @@ function UserGroupMultiSelect({
     placeholder?: string;
     isError?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
-    accounts?: UserGroupRow[];
+    accounts?: GlobalSettingsRow[];
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -1578,7 +1578,7 @@ function UserGroupMultiSelect({
                     .slice(0, visibleCount)
                     .map((service: string, index: number) => {
                         // Use consistent color function
-                        const colorTheme = getUserGroupColor(service);
+                        const colorTheme = getUserRoleColor(service);
                         
                         return (
                             <motion.span
@@ -1643,7 +1643,7 @@ function UserGroupMultiSelect({
                                         </div>
                                         <div className='space-y-1 max-h-32 overflow-y-auto'>
                                             {selectedUserGroups.slice(visibleCount).map((userGroup, idx) => {
-                                                const colorTheme = getUserGroupColor(userGroup);
+                                                const colorTheme = getUserRoleColor(userGroup);
                                                 return (
                                                     <div 
                                                         key={`additional-${idx}`}
@@ -2397,26 +2397,26 @@ function AsyncChipSelect({
     onFocus?: () => void;
     inputType?: 'text' | 'password';
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
-    accounts?: UserGroupRow[];
+    accounts?: GlobalSettingsRow[];
     currentRowId?: string;
     currentRowEnterprise?: string;
     currentRowProduct?: string;
     dropdownOptions?: {
-        groupNames: Array<{id: string; name: string}>;
+        roleNames: Array<{id: string; name: string}>;
         descriptions: Array<{id: string; name: string}>;
         entities: Array<{id: string; name: string}>;
         products: Array<{id: string; name: string}>;
         services: Array<{id: string; name: string}>;
-        roles: Array<{id: string; name: string}>;
+        scope: Array<{id: string; name: string}>;
     };
     onTabNext?: () => void;
     onTabPrev?: () => void;
@@ -2446,7 +2446,7 @@ function AsyncChipSelect({
                     return false;
                 }
 
-                if (type === 'groupName') {
+                if (type === 'roleName') {
                     // Never filter group names - show all options
                     return false;
                 } else if (type === 'entity') {
@@ -2509,7 +2509,7 @@ function AsyncChipSelect({
         // Prefer below if there's enough space, otherwise use above if there's really no space
         // For user group fields, always prefer below unless there's really no space
         let top;
-        const forceBelow = type === 'entity' || type === 'product' || type === 'service' || type === 'description' || type === 'groupName' || type === 'roles';
+        const forceBelow = type === 'entity' || type === 'product' || type === 'service' || type === 'description' || type === 'roleName' || type === 'scope';
         
         if (forceBelow && spaceBelow >= 100) {
             // For status fields, show below if there's at least 100px space
@@ -2556,9 +2556,9 @@ function AsyncChipSelect({
         try {
             let allData: Array<{id: string; name: string}> = [];
             
-            // Use dropdownOptions if available for groupName
-            if (type === 'groupName' && dropdownOptions?.groupNames) {
-                allData = dropdownOptions.groupNames;
+            // Use dropdownOptions if available for roleName
+            if (type === 'roleName' && dropdownOptions?.roleNames) {
+                allData = dropdownOptions.roleNames;
             } else if (type === 'description' && dropdownOptions?.descriptions) {
                 allData = dropdownOptions.descriptions;
             } else if (type === 'entity' && dropdownOptions?.entities) {
@@ -2567,28 +2567,28 @@ function AsyncChipSelect({
                 allData = dropdownOptions.products;
             } else if (type === 'service' && dropdownOptions?.services) {
                 allData = dropdownOptions.services;
-            } else if (type === 'roles' && dropdownOptions?.roles) {
-                allData = dropdownOptions.roles;
-            } else if (type === 'groupName') {
+            } else if (type === 'scope' && dropdownOptions?.scope) {
+                allData = dropdownOptions.scope;
+            } else if (type === 'roleName') {
                 // Build groups URL with account filter (enterprise filter makes backend too restrictive)
                 // Get values from localStorage
                 const selectedAccountId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null;
                 const selectedAccountName = typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null;
                 const selectedEnterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
-                const selectedEnterprise = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null;
+                const selectedEnterpriseName = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null;
                 
-                let groupsUrl = '/api/user-management/groups';
+                let rolesUrl = '/api/user-management/roles';
                 const params = new URLSearchParams();
                 if (selectedAccountId) params.append('accountId', selectedAccountId);
                 if (selectedAccountName) params.append('accountName', selectedAccountName);
                 if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
-                if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise);
-                if (params.toString()) groupsUrl += `?${params.toString()}`;
+                if (selectedEnterpriseName) params.append('enterpriseName', selectedEnterpriseName);
+                if (params.toString()) rolesUrl += `?${params.toString()}`;
 
-                const response = await api.get<Array<{id: string; name: string; groupName?: string}>>(groupsUrl) || [];
+                const response = await api.get<Array<{id: string; name: string; roleName?: string}>>(rolesUrl) || [];
                 allData = response.map((item: any) => ({
-                    id: item.id || item.groupId || String(Math.random()),
-                    name: item.name || item.groupName || ''
+                    id: item.id || item.roleId || String(Math.random()),
+                    name: item.name || item.roleName || ''
                 })).filter((item: any) => item.name);
             } else if (type === 'entity') {
                 allData = await api.get<Array<{id: string; name: string}>>(
@@ -2660,7 +2660,7 @@ function AsyncChipSelect({
 
     // Load groupName options immediately on mount if needed
     React.useEffect(() => {
-        if (type === 'groupName' && allOptions.length === 0) {
+        if (type === 'roleName' && allOptions.length === 0) {
             loadAllOptions();
         }
     }, [type, allOptions.length, loadAllOptions]);
@@ -2704,11 +2704,10 @@ function AsyncChipSelect({
 
         try {
             let created: {id: string; name: string} | null = null;
-            if (type === 'groupName') {
-                created = await api.post<{id: string; name: string}>(
-                    '/api/user-management/groups',
-                    {name, groupName: name},
-                );
+            if (type === 'roleName') {
+                // DON'T create database record immediately - just add to local dropdown options
+                // The actual database record will be created when Save button is clicked
+                created = { id: `temp-groupname-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name };
             } else if (type === 'description') {
                 // Description is free text, no API creation needed
                 onChange(name);
@@ -2732,7 +2731,7 @@ function AsyncChipSelect({
                     '/api/services',
                     {name},
                 );
-            } else if (type === 'roles') {
+            } else if (type === 'scope') {
                 // Roles are managed separately
                 return;
             } else {
@@ -2764,15 +2763,15 @@ function AsyncChipSelect({
                 // Notify parent component about the new item
                 if (onNewItemCreated && created) {
                     const typeMap: Record<string, string> = {
-                        'groupName': 'groupNames',
+                        'roleName': 'roleNames',
                         'description': 'descriptions',
                         'entity': 'entities',
                         'product': 'products',
                         'service': 'services',
-                        'roles': 'roles'
+                        'scope': 'scope'
                     };
                     
-                    const dropdownType = typeMap[type as string] || 'groupNames';
+                    const dropdownType = typeMap[type as string] || 'roleNames';
                     onNewItemCreated(dropdownType as any, created);
                 }
             }
@@ -2804,7 +2803,7 @@ function AsyncChipSelect({
 
     // Debug logging for groupName
     React.useEffect(() => {
-        if (type === 'groupName') {
+        if (type === 'roleName') {
         }
     }, [type, allOptions]);
 
@@ -3096,8 +3095,8 @@ function AsyncChipSelect({
     );
 }
 
-// AsyncChipSelect for Group Name with dropdown and + sign for new values
-function AsyncChipSelectGroupName({
+// AsyncChipSelect for Role Name with dropdown and + sign for new values
+function AsyncChipSelectRoleName({
     value,
     onChange,
     placeholder = '',
@@ -3107,18 +3106,18 @@ function AsyncChipSelectGroupName({
     selectedAccountId,
     selectedAccountName,
     selectedEnterpriseId,
-    selectedEnterprise,
+    selectedEnterpriseName,
 }: {
     value?: string;
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    userGroups?: UserGroupRow[];
+    userGroups?: GlobalSettingsRow[];
     onNewItemCreated?: (item: {id: string; name: string}) => void;
     selectedAccountId?: string;
     selectedAccountName?: string;
     selectedEnterpriseId?: string;
-    selectedEnterprise?: string;
+    selectedEnterpriseName?: string;
 }) {
     const [open, setOpen] = useState(false);
     const [current, setCurrent] = useState<string | undefined>(value);
@@ -3138,64 +3137,64 @@ function AsyncChipSelectGroupName({
 
     // Load options from database API - exactly like AssignedUserGroupTable
     const loadAllOptions = useCallback(async () => {
-        console.log('🔄 [GroupName] loadAllOptions called');
+        console.log('🔄 [RoleName] loadAllOptions called');
         setLoading(true);
         try {
             // Build URL with account/enterprise filters when available
-            let groupsUrl = '/api/user-management/groups';
+            let rolesUrl = '/api/user-management/roles';
             const params = new URLSearchParams();
             if (selectedAccountId) params.append('accountId', selectedAccountId);
             if (selectedAccountName) params.append('accountName', selectedAccountName || '');
             if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
-            if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise || '');
-            if (params.toString()) groupsUrl += `?${params.toString()}`;
+            if (selectedEnterpriseName) params.append('enterpriseName', selectedEnterpriseName || '');
+            if (params.toString()) rolesUrl += `?${params.toString()}`;
 
-            console.log('📡 [GroupName] Calling API:', groupsUrl);
-            const allData = await api.get<Array<{id: string; name: string}>>(groupsUrl) || [];
-            console.log(`✅ [GroupName] API call successful, got ${allData.length} items:`, allData);
+            console.log('📡 [RoleName] Calling API:', rolesUrl);
+            const allData = await api.get<Array<{id: string; name: string}>>(rolesUrl) || [];
+            console.log(`✅ [RoleName] API call successful, got ${allData.length} items:`, allData);
             // Transform the data to match expected format if needed
             const transformedData = allData.map((item: any) => ({
-                id: item.id || item.groupId || String(Math.random()),
-                name: item.name || item.groupName || item.group || ''
+                id: item.id || item.roleId || String(Math.random()),
+                name: item.name || item.roleName || item.role || ''
             })).filter((item: any) => item.name); // Filter out items without names
             
-            // Get distinct group names only (remove duplicates)
-            const uniqueGroupNames = new Map<string, {id: string; name: string}>();
+            // Get distinct role names only (remove duplicates)
+            const uniqueRoleNames = new Map<string, {id: string; name: string}>();
             transformedData.forEach((item: any) => {
                 const lowerName = item.name.toLowerCase();
-                if (!uniqueGroupNames.has(lowerName)) {
-                    uniqueGroupNames.set(lowerName, item);
+                if (!uniqueRoleNames.has(lowerName)) {
+                    uniqueRoleNames.set(lowerName, item);
                 }
             });
-            const distinctData = Array.from(uniqueGroupNames.values());
+            const distinctData = Array.from(uniqueRoleNames.values());
             
-            // Filter out group names that are already used in the current table
-            // This prevents duplicate group names within the same account/enterprise
-            const usedGroupNames = new Set(
+            // Filter out entity names that are already used in the current table
+            // This prevents duplicate entity names within the same account/enterprise
+            const usedEntityNames = new Set(
                 userGroups
-                    .map(ug => ug.groupName?.toLowerCase().trim())
+                    .map(ug => ug.entity?.toLowerCase().trim())
                     .filter(name => name) // Remove empty/null names
             );
             
             const availableData = distinctData.filter(item => 
-                !usedGroupNames.has(item.name.toLowerCase().trim())
+                !usedEntityNames.has(item.name.toLowerCase().trim())
             );
             
-            console.log(`📋 [GroupName] Total groups: ${transformedData.length}, Distinct group names: ${distinctData.length}`);
-            console.log(`📋 [GroupName] Already used in table: ${usedGroupNames.size}`);
-            console.log(`📋 [GroupName] Available (unused) group names: ${availableData.length}`);
-            console.log(`📋 [GroupName] Available group names for dropdown:`, availableData.map(d => d.name));
+            console.log(`📋 [Entity] Total entities: ${transformedData.length}, Distinct entity names: ${distinctData.length}`);
+            console.log(`📋 [Entity] Already used in table: ${usedEntityNames.size}`);
+            console.log(`📋 [RoleName] Available (unused) role names: ${availableData.length}`);
+            console.log(`📋 [RoleName] Available role names for dropdown:`, availableData.map(d => d.name));
             setAllOptions(availableData);
         } catch (error) {
-            console.error('❌ [GroupName] API call failed:', error);
+            console.error('❌ [RoleName] API call failed:', error);
             // Don't set empty array - keep previous data if any
             // This way, if API fails but user types, showCreateNew will still be true
             setAllOptions([]);
         } finally {
             setLoading(false);
-            console.log('🏁 [GroupName] loadAllOptions completed, loading set to false');
+            console.log('🏁 [RoleName] loadAllOptions completed, loading set to false');
         }
-    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, userGroups]);
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterpriseName, userGroups]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -3260,9 +3259,9 @@ function AsyncChipSelectGroupName({
 
     // Filter options - exactly like AssignedUserGroupTable
     const filterOptions = useCallback(() => {
-        console.log('🔍 [GroupName] filterOptions called', { allOptionsLength: allOptions.length, query });
+        console.log('🔍 [RoleName] filterOptions called', { allOptionsLength: allOptions.length, query });
         if (allOptions.length === 0) {
-            console.log('⚠️ [GroupName] allOptions is empty, setting options to []');
+            console.log('⚠️ [RoleName] allOptions is empty, setting options to []');
             setOptions([]);
             return;
         }
@@ -3270,7 +3269,7 @@ function AsyncChipSelectGroupName({
         
         // Don't filter out already selected group names - allow users to select existing group names
         // Duplicate prevention happens during save validation (checking Group Name + Entity + Product + Service)
-        console.log(`🔍 [GroupName] Starting with ${filtered.length} options from API`);
+        console.log(`🔍 [RoleName] Starting with ${filtered.length} options from API`);
         
         // Apply search filter
         if (query) {
@@ -3278,7 +3277,7 @@ function AsyncChipSelectGroupName({
             filtered = filtered.filter(opt => 
                 opt.name.toLowerCase().startsWith(queryLower)
             );
-            console.log(`🔍 [GroupName] After startsWith filter (${queryLower}): ${filtered.length} items`, filtered);
+            console.log(`🔍 [RoleName] After startsWith filter (${queryLower}): ${filtered.length} items`, filtered);
             
             // Sort filtered results: exact matches first, then alphabetical - exactly like AssignedUserGroupTable
             filtered = filtered.sort((a, b) => {
@@ -3294,7 +3293,7 @@ function AsyncChipSelectGroupName({
             });
         }
         
-        console.log(`✅ [GroupName] Setting options to ${filtered.length} filtered items`);
+        console.log(`✅ [RoleName] Setting options to ${filtered.length} filtered items`);
         setOptions(filtered);
     }, [allOptions, query]);
 
@@ -3306,14 +3305,14 @@ function AsyncChipSelectGroupName({
         const name = (query || '').trim();
         if (!name) return;
 
-        // Check if group name is already used in the current table (duplicate check)
+        // Check if entity name is already used in the current table (duplicate check)
         const isDuplicateInTable = userGroups.some(
-            ug => ug.groupName?.toLowerCase().trim() === name.toLowerCase()
+            ug => ug.entity?.toLowerCase().trim() === name.toLowerCase()
         );
         
         if (isDuplicateInTable) {
-            console.log('❌ [GroupName] Duplicate group name detected in table:', name);
-            alert(`Group name "${name}" already exists in the table. Please use a different name.`);
+            console.log('❌ [Entity] Duplicate entity name detected in table:', name);
+            alert(`Role name "${name}" already exists in the table. Please use a different name.`);
             return;
         }
 
@@ -3333,104 +3332,43 @@ function AsyncChipSelectGroupName({
         }
 
         try {
-            // Create new user group in database via API with account/enterprise context
-            console.log('➕ [GroupName] Creating new group:', name);
-            console.log('📦 [GroupName] Account/Enterprise context:', {
-                selectedAccountId,
-                selectedAccountName,
-                selectedEnterpriseId,
-                selectedEnterprise
-            });
+            // DO NOT create role in database immediately - just set the value locally
+            // The role will be created when the full row is saved (with all mandatory fields)
+            console.log('➕ [RoleName] Setting new role name (NOT creating in DB yet):', name);
+            console.log('📦 [RoleName] Role will be created when row is saved with all mandatory fields');
             
-            // Include account/enterprise context in request body - exactly like Save All
-            const groupData = {
-                name,
-                groupName: name,
-                accountId: selectedAccountId,
-                accountName: selectedAccountName,
-                enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterprise
-            };
+            // Just set the value locally without creating in database
+            onChange(name);
+            setCurrent(name);
+            setQuery('');
+            setOpen(false);
+            setHasPendingNewValue(false);
             
-            console.log('🌐 [GroupName] Creating group with context:', groupData);
-            
-            const created = await api.post<{id: string; name: string} | any>(
-                '/api/user-management/groups',
-                groupData
-            );
-            
-            console.log('✅ [GroupName] Group created:', created);
-            
-            // Transform response to match expected format
-            const formattedCreated = {
-                id: created?.id || created?.groupId || String(Math.random()),
-                name: created?.name || created?.groupName || name
-            };
-            
-            if (formattedCreated) {
-                // Add newly created to the dropdown list and select it
-                setOptions((prev) => {
-                    const exists = prev.some((o) => o.id === formattedCreated.id);
-                    return exists ? prev : [...prev, formattedCreated];
-                });
-                // Also add to allOptions for future exact match checking
-                setAllOptions((prev) => {
-                    const exists = prev.some((o) => o.id === formattedCreated.id);
-                    return exists ? prev : [...prev, formattedCreated];
-                });
-                onChange(formattedCreated.name);
-                setCurrent(formattedCreated.name);
-                setQuery('');
-                setOpen(false);
-                setHasPendingNewValue(false);
-                
-                // Focus the chip after creating new value so Tab navigation works - exactly like AssignedUserGroupTable
-                setTimeout(() => {
-                    try {
-                        // Find the chip element (which now has tabIndex=0 and is focusable)
-                        if (inputRef.current) {
-                            // inputRef should now point to the chip (motion.span)
-                            if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
-                                inputRef.current.focus();
-                                console.log('🎯 [GroupName] Focused chip after creation');
-                            } else {
-                                // If inputRef is still the input, find the chip
-                                const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
-                                if (chipElement) {
-                                    chipElement.focus();
-                                    console.log('🎯 [GroupName] Focused chip after creation (found via querySelector)');
-                                }
+            // Focus the chip after setting value so Tab navigation works
+            setTimeout(() => {
+                try {
+                    // Find the chip element (which now has tabIndex=0 and is focusable)
+                    if (inputRef.current) {
+                        // inputRef should now point to the chip (motion.span)
+                        if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
+                            inputRef.current.focus();
+                            console.log('🎯 [RoleName] Focused chip after setting value');
+                        } else {
+                            // If inputRef is still the input, find the chip
+                            const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
+                            if (chipElement) {
+                                chipElement.focus();
+                                console.log('🎯 [RoleName] Focused chip after setting value (found via querySelector)');
                             }
                         }
-                    } catch (e) {
-                        console.log('🎯 [GroupName] Error focusing chip after creation:', e);
                     }
-                }, 100); // Small delay to ensure React state updates are complete
-                
-                // Notify parent component about the new item
-                if (onNewItemCreated) {
-                    onNewItemCreated(formattedCreated);
+                } catch (e) {
+                    console.log('🎯 [RoleName] Error focusing chip after setting value:', e);
                 }
-            }
+            }, 100); // Small delay to ensure React state updates are complete
         } catch (error: any) {
-            console.error('Failed to create userGroup:', error);
-            // Handle duplicate error from backend
-            if (
-                error?.message?.includes('already exists') ||
-                error?.message?.includes('duplicate')
-            ) {
-                // Try to find the existing item and select it
-                const existingItem = allOptions.find(
-                    (opt) => opt.name.toLowerCase() === name.toLowerCase(),
-                );
-                if (existingItem) {
-                    onChange(existingItem.name);
-                    setCurrent(existingItem.name);
-                    setQuery('');
-                    setOpen(false);
-                    setHasPendingNewValue(false);
-                }
-            }
+            console.error('❌ [RoleName] Failed to set role name:', error);
+            alert(`Failed to set role name: ${error.message || 'Unknown error'}`);
         }
     };
 
@@ -3522,10 +3460,10 @@ function AsyncChipSelectGroupName({
                         value={query}
                         onChange={(e: any) => {
                             const newValue = e.target.value;
-                            console.log('⌨️ [GroupName] onChange:', { newValue, allOptionsLength: allOptions.length, open });
+                            console.log('⌨️ [RoleName] onChange:', { newValue, allOptionsLength: allOptions.length, open });
                             setQuery(newValue);
                             // Always open dropdown when typing to show options or + button
-                            console.log('📂 [GroupName] Setting open to true');
+                            console.log('📂 [RoleName] Setting open to true');
                             setOpen(true);
                             // Calculate position immediately
                             if (containerRef.current) {
@@ -3533,11 +3471,11 @@ function AsyncChipSelectGroupName({
                                 const width = Math.max(140, Math.min(200, containerRect.width));
                                 const top = containerRect.bottom + 2;
                                 const left = containerRect.left;
-                                console.log('📍 [GroupName] Setting dropdown position:', { top, left, width });
+                                console.log('📍 [RoleName] Setting dropdown position:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
                             // Reload options to exclude already-used group names
-                            console.log('📥 [GroupName] Reloading options to filter out used group names');
+                            console.log('📥 [RoleName] Reloading options to filter out used group names');
                             loadAllOptions();
                             // Clear current selection if user clears the input completely
                             if (newValue === '') {
@@ -3546,7 +3484,7 @@ function AsyncChipSelectGroupName({
                             }
                         }}
                         onFocus={() => {
-                            console.log('👁️ [GroupName] onFocus:', { allOptionsLength: allOptions.length, open, query });
+                            console.log('👁️ [RoleName] onFocus:', { allOptionsLength: allOptions.length, open, query });
                             setOpen(true);
                             // Calculate position immediately on focus
                             if (containerRef.current) {
@@ -3554,11 +3492,11 @@ function AsyncChipSelectGroupName({
                                 const width = Math.max(140, Math.min(200, containerRect.width));
                                 const top = containerRect.bottom + 2;
                                 const left = containerRect.left;
-                                console.log('📍 [GroupName] Setting dropdown position on focus:', { top, left, width });
+                                console.log('📍 [RoleName] Setting dropdown position on focus:', { top, left, width });
                                 setDropdownPortalPos({ top, left, width });
                             }
                             // Always reload options on focus to exclude already-used group names
-                            console.log('📥 [GroupName] Reloading options on focus to filter out used group names');
+                            console.log('📥 [RoleName] Reloading options on focus to filter out used group names');
                             loadAllOptions();
                         }}
                         onKeyDown={async (e: any) => {
@@ -3574,12 +3512,12 @@ function AsyncChipSelectGroupName({
                                 if (exactMatch) {
                                     // Double-check for duplicate (safeguard)
                                     const isDuplicate = userGroups.some(
-                                        ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                        ug => ug.entity?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
                                     );
                                     
                                     if (isDuplicate) {
-                                        console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
-                                        alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
+                                        console.log('❌ [Entity] Cannot select duplicate entity name:', exactMatch.name);
+                                        alert(`Workstream name "${exactMatch.name}" already exists in the table. Please use a different name.`);
                                         setQuery('');
                                         setOpen(false);
                                         return;
@@ -3600,18 +3538,18 @@ function AsyncChipSelectGroupName({
                                                 // inputRef should now point to the chip (motion.span)
                                                 if (inputRef.current.tagName === 'SPAN' || inputRef.current.getAttribute('tabindex') !== null) {
                                                     inputRef.current.focus();
-                                                    console.log('🎯 [GroupName] Focused chip after Enter on existing value');
+                                                    console.log('🎯 [RoleName] Focused chip after Enter on existing value');
                                                 } else {
                                                     // If inputRef is still the input, find the chip
                                                     const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                     if (chipElement) {
                                                         chipElement.focus();
-                                                        console.log('🎯 [GroupName] Focused chip after Enter on existing value (found via querySelector)');
+                                                        console.log('🎯 [RoleName] Focused chip after Enter on existing value (found via querySelector)');
                                                     }
                                                 }
                                             }
                                         } catch (e) {
-                                            console.log('🎯 [GroupName] Error focusing chip after Enter on existing value:', e);
+                                            console.log('🎯 [RoleName] Error focusing chip after Enter on existing value:', e);
                                         }
                                     }, 100); // Small delay to ensure React state updates are complete
                                 } else {
@@ -3644,11 +3582,11 @@ function AsyncChipSelectGroupName({
                                     if (exactMatch) {
                                         // Double-check for duplicate (safeguard)
                                         const isDuplicate = userGroups.some(
-                                            ug => ug.groupName?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
+                                            ug => ug.entity?.toLowerCase().trim() === exactMatch.name.toLowerCase().trim()
                                         );
                                         
                                         if (isDuplicate) {
-                                            console.log('❌ [GroupName] Cannot select duplicate group name:', exactMatch.name);
+                                            console.log('❌ [RoleName] Cannot select duplicate role name:', exactMatch.name);
                                             alert(`Group name "${exactMatch.name}" already exists in the table. Please use a different name.`);
                                             e.preventDefault();
                                             setQuery('');
@@ -3669,7 +3607,7 @@ function AsyncChipSelectGroupName({
                                                 const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                 if (chipElement) {
                                                     chipElement.focus();
-                                                    console.log('🎯 [GroupName] Focused chip after Tab on existing value');
+                                                    console.log('🎯 [RoleName] Focused chip after Tab on existing value');
                                                     
                                                     // Now trigger Tab navigation to next field - exactly like AssignedUserGroupTable
                                                     setTimeout(() => {
@@ -3697,7 +3635,7 @@ function AsyncChipSelectGroupName({
                                                     }, 50);
                                                 }
                                             } catch (e) {
-                                                console.log('🎯 [GroupName] Error focusing chip after Tab on existing value:', e);
+                                                console.log('🎯 [RoleName] Error focusing chip after Tab on existing value:', e);
                                             }
                                         }, 100);
                                     }
@@ -3774,7 +3712,7 @@ function AsyncChipSelectGroupName({
                     <div className='relative z-10 flex flex-col'>
                         <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
                             {(() => {
-                                console.log('🎨 [GroupName] Rendering dropdown content', {
+                                console.log('🎨 [RoleName] Rendering dropdown content', {
                                     query: query.trim(),
                                     optionsLength: options.length,
                                     allOptionsLength: allOptions.length,
@@ -3802,14 +3740,14 @@ function AsyncChipSelectGroupName({
                                     })
                                     : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
                                 
-                                console.log('🔍 [GroupName] filteredOptions:', filteredOptions);
+                                console.log('🔍 [RoleName] filteredOptions:', filteredOptions);
                                 
                                 // Check if query exactly matches an existing option - always check allOptions when available (database source of truth)
                                 const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 ) : null;
                                 
-                                console.log('🎯 [GroupName] exactMatch check:', {
+                                console.log('🎯 [RoleName] exactMatch check:', {
                                     query: query.trim(),
                                     allOptionsLength: allOptions.length,
                                     exactMatch: exactMatch?.name || null,
@@ -3821,7 +3759,7 @@ function AsyncChipSelectGroupName({
                                 // 2. Either allOptions is empty (still loading) OR no exact match found in database
                                 const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
                                 
-                                console.log('➕ [GroupName] showCreateNew calculation:', {
+                                console.log('➕ [RoleName] showCreateNew calculation:', {
                                     queryTrimmed: query.trim(),
                                     queryHasValue: !!query.trim(),
                                     allOptionsEmpty: allOptions.length === 0,
@@ -3831,7 +3769,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Show loading only if loading AND no query entered yet
                                 if (loading && allOptions.length === 0 && !query.trim()) {
-                                    console.log('⏳ [GroupName] Showing loading message');
+                                    console.log('⏳ [RoleName] Showing loading message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             Loading…
@@ -3841,7 +3779,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Only show "No matches" if there are no filtered options AND no new value to create AND not loading AND allOptions is loaded
                                 if (filteredOptions.length === 0 && !showCreateNew && !loading && allOptions.length > 0) {
-                                    console.log('🚫 [GroupName] Showing "No matches" message');
+                                    console.log('🚫 [RoleName] Showing "No matches" message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             No matches
@@ -3851,7 +3789,7 @@ function AsyncChipSelectGroupName({
                                 
                                 // Show empty state when no values exist in database
                                 if (filteredOptions.length === 0 && !query.trim() && !loading && allOptions.length === 0) {
-                                    console.log('📭 [GroupName] Showing "No value found" message');
+                                    console.log('📭 [RoleName] Showing "No value found" message');
                                     return (
                                         <div className='px-3 py-2 text-slate-500 text-center'>
                                             No value found
@@ -3859,7 +3797,7 @@ function AsyncChipSelectGroupName({
                                     );
                                 }
                                 
-                                console.log('✅ [GroupName] Rendering dropdown items and + button', {
+                                console.log('✅ [RoleName] Rendering dropdown items and + button', {
                                     filteredOptionsCount: filteredOptions.length,
                                     showCreateNew,
                                     showCreateNewType: typeof showCreateNew,
@@ -3892,11 +3830,11 @@ function AsyncChipSelectGroupName({
                                                         onClick={() => {
                                                             // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
                                                             const isDuplicate = userGroups.some(
-                                                                ug => ug.groupName?.toLowerCase().trim() === opt.name.toLowerCase().trim()
+                                                                ug => ug.entity?.toLowerCase().trim() === opt.name.toLowerCase().trim()
                                                             );
                                                             
                                                             if (isDuplicate) {
-                                                                console.log('❌ [GroupName] Cannot select duplicate group name:', opt.name);
+                                                                console.log('❌ [RoleName] Cannot select duplicate role name:', opt.name);
                                                                 alert(`Group name "${opt.name}" already exists in the table. Please use a different name.`);
                                                                 return;
                                                             }
@@ -3914,10 +3852,10 @@ function AsyncChipSelectGroupName({
                                                                     const chipElement = containerRef.current?.querySelector('span[tabindex="0"]') as HTMLElement;
                                                                     if (chipElement) {
                                                                         chipElement.focus();
-                                                                        console.log('🎯 [GroupName] Focused chip after dropdown selection');
+                                                                        console.log('🎯 [RoleName] Focused chip after dropdown selection');
                                                                     }
                                                                 } catch (e) {
-                                                                    console.log('🎯 [GroupName] Error focusing chip after dropdown selection:', e);
+                                                                    console.log('🎯 [RoleName] Error focusing chip after dropdown selection:', e);
                                                                 }
                                                             }, 100); // Small delay to ensure React state updates are complete
                                                         }}
@@ -3940,7 +3878,7 @@ function AsyncChipSelectGroupName({
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
-                                                        console.log('🖱️ [GroupName] + button clicked for:', query.trim());
+                                                        console.log('🖱️ [RoleName] + button clicked for:', query.trim());
                                                         addNew();
                                                     }}
                                                     className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
@@ -3972,7 +3910,7 @@ function AsyncChipSelectEntity({
     onNewItemCreated,
     onTabNext,
     onTabPrev,
-    selectedEnterprise = '',
+    selectedEnterpriseName = '',
     selectedEnterpriseId = '',
     selectedAccountId = '',
     selectedAccountName = '',
@@ -3981,11 +3919,11 @@ function AsyncChipSelectEntity({
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    accounts?: UserGroupRow[];
+    accounts?: GlobalSettingsRow[];
     onNewItemCreated?: (item: {id: string; name: string}) => void;
     onTabNext?: () => void;
     onTabPrev?: () => void;
-    selectedEnterprise?: string;
+    selectedEnterpriseName?: string;
     selectedEnterpriseId?: string;
     selectedAccountId?: string;
     selectedAccountName?: string;
@@ -4009,17 +3947,17 @@ function AsyncChipSelectEntity({
     // Load options from database API
     const loadAllOptions = useCallback(async () => {
         console.log('🔄 [Entity] loadAllOptions called', {
-            selectedEnterprise,
+            selectedEnterpriseName,
             selectedAccountId
         });
         setLoading(true);
         try {
-            if (!selectedAccountId || !selectedEnterprise) {
+            if (!selectedAccountId || !selectedEnterpriseName) {
                 console.log('⚠️ [Entity] Missing dependencies, clearing options', {
                     hasAccountId: !!selectedAccountId,
-                    hasEnterprise: !!selectedEnterprise,
+                    hasEnterprise: !!selectedEnterpriseName,
                     selectedAccountIdValue: selectedAccountId,
-                    selectedEnterpriseValue: selectedEnterprise
+                    selectedEnterpriseNameValue: selectedEnterpriseName
                 });
                 
                 // Try to get values directly from localStorage as fallback
@@ -4043,13 +3981,13 @@ function AsyncChipSelectEntity({
             
             // Get actual values to use (props or localStorage fallback)
             const actualAccountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
-            const actualEnterprise = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+            const actualEnterprise = selectedEnterpriseName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
             const actualAccountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
             
-            // Get enterpriseId from props or localStorage
-            const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
+            // Get enterpriseId from localStorage
+            const enterpriseId = window.localStorage.getItem('selectedEnterpriseId');
             if (!enterpriseId) {
-                console.log('⚠️ [Entity] No enterpriseId available');
+                console.log('⚠️ [Entity] No enterpriseId in localStorage');
                 setAllOptions([]);
                 setLoading(false);
                 return;
@@ -4075,17 +4013,21 @@ function AsyncChipSelectEntity({
                 expectedEntityName: 'Finance'
             });
             
-            const apiUrl = `/api/global-settings?accountId=${actualAccountId}&accountName=${encodeURIComponent(actualAccountName || '')}&enterpriseId=${enterpriseId}`;
+            // Include enterpriseName in the query to ensure proper filtering
+            const enterpriseName = selectedEnterpriseName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+            const apiUrl = `/api/global-settings?accountId=${actualAccountId}&accountName=${encodeURIComponent(actualAccountName || '')}&enterpriseId=${enterpriseId}${enterpriseName ? `&enterpriseName=${encodeURIComponent(enterpriseName)}` : ''}`;
             console.log('🌐 [Entity] Full API URL:', apiUrl);
+            console.log('🔍 [Entity] API call parameters:', {
+                accountId: actualAccountId,
+                accountName: actualAccountName,
+                enterpriseId: enterpriseId,
+                enterpriseName: enterpriseName
+            });
             
             const response = await api.get<Array<{
                 id?: string;
                 entityName: string;
                 enterprise?: string;
-                accountId?: string;
-                enterpriseId?: string;
-                accountName?: string;
-                enterpriseName?: string;
             }>>(apiUrl) || [];
             
             console.log('📦 [Entity] API response:', response);
@@ -4123,34 +4065,51 @@ function AsyncChipSelectEntity({
             }
             
             // Extract unique entity names filtered by Account and Enterprise
-            // First filter by matching accountId and enterpriseId to ensure we only get entities for the selected account/enterprise
-            const filteredByAccountAndEnterprise = response.filter(item => {
-                const matchesAccount = item.accountId === actualAccountId;
-                const matchesEnterprise = item.enterpriseId === enterpriseId;
-                const hasEntityName = item.entityName && item.entityName.trim() !== '';
-                
-                if (!matchesAccount || !matchesEnterprise) {
-                    console.log('🔍 [Entity] Filtering out item - does not match account/enterprise:', {
-                        entityName: item.entityName,
-                        itemAccountId: item.accountId,
-                        itemEnterpriseId: item.enterpriseId,
-                        expectedAccountId: actualAccountId,
-                        expectedEnterpriseId: enterpriseId,
-                        matchesAccount,
-                        matchesEnterprise
-                    });
-                }
-                
-                return matchesAccount && matchesEnterprise && hasEntityName;
-            });
-            
-            // Then extract unique entity names
+            // Also add client-side filtering to ensure we only show entities for the current account/enterprise combination
             const uniqueEntities = Array.from(new Set(
-                filteredByAccountAndEnterprise.map(item => item.entityName)
+                response
+                    .filter(item => {
+                        // Filter out items without entityName
+                        if (!item.entityName || item.entityName.trim() === '') {
+                            return false;
+                        }
+                        
+                        // Additional client-side filtering: verify account and enterprise match
+                        // This is a safety measure in case the backend doesn't filter correctly
+                        const itemAccountId = (item as any).accountId;
+                        const itemAccountName = (item as any).accountName;
+                        const itemEnterpriseId = (item as any).enterpriseId;
+                        const itemEnterpriseName = (item as any).enterpriseName || (item as any).enterprise;
+                        
+                        // If the item has account/enterprise info, verify it matches
+                        if (itemAccountId || itemAccountName || itemEnterpriseId || itemEnterpriseName) {
+                            const accountMatches = !itemAccountId || itemAccountId === actualAccountId;
+                            const accountNameMatches = !itemAccountName || itemAccountName === actualAccountName;
+                            const enterpriseIdMatches = !itemEnterpriseId || itemEnterpriseId === enterpriseId;
+                            const enterpriseNameMatches = !itemEnterpriseName || !enterpriseName || itemEnterpriseName === enterpriseName;
+                            
+                            if (!accountMatches || !accountNameMatches || !enterpriseIdMatches || !enterpriseNameMatches) {
+                                console.log('🚫 [Entity] Filtered out entity due to account/enterprise mismatch:', {
+                                    entityName: item.entityName,
+                                    itemAccountId,
+                                    itemAccountName,
+                                    itemEnterpriseId,
+                                    itemEnterpriseName,
+                                    expectedAccountId: actualAccountId,
+                                    expectedAccountName: actualAccountName,
+                                    expectedEnterpriseId: enterpriseId,
+                                    expectedEnterpriseName: enterpriseName
+                                });
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    })
+                    .map(item => item.entityName)
             ));
             
-            console.log('✅ [Entity] Filtered unique entities for account/enterprise:', uniqueEntities);
-            console.log('🔍 [Entity] Filtered from', response.length, 'total items to', filteredByAccountAndEnterprise.length, 'matching items');
+            console.log('✅ [Entity] Filtered unique entities:', uniqueEntities);
             
             // Compare with expected result
             if (uniqueEntities.length === 0) {
@@ -4182,7 +4141,7 @@ function AsyncChipSelectEntity({
             console.log('🏁 [Entity] loadAllOptions completed, loading set to false');
             setLoading(false);
         }
-    }, [selectedEnterprise, selectedAccountId, selectedAccountName, selectedEnterpriseId]);
+    }, [selectedEnterpriseName, selectedAccountId]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -4197,14 +4156,50 @@ function AsyncChipSelectEntity({
         setHasPendingNewValue(isNewValuePending(query));
     }, [query, isNewValuePending]);
 
-    // Calculate dropdown position
+    // Calculate dropdown position - improved to handle table container overflow
     const calculateDropdownPosition = useCallback(() => {
         if (!containerRef.current) return;
         
         const containerRect = containerRef.current.getBoundingClientRect();
-        const width = Math.max(140, Math.min(200, containerRect.width));
-        const top = containerRect.bottom + 2;
-        const left = containerRect.left;
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = 300; // Max height of dropdown
+        const spaceBelow = viewportHeight - containerRect.bottom;
+        const spaceAbove = containerRect.top;
+        
+        // Find the table container to ensure dropdown stays within table bounds
+        const tableContainer = containerRef.current.closest('.rounded-xl') ||
+                              containerRef.current.closest('[role="table"]') ||
+                              containerRef.current.closest('.overflow-auto') ||
+                              containerRef.current.closest('.w-full') ||
+                              document.body;
+        const tableRect = tableContainer.getBoundingClientRect();
+        
+        // Calculate portal position with table container constraints
+        const maxWidth = Math.min(300, tableRect.width - 64, viewportWidth - 64);
+        const width = Math.max(140, Math.min(maxWidth, containerRect.width));
+        
+        // Ensure dropdown stays within viewport horizontally
+        const idealLeft = containerRect.left;
+        const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32);
+        const minLeft = Math.max(tableRect.left + 32, 32);
+        const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+        
+        // Prefer below if there's enough space, otherwise use above if there's really no space
+        let top: number;
+        if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+            // Position below
+            top = containerRect.bottom + 2;
+        } else if (spaceAbove >= dropdownHeight) {
+            // Position above
+            top = containerRect.top - dropdownHeight - 2;
+        } else {
+            // Not enough space either way, position below and let it scroll
+            top = containerRect.bottom + 2;
+        }
+        
+        // Ensure dropdown doesn't go off-screen vertically
+        top = Math.max(8, Math.min(top, viewportHeight - 8));
         
         setDropdownPortalPos({ top, left, width });
     }, []);
@@ -4234,12 +4229,18 @@ function AsyncChipSelectEntity({
 
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
-            const target = e.target as Node;
-            const withinAnchor = !!containerRef.current?.contains(target);
-            const withinDropdown = !!dropdownRef.current?.contains(target);
-            if (!withinAnchor && !withinDropdown) {
-                setOpen(false);
-            }
+            // Small delay to allow chip click to process and dropdown to render
+            setTimeout(() => {
+                const target = e.target as Node;
+                const withinAnchor = !!containerRef.current?.contains(target);
+                const withinDropdown = !!dropdownRef.current?.contains(target);
+                // Also check if clicking within the entity column
+                const entityCol = (target as HTMLElement)?.closest('[data-col="entity"]');
+                const withinEntityCol = entityCol && containerRef.current && entityCol.contains(containerRef.current);
+                if (!withinAnchor && !withinDropdown && !withinEntityCol) {
+                    setOpen(false);
+                }
+            }, 10);
         };
         document.addEventListener('click', onDoc, true);
         return () => document.removeEventListener('click', onDoc, true);
@@ -4295,7 +4296,7 @@ function AsyncChipSelectEntity({
         try {
             // Get actual values to use (props or localStorage fallback)
             const actualAccountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
-            const actualEnterprise = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+            const actualEnterprise = selectedEnterpriseName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
             const actualAccountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
             
             // Create new entity via global-settings API to match AssignedUserGroupTable
@@ -4386,8 +4387,51 @@ function AsyncChipSelectEntity({
                         tabIndex={0}
                         onClick={(e: any) => {
                             if (!(e.target as HTMLElement).closest('button')) {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 setQuery(current || value || '');
+                                // Calculate position immediately before opening to ensure dropdown is visible
+                                if (containerRef.current) {
+                                    const containerRect = containerRef.current.getBoundingClientRect();
+                                    const viewportHeight = window.innerHeight;
+                                    const viewportWidth = window.innerWidth;
+                                    const dropdownHeight = 300;
+                                    const spaceBelow = viewportHeight - containerRect.bottom;
+                                    const spaceAbove = containerRect.top;
+                                    
+                                    const tableContainer = containerRef.current.closest('.rounded-xl') ||
+                                                          containerRef.current.closest('[role="table"]') ||
+                                                          containerRef.current.closest('.overflow-auto') ||
+                                                          containerRef.current.closest('.w-full') ||
+                                                          document.body;
+                                    const tableRect = tableContainer.getBoundingClientRect();
+                                    
+                                    const maxWidth = Math.min(300, tableRect.width - 64, viewportWidth - 64);
+                                    const width = Math.max(140, Math.min(maxWidth, containerRect.width));
+                                    
+                                    const idealLeft = containerRect.left;
+                                    const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32);
+                                    const minLeft = Math.max(tableRect.left + 32, 32);
+                                    const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
+                                    
+                                    let top: number;
+                                    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+                                        top = containerRect.bottom + 2;
+                                    } else if (spaceAbove >= dropdownHeight) {
+                                        top = containerRect.top - dropdownHeight - 2;
+                                    } else {
+                                        top = containerRect.bottom + 2;
+                                    }
+                                    
+                                    top = Math.max(8, Math.min(top, viewportHeight - 8));
+                                    
+                                    setDropdownPortalPos({ top, left, width });
+                                }
                                 setOpen(true);
+                                // Focus the input after opening to ensure dropdown stays visible
+                                setTimeout(() => {
+                                    inputRef.current?.focus();
+                                }, 10);
                             }
                         }}
                         onKeyDown={(e: any) => {
@@ -4449,13 +4493,8 @@ function AsyncChipSelectEntity({
                             const newValue = e.target.value;
                             setQuery(newValue);
                             setOpen(true);
-                            if (containerRef.current) {
-                                const containerRect = containerRef.current.getBoundingClientRect();
-                                const width = Math.max(140, Math.min(200, containerRect.width));
-                                const top = containerRect.bottom + 2;
-                                const left = containerRect.left;
-                                setDropdownPortalPos({ top, left, width });
-                            }
+                            // Use improved position calculation
+                            calculateDropdownPosition();
                             if (allOptions.length === 0) {
                                 loadAllOptions();
                             }
@@ -4466,13 +4505,8 @@ function AsyncChipSelectEntity({
                         }}
                         onFocus={() => {
                             setOpen(true);
-                            if (containerRef.current) {
-                                const containerRect = containerRef.current.getBoundingClientRect();
-                                const width = Math.max(140, Math.min(200, containerRect.width));
-                                const top = containerRect.bottom + 2;
-                                const left = containerRect.left;
-                                setDropdownPortalPos({ top, left, width });
-                            }
+                            // Use improved position calculation
+                            calculateDropdownPosition();
                             if (allOptions.length === 0) {
                                 loadAllOptions();
                             }
@@ -4604,37 +4638,49 @@ function AsyncChipSelectEntity({
                         width: 'max-content',
                         minWidth: `${dropdownPortalPos.width}px`,
                         maxWidth: '500px',
-                        zIndex: 10000
+                        zIndex: 99999,
+                        pointerEvents: 'auto'
                     }}
                 >
                     <div className="absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"></div>
                     <div className='relative z-10 flex flex-col'>
-                        <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
-                            {loading && allOptions.length === 0 && !query.trim() ? (
-                                <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
-                            ) : (() => {
-                                const filteredOptions = query.trim() 
-                                    ? options.filter(opt => 
-                                        opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
-                                        opt.name.toLowerCase().includes(query.toLowerCase())
-                                    ).sort((a, b) => {
-                                        const aLower = a.name.toLowerCase();
-                                        const bLower = b.name.toLowerCase();
-                                        const queryLower = query.toLowerCase();
-                                        const aStartsWith = aLower.startsWith(queryLower);
-                                        const bStartsWith = bLower.startsWith(queryLower);
-                                        if (aStartsWith && !bStartsWith) return -1;
-                                        if (bStartsWith && !aStartsWith) return 1;
-                                        return aLower.localeCompare(bLower);
-                                    })
-                                    : options.slice(0, 50);
+                        {(() => {
+                            // Calculate showCreateNew outside so it can be used in style
+                            const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
+                                opt.name.toLowerCase() === query.toLowerCase().trim()
+                            ) : null;
+                            const showCreateNew = query.trim() && (allOptions.length === 0 || !exactMatch);
+                            
+                            return (
+                                <>
+                                    <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: showCreateNew ? '180px' : '200px'}}>
+                                        {loading && allOptions.length === 0 && !query.trim() ? (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
+                                        ) : (() => {
+                                            const filteredOptions = query.trim() 
+                                                ? options.filter(opt => 
+                                                    opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
+                                                    opt.name.toLowerCase().includes(query.toLowerCase())
+                                                ).sort((a, b) => {
+                                                    const aLower = a.name.toLowerCase();
+                                                    const bLower = b.name.toLowerCase();
+                                                    const queryLower = query.toLowerCase();
+                                                    const aStartsWith = aLower.startsWith(queryLower);
+                                                    const bStartsWith = bLower.startsWith(queryLower);
+                                                    if (aStartsWith && !bStartsWith) return -1;
+                                                    if (bStartsWith && !aStartsWith) return 1;
+                                                    return aLower.localeCompare(bLower);
+                                                })
+                                                : options.slice(0, 50);
                                 
-                                const exactMatch = query.trim() && allOptions.length > 0 ? allOptions.find(opt => 
-                                    opt.name.toLowerCase() === query.toLowerCase().trim()
-                                ) : null;
-                                
-                                // Disable "Add new" functionality for Entity field
-                                const showCreateNew = false;
+                                // Show loading only if loading AND no query entered yet
+                                if (loading && allOptions.length === 0 && !query.trim()) {
+                                    return (
+                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                            Loading…
+                                        </div>
+                                    );
+                                }
                                 
                                 if (filteredOptions.length === 0 && !showCreateNew && !loading && allOptions.length > 0) {
                                     return (
@@ -4711,30 +4757,31 @@ function AsyncChipSelectEntity({
                                                 </motion.div>
                                             );
                                         })}
-                                        
+                                    </>
+                                );
+                                            })()}
+                                        </div>
+                                        {/* Add button outside scrollable area to ensure it's always visible */}
                                         {showCreateNew && (
-                                            <motion.div
-                                                initial={{scale: 0.98, opacity: 0}}
-                                                animate={{scale: 1, opacity: 1}}
-                                                className='mt-2 border-t border-slate-200 pt-2'
-                                            >
-                                                <button
+                                            <div className='border-t border-slate-200 pt-2 pb-2 px-3 bg-white'>
+                                                <motion.button
+                                                    initial={{scale: 0.98, opacity: 0}}
+                                                    animate={{scale: 1, opacity: 1}}
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
                                                         addNew();
                                                     }}
-                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg font-medium'
                                                     type='button'
                                                 >
                                                     + Add &quot;{query.trim()}&quot;
-                                                </button>
-                                            </motion.div>
+                                                </motion.button>
+                                            </div>
                                         )}
                                     </>
                                 );
                             })()}
-                        </div>
                     </div>
                 </div>,
                 document.body
@@ -4749,7 +4796,7 @@ function AsyncChipSelectProduct({
     onChange,
     placeholder = '',
     isError = false,
-    selectedEnterprise = '',
+    selectedEnterpriseName = '',
     selectedAccountId = '',
     selectedEnterpriseId = '',
     onNewItemCreated,
@@ -4760,7 +4807,7 @@ function AsyncChipSelectProduct({
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    selectedEnterprise?: string;
+    selectedEnterpriseName?: string;
     selectedAccountId?: string;
     selectedEnterpriseId?: string;
     onNewItemCreated?: (item: {id: string; name: string}) => void;
@@ -4794,7 +4841,7 @@ function AsyncChipSelectProduct({
                 return;
             }
 
-            console.log('🔍 [Product] Loading products for account:', selectedAccountId, 'enterprise:', selectedEnterprise);
+            console.log('🔍 [Product] Loading products for account:', selectedAccountId, 'enterprise:', selectedEnterpriseName);
 
             // Get account data with licenses to find products for this account and enterprise
             const accountData = await api.get<{
@@ -4822,7 +4869,7 @@ function AsyncChipSelectProduct({
                 accountData.licenses
                     .filter(license => {
                         // Match by enterprise name if available, otherwise show all products for this account
-                        return !selectedEnterprise || license.enterprise === selectedEnterprise;
+                        return !selectedEnterpriseName || license.enterprise === selectedEnterpriseName;
                     })
                     .map(license => license.product)
                     .filter(product => product && product.trim() !== '')
@@ -4843,7 +4890,7 @@ function AsyncChipSelectProduct({
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, selectedEnterprise]);
+    }, [selectedAccountId, selectedEnterpriseName]);
 
     // Check if query is a new value
     const isNewValuePending = useCallback((queryValue: string): boolean => {
@@ -4884,10 +4931,10 @@ function AsyncChipSelectProduct({
     }, [open, calculateDropdownPosition]);
 
     useEffect(() => {
-        if (open && allOptions.length === 0 && selectedEnterprise) {
+        if (open && allOptions.length === 0 && selectedEnterpriseName) {
             loadAllOptions();
         }
-    }, [open, allOptions.length, selectedEnterprise, loadAllOptions]);
+    }, [open, allOptions.length, selectedEnterpriseName, loadAllOptions]);
 
     useEffect(() => {
         setCurrent(value);
@@ -5104,7 +5151,7 @@ function AsyncChipSelectProduct({
                                 const left = containerRect.left;
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            if (allOptions.length === 0 && selectedEnterprise) {
+                            if (allOptions.length === 0 && selectedEnterpriseName) {
                                 loadAllOptions();
                             }
                             if (newValue === '') {
@@ -5121,7 +5168,7 @@ function AsyncChipSelectProduct({
                                 const left = containerRect.left;
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            if (allOptions.length === 0 && selectedEnterprise) {
+                            if (allOptions.length === 0 && selectedEnterpriseName) {
                                 loadAllOptions();
                             }
                         }}
@@ -5233,10 +5280,10 @@ function AsyncChipSelectProduct({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterprise ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterpriseName ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
                         placeholder=""
-                        disabled={!selectedEnterprise}
-                        readOnly={!selectedEnterprise}
+                        disabled={!selectedEnterpriseName}
+                        readOnly={!selectedEnterpriseName}
                     />
                 ) : null}
             </div>
@@ -5262,7 +5309,7 @@ function AsyncChipSelectProduct({
                         <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
                             {loading && allOptions.length === 0 && !query.trim() ? (
                                 <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
-                            ) : !selectedEnterprise ? (
+                            ) : !selectedEnterpriseName ? (
                                 <div className='px-3 py-2 text-slate-500 text-center'>Please select Enterprise first</div>
                             ) : (() => {
                                 const filteredOptions = query.trim() 
@@ -5395,7 +5442,7 @@ function AsyncChipSelectService({
     onChange,
     placeholder = '',
     isError = false,
-    selectedEnterprise = '',
+    selectedEnterpriseName = '',
     selectedProduct = '',
     selectedAccountId = '',
     selectedEnterpriseId = '',
@@ -5407,7 +5454,7 @@ function AsyncChipSelectService({
     onChange: (next?: string) => void;
     placeholder?: string;
     isError?: boolean;
-    selectedEnterprise?: string;
+    selectedEnterpriseName?: string;
     selectedProduct?: string;
     selectedAccountId?: string;
     selectedEnterpriseId?: string;
@@ -5438,7 +5485,7 @@ function AsyncChipSelectService({
         setLoading(true);
         try {
             // Service field is disabled until Product is selected
-            if (!selectedAccountId || !selectedEnterprise || !productToUse) {
+            if (!selectedAccountId || !selectedEnterpriseName || !productToUse) {
                 setAllOptions([]);
                 setLoading(false);
                 return;
@@ -5457,7 +5504,7 @@ function AsyncChipSelectService({
             const uniqueServices = Array.from(new Set(
                 accountData.licenses
                     .filter(license => 
-                        license.enterprise === selectedEnterprise &&
+                        license.enterprise === selectedEnterpriseName &&
                         license.product === productToUse &&
                         license.service && license.service.trim() !== ''
                     )
@@ -5477,7 +5524,7 @@ function AsyncChipSelectService({
         } finally {
             setLoading(false);
         }
-    }, [selectedEnterprise, selectedProduct, selectedAccountId]);
+    }, [selectedEnterpriseName, selectedProduct]);
 
     const isNewValuePending = useCallback((queryValue: string): boolean => {
         if (!queryValue.trim()) return false;
@@ -5513,45 +5560,17 @@ function AsyncChipSelectService({
         }
     }, [open, calculateDropdownPosition]);
 
-    // Track previous product to detect changes
-    const prevProductRef = useRef<string>(selectedProduct);
-
-    // Reload options when product changes - this is critical for showing correct services
     useEffect(() => {
-        const productChanged = prevProductRef.current !== selectedProduct;
-        
-        if (productChanged && selectedEnterprise && selectedProduct && selectedAccountId) {
-            console.log('🔄 [Service] Product changed from', prevProductRef.current, 'to', selectedProduct, '- reloading services');
-            // Update the ref
-            prevProductRef.current = selectedProduct;
-            // Clear existing options first
-            setAllOptions([]);
-            setOptions([]);
-            // Clear the current value when product changes since services are product-specific
-            if (value) {
-                onChange('');
-            }
-            // Reload options for the new product
+        if (open && allOptions.length === 0 && selectedEnterpriseName && selectedProduct) {
             loadAllOptions();
-        } else if (!productChanged && selectedEnterprise && selectedProduct && selectedAccountId && allOptions.length === 0) {
-            // Initial load when product is first selected (no previous product)
-            loadAllOptions();
-        } else if (!selectedProduct) {
-            // Clear options if product is cleared
-            prevProductRef.current = '';
-            setAllOptions([]);
-            setOptions([]);
-        } else {
-            // Update ref even if no reload needed
-            prevProductRef.current = selectedProduct;
         }
-    }, [selectedProduct, selectedEnterprise, selectedAccountId, loadAllOptions, value, onChange, allOptions.length]);
+    }, [open, allOptions.length, selectedEnterpriseName, selectedProduct, loadAllOptions]);
     
     useEffect(() => {
-        if (open && allOptions.length === 0 && selectedEnterprise && selectedProduct && selectedAccountId) {
+        if (selectedEnterpriseName && selectedProduct && allOptions.length === 0) {
             loadAllOptions();
         }
-    }, [open, allOptions.length, selectedEnterprise, selectedProduct, selectedAccountId, loadAllOptions]);
+    }, [selectedProduct, selectedEnterpriseName, allOptions.length, loadAllOptions]);
 
     useEffect(() => {
         setCurrent(value);
@@ -5764,7 +5783,7 @@ function AsyncChipSelectService({
                                 const left = containerRect.left;
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            if (allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+                            if (allOptions.length === 0 && selectedEnterpriseName && selectedProduct) {
                                 loadAllOptions();
                             }
                             if (newValue === '') {
@@ -5782,7 +5801,7 @@ function AsyncChipSelectService({
                                 const left = containerRect.left;
                                 setDropdownPortalPos({ top, left, width });
                             }
-                            if (allOptions.length === 0 && selectedEnterprise && selectedProduct) {
+                            if (allOptions.length === 0 && selectedEnterpriseName && selectedProduct) {
                                 loadAllOptions();
                             }
                         }}
@@ -5894,9 +5913,9 @@ function AsyncChipSelectService({
                                 }
                             }, 150);
                         }}
-                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterprise || !selectedProduct ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
+                        className={`w-full text-left px-2 py-1 text-[12px] rounded border ${isError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : open ? 'border-blue-500 bg-white ring-2 ring-blue-200' : 'border-blue-300 bg-white hover:bg-slate-50'} ${!selectedEnterpriseName || !selectedProduct ? 'opacity-50 cursor-not-allowed' : ''} text-slate-700 focus:outline-none focus:ring-2 ${isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500'}`}
                         placeholder=""
-                        readOnly={!selectedEnterprise || !selectedProduct}
+                        readOnly={!selectedEnterpriseName || !selectedProduct}
                     />
                 ) : null}
             </div>
@@ -5922,7 +5941,7 @@ function AsyncChipSelectService({
                         <div className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto' style={{maxHeight: '200px'}}>
                             {loading && allOptions.length === 0 && !query.trim() ? (
                                 <div className='px-3 py-2 text-slate-500 text-center'>Loading…</div>
-                            ) : !selectedEnterprise ? (
+                            ) : !selectedEnterpriseName ? (
                                 <div className='px-3 py-2 text-slate-500 text-center'>Please select Enterprise first</div>
                             ) : !selectedProduct ? (
                                 <div className='px-3 py-2 text-slate-500 text-center'>Please select Product first</div>
@@ -6051,35 +6070,31 @@ function AsyncChipSelectService({
     );
 }
 
-interface UserGroupsTableProps {
-    rows: UserGroupRow[];
+interface GlobalSettingsTableProps {
+    rows: GlobalSettingsRow[];
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
     title?: string;
-    groupByExternal?: 'none' | 'groupName' | 'entity' | 'product' | 'service';
+    groupByExternal?: 'none' | 'accountName' | 'enterpriseName' | 'entityName' | 'selectedTools';
+    groupBySelectedTools?: string[];
     onGroupByChange?: (
-        g: 'none' | 'groupName' | 'entity' | 'product' | 'service',
+        g: 'none' | 'accountName' | 'enterpriseName' | 'entityName' | 'selectedTools',
     ) => void;
     hideControls?: boolean;
     visibleColumns?: Array<
-        | 'groupName'
-        | 'description'
+        | 'account'
+        | 'enterprise'
         | 'entity'
-        | 'product'
-        | 'service'
-        | 'roles'
+        | 'configuration'
         | 'actions'
     >;
     highlightQuery?: string;
     customColumnLabels?: Record<string, string>;
     enableDropdownChips?: boolean;
     dropdownOptions?: {
-        groupNames?: Array<{id: string; name: string}>;
-        descriptions?: Array<{id: string; name: string}>;
+        accounts?: Array<{id: string; name: string}>;
+        enterprises?: Array<{id: string; name: string}>;
         entities?: Array<{id: string; name: string}>;
-        products?: Array<{id: string; name: string}>;
-        services?: Array<{id: string; name: string}>;
-        roles?: Array<{id: string; name: string}>;
     };
     onUpdateField?: (rowId: string, field: string, value: any) => void;
     hideRowExpansion?: boolean;
@@ -6089,13 +6104,13 @@ interface UserGroupsTableProps {
     hasBlankRow?: boolean;
     externalFieldErrors?: {[key: string]: Record<string, string>}; // Per-row field errors from parent
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
     onShowAllColumns?: () => void;
@@ -6104,7 +6119,7 @@ interface UserGroupsTableProps {
     compressingLicenseId?: string | null;
     foldingLicenseId?: string | null;
     triggerValidation?: boolean; // Trigger validation highlighting
-    selectedEnterprise?: string;
+    selectedEnterpriseName?: string;
     selectedEnterpriseId?: string;
     selectedAccountId?: string;
     selectedAccountName?: string;
@@ -6117,14 +6132,12 @@ interface UserGroupsTableProps {
     onLicenseValidationChange?: (hasIncompleteLicenses: boolean, incompleteLicenseRows: string[]) => void; // Callback for license validation state
     onLicenseDelete?: (licenseId: string) => Promise<void>; // Callback for license deletion with animation
     onCompleteLicenseDeletion?: () => void; // Callback to complete license deletion after confirmation
-    onOpenAddressModal?: (row: UserGroupRow) => void; // Callback to open address modal
-    onOpenUserGroupModal?: (row: UserGroupRow) => void; // Callback to open user group modal
+    onOpenConfigurationModal?: (row: GlobalSettingsRow) => void; // Callback to open configuration modal
     onShowStartDateProtectionModal?: (message: string) => void; // Callback to show start date protection modal
     onDuplicateDetected?: (message: string) => void; // Callback to show duplicate entry modal
-    onOpenRolesModal?: (row: UserGroupRow) => void; // Callback to open roles modal
 }
 
-function SortableUserGroupRow({
+function SortableGlobalSettingsRow({
     row,
     index,
     onEdit,
@@ -6153,17 +6166,14 @@ function SortableUserGroupRow({
     foldingRowId = null,
     allRows = [],
     onDeleteClick,
-    onOpenAddressModal,
-    onOpenUserGroupModal,
-    onOpenRolesModal,
-    onShowStartDateProtectionModal,
-    selectedEnterprise = '',
-    selectedEnterpriseId = '',
-    selectedAccountId = '',
-    selectedAccountName = '',
+    onOpenConfigurationModal,
+    selectedAccountId,
+    selectedAccountName,
+    selectedEnterpriseId,
+    selectedEnterpriseName,
     onShowGlobalValidationModal,
 }: {
-    row: UserGroupRow;
+    row: GlobalSettingsRow;
     index: number;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
@@ -6174,10 +6184,10 @@ function SortableUserGroupRow({
     isExpanded: boolean;
     onToggle: (id: string) => void;
     expandedContent?: React.ReactNode;
-    onUpdateField: (rowId: string, key: keyof UserGroupRow, value: any) => void;
+    onUpdateField: (rowId: string, key: keyof GlobalSettingsRow, value: any) => void;
     isSelected: boolean;
     onSelect: (id: string) => void;
-    onStartFill: (rowId: string, col: keyof UserGroupRow, value: string) => void;
+    onStartFill: (rowId: string, col: keyof GlobalSettingsRow, value: string) => void;
     inFillRange: boolean;
     pinFirst?: boolean;
     firstColWidth?: string;
@@ -6185,29 +6195,26 @@ function SortableUserGroupRow({
     enableDropdownChips?: boolean;
     shouldShowHorizontalScroll?: boolean;
     onDropdownOptionUpdate?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         action: 'update' | 'delete',
         oldName: string,
         newName?: string,
     ) => Promise<void>;
     onNewItemCreated?: (
-        type: 'groupNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'roles',
+        type: 'roleNames' | 'descriptions' | 'entities' | 'products' | 'services' | 'scope',
         item: {id: string; name: string},
     ) => void;
     isCellMissing?: (rowId: string, field: string) => boolean;
     compressingRowId?: string | null;
     foldingRowId?: string | null;
-    allRows?: UserGroupRow[];
+    allRows?: GlobalSettingsRow[];
     onDeleteClick?: (rowId: string) => void;
-    onOpenAddressModal?: (row: UserGroupRow) => void;
-    onOpenUserGroupModal?: (row: UserGroupRow) => void;
-    onOpenRolesModal?: (row: UserGroupRow) => void;
-    onShowStartDateProtectionModal?: (message: string) => void;
-    onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
-    selectedEnterprise?: string;
-    selectedEnterpriseId?: string;
+    onOpenConfigurationModal?: (row: GlobalSettingsRow) => void;
     selectedAccountId?: string;
     selectedAccountName?: string;
+    selectedEnterpriseId?: string;
+    selectedEnterpriseName?: string;
+    onShowGlobalValidationModal?: (rowId: string, field: string, message: string) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuUp, setMenuUp] = useState(false);
@@ -6281,11 +6288,8 @@ function SortableUserGroupRow({
     // Tab navigation state and logic
     const editableCols = cols.filter((col) =>
         [
-            'groupName',
-            'description',
             'entity',
-            'product',
-            'service',
+            'configuration',
         ].includes(col),
     );
 
@@ -6546,7 +6550,8 @@ function SortableUserGroupRow({
                     </motion.button>
                 )}
             </div>
-            {cols.includes('groupName') && (
+            {/* Entity Column - First Column */}
+            {cols.includes('entity') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible ${
                         pinFirst && !shouldShowHorizontalScroll
@@ -6562,77 +6567,33 @@ function SortableUserGroupRow({
                     <div
                         className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='groupName'
-                        style={{width: '100%', minWidth: '100%', maxWidth: '100%', overflow: 'visible'}}
-                    >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelectGroupName
-                                value={row.groupName || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'groupName' as any, v || '');
-                                }}
-                                placeholder=''
-                                isError={isCellMissing(row.id, 'groupName') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].groupName)}
-                                userGroups={allRows}
-                                onNewItemCreated={(item) => {
-                                    if (onNewItemCreated) {
-                                        onNewItemCreated('groupNames', item);
-                                    }
-                                }}
-                                selectedAccountId={selectedAccountId}
-                                selectedAccountName={selectedAccountName}
-                                selectedEnterpriseId={selectedEnterpriseId}
-                                selectedEnterprise={selectedEnterprise}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.groupName || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'groupName' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`groupName-${row.id}`}
-                                isError={isCellMissing(row.id, 'groupName')}
-                                placeholder='Enter group name'
-                                {...createTabNavigation('groupName')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Description Column */}
-            {cols.includes('description') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
-                        data-row-id={row.id}
-                        data-col='description'
+                        data-col='entity'
                         style={{width: '100%', overflow: 'visible'}}
                     >
-                        <EditableChipInput
-                            value={row.description || ''}
-                            onCommit={(v) => onUpdateField(row.id, 'description' as any, v)}
-                            onRemove={() => onUpdateField(row.id, 'description' as any, '')}
-                            className='text-[12px]'
-                            dataAttr={`description-${row.id}`}
-                            isError={isCellMissing(row.id, 'description') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].description)}
-                            placeholder='Enter description'
-                            {...createTabNavigation('description')}
+                        <AsyncChipSelectEntity
+                            value={row.entity || ''}
+                            onChange={(v) =>
+                                onUpdateField(row.id, 'entity' as any, v || '')
+                            }
+                            placeholder='Enter workstream name'
+                            isError={isCellMissing(row.id, 'entity')}
+                            accounts={allRows}
+                            selectedAccountId={selectedAccountId}
+                            selectedAccountName={selectedAccountName}
+                            selectedEnterpriseId={selectedEnterpriseId}
+                            selectedEnterpriseName={selectedEnterpriseName}
+                            onNewItemCreated={(item) => {
+                                if (onNewItemCreated) {
+                                    onNewItemCreated('entities', item);
+                                }
+                            }}
                         />
                     </div>
                 </div>
             )}
 
-            {/* Entity Column */}
-            {cols.includes('entity') && (
+            {/* Account Column - Read-only */}
+            {cols.includes('account') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -6644,48 +6605,41 @@ function SortableUserGroupRow({
                     <div
                         className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='entity'
-                        style={{width: '100%', overflow: 'visible'}}
+                        data-col='account'
+                        style={{width: '100%', minWidth: '100%', maxWidth: '100%', overflow: 'visible'}}
                     >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelectEntity
-                                value={row.entity || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'entity' as any, v || '');
-                                }}
-                                placeholder='Enter workstream'
-                                isError={isCellMissing(row.id, 'entity') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].entity)}
-                                accounts={allRows}
-                                onNewItemCreated={(item) => {
-                                    if (onNewItemCreated) {
-                                        onNewItemCreated('entities', item);
-                                    }
-                                }}
-                                selectedEnterprise={selectedEnterprise}
-                                selectedEnterpriseId={selectedEnterpriseId}
-                                selectedAccountId={selectedAccountId}
-                                selectedAccountName={selectedAccountName}
-                                {...createTabNavigation('entity')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.entity || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'entity' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`entity-${row.id}`}
-                                isError={isCellMissing(row.id, 'entity')}
-                                placeholder='Enter workstream'
-                                {...createTabNavigation('entity')}
-                            />
-                        )}
+                        <span className='text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200 w-full'>
+                            {row.account || selectedAccountName || ''}
+                        </span>
                     </div>
                 </div>
             )}
 
-            {/* Product Column */}
-            {cols.includes('product') && (
+            {/* Enterprise Column - Read-only */}
+            {cols.includes('enterprise') && (
+                <div
+                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
+                    style={{
+                        backgroundColor: isSelected 
+                            ? 'rgb(239 246 255)' // bg-blue-50
+                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
+                    }}
+                >
+                    <div
+                        className='relative flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
+                        data-row-id={row.id}
+                        data-col='enterprise'
+                        style={{width: '100%', overflow: 'visible'}}
+                    >
+                        <span className='text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200 w-full'>
+                            {row.enterprise || selectedEnterpriseName || ''}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Configuration Column */}
+            {cols.includes('configuration') && (
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
@@ -6697,139 +6651,19 @@ function SortableUserGroupRow({
                     <div
                         className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
                         data-row-id={row.id}
-                        data-col='product'
+                        data-col='configuration'
                         style={{width: '100%', overflow: 'visible'}}
                     >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelectProduct
-                                value={row.product || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'product' as any, v || '');
-                                }}
-                                placeholder='Enter product'
-                                isError={isCellMissing(row.id, 'product') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].product)}
-                                selectedEnterprise={selectedEnterprise}
-                                selectedAccountId={selectedAccountId}
-                                selectedEnterpriseId={selectedEnterpriseId}
-                                onNewItemCreated={(item) => {
-                                    if (onNewItemCreated) {
-                                        onNewItemCreated('products', item);
-                                    }
-                                }}
-                                {...createTabNavigation('product')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.product || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'product' as any, v)
+                        <ConfigurationTooltip
+                            configuration={row.configuration || 'Not configured'}
+                            configurationDetails={row.configurationDetails}
+                            isConfigured={row.isConfigured || false}
+                            onIconClick={() => {
+                                if (onOpenConfigurationModal) {
+                                    onOpenConfigurationModal(row);
                                 }
-                                className='text-[12px]'
-                                dataAttr={`product-${row.id}`}
-                                isError={isCellMissing(row.id, 'product') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].product)}
-                                placeholder='Enter product'
-                                {...createTabNavigation('product')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Service Column */}
-            {cols.includes('service') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='flex items-center text-slate-700 font-normal text-[12px] w-full flex-1'
-                        data-row-id={row.id}
-                        data-col='service'
-                        style={{width: '100%', overflow: 'visible'}}
-                    >
-                        {enableDropdownChips ? (
-                            <AsyncChipSelectService
-                                value={row.service || ''}
-                                onChange={(v) => {
-                                    onUpdateField(row.id, 'service' as any, v || '');
-                                }}
-                                placeholder={row.product ? 'Select service' : 'Select product first'}
-                                isError={isCellMissing(row.id, 'service') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].service)}
-                                selectedEnterprise={selectedEnterprise}
-                                selectedProduct={row.product || ''}
-                                selectedAccountId={selectedAccountId}
-                                selectedEnterpriseId={selectedEnterpriseId}
-                                onNewItemCreated={(item) => {
-                                    if (onNewItemCreated) {
-                                        onNewItemCreated('services', item);
-                                    }
-                                }}
-                                {...createTabNavigation('service')}
-                            />
-                        ) : (
-                            <InlineEditableText
-                                value={row.service || ''}
-                                onCommit={(v) =>
-                                    onUpdateField(row.id, 'service' as any, v)
-                                }
-                                className='text-[12px]'
-                                dataAttr={`service-${row.id}`}
-                                isError={isCellMissing(row.id, 'service') || !!((fieldValidationErrors as any)[row.id] && (fieldValidationErrors as any)[row.id].service)}
-                                placeholder='Enter service'
-                                {...createTabNavigation('service')}
-                            />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Roles Column */}
-            {cols.includes('roles') && (
-                <div
-                    className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
-                    style={{
-                        backgroundColor: isSelected 
-                            ? 'rgb(239 246 255)' // bg-blue-50
-                            : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
-                    }}
-                >
-                    <div
-                        className='flex items-center justify-center text-slate-700 font-normal text-[12px] w-full flex-1'
-                        data-row-id={row.id}
-                        data-col='roles'
-                        style={{width: '100%', overflow: 'visible'}}
-                    >
-                        {(() => {
-                            const roleCount = Array.isArray(row.assignedRoles)
-                                ? row.assignedRoles.length
-                                : (row.roles
-                                    ? row.roles.split(',').map((role) => role.trim()).filter(Boolean).length
-                                    : 0);
-                            return (
-                        <button
-                            onClick={() => onOpenRolesModal?.(row)}
-                            className="relative flex items-center justify-center w-6 h-6 bg-blue-100 border border-blue-300 rounded-lg transition-colors duration-150 hover:bg-blue-200 hover:border-blue-400"
-                            title={`Manage roles for ${row.groupName || 'this group'}${roleCount ? ` (${roleCount})` : ''}`}
-                            tabIndex={-1}
-                        >
-                            <Shield className="w-5 h-5 text-blue-600" />
-                            {roleCount > 0 && (
-                                <div
-                                    className="absolute w-3.5 h-3.5 bg-blue-700 rounded-full flex items-center justify-center shadow-md"
-                                    style={{ top: 0, right: 0, transform: 'translate(35%, -35%)' }}
-                                >
-                                    <span className="text-[9px] text-white font-semibold leading-none">
-                                        {roleCount}
-                                    </span>
-                                </div>
-                            )}
-                        </button>
-                            );
-                        })()}
+                            }}
+                        />
                     </div>
                 </div>
             )}
@@ -6841,12 +6675,13 @@ function SortableUserGroupRow({
     );
 }
 
-const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
+const GlobalSettingsTable = forwardRef<any, GlobalSettingsTableProps>(({
     rows,
     onEdit,
     onDelete,
     title,
     groupByExternal,
+    groupBySelectedTools = [],
     onGroupByChange,
     hideControls,
     visibleColumns,
@@ -6875,22 +6710,19 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     externalSortDirection,
     onSortChange,
     isAIInsightsPanelOpen = false,
-    selectedEnterprise = '',
+    selectedEnterpriseName = '',
     selectedEnterpriseId = '',
     selectedAccountId = '',
     selectedAccountName = '',
     onLicenseValidationChange,
     onLicenseDelete,
     onCompleteLicenseDeletion,
-    onOpenAddressModal,
-    onOpenUserGroupModal,
-    onShowStartDateProtectionModal,
+    onOpenConfigurationModal,
     onDuplicateDetected,
-    onOpenRolesModal,
 }, ref) => {
     // Debug: Log received props
-    console.log('🐛 [ManageUserGroupsTable] Props received:', {
-        selectedEnterprise,
+    console.log('🐛 [GlobalSettingsTable] Props received:', {
+        selectedEnterpriseName,
         selectedEnterpriseId,
         selectedAccountId,
         selectedAccountName,
@@ -6908,6 +6740,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         message: string;
         rowId: string;
     }>({ open: false, field: '', message: '', rowId: '' });
+
+    // Scope Config Modal state
+    // Configuration modal is handled by parent via onOpenConfigurationModal prop
+    const [selectedSettingForConfiguration, setSelectedSettingForConfiguration] = useState<GlobalSettingsRow | null>(null);
 
     // Global validation modal helper functions
     const showGlobalValidationModal = useCallback((rowId: string, field: string, message: string) => {
@@ -7087,11 +6923,11 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     // Validation state
 
     // Use refs to track previous values and avoid infinite loops
-    const prevRowsRef = useRef<UserGroupRow[]>([]);
+    const prevRowsRef = useRef<GlobalSettingsRow[]>([]);
     const orderRef = useRef<string[]>([]);
     
     // Keep local state for editing, but initialize it safely
-    const [localEdits, setLocalEdits] = useState<Record<string, Partial<UserGroupRow>>>({});
+    const [localEdits, setLocalEdits] = useState<Record<string, Partial<GlobalSettingsRow>>>({});
     
     // Use useMemo for base derived state with stable comparison
     const { baseLocalRows, order } = useMemo(() => {
@@ -7149,16 +6985,16 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     };
     
     // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (row: UserGroupRow, field: string): boolean => {
+    const isFieldMissing = (row: GlobalSettingsRow, field: string): boolean => {
         switch (field) {
-            case 'groupName':
-                return !row.groupName || row.groupName.trim() === '';
+            case 'account':
+                return !row.account || row.account.trim() === '';
+            case 'enterprise':
+                return !row.enterprise || row.enterprise.trim() === '';
             case 'entity':
                 return !row.entity || row.entity.trim() === '';
-            case 'product':
-                return !row.product || row.product.trim() === '';
-            case 'service':
-                return !row.service || row.service.trim() === '';
+            case 'configuration':
+                return !row.configuration || row.configuration.trim() === '';
             default:
                 return false;
         }
@@ -7191,7 +7027,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         
         localRows.forEach(row => {
             // Check if any required field is missing
-            if (isFieldMissing(row, 'groupName') ||
+            if (isFieldMissing(row, 'roleName') ||
                 isFieldMissing(row, 'entity') ||
                 isFieldMissing(row, 'product') ||
                 isFieldMissing(row, 'service')) {
@@ -7212,7 +7048,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
                 // Check if any required field is missing
-                if (isFieldMissing(row, 'groupName') ||
+                if (isFieldMissing(row, 'roleName') ||
                     isFieldMissing(row, 'entity') ||
                     isFieldMissing(row, 'product') ||
                     isFieldMissing(row, 'service')) {
@@ -7282,22 +7118,22 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         () =>
             order
                 .map((id) => localRows.find((r) => r.id === id))
-                .filter(Boolean) as UserGroupRow[],
+                .filter(Boolean) as GlobalSettingsRow[],
         [order, localRows],
     );
 
     // Persist helpers
     // Debounced autosave per-row to avoid excessive API traffic
     const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, UserGroupRow>>({});
-    function schedulePersist(row: UserGroupRow, delay = 600) {
+    const latestRowRef = useRef<Record<string, GlobalSettingsRow>>({});
+    function schedulePersist(row: GlobalSettingsRow, delay = 600) {
         const rowId = String(row.id);
         latestRowRef.current[rowId] = row;
         if (saveTimersRef.current[rowId])
             clearTimeout(saveTimersRef.current[rowId]);
         saveTimersRef.current[rowId] = setTimeout(() => {
             const latest = latestRowRef.current[rowId];
-            if (latest) void persistUserGroupRow(latest);
+            if (latest) void persistGlobalSettingRow(latest);
         }, delay);
     }
     useEffect(() => {
@@ -7310,29 +7146,27 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         };
     }, []);
 
-    async function persistUserGroupRow(row: UserGroupRow) {
+    async function persistGlobalSettingRow(row: GlobalSettingsRow) {
         try {
             // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
             if (String(row.id || '').startsWith('tmp-')) {
                 return;
             }
             const core = {
-                // Core fields for user group management
-                groupName: row.groupName,
-                description: row.description,
+                // Core fields for global settings
+                account: row.account,
+                enterprise: row.enterprise,
                 entity: row.entity,
-                product: row.product,
-                service: row.service,
+                configuration: row.configuration,
             } as any;
             // Map UI state into backend details JSON expected by server
             const details = {
-                // User group specific fields
-                groupName: row.groupName || '',
-                description: row.description || '',
+                // Global settings specific fields
+                account: row.account || '',
+                enterprise: row.enterprise || '',
                 entity: row.entity || '',
-                product: row.product || '',
-                service: row.service || '',
-                roles: row.roles || '',
+                configuration: row.configuration || '',
+                configurationDetails: row.configurationDetails || {},
             } as any;
             // Handle existing (non-temporary) rows
             // Check if we're on user group management page
@@ -7353,26 +7187,22 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }
 
     // Helper function to check for duplicate combinations
-    const checkForDuplicate = (rowId: string, updatedRow: UserGroupRow): boolean => {
-        // Check if combination of groupName + entity + product + service already exists in another row
+    const checkForDuplicate = (rowId: string, updatedRow: GlobalSettingsRow): boolean => {
+        // Check if combination of entity + account + enterprise already exists in another row
         const duplicateRow = localRows.find(row => 
             row.id !== rowId && // Exclude current row
-            row.groupName?.trim().toLowerCase() === updatedRow.groupName?.trim().toLowerCase() &&
             row.entity?.trim().toLowerCase() === updatedRow.entity?.trim().toLowerCase() &&
-            row.product?.trim().toLowerCase() === updatedRow.product?.trim().toLowerCase() &&
-            row.service?.trim().toLowerCase() === updatedRow.service?.trim().toLowerCase() &&
-            // Only check for duplicates if all key fields are filled
-            updatedRow.groupName?.trim() && 
-            updatedRow.entity?.trim() && 
-            updatedRow.product?.trim() && 
-            updatedRow.service?.trim()
+            row.account?.trim().toLowerCase() === updatedRow.account?.trim().toLowerCase() &&
+            row.enterprise?.trim().toLowerCase() === updatedRow.enterprise?.trim().toLowerCase() &&
+            // Only check for duplicates if entity field is filled
+            updatedRow.entity?.trim()
         );
         
         return !!duplicateRow;
     };
 
-    function updateRowField(rowId: string, key: keyof UserGroupRow, value: any) {
-        let changed: UserGroupRow | null = null;
+    function updateRowField(rowId: string, key: keyof GlobalSettingsRow, value: any) {
+        let changed: GlobalSettingsRow | null = null;
         
         // Update local edits instead of directly modifying localRows
         setLocalEdits(prev => {
@@ -7381,19 +7211,14 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             if (baseRow) {
                 const currentEdits = prev[rowId] || {};
                 const currentRow = { ...baseRow, ...currentEdits };
-                const next = {...currentRow, [key]: value} as UserGroupRow;
-                
-                // If product field is being cleared, also clear the service field
-                if (key === 'product' && (!value || value.trim() === '')) {
-                    next.service = '';
-                }
+                const next = {...currentRow, [key]: value} as GlobalSettingsRow;
                 
                 // Check for duplicates only for key fields
-                if (['groupName', 'entity', 'product', 'service'].includes(key as string)) {
+                if (['roleName', 'entity', 'product', 'service'].includes(key as string)) {
                     const isDuplicate = checkForDuplicate(rowId, next);
                     if (isDuplicate) {
                         // Show duplicate modal via callback instead of browser alert
-                        const message = `This combination of Group Name (${next.groupName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
+                        const message = `This combination of Workstream Name (${next.entity}), Account (${next.account}), and Enterprise (${next.enterprise}) already exists in another row. Please use a different combination.`;
                         if (onDuplicateDetected) {
                             onDuplicateDetected(message);
                         } else {
@@ -7407,11 +7232,6 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                 
                 // Prepare the field updates
                 let fieldUpdates: any = { [key]: value };
-                
-                // If product field is being cleared, also clear the service field
-                if (key === 'product' && (!value || value.trim() === '')) {
-                    fieldUpdates.service = '';
-                }
                 
                 return {
                     ...prev,
@@ -7433,16 +7253,13 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }
 
     // Helper function to check if main row fields are complete
-    const isMainRowComplete = (row: UserGroupRow): boolean => {
-        return !!(row.groupName && row.groupName.trim() && 
-                 row.entity && row.entity.trim() && 
-                 row.product && row.product.trim() &&
-                 row.service && row.service.trim());
+    const isMainRowComplete = (row: GlobalSettingsRow): boolean => {
+        return !!(row.entity && row.entity.trim());
     };
 
     // State for grouping
     const [groupBy, setGroupBy] = useState<
-        'none' | 'groupName' | 'entity' | 'product' | 'service'
+        'none' | 'accountName' | 'enterpriseName' | 'entityName' | 'selectedTools'
     >('none');
     
     // sync external groupBy
@@ -7451,36 +7268,34 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
     }, [groupByExternal]);
 
     // Clean break - license management removed
-    const columnOrder: UserGroupsTableProps['visibleColumns'] = useMemo(
+    const columnOrder: GlobalSettingsTableProps['visibleColumns'] = useMemo(
         () => [
-            // User group columns
-            'groupName',
-            'description',
+            // Global Settings columns
             'entity',
-            'product',
-            'service',
-            'roles',
+            'account',
+            'enterprise',
+            'configuration',
         ],
         [],
     );
     
     // Continue with component structure
     const cols = useMemo(() => {
-        const base = (columnOrder || []) as string[];
-        if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
+        if (!visibleColumns) {
+            // Fall back to columnOrder if visibleColumns is null/undefined
+            return (columnOrder || []) as string[];
+        }
         if (visibleColumns.length === 0) return []; // If empty array, show no columns
-        const allowed = new Set(visibleColumns as string[]);
-        // Keep canonical order from columnOrder; filter by visibility
-        return base.filter((c) => allowed.has(c));
+        // Use the order from visibleColumns when provided, as it represents the user's preferred order
+        return visibleColumns as string[];
     }, [visibleColumns, columnOrder]);
 
     const colSizes = useMemo(() => ({
         deleteButton: '8px', // Space for delete button with proper padding
-        groupName: '200px', // Group Name column - increased for sort arrows
-        description: '250px', // Description column - needs more space
-        entity: '180px', // Entity column - increased for sort arrows
-        product: '180px', // Product column - increased for sort arrows
-        service: '180px', // Service column - increased for sort arrows
+        account: '200px', // Account column
+        enterprise: '200px', // Enterprise column
+        entity: '200px', // Entity Name column
+        configuration: 'minmax(300px, 1fr)', // Configuration column gets remaining space
         roles: '100px', // Roles column - icon only
     } as Record<string, string>), []);
     const [customColumns, setCustomColumns] = useState<string[]>([]);
@@ -7848,36 +7663,69 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
             return { 'All Records': displayItems };
         }
 
-        const groups: Record<string, UserGroupRow[]> = {};
+        const groups: Record<string, GlobalSettingsRow[]> = {};
         
         displayItems.forEach((item) => {
             let groupKey = '';
             
             switch (groupBy) {
-                case 'groupName':
-                    groupKey = item.groupName || '(No Group Name)';
+                case 'accountName':
+                    groupKey = item.account || '(No Account)';
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(item);
                     break;
-                case 'entity':
-                    groupKey = item.entity || '(No Entity)';
+                case 'enterpriseName':
+                    groupKey = item.enterprise || '(No Enterprise)';
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(item);
                     break;
-                case 'product':
-                    groupKey = item.product || '(No Product)';
+                case 'entityName':
+                    groupKey = item.entity || '(No Workstream Name)';
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(item);
                     break;
-                case 'service':
-                    groupKey = item.service || '(No Service)';
+                case 'selectedTools':
+                    // Group by selected tools - a row can appear in multiple groups
+                    const configDetails = item.configurationDetails || (item as any).categories || {};
+                    const allTools = Object.values(configDetails).flat() as string[];
+                    
+                    if (groupBySelectedTools.length > 0) {
+                        groupBySelectedTools.forEach((tool) => {
+                            const toolLower = tool.toLowerCase();
+                            const hasTool = allTools.some((t: string) => t.toLowerCase() === toolLower);
+                            if (hasTool) {
+                                if (!groups[tool]) {
+                                    groups[tool] = [];
+                                }
+                                groups[tool].push(item);
+                            }
+                        });
+                    } else {
+                        // If no tools selected, show all records
+                        groupKey = 'All Records';
+                        if (!groups[groupKey]) {
+                            groups[groupKey] = [];
+                        }
+                        groups[groupKey].push(item);
+                    }
                     break;
                 default:
                     groupKey = 'All Records';
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(item);
             }
-            
-            if (!groups[groupKey]) {
-                groups[groupKey] = [];
-            }
-            groups[groupKey].push(item);
         });
 
         // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-        const sortedGroups: Record<string, UserGroupRow[]> = {};
+        const sortedGroups: Record<string, GlobalSettingsRow[]> = {};
         const sortedKeys = Object.keys(groups).sort((a, b) => {
             const aIsEmpty = a.startsWith('(No ');
             const bIsEmpty = b.startsWith('(No ');
@@ -7891,7 +7739,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
         });
 
         return sortedGroups;
-    }, [displayItems, groupBy]);
+    }, [displayItems, groupBy, groupBySelectedTools]);
 
     // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
     const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
@@ -8281,12 +8129,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
-                            groupName: 'Group Name',
-                            description: 'Description',
-                            entity: 'Workstream',
-                            product: 'Product',
-                            service: 'Service',
-                            roles: 'Roles',
+                            account: 'Account',
+                            enterprise: 'Enterprise',
+                            entity: 'Workstream Name',
+                            configuration: 'Configuration',
                         };
 
                         // Merge custom labels with defaults
@@ -8348,42 +8194,60 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
                                                     : ''
                                             } ${
-                                                c === 'roles' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
+                                                c === 'scope' ? 'border-r-0' : 'border-r border-slate-200' // Remove right border for last column
                                             }`}
-                                            style={c === 'roles' ? { minWidth: '100px' } : undefined} // Width for roles icon
+                                            style={c === 'scope' ? { minWidth: '100px' } : undefined} // Width for roles icon
                                         >
-                                            <div className='flex items-center gap-2'>
+                                            <div className='flex items-center gap-2 pr-10'>
                                                 {iconFor[c] && iconFor[c]}
                                                 <span>{labelFor[c] || c}</span>
                                             </div>
-                                            {[
-                                                'groupName',
-                                                'description',
-                                                'entity',
-                                                'product',
-                                                'service',
-                                            ].includes(c) && (
-                                                <div className={`inline-flex items-center ml-4 ${c === 'roles' ? '' : 'absolute right-8 top-1/2 -translate-y-1/2'}`}>
-                                                    <button
-                                                        onClick={() => toggleSort(c as any, 'asc')}
-                                                        className={`${sortCol === c && sortDir === 'asc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
-                                                    >
-                                                        <ArrowUp
-                                                            size={sortCol === c && sortDir === 'asc' ? 20 : 16}
+                                            {c === 'entity' && (
+                                                <div className="inline-flex items-center absolute right-8 top-1/2 -translate-y-1/2">
+                                                    <div className="relative inline-flex items-center justify-center" style={{ width: '24px', height: '24px' }}>
+                                                        {/* Base combined icon - use separate arrows to allow individual coloring */}
+                                                        <div className="relative inline-flex items-center justify-center" style={{ width: '24px', height: '24px' }}>
+                                                            <ArrowUpIcon 
+                                                                className={`absolute h-4 w-4 transition-all duration-300 ${(sortCol === c && sortDir === 'asc') ? 'text-green-600 font-bold' : 'text-slate-600'}`}
+                                                                style={{ 
+                                                                    top: '2px',
+                                                                    left: '1px',
+                                                                    strokeWidth: (sortCol === c && sortDir === 'asc') ? '2.5' : '2'
+                                                                }}
+                                                            />
+                                                            <ArrowDownIcon 
+                                                                className={`absolute h-4 w-4 transition-all duration-300 ${(sortCol === c && sortDir === 'desc') ? 'text-green-600 font-bold' : 'text-slate-600'}`}
+                                                                style={{ 
+                                                                    bottom: '-1px',
+                                                                    right: '1px',
+                                                                    strokeWidth: (sortCol === c && sortDir === 'desc') ? '2.5' : '2'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {/* Clickable areas for up and down arrows */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleSort(c as any, 'asc');
+                                                            }}
+                                                            className={`absolute top-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
+                                                            aria-label="Sort ascending"
+                                                            title="Sort ascending"
                                                         />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleSort(c as any, 'desc')}
-                                                        className={`${sortCol === c && sortDir === 'desc' ? 'text-blue-600 font-bold' : 'text-slate-400'} transition-all duration-200 hover:text-slate-600`}
-                                                    >
-                                                        <ArrowDown
-                                                            size={sortCol === c && sortDir === 'desc' ? 20 : 16}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleSort(c as any, 'desc');
+                                                            }}
+                                                            className={`absolute bottom-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
+                                                            aria-label="Sort descending"
+                                                            title="Sort descending"
                                                         />
-                                                    </button>
+                                                    </div>
                                                 </div>
                                             )}
                                             {/* Show resize handle for resizable columns but not for last column */}
-                                            {['groupName', 'description', 'entity', 'product', 'service'].includes(c) && (
+                                            {['roleName', 'description', 'entity', 'account', 'enterprise', 'product', 'service'].includes(c) && idx < cols.length - 1 && (
                                                 <div
                                                     onMouseDown={(e: any) =>
                                                         startResize(c, e)
@@ -8394,7 +8258,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
                                                 </div>
                                             )}
-                                            {c === 'groupName' && (
+                                            {c === 'roleName' && (
                                                 <span
                                                     aria-hidden
                                                     className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
@@ -8419,7 +8283,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                         <div className='space-y-1 pt-2'>
                             {displayItems.map((r, idx) => (
                                 <div key={r.id}>
-                                    <SortableUserGroupRow
+                                    <SortableGlobalSettingsRow
                                         row={r}
                                         index={idx}
                                         cols={cols}
@@ -8452,13 +8316,10 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                         inFillRange={false}
                                         onDeleteClick={handleDeleteClick}
                                         shouldShowHorizontalScroll={shouldShowHorizontalScroll}
-                                        onOpenAddressModal={onOpenAddressModal}
-                                        onOpenUserGroupModal={onOpenUserGroupModal}
-                                        onOpenRolesModal={onOpenRolesModal}
-                                        onShowStartDateProtectionModal={onShowStartDateProtectionModal}
+                                        onOpenConfigurationModal={onOpenConfigurationModal}
                                         onShowGlobalValidationModal={showGlobalValidationModal}
-                                        selectedEnterprise={selectedEnterprise}
                                         selectedEnterpriseId={selectedEnterpriseId}
+                                        selectedEnterpriseName={selectedEnterpriseName}
                                         selectedAccountId={selectedAccountId}
                                         selectedAccountName={selectedAccountName}
                                     />
@@ -8510,7 +8371,7 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                     <div className='border-b border-slate-200 overflow-visible'>
                                         {groupRows.map((r, idx) => (
                                             <div key={r.id}>
-                                                <SortableUserGroupRow
+                                                <SortableGlobalSettingsRow
                                                     row={r}
                                                     index={idx}
                                                     cols={cols}
@@ -8543,12 +8404,9 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                                                     inFillRange={false}
                                                     onDeleteClick={handleDeleteClick}
                                                     shouldShowHorizontalScroll={shouldShowHorizontalScroll}
-                                                    onOpenAddressModal={onOpenAddressModal}
-                                                    onOpenUserGroupModal={onOpenUserGroupModal}
-                                        onOpenRolesModal={onOpenRolesModal}
-                                                    onShowStartDateProtectionModal={onShowStartDateProtectionModal}
+                                                    onOpenConfigurationModal={onOpenConfigurationModal}
                                                     onShowGlobalValidationModal={showGlobalValidationModal}
-                                                    selectedEnterprise={selectedEnterprise}
+                                                    selectedEnterpriseName={selectedEnterpriseName}
                                                     selectedEnterpriseId={selectedEnterpriseId}
                                                     selectedAccountId={selectedAccountId}
                                                     selectedAccountName={selectedAccountName}
@@ -8643,11 +8501,14 @@ const ManageUserGroupsTable = forwardRef<any, UserGroupsTableProps>(({
                     </div>
                 </div>
             )}
+
+            {/* Configuration modal is handled by parent component via onOpenConfigurationModal */}
         </div>
     );
 });
 
 // Set the display name for debugging
-ManageUserGroupsTable.displayName = 'ManageUserGroupsTable';
+GlobalSettingsTable.displayName = 'GlobalSettingsTable';
 
-export default ManageUserGroupsTable;
+export default GlobalSettingsTable;
+    
