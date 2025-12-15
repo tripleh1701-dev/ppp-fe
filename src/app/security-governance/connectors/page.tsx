@@ -1,1454 +1,3082 @@
-'use client';
+﻿'use client';
 
-import {useEffect, useMemo, useRef, useState, useCallback} from 'react';
-import ConfirmModal from '@/components/ConfirmModal';
-import ConnectorDetailsPanel from '@/components/ConnectorDetailsPanel';
-import {motion, AnimatePresence} from 'framer-motion';
-// @ts-ignore
-import * as XLSX from 'xlsx';
+/**
+ * ============================================================================
+ * TEMPORARY LOCAL STORAGE IMPLEMENTATION - REVERT WHEN APIs ARE READY
+ * ============================================================================
+ * 
+ * This file currently uses localStorage to persist connectors data for testing.
+ * 
+ * TO REVERT TO API-BASED STORAGE:
+ * 1. Search for "LOCAL_STORAGE_CONNECTORS" to find all related code
+ * 2. Set USE_LOCAL_STORAGE constant to false (line ~37)
+ * 3. Remove the localStorage save/load functions (lines ~40-64)
+ * 4. Remove the useEffect that saves to localStorage (line ~73-78)
+ * 5. Remove the initial load useEffect (line ~673-682)
+ * 6. Update loadConnectors function to call actual API endpoints
+ * 7. Update all setConnectors calls to use API save functions instead
+ * 
+ * The localStorage key used is: 'connectors_connectors_data'
+ * ============================================================================
+ */
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
-    EllipsisVerticalIcon,
-    EyeIcon,
-    PencilSquareIcon,
-    TrashIcon,
-    LinkIcon,
     PlusIcon,
     MagnifyingGlassIcon,
-    FunnelIcon,
     ArrowsUpDownIcon,
-    Squares2X2Icon,
+    EyeSlashIcon,
+    EyeIcon,
+    RectangleStackIcon,
     BookmarkIcon,
-    ShieldCheckIcon,
-    InformationCircleIcon,
-    XMarkIcon,
 } from '@heroicons/react/24/outline';
+import ConfirmModal from '@/components/ConfirmModal';
+import ManageConnectorsTable, { ConnectorRow } from '@/components/ManageConnectorsTable';
+import ConnectorDetailsModal, { Connector } from '@/components/ConnectorDetailsModal';
+import { api, API_BASE } from '@/utils/api';
+import { generateId } from '@/utils/id-generator';
 
-interface ConnectorRecord {
-    id: string;
-    connectorName: string;
-    description: string;
-    type: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
-    lastUpdated: string;
-    createdAt: string;
-    createdBy: string;
-}
+export default function ManageConnectors() {
+    // Router for navigation interception
+    const router = useRouter();
+    
+    // Debug: Track re-renders
+    const renderCountRef = useRef(0);
+    renderCountRef.current += 1;
 
-// Reusable trash button (copied from credentials manager)
-function ToolbarTrashButton({
-    onClick,
-    bounce = false,
-}: {
-    onClick?: () => void;
-    bounce?: boolean;
-}) {
-    const [over, setOver] = useState(false);
-    return (
-        <motion.button
-            id='connector-trash-target'
-            type='button'
-            onClick={onClick}
-            aria-label='Trash'
-            aria-dropeffect='move'
-            className={`group relative ml-3 inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all duration-300 transform ${
-                over
-                    ? 'bg-gradient-to-br from-red-400 to-red-600 border-red-500 ring-4 ring-red-300/50 scale-110 shadow-lg'
-                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:from-red-500 hover:to-red-600 hover:border-red-500 hover:shadow-lg hover:scale-105'
-            } ${over ? 'drag-over' : ''}`}
-            title='Trash'
-            whileHover={{
-                scale: 1.1,
-                rotate: [0, -8, 8, 0],
-                transition: {duration: 0.4},
-            }}
-            whileTap={{
-                scale: 0.95,
-                transition: {duration: 0.1},
-            }}
-        >
-            <TrashIcon
-                className={`w-5 h-5 transition-colors duration-300 ${
-                    over ? 'text-white' : 'text-red-600 group-hover:text-white'
-                }`}
-            />
-            <style jsx>{`
-                .drag-over {
-                    animation: trashBounce 0.6s ease-in-out infinite;
-                }
-                @keyframes trashBounce {
-                    0%,
-                    100% {
-                        transform: scale(1.1) translateY(0);
-                    }
-                    50% {
-                        transform: scale(1.1) translateY(-4px);
-                    }
-                }
-            `}</style>
-        </motion.button>
-    );
-}
-
-// Connector Categories with proper SVG icons from public/images/logos (same as pipeline canvas)
-const connectorCategories = {
-    plan: {
-        name: 'PLAN',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <rect
-                    x='3'
-                    y='4'
-                    width='18'
-                    height='16'
-                    rx='2'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='1.5'
-                />
-                <rect
-                    x='3'
-                    y='4'
-                    width='18'
-                    height='5'
-                    rx='2'
-                    fill='currentColor'
-                    opacity='0.2'
-                />
-                <path
-                    d='M7 2V6M17 2V6'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'jira',
-                name: 'JIRA',
-                icon: (
-                    <img
-                        src='/images/logos/jira.svg'
-                        alt='JIRA'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'trello',
-                name: 'Trello',
-                icon: (
-                    <img
-                        src='/images/logos/trello.svg'
-                        alt='Trello'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'asana',
-                name: 'Asana',
-                icon: (
-                    <img
-                        src='/images/logos/asana.svg'
-                        alt='Asana'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    code: {
-        name: 'CODE',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <rect
-                    x='2'
-                    y='3'
-                    width='20'
-                    height='18'
-                    rx='2'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='1.5'
-                />
-                <rect
-                    x='2'
-                    y='3'
-                    width='20'
-                    height='6'
-                    rx='2'
-                    fill='currentColor'
-                    opacity='0.2'
-                />
-                <circle cx='6' cy='6' r='1' fill='currentColor' />
-                <circle cx='9' cy='6' r='1' fill='currentColor' />
-                <circle cx='12' cy='6' r='1' fill='currentColor' />
-                <path
-                    d='M8 14l2-2-2-2'
-                    stroke='currentColor'
-                    strokeWidth='1.5'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                />
-                <path
-                    d='M12 14h4'
-                    stroke='currentColor'
-                    strokeWidth='1.5'
-                    strokeLinecap='round'
-                />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'github',
-                name: 'Github',
-                icon: (
-                    <img
-                        src='/images/logos/github.svg'
-                        alt='GitHub'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'gitlab',
-                name: 'GitLab',
-                icon: (
-                    <img
-                        src='/images/logos/gitlab.svg'
-                        alt='GitLab'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'azurerepo',
-                name: 'AzureRepo',
-                icon: (
-                    <img
-                        src='/images/logos/azure.svg'
-                        alt='Azure Repos'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'bitbucket',
-                name: 'Bitbucket',
-                icon: (
-                    <img
-                        src='/images/logos/bitbucket.svg'
-                        alt='Bitbucket'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    build: {
-        name: 'BUILD',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <path d='M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5A3.5 3.5 0 0 1 15.5 12A3.5 3.5 0 0 1 12 15.5M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12C19.5 11.66 19.47 11.34 19.43 11.02L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.96 19.05 5.05L16.56 6.05C16.04 5.65 15.48 5.32 14.87 5.07L14.5 2.42C14.46 2.18 14.25 2 14 2H10C9.75 2 9.54 2.18 9.5 2.42L9.13 5.07C8.52 5.32 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.96 4.46 5.05 4.34 5.27L2.34 8.73C2.22 8.95 2.27 9.22 2.46 9.37L4.57 11.02C4.53 11.34 4.5 11.67 4.5 12C4.5 12.33 4.53 12.66 4.57 12.98L2.46 14.63C2.27 14.78 2.22 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.03 4.95 18.95L7.44 17.94C7.96 18.34 8.52 18.68 9.13 18.93L9.5 21.58C9.54 21.82 9.75 22 10 22H14C14.25 22 14.46 21.82 14.5 21.58L14.87 18.93C15.48 18.68 16.04 18.34 16.56 17.94L19.05 18.95C19.27 19.03 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98Z' />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'jenkins',
-                name: 'Jenkins',
-                icon: (
-                    <img
-                        src='/images/logos/jenkins.svg'
-                        alt='Jenkins'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'github-actions',
-                name: 'GitHub Actions',
-                icon: (
-                    <img
-                        src='/images/logos/github_actions.png'
-                        alt='GitHub Actions'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'aws',
-                name: 'AWS',
-                icon: (
-                    <img
-                        src='/images/logos/aws.svg'
-                        alt='AWS'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'circleci',
-                name: 'CircleCI',
-                icon: (
-                    <img
-                        src='/images/logos/circleci.svg'
-                        alt='CircleCI'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'travis',
-                name: 'Travis CI',
-                icon: (
-                    <img
-                        src='/images/logos/travis_ci.svg'
-                        alt='Travis CI'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'gitlab-ci',
-                name: 'GitLab CI',
-                icon: (
-                    <img
-                        src='/images/logos/gitlab_ci.svg'
-                        alt='GitLab CI'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'teamcity',
-                name: 'TeamCity',
-                icon: (
-                    <img
-                        src='/images/logos/teamcity.svg'
-                        alt='TeamCity'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'bamboo',
-                name: 'Bamboo',
-                icon: (
-                    <img
-                        src='/images/logos/bamboo.png'
-                        alt='Bamboo'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    test: {
-        name: 'TEST',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <path
-                    d='M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V5H19V19Z'
-                    opacity='0.2'
-                />
-                <path
-                    d='M7 12L10 15L17 8'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    fill='none'
-                />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'cypress',
-                name: 'Cypress',
-                icon: (
-                    <img
-                        src='/images/logos/cypress.png'
-                        alt='Cypress'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'mocha',
-                name: 'Mocha',
-                icon: (
-                    <img
-                        src='/images/logos/mocha.svg'
-                        alt='Mocha'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'playwright',
-                name: 'Playwright',
-                icon: (
-                    <img
-                        src='/images/logos/playwright.svg'
-                        alt='Playwright'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'puppeteer',
-                name: 'Puppeteer',
-                icon: (
-                    <img
-                        src='/images/logos/puppeteer.png'
-                        alt='Puppeteer'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    deploy: {
-        name: 'DEPLOY',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <path d='M12 2L2 7L12 12L22 7L12 2Z' opacity='0.3' />
-                <path
-                    d='M2 17L12 22L22 17'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    fill='none'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                />
-                <path
-                    d='M2 12L12 17L22 12'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    fill='none'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'kubernetes',
-                name: 'Kubernetes',
-                icon: (
-                    <img
-                        src='/images/logos/kubernetes.svg'
-                        alt='Kubernetes'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'helm',
-                name: 'Helm',
-                icon: (
-                    <img
-                        src='/images/logos/helm.svg'
-                        alt='Helm'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'aws-deploy',
-                name: 'AWS',
-                icon: (
-                    <img
-                        src='/images/logos/aws.svg'
-                        alt='AWS'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'docker',
-                name: 'Docker',
-                icon: (
-                    <img
-                        src='/images/logos/docker.svg'
-                        alt='Docker'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'terraform',
-                name: 'Terraform',
-                icon: (
-                    <img
-                        src='/images/logos/terraform.svg'
-                        alt='Terraform'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'ansible',
-                name: 'Ansible',
-                icon: (
-                    <img
-                        src='/images/logos/ansible.svg'
-                        alt='Ansible'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    approval: {
-        name: 'APPROVAL',
-        icon: (
-            <svg
-                className='w-4 h-4'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-            >
-                <path
-                    d='M20 6L9 17l-5-5'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                />
-                <circle cx='12' cy='12' r='9' strokeWidth='2' opacity='0.3' />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'slack',
-                name: 'Slack',
-                icon: (
-                    <img
-                        src='/images/logos/slack.svg'
-                        alt='Slack'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'teams',
-                name: 'Teams',
-                icon: (
-                    <img
-                        src='/images/logos/teams.svg'
-                        alt='Microsoft Teams'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'discord',
-                name: 'Discord',
-                icon: (
-                    <img
-                        src='/images/logos/discord.svg'
-                        alt='Discord'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'email',
-                name: 'Email',
-                icon: (
-                    <img
-                        src='/images/logos/email.png'
-                        alt='Email'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-    release: {
-        name: 'RELEASE',
-        icon: (
-            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                <rect
-                    x='3'
-                    y='6'
-                    width='18'
-                    height='12'
-                    rx='2'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='1.5'
-                />
-                <rect
-                    x='3'
-                    y='6'
-                    width='18'
-                    height='4'
-                    rx='2'
-                    fill='currentColor'
-                    opacity='0.2'
-                />
-                <path
-                    d='M12 2L8 6H16L12 2Z'
-                    fill='currentColor'
-                    opacity='0.6'
-                />
-            </svg>
-        ),
-        connectors: [
-            {
-                id: 'grafana',
-                name: 'Grafana',
-                icon: (
-                    <img
-                        src='/images/logos/grafana.svg'
-                        alt='Grafana'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'prometheus',
-                name: 'Prometheus',
-                icon: (
-                    <img
-                        src='/images/logos/prometheus.svg'
-                        alt='Prometheus'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'datadog',
-                name: 'Datadog',
-                icon: (
-                    <img
-                        src='/images/logos/datadog.svg'
-                        alt='Datadog'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-            {
-                id: 'new-relic',
-                name: 'New Relic',
-                icon: (
-                    <img
-                        src='/images/logos/new_relic.svg'
-                        alt='New Relic'
-                        className='w-8 h-8'
-                    />
-                ),
-            },
-        ],
-    },
-};
-
-// Create Connector Sidebar Component (category-wise with SVG icons)
-function CreateConnectorSidebar({
-    isOpen,
-    onClose,
-    onSave,
-    onConnectorSelect,
-    shouldResetSelection,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (connector: Partial<ConnectorRecord>) => void;
-    onConnectorSelect: (connector: any) => void;
-    shouldResetSelection?: boolean;
-}) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedConnector, setSelectedConnector] = useState<any>(null);
-
-    // Reset selection when requested (e.g., when details panel is closed)
+    // ============================================================================
+    // TEMPORARY: Local Storage for Testing (REVERT WHEN APIs ARE READY)
+    // ============================================================================
+    // This section stores connectors data in localStorage for testing purposes.
+    // TODO: Remove this entire section and replace with API calls when backend APIs are ready.
+    // Search for "LOCAL_STORAGE_CONNECTORS" to find all related code.
+    const LOCAL_STORAGE_CONNECTORS_KEY = 'connectors_connectors_data';
+    const USE_LOCAL_STORAGE = true; // Set to false to disable localStorage (for API testing)
+    
+    // Helper function to get localStorage key for account/enterprise combination
+    const getLocalStorageKey = (accountId: string, enterpriseId: string): string => {
+        if (accountId && enterpriseId) {
+            return `${LOCAL_STORAGE_CONNECTORS_KEY}_${accountId}_${enterpriseId}`;
+        }
+        // Fallback to default key if no account/enterprise
+        return LOCAL_STORAGE_CONNECTORS_KEY;
+    };
+    
+    // Load connectors from localStorage for current account/enterprise
+    const loadConnectorsFromLocalStorage = useCallback((accountId?: string, enterpriseId?: string): ConnectorRow[] => {
+        if (!USE_LOCAL_STORAGE || typeof window === 'undefined') return [];
+        try {
+            if (!accountId || !enterpriseId) {
+                console.log('⚠️ [LocalStorage] Cannot load - missing accountId or enterpriseId');
+                return [];
+            }
+            const key = getLocalStorageKey(accountId, enterpriseId);
+            const stored = window.localStorage.getItem(key);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                console.log('📦 [LocalStorage] Loaded connectors from localStorage:', parsed.length, 'rows for account/enterprise:', accountId, enterpriseId);
+                return parsed;
+            }
+        } catch (error) {
+            console.error('❌ [LocalStorage] Failed to load connectors from localStorage:', error);
+        }
+        return [];
+    }, []);
+    
+    // Save connectors to localStorage for current account/enterprise
+    const saveConnectorsToLocalStorage = useCallback((roles: ConnectorRow[], accountId?: string, enterpriseId?: string) => {
+        if (!USE_LOCAL_STORAGE || typeof window === 'undefined') return;
+        try {
+            if (!accountId || !enterpriseId) {
+                console.log('⚠️ [LocalStorage] Cannot save - missing accountId or enterpriseId');
+                return;
+            }
+            const key = getLocalStorageKey(accountId, enterpriseId);
+            window.localStorage.setItem(key, JSON.stringify(roles));
+            console.log('💾 [LocalStorage] Saved connectors to localStorage:', roles.length, 'rows for account/enterprise:', accountId, enterpriseId);
+        } catch (error) {
+            console.error('❌ [LocalStorage] Failed to save connectors to localStorage:', error);
+        }
+    }, []);
+    
+    // Debug function to check localStorage data (can be called from browser console)
     useEffect(() => {
-        if (shouldResetSelection) {
-            setSelectedConnector(null);
+        if (typeof window !== 'undefined') {
+            // Expose function to window for debugging
+            (window as any).checkConnectorsLocalStorage = () => {
+                try {
+                    const stored = window.localStorage.getItem(LOCAL_STORAGE_CONNECTORS_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        console.log('📦 [Debug] Connectors in localStorage:', parsed);
+                        console.log('📦 [Debug] Count:', parsed.length, 'rows');
+                        return parsed;
+                    } else {
+                        console.log('📦 [Debug] No connectors data in localStorage');
+                        return [];
+                    }
+                } catch (error) {
+                    console.error('❌ [Debug] Error reading localStorage:', error);
+                    return null;
+                }
+            };
+            
+            // Log current localStorage status on mount
+            const stored = window.localStorage.getItem(LOCAL_STORAGE_CONNECTORS_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    console.log('📦 [LocalStorage] Found existing connectors data:', parsed.length, 'rows');
+                } catch (error) {
+                    console.error('❌ [LocalStorage] Error parsing existing data:', error);
+                }
+            } else {
+                console.log('📦 [LocalStorage] No existing connectors data found');
+            }
         }
-    }, [shouldResetSelection]);
+    }, []);
+    // ============================================================================
+    // END TEMPORARY LOCAL STORAGE SECTION
+    // ============================================================================
+    
+    // Connector data state
+    const [connectors, setConnectors] = useState<ConnectorRow[]>([]);
+    
+    // Track if we're currently loading to prevent overwriting localStorage during load
+    const isLoadingRef = useRef(false);
+    
+    // Client-side display order tracking - independent of API timestamps
+    const displayOrderRef = useRef<Map<string, number>>(new Map());
 
-    const handleConnectorSelect = (connector: any) => {
-        console.log('🔗 Connector selected:', connector.name);
-        setSelectedConnector(connector);
-        // Notify parent component to open the connector details panel
-        onConnectorSelect(connector);
-    };
-
-    const handleConnectorSave = () => {
-        if (selectedConnector) {
-            onSave({
-                connectorName: selectedConnector.name,
-                description: `${selectedConnector.name} connector integration`,
-                type: selectedConnector.id.toUpperCase(),
-                status: 'ACTIVE' as const,
-                id: `connector-${Date.now()}`,
-                lastUpdated: new Date().toISOString(),
-                createdAt: new Date().toISOString(),
-                createdBy: 'current-user',
-            });
-            setSelectedConnector(null);
-            onClose();
-        }
-    };
-
-    // Filter categories based on search
-    const filteredCategories = Object.entries(connectorCategories)
-        .map(([key, category]) => ({
-            key,
-            ...category,
-            connectors: category.connectors.filter((connector) =>
-                connector.name
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()),
-            ),
-        }))
-        .filter((category) => category.connectors.length > 0 || !searchQuery);
-
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        initial={{opacity: 0}}
-                        animate={{opacity: 1}}
-                        exit={{opacity: 0}}
-                        className='fixed inset-0 bg-black bg-opacity-50 z-40'
-                        onClick={onClose}
-                    />
-
-                    {/* Main Sidebar - Collapsed when connector selected */}
-                    <motion.div
-                        initial={{x: '100%'}}
-                        animate={{
-                            x: 0,
-                            width: '500px',
-                        }}
-                        exit={{x: '100%'}}
-                        transition={{
-                            type: 'spring',
-                            damping: 25,
-                            stiffness: 200,
-                        }}
-                        className='fixed right-0 top-0 h-full bg-white shadow-2xl z-50 flex flex-col'
-                        style={{
-                            width: '500px',
-                        }}
-                    >
-                        {/* Header with frame.svg background */}
-                        <div
-                            className='relative border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100'
-                            style={{
-                                padding: selectedConnector
-                                    ? '12px 8px'
-                                    : '24px',
-                            }}
-                        >
-                            <div className='absolute inset-0 opacity-10'>
-                                <img
-                                    src='/images/logos/frame.svg'
-                                    alt='Frame'
-                                    className='w-full h-full object-cover'
-                                />
-                            </div>
-                            <div className='relative flex items-center justify-between'>
-                                {selectedConnector ? (
-                                    // Collapsed header - minimal layout
-                                    <div className='flex flex-col items-center w-full space-y-2'>
-                                        <button
-                                            onClick={onClose}
-                                            className='p-1 hover:bg-white/20 rounded-full transition-colors'
-                                        >
-                                            <XMarkIcon className='w-4 h-4 text-gray-700' />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    // Expanded header - horizontal layout
-                                    <>
-                                        <div className='flex items-center space-x-3'>
-                                            <div className='w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center'>
-                                                <svg
-                                                    className='w-5 h-5 text-white'
-                                                    fill='currentColor'
-                                                    viewBox='0 0 24 24'
-                                                >
-                                                    <path d='M12 2L2 7L12 12L22 7L12 2Z' />
-                                                </svg>
-                                            </div>
-                                            <h2 className='text-xl font-bold text-gray-900'>
-                                                Connectors
-                                            </h2>
-                                        </div>
-                                        <button
-                                            onClick={onClose}
-                                            className='p-2 hover:bg-white/20 rounded-full transition-colors'
-                                        >
-                                            <XMarkIcon className='w-5 h-5 text-gray-700' />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {selectedConnector ? (
-                            // Collapsed view - show all categories vertically
-                            <div className='flex-1 flex flex-col relative'>
-                                {/* Vertical category list */}
-                                <div className='relative flex-1 overflow-y-auto py-4 space-y-4'>
-                                    {Object.entries(connectorCategories).map(
-                                        ([key, category]) => (
-                                            <div
-                                                key={key}
-                                                className='flex justify-center cursor-pointer group'
-                                                onClick={() =>
-                                                    setSelectedConnector(null)
-                                                }
-                                                title={`Open ${category.name} connectors`}
-                                            >
-                                                {/* Category Icon - Animated, Icons Only */}
-                                                <div className='w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center hover:bg-blue-100 group-hover:scale-110 transition-all shadow-sm'>
-                                                    <div className='w-6 h-6 text-blue-600'>
-                                                        {key === 'plan' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <rect
-                                                                    x='3'
-                                                                    y='4'
-                                                                    width='18'
-                                                                    height='16'
-                                                                    rx='2'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='1.5'
-                                                                />
-                                                                <rect
-                                                                    x='3'
-                                                                    y='4'
-                                                                    width='18'
-                                                                    height='5'
-                                                                    rx='2'
-                                                                    fill='currentColor'
-                                                                    opacity='0.2'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.2;0.6;0.2'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </rect>
-                                                                <path
-                                                                    d='M7 2V6M17 2V6'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='2'
-                                                                    strokeLinecap='round'
-                                                                />
-                                                                <rect
-                                                                    x='6'
-                                                                    y='11'
-                                                                    width='3'
-                                                                    height='2'
-                                                                    rx='0.5'
-                                                                    fill='currentColor'
-                                                                    opacity='0.6'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.6;1;0.6'
-                                                                        dur='1.5s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </rect>
-                                                            </svg>
-                                                        ) : key === 'build' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <path d='M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5A3.5 3.5 0 0 1 15.5 12A3.5 3.5 0 0 1 12 15.5M19.43 12.98C19.47 12.66 19.5 12.34 19.5 12C19.5 11.66 19.47 11.34 19.43 11.02L21.54 9.37C21.73 9.22 21.78 8.95 21.66 8.73L19.66 5.27C19.54 5.05 19.27 4.96 19.05 5.05L16.56 6.05C16.04 5.65 15.48 5.32 14.87 5.07L14.5 2.42C14.46 2.18 14.25 2 14 2H10C9.75 2 9.54 2.18 9.5 2.42L9.13 5.07C8.52 5.32 7.96 5.66 7.44 6.05L4.95 5.05C4.73 4.96 4.46 5.05 4.34 5.27L2.34 8.73C2.22 8.95 2.27 9.22 2.46 9.37L4.57 11.02C4.53 11.34 4.5 11.67 4.5 12C4.5 12.33 4.53 12.66 4.57 12.98L2.46 14.63C2.27 14.78 2.22 15.05 2.34 15.27L4.34 18.73C4.46 18.95 4.73 19.03 4.95 18.95L7.44 17.94C7.96 18.34 8.52 18.68 9.13 18.93L9.5 21.58C9.54 21.82 9.75 22 10 22H14C14.25 22 14.46 21.82 14.5 21.58L14.87 18.93C15.48 18.68 16.04 18.34 16.56 17.94L19.05 18.95C19.27 19.03 19.54 18.95 19.66 18.73L21.66 15.27C21.78 15.05 21.73 14.78 21.54 14.63L19.43 12.98Z'>
-                                                                    <animateTransform
-                                                                        attributeName='transform'
-                                                                        attributeType='XML'
-                                                                        type='rotate'
-                                                                        from='0 12 12'
-                                                                        to='360 12 12'
-                                                                        dur='4s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                            </svg>
-                                                        ) : key === 'deploy' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <path
-                                                                    d='M12 2L2 7L12 12L22 7L12 2Z'
-                                                                    opacity='0.3'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.3;0.6;0.3'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <path
-                                                                    d='M2 17L12 22L22 17'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='2'
-                                                                    fill='none'
-                                                                    strokeLinecap='round'
-                                                                    strokeLinejoin='round'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='stroke-dasharray'
-                                                                        values='0 40;20 20;40 0;20 20;0 40'
-                                                                        dur='3s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <circle
-                                                                    cx='12'
-                                                                    cy='17'
-                                                                    r='1'
-                                                                    fill='currentColor'
-                                                                    opacity='0.6'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='r'
-                                                                        values='1;2;1'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </circle>
-                                                            </svg>
-                                                        ) : key === 'code' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <rect
-                                                                    x='2'
-                                                                    y='3'
-                                                                    width='20'
-                                                                    height='18'
-                                                                    rx='2'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='1.5'
-                                                                />
-                                                                <rect
-                                                                    x='2'
-                                                                    y='3'
-                                                                    width='20'
-                                                                    height='6'
-                                                                    rx='2'
-                                                                    fill='currentColor'
-                                                                    opacity='0.2'
-                                                                />
-                                                                <path
-                                                                    d='M8 14l2-2-2-2'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='1.5'
-                                                                    strokeLinecap='round'
-                                                                    strokeLinejoin='round'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.7;1;0.7'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <path
-                                                                    d='M12 14h4'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='1.5'
-                                                                    strokeLinecap='round'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='stroke-dasharray'
-                                                                        values='0 6;3 3;6 0;3 3;0 6'
-                                                                        dur='3s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                            </svg>
-                                                        ) : key === 'test' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <path
-                                                                    d='M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V5H19V19Z'
-                                                                    opacity='0.2'
-                                                                />
-                                                                <path
-                                                                    d='M7 12L10 15L17 8'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='2'
-                                                                    strokeLinecap='round'
-                                                                    strokeLinejoin='round'
-                                                                    fill='none'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='stroke-dasharray'
-                                                                        values='0 24;12 12;24 0;12 12;0 24'
-                                                                        dur='3s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <circle
-                                                                    cx='7'
-                                                                    cy='8'
-                                                                    r='1'
-                                                                    fill='currentColor'
-                                                                    opacity='0.6'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.6;1;0.6'
-                                                                        dur='1s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </circle>
-                                                            </svg>
-                                                        ) : key ===
-                                                          'approval' ? (
-                                                            <svg
-                                                                className='w-5 h-5'
-                                                                fill='none'
-                                                                stroke='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <path
-                                                                    d='M20 6L9 17l-5-5'
-                                                                    strokeWidth='2'
-                                                                    strokeLinecap='round'
-                                                                    strokeLinejoin='round'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='stroke-dasharray'
-                                                                        values='0 30;15 15;30 0;15 15;0 30'
-                                                                        dur='3s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <circle
-                                                                    cx='12'
-                                                                    cy='12'
-                                                                    r='9'
-                                                                    strokeWidth='2'
-                                                                    opacity='0.3'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='r'
-                                                                        values='9;11;9'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.3;0.6;0.3'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </circle>
-                                                            </svg>
-                                                        ) : key ===
-                                                          'release' ? (
-                                                            <svg
-                                                                className='w-6 h-6'
-                                                                fill='currentColor'
-                                                                viewBox='0 0 24 24'
-                                                            >
-                                                                <rect
-                                                                    x='3'
-                                                                    y='6'
-                                                                    width='18'
-                                                                    height='12'
-                                                                    rx='2'
-                                                                    fill='none'
-                                                                    stroke='currentColor'
-                                                                    strokeWidth='1.5'
-                                                                />
-                                                                <rect
-                                                                    x='3'
-                                                                    y='6'
-                                                                    width='18'
-                                                                    height='4'
-                                                                    rx='2'
-                                                                    fill='currentColor'
-                                                                    opacity='0.2'
-                                                                />
-                                                                <path
-                                                                    d='M12 2L8 6H16L12 2Z'
-                                                                    fill='currentColor'
-                                                                    opacity='0.6'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.6;1;0.6'
-                                                                        dur='2s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </path>
-                                                                <rect
-                                                                    x='6'
-                                                                    y='12'
-                                                                    width='4'
-                                                                    height='2'
-                                                                    rx='0.5'
-                                                                    fill='currentColor'
-                                                                    opacity='0.7'
-                                                                >
-                                                                    <animate
-                                                                        attributeName='opacity'
-                                                                        values='0.7;1;0.7'
-                                                                        dur='1.5s'
-                                                                        repeatCount='indefinite'
-                                                                    />
-                                                                </rect>
-                                                            </svg>
-                                                        ) : (
-                                                            category.icon
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Search */}
-                                <div className='p-4 border-b border-gray-200'>
-                                    <div className='relative'>
-                                        <MagnifyingGlassIcon className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
-                                        <input
-                                            type='text'
-                                            placeholder='Search'
-                                            value={searchQuery}
-                                            onChange={(e) =>
-                                                setSearchQuery(e.target.value)
-                                            }
-                                            className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Categories and Connectors */}
-                                <div className='flex-1 overflow-y-auto p-4 space-y-4 bg-white/80'>
-                                    {filteredCategories.map((category) => (
-                                        <div key={category.key}>
-                                            {/* Category Header */}
-                                            <div className='flex items-center space-x-2 mb-3'>
-                                                <div className='w-5 h-5 text-blue-600'>
-                                                    {category.icon}
-                                                </div>
-                                                <h3 className='text-sm font-bold text-gray-900 uppercase tracking-wider'>
-                                                    {category.name}
-                                                </h3>
-                                                <div className='flex-1 h-px bg-gray-200'></div>
-                                            </div>
-
-                                            {/* Connectors List - Compact */}
-                                            <div className='grid grid-cols-4 gap-2'>
-                                                {category.connectors.map(
-                                                    (connector) => (
-                                                        <div
-                                                            key={connector.id}
-                                                            onClick={() =>
-                                                                handleConnectorSelect(
-                                                                    connector,
-                                                                )
-                                                            }
-                                                            className={`flex flex-col items-center p-2 rounded-lg hover:bg-blue-50 active:bg-blue-100 cursor-pointer transition-all duration-200 group border ${
-                                                                selectedConnector?.id ===
-                                                                connector.id
-                                                                    ? 'border-blue-500 bg-blue-100'
-                                                                    : 'border-transparent hover:border-blue-200'
-                                                            }`}
-                                                        >
-                                                            {/* Icon */}
-                                                            <div className='w-8 h-8 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform'>
-                                                                {connector.icon}
-                                                            </div>
-
-                                                            {/* Connector Name */}
-                                                            <span className='text-xs font-medium text-gray-700 text-center leading-tight'>
-                                                                {connector.name}
-                                                            </span>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </motion.div>
-
-                    {/* Progressive Sidebar for Connector Configuration - Using ConnectorDetailsPanel */}
-                    <ConnectorDetailsPanel
-                        isOpen={!!selectedConnector}
-                        onClose={() => setSelectedConnector(null)}
-                        connector={selectedConnector}
-                        sidebarWidth={0} // No main sidebar on this page
-                    />
-                </>
-            )}
-        </AnimatePresence>
-    );
-}
-
-export default function Connectors() {
-    const [connectors, setConnectors] = useState<ConnectorRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Function to sort configs by client-side display order for stable UI
+    const sortConfigsByDisplayOrder = useCallback((configs: ConnectorRow[]) => {
+        return [...configs].sort((a, b) => {
+            const orderA = displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderB = displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return orderA - orderB;
+        });
+    }, []);
+    
+    const [isLoading, setIsLoading] = useState(true);
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-    const [showSearchBar, setShowSearchBar] = useState(false);
-    const [showCreateSidebar, setShowCreateSidebar] = useState(false);
-    const [showConnectorDetails, setShowConnectorDetails] = useState(false);
-    const [selectedConnectorForDetails, setSelectedConnectorForDetails] =
-        useState<any>(null);
-    const [shouldResetSelection, setShouldResetSelection] = useState(false);
-    const [saveNotifications, setSaveNotifications] = useState<
-        Array<{id: string; message: string; timestamp: number}>
-    >([]);
+    const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
 
-    // Function to show save notification
-    const showSaveNotification = useCallback((message: string) => {
-        const id = Date.now().toString();
-        const notification = {
-            id,
-            message,
-            timestamp: Date.now(),
+    // Notification state
+    const [notificationMessage, setNotificationMessage] = useState<string>('');
+    const [showNotification, setShowNotification] = useState(false);
+
+    // Delete confirmation modal state
+    const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [showValidationErrors, setShowValidationErrors] = useState(false);
+    const [validationMessage, setValidationMessage] = useState('');
+    const [incompleteRows, setIncompleteRows] = useState<string[]>([]);
+    const [externalFieldErrors, setExternalFieldErrors] = useState<{[key:string]: Record<string,string>}>({});
+    
+    // Duplicate entry modal state
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    
+    // Connector Modal state
+    const [isConnectorModalOpen, setIsConnectorModalOpen] = useState(false);
+    const [selectedRowForConnector, setSelectedRowForConnector] = useState<ConnectorRow | null>(null);
+    
+    // Check for OAuth completion and reopen modal
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const checkOAuthCompletion = () => {
+            const shouldReopenModal = localStorage.getItem('githubOAuthShouldReopenModal');
+            const connectorId = localStorage.getItem('githubOAuthConnectorId');
+            const connectorName = localStorage.getItem('githubOAuthConnectorName');
+            
+            if (shouldReopenModal === 'true' && connectorId && connectorName) {
+                // Find the row that matches the connector name
+                const matchingRow = connectors.find(row => row.connectorName === connectorName);
+                
+                if (matchingRow) {
+                    console.log('🔄 [OAuth] Reopening modal for connector:', connectorName);
+                    setSelectedRowForConnector(matchingRow);
+                    setIsConnectorModalOpen(true);
+                }
+                
+                // Clean up the flag (but keep connectorId for modal to check status)
+                localStorage.removeItem('githubOAuthShouldReopenModal');
+            }
+        };
+        
+        // Check immediately
+        checkOAuthCompletion();
+        
+        // Also listen for messages from OAuth callback window
+        const handleOAuthMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'GITHUB_OAUTH_SUCCESS' || event.data.type === 'GITHUB_OAUTH_ERROR') {
+                checkOAuthCompletion();
+            }
+        };
+        
+        window.addEventListener('message', handleOAuthMessage);
+        return () => {
+            window.removeEventListener('message', handleOAuthMessage);
+        };
+    }, [connectors]);
+    const [duplicateMessage, setDuplicateMessage] = useState('');
+    const duplicateDetectedRef = useRef(false); // Track if duplicate was detected during autosave
+    
+    // Navigation warning state - exactly like Manage Users
+    const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+    const [pendingNavigation, setPendingNavigation] = useState<
+        (() => void) | null
+    >(null);
+    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [preventNavigation, setPreventNavigation] = useState(false);
+    const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
+    
+    // Initialize state with localStorage values to prevent initial empty state
+    const initializeFromLocalStorage = () => {
+        if (typeof window === 'undefined') return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
+        
+        try {
+            const savedName = window.localStorage.getItem('selectedEnterpriseName');
+            const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+            const savedAccountId = window.localStorage.getItem('selectedAccountId');
+            const savedAccountName = window.localStorage.getItem('selectedAccountName');
+            
+            return {
+                enterprise: savedName || '',
+                enterpriseId: (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '',
+                accountId: (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '',
+                accountName: (savedAccountName && savedAccountName !== 'null') ? savedAccountName : ''
+            };
+        } catch (error) {
+            console.warn('Failed to initialize from localStorage:', error);
+            return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
+        }
+    };
+
+    const initialValues = initializeFromLocalStorage();
+    
+    // Selected Enterprise from top right corner
+    const [selectedEnterprise, setSelectedEnterprise] = useState<string>(initialValues.enterprise);
+    const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>(initialValues.enterpriseId);
+    
+    // Selected Account from top right corner
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(initialValues.accountId);
+    const [selectedAccountName, setSelectedAccountName] = useState<string>(initialValues.accountName);
+    
+    // Track if we've completed initial localStorage loading to prevent premature auto-refresh
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    
+    // Load selected enterprise from localStorage and listen for changes
+    useEffect(() => {
+        const loadSelectedEnterprise = () => {
+            try {
+                console.log('🐛 [ManageConnectors Page] Loading localStorage values...');
+                
+                const savedName = window.localStorage.getItem('selectedEnterpriseName');
+                const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
+                const savedAccountId = window.localStorage.getItem('selectedAccountId');
+                const savedAccountName = window.localStorage.getItem('selectedAccountName');
+                
+                console.log('🐛 [ManageConnectors Page] localStorage values:', {
+                    selectedEnterpriseName: savedName,
+                    selectedEnterpriseId: savedEnterpriseId,
+                    selectedAccountId: savedAccountId,
+                    selectedAccountName: savedAccountName
+                });
+                
+                // Only update state if values have actually changed to prevent unnecessary re-renders
+                if (savedName !== selectedEnterprise) {
+                    setSelectedEnterprise(savedName || '');
+                }
+                
+                const newEnterpriseId = (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '';
+                if (newEnterpriseId !== selectedEnterpriseId) {
+                    setSelectedEnterpriseId(newEnterpriseId);
+                }
+                
+                const newAccountId = (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '';
+                const newAccountName = (savedAccountName && savedAccountName !== 'null') ? savedAccountName : '';
+                
+                if (newAccountId !== selectedAccountId) {
+                    setSelectedAccountId(newAccountId);
+                }
+                if (newAccountName !== selectedAccountName) {
+                    setSelectedAccountName(newAccountName);
+                }
+                
+                console.log('🐛 [ManageConnectors Page] Setting state values:', {
+                    enterprise: savedName || '',
+                    enterpriseId: newEnterpriseId,
+                    accountId: newAccountId,
+                    accountName: newAccountName
+                });
+                
+                // Mark as initialized after first load
+                setIsInitialized(true);
+            } catch (error) {
+                console.warn('Failed to load selected enterprise/account:', error);
+                setIsInitialized(true); // Still mark as initialized even on error
+            }
         };
 
-        setSaveNotifications((prev) => [...prev, notification]);
+        // Load on mount
+        loadSelectedEnterprise();
 
-        // Auto-remove notification after 3 seconds
-        setTimeout(() => {
-            setSaveNotifications((prev) => prev.filter((n) => n.id !== id));
-        }, 3000);
-    }, []);
+        // Listen for enterprise and account changes
+        const handleEnterpriseChange = () => {
+            loadSelectedEnterprise();
+        };
 
-    // Load connectors from API
-    const loadConnectors = useCallback(async () => {
-        try {
-            setLoading(true);
-            console.log('🔄 Loading connectors from API...');
+        const handleAccountChange = () => {
+            loadSelectedEnterprise(); // This function loads both account and enterprise values
+        };
 
-            // Mock API call - replace with actual API
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+        window.addEventListener('enterpriseChanged', handleEnterpriseChange);
+        window.addEventListener('accountChanged', handleAccountChange);
+        window.addEventListener('storage', handleEnterpriseChange);
 
-            // Initially no connectors - empty state
-            setConnectors([]);
+        return () => {
+            window.removeEventListener('enterpriseChanged', handleEnterpriseChange);
+            window.removeEventListener('accountChanged', handleAccountChange);
+            window.removeEventListener('storage', handleEnterpriseChange);
+        };
+    }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
 
-            console.log('✅ Connectors loaded successfully');
-        } catch (error) {
-            console.error('❌ Error loading connectors:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, []); // Empty dependency array to prevent repeated calls
-
+    // Debug: Log current state values
     useEffect(() => {
-        loadConnectors();
-    }, []); // Empty dependency array to load only once
+        console.log('🐛 [ManageConnectors Page] State updated:', {
+            selectedEnterprise,
+            selectedEnterpriseId,
+            selectedAccountId,
+            selectedAccountName
+        });
+    }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
+    
+    const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+    const [deletingRow, setDeletingRow] = useState(false);
 
-    // Handle create connector
-    const handleCreateConnector = useCallback(() => {
-        console.log('➕ Opening create connector sidebar...');
-        setShowCreateSidebar(true);
-    }, []);
+    // Auto-save related state - use useRef to persist through re-renders
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const connectorsRef = useRef<ConnectorRow[]>([]);
+    const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
+    const originalRouterRef = useRef<any>(null); // Store original router for navigation after confirmation
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
+    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<Set<string>>(new Set());
 
-    // Handle connector selection from create sidebar
-    const handleConnectorSelect = useCallback((connector: any) => {
-        console.log('🔗 Connector selected for configuration:', connector.name);
-        setSelectedConnectorForDetails(connector);
-        setShowConnectorDetails(true);
-        // Keep the create sidebar open but collapsed (showing only icons)
-        // setShowCreateSidebar(false); // Remove this to keep sidebar visible in collapsed state
-    }, []);
+    // Update ref to track current connectors state
+    useEffect(() => {
+        connectorsRef.current = connectors;
+    }, [connectors]);
 
-    // Handle save connector
-    const handleSaveConnector = useCallback(
-        (connectorData: Partial<ConnectorRecord>) => {
-            console.log('💾 Saving new connector:', connectorData);
-            const newConnector = connectorData as ConnectorRecord;
-            setConnectors((prev) => [...prev, newConnector]);
-            showSaveNotification('Connector created successfully');
-        },
-        [showSaveNotification],
-    );
-
-    // Confirm delete
-    const confirmDelete = useCallback(() => {
-        if (pendingDeleteId) {
-            console.log('✅ Confirmed delete for connector:', pendingDeleteId);
-            setConnectors((prev) =>
-                prev.filter((c) => c.id !== pendingDeleteId),
-            );
-            setPendingDeleteId(null);
-            showSaveNotification('Connector deleted successfully');
+    // Auto-save connectors to localStorage whenever it changes (but not during loading)
+    useEffect(() => {
+        // Don't save during initial load or if loading flag is set
+        if (isLoadingRef.current || !isInitialized) {
+            return;
         }
-    }, [pendingDeleteId, showSaveNotification]);
+        
+        // Only save if we have account/enterprise selected and connectors has data
+        if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId && connectors.length > 0) {
+            // Use a small delay to batch multiple rapid updates
+            const saveTimer = setTimeout(() => {
+                if (!isLoadingRef.current) { // Double-check loading flag
+                    saveConnectorsToLocalStorage(connectors, selectedAccountId, selectedEnterpriseId);
+                    console.log('💾 [AutoSave] Saved connectors to localStorage:', connectors.length, 'rows');
+                    // Log connectors count for debugging
+                    const connectorsCount = connectors.reduce((sum, row) => sum + (row.connectors?.length || 0), 0);
+                    if (connectorsCount > 0) {
+                        console.log('💾 [AutoSave] Total connectors saved:', connectorsCount);
+                    }
+                }
+            }, 100);
+            
+            return () => clearTimeout(saveTimer);
+        }
+    }, [connectors, selectedAccountId, selectedEnterpriseId, isInitialized, saveConnectorsToLocalStorage]);
+
+    // Update ref to track current modifiedExistingRecords state
+    useEffect(() => {
+        modifiedExistingRecordsRef.current = modifiedExistingRecords;
+    }, [modifiedExistingRecords]);
+
+    // State to track AI panel collapse state for notification positioning
+    const [isAIPanelCollapsed, setIsAIPanelCollapsed] = useState(false);
+
+    // Row animation states
+    const [compressingRowId, setCompressingRowId] = useState<string | null>(null);
+    const [foldingRowId, setFoldingRowId] = useState<string | null>(null);
+
+    // Dropdown options for chips and filters
+    const [dropdownOptions, setDropdownOptions] = useState({
+        connectorNames: [] as Array<{id: string; name: string}>,
+        descriptions: [] as Array<{id: string; name: string}>,
+        entities: [] as Array<{id: string; name: string}>,
+        products: [] as Array<{id: string; name: string}>,
+        services: [] as Array<{id: string; name: string}>,
+        scope: [] as Array<{id: string; name: string}>,
+    });
+
+    // Toolbar controls state
+    const [showSearchBar, setShowSearchBar] = useState(true); // Always show search
+    const [searchTerm, setSearchTerm] = useState('');
+    const [appliedSearchTerm, setAppliedSearchTerm] = useState(''); // Applied search term
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+    const [sortOpen, setSortOpen] = useState(false);
+    const [sortColumn, setSortColumn] = useState('');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | ''>('');
+    const [hideOpen, setHideOpen] = useState(false);
+    const [hideQuery, setHideQuery] = useState('');
+    const [groupOpen, setGroupOpen] = useState(false);
+    const [ActiveGroupLabel, setActiveGroupLabel] = useState<
+        'None' | 'Connector Name' | 'Description' | 'Workstream' | 'Product' | 'Service'
+    >('None');
+    
+    type ColumnType = 'connectorName' | 'description' | 'entity' | 'product' | 'service' | 'scope' | 'connectivityStatus' | 'actions';
+    
+    const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
+        'connectorName',
+        'description',
+        'entity',
+        'product',
+        'service',
+        'scope',
+        'connectivityStatus',
+    ]);
+
+    // Refs for dropdowns
+    const searchRef = useRef<HTMLDivElement>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
+    const sortRef = useRef<HTMLDivElement>(null);
+    const hideRef = useRef<HTMLDivElement>(null);
+    const groupRef = useRef<HTMLDivElement>(null);
+
+    // Helper function to show notifications
+    const showBlueNotification = (message: string, duration: number = 3000, showCheckmark: boolean = true) => {
+        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
+        setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
+    };
+
+    // Load dropdown options from API
+    // NOTE: API calls removed - connectors should use connector-specific APIs instead
+    const loadDropdownOptions = useCallback(async () => {
+        try {
+            // API calls removed - connectors should use connector-specific APIs
+            // Original APIs: /api/user-management/roles, /api/products, /api/services
+            console.log('⚠️ [Connectors] loadDropdownOptions called but APIs removed - use connector APIs instead');
+
+            // Extract unique connector names from current Connectors (local state only)
+            const uniqueConnectorNames = Array.from(new Set(connectors.map(connector => connector.connectorName)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `connectorName-${name}-${index}`,
+                name: name
+            }));
+
+            // Extract unique entities from current Connectors (local state only)
+            const uniqueEntities = Array.from(new Set(connectors.map(connector => connector.entity)
+                .filter(Boolean)
+            )).map((name, index) => ({
+                id: `entity-${name}-${index}`,
+                name: name
+            }));
+
+            setDropdownOptions({
+                connectorNames: uniqueConnectorNames,
+                descriptions: [],
+                entities: uniqueEntities,
+                products: [],
+                services: [],
+                scope: [],
+            });
+        } catch (error) {
+            console.error('Failed to load dropdown options:', error);
+            // Set empty dropdown options on error to prevent infinite loops
+            setDropdownOptions({
+                connectorNames: [],
+                descriptions: [],
+                entities: [],
+                products: [],
+                services: [],
+                scope: [],
+            });
+        }
+    }, [connectors]);
+
+    // Helper function to close all dialogs
+    const closeAllDialogs = () => {
+        setFilterVisible(false);
+        setSortOpen(false);
+        setHideOpen(false);
+        setGroupOpen(false);
+    };
+
+    // Function to toggle dialogs
+    const toggleDialog = (dialogType: 'filter' | 'sort' | 'hide' | 'group') => {
+        closeAllDialogs();
+        setTimeout(() => {
+            switch (dialogType) {
+                case 'filter':
+                    setFilterVisible(true);
+                    break;
+                case 'sort':
+                    setSortOpen(true);
+                    break;
+                case 'hide':
+                    setHideOpen(true);
+                    break;
+                case 'group':
+                    setGroupOpen(true);
+                    break;
+            }
+        }, 10);
+    };
+
+    // Ref to track current filter form values for outside click handler
+    const filterFormRef = useRef({
+        connectorName: '',
+        description: '',
+        entity: '',
+        product: '',
+        service: '',
+    });
+
+    // Click outside handler to close toolbar dialogs
+    // Filter panel closes on outside click if: all fields are empty OR Clear All was clicked
+    // Filter panel stays open if any field has a value (to prevent accidental closure while typing)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            
+            // Check if any dialog is open
+            if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
+                return; // No dialog is open
+            }
+            
+            // Check if click is outside dialog containers
+            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
+            
+            // Close Filter panel if:
+            // 1. Clear All was clicked, OR
+            // 2. All filter fields are empty (no values entered)
+            if (filterVisible && isOutsideFilter) {
+                const currentForm = filterFormRef.current;
+                const isFilterEmpty = !currentForm.connectorName && !currentForm.description && !currentForm.entity && !currentForm.product && !currentForm.service;
+                
+                if (filterClearedRef.current || isFilterEmpty) {
+                    setFilterVisible(false);
+                    filterClearedRef.current = false; // Reset flag
+                }
+            }
+            
+            // Close Sort, Hide, group panels immediately on outside click
+            if (sortOpen && isOutsideSort) {
+                setSortOpen(false);
+            }
+            if (hideOpen && isOutsideHide) {
+                setHideOpen(false);
+            }
+            if (groupOpen && isOutsideGroup) {
+                setGroupOpen(false);
+            }
+        };
+
+        // Add event listener
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [filterVisible, sortOpen, hideOpen, groupOpen]);
+
+    // All available columns
+    const allCols: ColumnType[] = ['connectorName', 'description', 'entity', 'product', 'service', 'scope', 'connectivityStatus'];
+    
+    // Columns available for sorting
+    const sortableCols: ColumnType[] = ['connectorName', 'description', 'entity', 'product', 'service'];
+
+    // Column label mapping - exactly like Manage Users
+    const columnLabels: Record<string, string> = {
+        connectorName: 'Connector Name',
+        description: 'Description',
+        entity: 'Workstream',
+        product: 'Product',
+        service: 'Service',
+        scope: 'Connector',
+        connectivityStatus: 'Status'
+    };
+
+    // Process Connector data with filtering, sorting, and search
+    const processedConfigs = React.useMemo(() => {
+        let filtered = [...connectors];
+
+        // Apply search filter
+        if (appliedSearchTerm.trim()) {
+            filtered = filtered.filter((config) => {
+                const searchLower = appliedSearchTerm.toLowerCase();
+                return (
+                    config.connectorName?.toLowerCase().includes(searchLower) ||
+                    config.description?.toLowerCase().includes(searchLower) ||
+                    config.entity?.toLowerCase().includes(searchLower) ||
+                    config.product?.toLowerCase().includes(searchLower) ||
+                    config.service?.toLowerCase().includes(searchLower) ||
+                    config.scope?.toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        // Apply filters
+        if (activeFilters.connectorName) {
+            filtered = filtered.filter(
+                (config) => config.connectorName?.toLowerCase().includes(activeFilters.connectorName.toLowerCase()),
+            );
+        }
+        if (activeFilters.description) {
+            filtered = filtered.filter(
+                (config) => config.description?.toLowerCase().includes(activeFilters.description.toLowerCase()),
+            );
+        }
+        if (activeFilters.entity) {
+            filtered = filtered.filter(
+                (config) => config.entity?.toLowerCase().includes(activeFilters.entity.toLowerCase()),
+            );
+        }
+        if (activeFilters.product) {
+            filtered = filtered.filter(
+                (config) => config.product?.toLowerCase().includes(activeFilters.product.toLowerCase()),
+            );
+        }
+        if (activeFilters.service) {
+            filtered = filtered.filter(
+                (config) => config.service?.toLowerCase().includes(activeFilters.service.toLowerCase()),
+            );
+        }
+
+        // Apply sorting only when both column and direction are explicitly set
+        if (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc')) {
+            filtered.sort((a, b) => {
+                let valueA = '';
+                let valueB = '';
+
+                switch (sortColumn) {
+                    case 'connectorName':
+                        valueA = (a.connectorName || '').toString().toLowerCase();
+                        valueB = (b.connectorName || '').toString().toLowerCase();
+                        break;
+                    case 'description':
+                        valueA = (a.description || '').toString().toLowerCase();
+                        valueB = (b.description || '').toString().toLowerCase();
+                        break;
+                    case 'entity':
+                        valueA = (a.entity || '').toString().toLowerCase();
+                        valueB = (b.entity || '').toString().toLowerCase();
+                        break;
+                    case 'product':
+                        valueA = (a.product || '').toString().toLowerCase();
+                        valueB = (b.product || '').toString().toLowerCase();
+                        break;
+                    case 'service':
+                        valueA = (a.service || '').toString().toLowerCase();
+                        valueB = (b.service || '').toString().toLowerCase();
+                        break;
+                    default:
+                        valueA = '';
+                        valueB = '';
+                        break;
+                }
+
+                if (valueA < valueB) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (valueA > valueB) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [
+        connectors, 
+        appliedSearchTerm, 
+        activeFilters, 
+        sortColumn,
+        sortDirection
+    ]);
+
+    // Helper functions for filter management
+    const applyFilters = (filters: Record<string, any>) => {
+        setActiveFilters(filters);
+        closeAllDialogs();
+    };
+
+    const clearFilters = () => {
+        setActiveFilters({});
+    };
+
+    const applySort = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+    };
+
+    const applySorting = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        // Don't close dialog to allow multiple adjustments
+    };
+
+    const applySortAndClose = (column: string, direction: 'asc' | 'desc') => {
+        setSortColumn(column);
+        setSortDirection(direction);
+        closeAllDialogs();
+    };
+
+    const clearSorting = () => {
+        setSortColumn('');
+        setSortDirection('');
+        
+        // Dispatch custom event to clear table sorting
+        const clearEvent = new CustomEvent('clearTableSorting');
+        window.dispatchEvent(clearEvent);
+    };
+
+    const clearSort = () => {
+        clearSorting();
+    };
+
+    const setGroupByFromLabel = (label: string) => {
+        setActiveGroupLabel(label as any);
+        closeAllDialogs();
+    };
+
+    const clearGroupBy = () => {
+        setActiveGroupLabel('None');
+    };
+
+    // Load Connectors from database. Accept optional filters so we can request groups
+    // for a specific account/enterprise combination: { accountId, accountName, enterpriseId, enterpriseName }
+    // NOTE: API calls removed - connectors should use connector-specific APIs instead
+    const loadConnectors = useCallback(async (filters?: {
+        accountId?: string | null;
+        accountName?: string | null;
+        enterpriseId?: string | null;
+        enterpriseName?: string | null;
+    }) => {
+        setIsLoading(true);
+        isLoadingRef.current = true; // Prevent localStorage save during load
+        try {
+            // ============================================================================
+            // TEMPORARY: Load from localStorage (REVERT WHEN APIs ARE READY)
+            // ============================================================================
+            if (USE_LOCAL_STORAGE) {
+                const loadedRoles = loadConnectorsFromLocalStorage();
+                setConnectors(loadedRoles);
+                console.log('📦 [Connectors] Loaded from localStorage:', loadedRoles.length, 'rows');
+            } else {
+                // TODO: Replace with actual API call when backend is ready
+                // API call removed - connectors should use connector-specific APIs
+                // Original API: /api/user-management/roles
+                console.log('⚠️ [Connectors] loadConnectors called but API removed - use connector APIs instead');
+                setConnectors([]);
+            }
+            // ============================================================================
+        } catch (error) {
+            console.error('Failed to load Connectors:', error);
+            setConnectors([]);
+        } finally {
+            setIsLoading(false);
+            // Reset loading flag after a short delay to allow state to update
+            setTimeout(() => {
+                isLoadingRef.current = false;
+            }, 100);
+        }
+    }, [loadConnectorsFromLocalStorage]);
+
+    // Initial load from localStorage on mount (if enabled and account/enterprise selected)
+    useEffect(() => {
+        if (USE_LOCAL_STORAGE && isInitialized && selectedAccountId && selectedEnterpriseId) {
+            isLoadingRef.current = true; // Prevent localStorage save during initial load
+            const loadedRoles = loadConnectorsFromLocalStorage(selectedAccountId, selectedEnterpriseId);
+            if (loadedRoles.length > 0) {
+                setConnectors(loadedRoles);
+                console.log('📦 [Connectors] Initial load from localStorage:', loadedRoles.length, 'rows for account:', selectedAccountId, 'enterprise:', selectedEnterpriseId);
+            }
+            // Reset loading flag after a short delay to allow state to update
+            setTimeout(() => {
+                isLoadingRef.current = false;
+            }, 100);
+        }
+    }, [isInitialized, selectedAccountId, selectedEnterpriseId, loadConnectorsFromLocalStorage]);
+    
+    // Load Connectors on mount and whenever the selected account/enterprise changes.
+    // This ensures that when the top-right account dropdown changes (and the enterprise
+    // selection remains), the table refreshes automatically for that Account+Enterprise.
+    // ALWAYS requires both Account and Enterprise to be selected.
+    useEffect(() => {
+        // Don't run auto-refresh until localStorage initialization is complete
+        if (!isInitialized) {
+            console.log('🔄 [ManageConnectors] Waiting for initialization...');
+            return;
+        }
+
+        // Read enterpriseId from localStorage (some other components keep the id there)
+        const enterpriseId = typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null;
+
+        console.log('🔄 [ManageConnectors] Loading Connectors with context:', {
+            selectedAccountId,
+            selectedAccountName,
+            selectedEnterprise,
+            enterpriseId,
+            hasAccountId: !!selectedAccountId,
+            hasEnterprise: !!(selectedEnterprise || enterpriseId),
+            isInitialized
+        });
+
+        // Set loading flag to prevent localStorage save during load
+        isLoadingRef.current = true;
+
+        // Clear existing data immediately when enterprise/account changes to prevent stale data
+        setConnectors([]);
+
+        // ONLY load data if both account id and enterprise selection exist
+        // NOTE: API call removed - connectors should use connector-specific APIs instead
+        const currentEnterpriseId = enterpriseId || selectedEnterpriseId;
+        if (selectedAccountId && currentEnterpriseId) {
+            // ============================================================================
+            // TEMPORARY: Load from localStorage (REVERT WHEN APIs ARE READY)
+            // ============================================================================
+            if (USE_LOCAL_STORAGE) {
+                const loadedRoles = loadConnectorsFromLocalStorage(selectedAccountId, currentEnterpriseId);
+                setConnectors(loadedRoles);
+                console.log('📦 [Connectors] Loaded from localStorage:', loadedRoles.length, 'rows for account:', selectedAccountId, 'enterprise:', currentEnterpriseId);
+            } else {
+                console.log('⚠️ [Connectors] loadConnectors call removed - use connector APIs instead');
+                // loadConnectors({...}); // REMOVED - use connector-specific APIs
+            }
+            // ============================================================================
+            setIsLoading(false);
+            // Reset loading flag after a short delay to allow state to update
+            setTimeout(() => {
+                isLoadingRef.current = false;
+            }, 100);
+            return;
+        }
+
+        // Clear table and show message when required context is missing
+        console.log('⚠️ [ManageConnectors] Missing Account or Enterprise selection, clearing table');
+        setConnectors([]);
+        setIsLoading(false);
+        // Reset loading flag after a short delay
+        setTimeout(() => {
+            isLoadingRef.current = false;
+        }, 100);
+        
+        // Show a notification to guide user (only after initialization to avoid false warnings)
+        if (!selectedAccountId) {
+            showBlueNotification('Please select an Account from the top-right dropdown to view Connectors', 5000, false);
+        }
+        // Enterprise notification removed - enterprise is now auto-selected based on account licenses
+    }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, isInitialized, loadConnectors, loadConnectorsFromLocalStorage]);
+    
+    // Load dropdown options whenever connectors changes - use a ref to prevent infinite loops
+    const dropdownOptionsLoadedRef = useRef(false);
+    const connectorsCountRef = useRef(0);
+    useEffect(() => {
+        if (!isLoading && connectors.length > 0 && 
+            (connectors.length !== connectorsCountRef.current || !dropdownOptionsLoadedRef.current)) {
+            connectorsCountRef.current = connectors.length;
+            dropdownOptionsLoadedRef.current = true;
+            loadDropdownOptions();
+        }
+    }, [connectors.length, loadDropdownOptions, isLoading]);
+    
+    // Clear auto-save timer on component unmount - exactly like Manage Users
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        };
+    }, []);
+
+    // Effect to detect AI panel collapse state by observing its width - exactly like Manage Users
+    useEffect(() => {
+        const detectAIPanelState = () => {
+            // Look for the AI panel by finding the motion.div with width animations
+            const aiPanel = document.querySelector('[class*="w-\\[300px\\]"], [class*="w-16"]') as HTMLElement;
+            if (aiPanel) {
+                const computedStyle = window.getComputedStyle(aiPanel);
+                const width = parseInt(computedStyle.width);
+                const isCollapsed = width <= 80; // 64px + some margin for safety
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel width detected:', width, 'Collapsed:', isCollapsed);
+            }
+        };
+
+        // Create a ResizeObserver to watch for AI panel width changes
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                const isCollapsed = width <= 80;
+                setIsAIPanelCollapsed(isCollapsed);
+                console.log('🤖 AI Panel resized to:', width, 'Collapsed:', isCollapsed);
+            }
+        });
+
+        // Find and observe the AI panel
+        const findAndObserveAIPanel = () => {
+            // Look for the AI panel container
+            const aiPanelContainer = document.querySelector('.order-1.lg\\:order-2') as HTMLElement;
+            if (aiPanelContainer) {
+                const aiPanel = aiPanelContainer.querySelector('div') as HTMLElement;
+                if (aiPanel) {
+                    resizeObserver.observe(aiPanel);
+                    detectAIPanelState(); // Initial detection
+                    console.log('🤖 AI Panel observer attached');
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Try to find the panel immediately
+        if (!findAndObserveAIPanel()) {
+            // If not found, try again after a short delay
+            const timeoutId = setTimeout(() => {
+                findAndObserveAIPanel();
+            }, 500);
+
+            return () => {
+                clearTimeout(timeoutId);
+                resizeObserver.disconnect();
+            };
+        }
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, []);
+
+    // Function to check if there's a blank row - exactly like Manage Users
+    const hasBlankRow = () => {
+        return connectors.some((connector) => {
+            const isTemporary = String(connector.id).startsWith('tmp-');
+            const isEmpty =
+                !connector.connectorName &&
+                !connector.entity &&
+                !connector.product &&
+                !connector.service;
+            return isTemporary && isEmpty;
+        });
+    };
+
+    // Function to validate incomplete rows and return validation details - exactly like Manage Users
+    const validateIncompleteRows = () => {
+        // Get all temporary (unsaved) rows
+        const temporaryRows = connectors.filter((connector: any) => 
+            String(connector.id).startsWith('tmp-')
+        );
+
+        // Get all existing rows
+        const existingRows = connectors.filter((connector: any) => 
+            !String(connector.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows (exclude completely blank rows)
+        const incompleteTemporaryRows = temporaryRows.filter((connector: any) => {
+            const hasconnectorName = connector.connectorName?.trim();
+            const hasEntity = connector.entity?.trim();
+            const hasProduct = connector.product?.trim();
+            const hasService = connector.service?.trim();
+
+            // Don't include completely blank rows (new rows that haven't been touched)
+            const isCompletelyBlank = !hasconnectorName && !hasEntity && !hasProduct && !hasService;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
+            return !hasconnectorName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Check for incomplete existing rows
+        const incompleteExistingRows = existingRows.filter((connector: any) => {
+            const hasconnectorName = connector.connectorName?.trim();
+            const hasEntity = connector.entity?.trim();
+            const hasProduct = connector.product?.trim();
+            const hasService = connector.service?.trim();
+
+            // Don't include completely blank rows
+            const isCompletelyBlank = !hasconnectorName && !hasEntity && !hasProduct && !hasService;
+            if (isCompletelyBlank) return false;
+
+            // Row is incomplete if it has some data but not all required fields
+            return !hasconnectorName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        if (incompleteRows.length > 0) {
+            const missingFields = new Set<string>();
+            incompleteRows.forEach((connector) => {
+                if (!connector.connectorName?.trim()) missingFields.add('Connector Name');
+                if (!connector.entity?.trim()) missingFields.add('Workstream');
+                if (!connector.product?.trim()) missingFields.add('Product');
+                if (!connector.service?.trim()) missingFields.add('Service');
+            });
+            
+            const incompleteCount = incompleteRows.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
+            
+            return {
+                hasIncomplete: true,
+                incompleteRows,
+                message
+            };
+        }
+        
+        return {
+            hasIncomplete: false,
+            incompleteRows: [],
+            message: ''
+        };
+    };
+
+    // Handle adding new Connector row
+    const handleAddNewRow = () => {
+        console.log('➕ Add new row requested');
+        
+        // Clear any pending autosave to prevent blank rows from being saved
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+        setAutoSaveCountdown(null);
+        setIsAutoSaving(false);
+        
+        // Check if there's already a blank row
+        if (hasBlankRow()) {
+            showBlueNotification(
+                'Please complete the existing blank row before adding a new one.',
+                3000,
+                false // No checkmark for error message
+            );
+            return;
+        }
+
+        // Check for incomplete rows before adding new row
+        const validation = validateIncompleteRows();
+        if (validation.hasIncomplete) {
+            // Show notification instead of modal - exactly like Manage Users
+            showBlueNotification(
+                validation.message,
+                5000,
+                false // No checkmark for error message
+            );
+            
+            // Enable red border highlighting for incomplete rows
+            setShowValidationErrors(true);
+            setIncompleteRows(validation.incompleteRows.map((r: any) => r.id));
+            
+            return;
+        }
+        
+        const newRole: ConnectorRow = {
+            id: `tmp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            connectorName: '',
+            description: '',
+            entity: '',
+            product: '',
+            service: '',
+            scope: '',
+        };
+        
+        // Add to end of array with display order
+        displayOrderRef.current.set(newRole.id, Date.now());
+        
+        setConnectors([...connectors, newRole]);
+        
+        // Clear validation errors when adding a new row to ensure new rows start with normal styling
+        if (showValidationErrors) {
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
+        }
+        
+        console.log('➕ Added new blank row:', newRole.id);
+    };
+
+    // Ref to store the autosave function
+    const debouncedAutoSaveRef = useRef<(() => void) | null>(null);
+
+    // Handle field updates
+    const handleUpdateField = useCallback((rowId: string, field: string, value: any) => {
+        console.log('🔄 handleUpdateField called:', { rowId, field, value });
+        
+        // First, update the state
+        let updatedGroup: ConnectorRow | null = null;
+        setConnectors(prev => {
+            // Always create new array and new objects for React to detect changes
+            return prev.map(connector => {
+                if (connector.id === rowId) {
+                    // Track if this is an existing record (not temporary)
+                    if (!String(rowId).startsWith('tmp-')) {
+                        setModifiedExistingRecords((prevModified) => {
+                            const newSet = new Set(prevModified);
+                            newSet.add(String(rowId));
+                            return newSet;
+                        });
+                    }
+                    
+                    // Create new object with updated field
+                    updatedGroup = { ...connector, [field]: value };
+                    return updatedGroup;
+                }
+                return connector; // Return same reference for unchanged rows
+            });
+        });
+        
+        // Check if all mandatory fields are now filled for this row
+        if (updatedGroup) {
+            const hasconnectorName = (updatedGroup as any).connectorName?.trim() && (updatedGroup as any).connectorName.trim().length > 0;
+            const hasEntity = (updatedGroup as any).entity?.trim() && (updatedGroup as any).entity.trim().length > 0;
+            const hasProduct = (updatedGroup as any).product?.trim() && (updatedGroup as any).product.trim().length > 0;
+            const hasService = (updatedGroup as any).service?.trim() && (updatedGroup as any).service.trim().length > 0;
+            
+            const isComplete = hasconnectorName && hasEntity && hasProduct && hasService;
+            
+            console.log('🔍 Checking if row is complete after update:', {
+                rowId,
+                field,
+                value,
+                hasconnectorName,
+                hasEntity,
+                hasProduct,
+                hasService,
+                isComplete
+            });
+            
+            // Only trigger autosave if all mandatory fields are filled
+            if (isComplete && debouncedAutoSaveRef.current) {
+                console.log('✅ All mandatory fields filled - triggering autosave timer');
+                debouncedAutoSaveRef.current();
+            } else {
+                console.log('⏸️ Not all mandatory fields filled - clearing autosave timer if exists');
+                // Clear autosave timer if row becomes incomplete
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                    autoSaveTimerRef.current = null;
+                    setAutoSaveCountdown(null);
+                    if (countdownIntervalRef.current) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownIntervalRef.current = null;
+                    }
+                }
+            }
+        }
+    }, []);
+
+    // Row squeeze animation sequence - exactly like Manage Users
+    const startRowCompressionAnimation = async (rowId: string) => {
+        console.log('🎬 Starting squeeze animation for row:', rowId);
+
+        // Step 1: Squeeze the row horizontally with animation
+        setCompressingRowId(rowId);
+
+        // Wait for squeeze animation
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Step 2: Fade out the row
+        setFoldingRowId(rowId);
+        setCompressingRowId(null);
+
+        // Wait for fade animation
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Step 3: Show confirmation modal
+        setPendingDeleteRowId(rowId);
+        setShowDeleteConfirmation(true);
+        setFoldingRowId(null);
+    };
+
+    // Handle delete confirmation
+    const handleDeleteClick = (groupId: string) => {
+        startRowCompressionAnimation(groupId);
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingDeleteRowId) return;
+        
+        setDeletingRow(true);
+        try {
+            console.log('🗑️ Deleting Connector:', pendingDeleteRowId);
+            
+            // Add a small delay to show the loading state
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Find the connector to be deleted for debugging
+            const connectorToDelete = connectors.find(g => g.id === pendingDeleteRowId);
+            console.log('📄 Connector data to delete:', connectorToDelete);
+
+            // Delete from database via API (only if not a temporary row)
+            // NOTE: API call removed - connectors should use connector-specific APIs instead
+            if (!String(pendingDeleteRowId).startsWith('tmp-')) {
+                try {
+                    // API call removed - connectors should use connector-specific APIs
+                    // Original API: /api/user-management/roles/${pendingDeleteRowId}
+                    console.log('⚠️ [Connectors] Delete API removed - use connector APIs instead');
+                    console.log('🗑️ Would delete connector with ID:', pendingDeleteRowId);
+                    // await api.del(deleteUrl); // REMOVED
+                } catch (error) {
+                    console.error('❌ Error deleting connector:', error);
+                    throw new Error('Failed to delete connector');
+                }
+            } else {
+                console.log('ℹ️ Temporary row - only removing from frontend state and localStorage');
+                // Remove temporary row from localStorage if needed
+                const storedGroups = localStorage.getItem('user-groups-data');
+                if (storedGroups) {
+                    try {
+                        const groupsData = JSON.parse(storedGroups);
+                        const updatedGroupsData = groupsData.filter((g: any) => g.id !== pendingDeleteRowId);
+                        localStorage.setItem('user-groups-data', JSON.stringify(updatedGroupsData));
+                        console.log('✅ Temporary Connector deleted from localStorage');
+                    } catch (error) {
+                        console.error('Error updating localStorage:', error);
+                    }
+                }
+            }
+
+            // Remove from local state
+            setConnectors((prev) => {
+                const updated = prev.filter((connector) => connector.id !== pendingDeleteRowId);
+                // Apply stable sorting to maintain display order
+                return sortConfigsByDisplayOrder(updated);
+            });
+
+            console.log('✅ Connector deleted successfully');
+            
+            // Show success notification
+            showBlueNotification('Successfully deleted 1 entries.');
+
+            // Close modal and reset state
+            setShowDeleteConfirmation(false);
+            setPendingDeleteRowId(null);
+            setCompressingRowId(null);
+            setFoldingRowId(null);
+        } catch (error) {
+            console.error('❌ Failed to delete Connector:', error);
+            console.error('❌ Full error details:', {
+                error,
+                pendingDeleteRowId,
+                storageType: 'database'
+            });
+            
+            // Log the specific error message if available
+            if (error instanceof Error) {
+                console.error('❌ Error message:', error.message);
+            }
+            
+            // Show error notification
+            showBlueNotification('Failed to delete Connector. Please try again.', 5000, false);
+        } finally {
+            setDeletingRow(false);
+        }
+    };
+
+    // Auto-save new Connector when all required fields are filled - exactly like Manage Users
+    const autoSaveNewUserGroup = async (tempRowId: string, updatedGroup?: any) => {
+        console.log('🚀 autoSaveNewUserGroup function called with tempRowId:', tempRowId);
+
+        // Mark row as saving
+        setSavingRows((prev) => new Set([...Array.from(prev), tempRowId]));
+
+        // Use the provided updated connector or find it from current ref state
+        const connector = updatedGroup || connectorsRef.current.find((g) => g.id === tempRowId);
+        if (!connector) {
+            console.error('❌ Connector not found for auto-save:', tempRowId);
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+            return;
+        }
+
+        console.log('💾 Auto-saving new Connector:', connector);
+
+        // Check for duplicate entry (same connectorName + entity + product + service)
+        const isDuplicate = connectorsRef.current.some((existingConnector) => {
+            // Skip the current temporary row being saved
+            if (existingConnector.id === tempRowId) return false;
+            
+            // Check if all key fields match
+            return existingConnector.connectorName?.toLowerCase().trim() === connector.connectorName?.toLowerCase().trim() &&
+                   existingConnector.entity?.toLowerCase().trim() === connector.entity?.toLowerCase().trim() &&
+                   existingConnector.product?.toLowerCase().trim() === connector.product?.toLowerCase().trim() &&
+                   existingConnector.service?.toLowerCase().trim() === connector.service?.toLowerCase().trim();
+        });
+
+        if (isDuplicate) {
+            console.error('❌ Duplicate entry detected - Connector with same Connector Name, Workstream, Product, and Service already exists');
+            
+            // Mark that duplicate was detected (to suppress generic error notification)
+            duplicateDetectedRef.current = true;
+            
+            // Clear autosave timer and countdown
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+            setAutoSaveCountdown(null);
+            setIsAutoSaving(false);
+            
+            // Show duplicate modal
+            setDuplicateMessage(
+                `This combination of Connector Name (${connector.connectorName}), Workstream (${connector.entity}), Product (${connector.product}), and Service (${connector.service}) already exists in another row. Please use a different combination.`
+            );
+            setShowDuplicateModal(true);
+            
+            // Don't save the duplicate - return early instead of throwing error
+            setSavingRows((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(tempRowId);
+                return newSet;
+            });
+            return; // Exit early without saving
+        }
+
+        // Check if a connector with this name already exists in the database (created via + Add button)
+        // NOTE: API calls removed - connectors should use connector-specific APIs instead
+        console.log('⚠️ [Connectors] Auto-save API calls removed - use connector APIs instead');
+        console.log('🔍 [AutoSave] Would check if connector exists:', connector.connectorName);
+        
+        // API calls removed - connectors should use connector-specific APIs
+        // Original APIs: GET /api/user-management/roles, PUT /api/user-management/roles/:id, POST /api/user-management/roles
+        
+        // For now, just update local state without API calls
+        const newId = `group-${Date.now()}-${Math.random()}`;
+        const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+
+        // Update the accounts state with the new ID
+        setConnectors((prev) => {
+            const updated = prev.map((g) =>
+                g.id === tempRowId
+                    ? {...g, id: newId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                    : g,
+            );
+            // Apply stable sorting to maintain display order
+            return sortConfigsByDisplayOrder(updated);
+        });
+
+        // Update display order reference with the new ID
+        if (oldDisplayOrder !== undefined) {
+            displayOrderRef.current.delete(tempRowId); // Remove old reference
+            displayOrderRef.current.set(newId, oldDisplayOrder); // Add new reference
+            console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for new connector ID ${newId}`);
+        }
+
+        console.log('🎉 [AutoSave] Connector updated locally (API calls removed)');
+        
+        // Clean up after successful save
+        setSavingRows((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(tempRowId);
+            return newSet;
+        });
+    };
+
+    // Debounced auto-save function with countdown - exactly like Manage Users
+    const debouncedAutoSave = useCallback(async () => {
+        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
+        
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            clearInterval(countdownIntervalRef.current!);
+        }
+
+        // Clear validation errors when auto-save timer starts (user is actively editing)
+        if (showValidationErrors) {
+            console.log('🧹 Clearing validation errors as user is actively editing');
+            setShowValidationErrors(false);
+            setExternalFieldErrors({});
+        }
+
+        // Start countdown
+        setAutoSaveCountdown(10);
+        
+        // Countdown interval
+        const countdownInterval = setInterval(() => {
+            setAutoSaveCountdown((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(countdownInterval);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        countdownIntervalRef.current = countdownInterval;
+
+        // Set new timer for 10 seconds
+        const timer = setTimeout(async () => {
+            try {
+                console.log('🔥 10-second timer triggered - starting auto-save process');
+                
+                // Clear the timer ref immediately since it's now executing - prevents navigation warning
+                autoSaveTimerRef.current = null;
+                console.log('✅ Cleared autoSaveTimerRef - navigation should be allowed during autosave execution');
+                
+                // Reset duplicate detection flag at the start of each autosave
+                duplicateDetectedRef.current = false;
+                
+                setIsAutoSaving(true);
+                setAutoSaveCountdown(null);
+                clearInterval(countdownIntervalRef.current!);
+                countdownIntervalRef.current = null;
+                
+                // Get all temporary (unsaved) rows that are complete using current ref
+                const temporaryRows = connectorsRef.current.filter((connector) => {
+                    const isTemp = String(connector.id).startsWith('tmp-');
+                    if (!isTemp) return false;
+                    
+                    // Be more strict about what constitutes a complete Connector row
+                    const hasconnectorName = connector.connectorName?.trim() && connector.connectorName.trim().length > 0;
+                    const hasEntity = connector.entity?.trim() && connector.entity.trim().length > 0;
+                    const hasProduct = connector.product?.trim() && connector.product.trim().length > 0;
+                    const hasService = connector.service?.trim() && connector.service.trim().length > 0;
+                    
+                    const isComplete = hasconnectorName && hasEntity && hasProduct && hasService;
+                    
+                    if (isTemp && !isComplete) {
+                        console.log(`🚫 Skipping incomplete temporary Connector ${connector.id}:`, {
+                            hasconnectorName: !!hasconnectorName,
+                            hasEntity: !!hasEntity,
+                            hasProduct: !!hasProduct,
+                            hasService: !!hasService,
+                            groupNameValue: connector.connectorName,
+                            entityValue: connector.entity,
+                            productValue: connector.product,
+                            serviceValue: connector.service
+                        });
+                    }
+                    
+                    return isComplete;
+                });
+                
+                // Get all modified existing records that are still complete
+                const modifiedRows = connectorsRef.current.filter((connector) => {
+                    const isExisting = !String(connector.id).startsWith('tmp-');
+                    const isModified = modifiedExistingRecordsRef.current.has(String(connector.id));
+                    
+                    if (isExisting && isModified) {
+                        // Double-check that the record still has all required fields
+                        const hasconnectorName = connector.connectorName?.trim();
+                        const hasEntity = connector.entity?.trim();
+                        const hasProduct = connector.product?.trim();
+                        const hasService = connector.service?.trim();
+                        
+                        const isComplete = hasconnectorName && hasEntity && hasProduct && hasService;
+                        
+                        console.log(`🔍 Checking modified Connector ${connector.id}: isComplete=${isComplete}`, {
+                            hasconnectorName: !!hasconnectorName,
+                            hasEntity: !!hasEntity,
+                            hasProduct: !!hasProduct,
+                            hasService: !!hasService,
+                            groupNameValue: connector.connectorName,
+                            entityValue: connector.entity,
+                            productValue: connector.product,
+                            serviceValue: connector.service
+                        });
+                        
+                        return isComplete;
+                    }
+                    
+                    console.log(`🔍 Checking Connector ${connector.id}: isExisting=${isExisting}, isModified=${isModified}`);
+                    return false;
+                });
+                
+            console.log(`📊 Found ${temporaryRows.length} complete temporary Connectors to auto-save`);
+            console.log(`📊 Found ${modifiedRows.length} modified existing Connectors to auto-save`);
+            
+            // Check for orphaned records in modifiedExistingRecords
+            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
+                !connectorsRef.current.find(connector => String(connector.id) === recordId)
+            );
+            if (orphanedRecords.length > 0) {
+                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
+                console.log('🧹 Cleaning up orphaned records from modified set');
+                setModifiedExistingRecords(prev => {
+                    const newSet = new Set(prev);
+                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
+                    return newSet;
+                });
+                // Update the ref immediately for this operation
+                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
+                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
+                modifiedExistingRecordsRef.current = cleanedSet;
+            }
+            
+            const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+            if (totalRowsToSave > 0) {
+                console.log('💾 Auto-saving Connectors after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
+                
+                let successCount = 0;
+                let failureCount = 0;
+                
+                // Save new temporary Connectors
+                for (const tempRow of temporaryRows) {
+                    console.log(`💾 Auto-saving Connector: ${tempRow.id}`);
+                    
+                    // Reset duplicate flag before each save attempt
+                    const duplicateFlagBefore = duplicateDetectedRef.current;
+                    
+                    try {
+                        await autoSaveNewUserGroup(tempRow.id);
+                        
+                        // Check if duplicate was detected during save
+                        if (!duplicateDetectedRef.current || duplicateFlagBefore === duplicateDetectedRef.current) {
+                            // Only count as success if no duplicate was detected
+                            successCount++;
+                        } else {
+                            // Duplicate detected - don't count as success or failure
+                            console.log('ℹ️ Duplicate detected - not counting as success or failure');
+                        }
+                    } catch (error) {
+                        console.error(`❌ Failed to auto-save new Connector ${tempRow.id}:`, error);
+                        // Only count as failure if not a duplicate (duplicate modal already shown)
+                        if (!duplicateDetectedRef.current) {
+                            failureCount++;
+                        }
+                    }
+                }
+                
+                // Save modified existing Connectors to database via API
+                for (const modifiedRow of modifiedRows) {
+                    console.log(`💾 Saving modified existing Connector: ${modifiedRow.id}`);
+                    try {
+                        // Check for duplicate entry (same connectorName + entity + product + service as another record)
+                        const isDuplicate = connectorsRef.current.some((existingRole) => {
+                            // Skip the current row being updated
+                            if (existingRole.id === modifiedRow.id) return false;
+                            
+                            // Check if all key fields match with another existing record
+                            return existingRole.connectorName?.toLowerCase().trim() === modifiedRow.connectorName?.toLowerCase().trim() &&
+                                   existingRole.entity?.toLowerCase().trim() === modifiedRow.entity?.toLowerCase().trim() &&
+                                   existingRole.product?.toLowerCase().trim() === modifiedRow.product?.toLowerCase().trim() &&
+                                   existingRole.service?.toLowerCase().trim() === modifiedRow.service?.toLowerCase().trim();
+                        });
+
+                        if (isDuplicate) {
+                            console.error(`❌ Duplicate entry detected for autosave update: ${modifiedRow.connectorName}`);
+                            
+                            // Mark that duplicate was detected (to suppress generic error notification)
+                            duplicateDetectedRef.current = true;
+                            
+                            // Show duplicate modal
+                            setDuplicateMessage(
+                                `This combination of Connector Name (${modifiedRow.connectorName}), Workstream (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
+                            );
+                            setShowDuplicateModal(true);
+                            
+                            failureCount++;
+                            continue; // Skip this row
+                        }
+                        
+                        // NOTE: API call removed - connectors should use connector-specific APIs instead
+                        // Original API: PUT /api/user-management/roles/:id
+                        console.log('⚠️ [Connectors] Update API call removed - use connector APIs instead');
+                        console.log(`💾 Would update connector ${modifiedRow.id}`);
+                        // await api.put(`/api/user-management/roles/${modifiedRow.id}`, {...}); // REMOVED
+                        console.log(`✅ Connector ${modifiedRow.id} updated locally (API calls removed)`);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`❌ Failed to save modified Connector ${modifiedRow.id}:`, error);
+                        failureCount++;
+                    }
+                }
+                
+                // Clear the modified records tracking only if all saves succeeded
+                if (failureCount === 0) {
+                    setModifiedExistingRecords(new Set());
+                    modifiedExistingRecordsRef.current = new Set();
+                    console.log('✅ Cleared modifiedExistingRecords - no more unsaved changes');
+                }
+                
+                // Show appropriate notification based on results
+                // Don't show any notification if duplicate modal was shown
+                if (duplicateDetectedRef.current && successCount === 0 && failureCount === 0) {
+                    // Only duplicate detected - modal already shown, no notification needed
+                    console.log('ℹ️ Duplicate detected - modal shown, skipping all notifications');
+                } else if (successCount > 0 && failureCount === 0 && !duplicateDetectedRef.current) {
+                    // All succeeded and no duplicates
+                    console.log('✨ Showing auto-save success animation for all entries');
+                    setShowAutoSaveSuccess(true);
+                    
+                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
+                        : temporaryRows.length > 0
+                        ? `Auto-saved ${temporaryRows.length} new entries`
+                        : `Auto-saved ${modifiedRows.length} updated entries`;
+                    
+                    showBlueNotification(message);
+                    
+                    setTimeout(() => {
+                        console.log('✨ Hiding auto-save success animation');
+                        setShowAutoSaveSuccess(false);
+                    }, 3000);
+                    
+                    console.log(`✅ Auto-saved ${successCount} entries successfully`);
+                    
+                    // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
+                    console.log('🔄 Reloading Connectors after successful autosave to update IDs...');
+                    await loadConnectors({
+                        accountId: selectedAccountId,
+                        accountName: selectedAccountName,
+                        enterpriseId: selectedEnterpriseId,
+                        enterpriseName: selectedEnterprise
+                    });
+                    
+                    console.log('✅ Reload complete after autosave - checking state:', {
+                        autoSaveTimerRef: autoSaveTimerRef.current,
+                        modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                        userGroupsCount: connectorsRef.current.length,
+                        hasTempRows: connectorsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                    });
+                } else if (successCount > 0 && failureCount > 0 && !duplicateDetectedRef.current) {
+                    // Partial success and no duplicates
+                    console.warn(`⚠️ Auto-save partial: ${successCount} succeeded, ${failureCount} failed`);
+                    showBlueNotification(`Partially saved: ${successCount} succeeded, ${failureCount} failed. Please try saving manually.`, 8000, false);
+                } else if (failureCount > 0 && !duplicateDetectedRef.current) {
+                    // All failed (but not due to duplicate)
+                    console.error(`❌ All auto-save attempts failed: ${failureCount} errors`);
+                    showBlueNotification(`Failed to auto-save changes. Please save manually.`, 8000, false);
+                }
+            } else {
+                console.log('ℹ️ No complete rows to auto-save');
+            }
+            
+            setIsAutoSaving(false);
+            } catch (error) {
+                console.error('❌ Auto-save error:', error);
+                setIsAutoSaving(false);
+            }
+        }, 10000); // 10 seconds
+
+        autoSaveTimerRef.current = timer;
+    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, showValidationErrors, loadConnectors]);
+
+    // Update the ref whenever debouncedAutoSave changes
+    useEffect(() => {
+        debouncedAutoSaveRef.current = debouncedAutoSave;
+    }, [debouncedAutoSave]);
+
+    // Function to check for unsaved changes - exactly like Manage Users
+    const getUnsavedChanges = () => {
+        const hasActiveTimer = !!autoSaveTimerRef.current;
+        const hasModifiedRecords = modifiedExistingRecordsRef.current.size > 0;
+        const hasTempRows = connectorsRef.current.some((connector: any) => 
+            String(connector.id).startsWith('tmp-')
+        );
+        
+        const hasUnsavedChanges = hasActiveTimer || hasModifiedRecords || hasTempRows;
+        
+        console.log('🔍 [getUnsavedChanges] Check:', {
+            hasActiveTimer,
+            hasModifiedRecords,
+            modifiedRecordsCount: modifiedExistingRecordsRef.current.size,
+            hasTempRows,
+            tempRowsIds: connectorsRef.current.filter(g => String(g.id).startsWith('tmp-')).map(g => g.id),
+            totalGroups: connectorsRef.current.length,
+            hasUnsavedChanges
+        });
+        
+        return hasUnsavedChanges;
+    };
+
+    // Function to check for incomplete rows - exactly like Manage Users
+    const getIncompleteRows = () => {
+        const incompleteRows = connectors
+            .filter((connector: any) => {
+                const hasconnectorName = connector.connectorName?.trim();
+                const hasEntity = connector.entity?.trim();
+                const hasProduct = connector.product?.trim();
+                const hasService = connector.service?.trim();
+
+                // Include completely blank rows only when validation is explicitly shown
+                const isCompletelyBlank = !hasconnectorName && !hasEntity && !hasProduct && !hasService;
+                if (isCompletelyBlank && !showValidationErrors) return false;
+
+                // Row is incomplete if any required field is missing
+                const isIncomplete = !hasconnectorName || !hasEntity || !hasProduct || !hasService;
+                
+                console.log('🔍 Row validation check:', {
+                    id: connector.id,
+                    hasconnectorName,
+                    hasEntity,
+                    hasProduct,
+                    hasService,
+                    isIncomplete
+                });
+                
+                return isIncomplete;
+            })
+            .map((connector: any) => connector.id);
+            
+        // Only log when showValidationErrors is true to prevent infinite loops
+        if (showValidationErrors && incompleteRows.length > 0) {
+            console.log('🔍 getIncompleteRows result:', {
+                incompleteRowIds: incompleteRows,
+                totalGroups: connectors.length,
+                showValidationErrors,
+                sampleGroupIds: connectors.slice(0, 3).map(g => g.id)
+            });
+        }
+        
+        return incompleteRows;
+    };
+
+    // Router interception for navigation prevention - exactly like Manage Users
+    useEffect(() => {
+        // Store reference to original methods
+        const originalPush = router.push;
+        const originalReplace = router.replace;
+        
+        // Store original router for use in navigation confirmation
+        originalRouterRef.current = { push: originalPush, replace: originalReplace };
+
+        // Override router.push to intercept navigation
+        router.push = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - push method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+
+            return originalPush(href, options);
+        };
+
+        router.replace = (href: string, options?: any) => {
+            // Check for unsaved changes but allow navigation if user has confirmed
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                console.log('🚨 Navigation intercepted - replace method:', {
+                    hasUnsavedChanges: currentUnsavedChanges,
+                    incompleteRows: currentIncompleteRows.length,
+                    modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
+                    userConfirmedLeave
+                });
+                
+                if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
+                    setIncompleteRows(currentIncompleteRows);
+                    setPendingNavigationUrl(href);
+                    setShowNavigationWarning(true);
+                    return Promise.resolve(true); // Return resolved promise to prevent error
+                }
+            }
+            return originalReplace(href, options);
+        };
+
+        // Handle browser history navigation (back/forward buttons)
+        const handlePopState = (event: PopStateEvent) => {
+            const currentUnsavedChanges = getUnsavedChanges();
+            const currentIncompleteRows = getIncompleteRows();
+            
+            if ((currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
+                event.preventDefault();
+                // Push current state back to prevent navigation
+                window.history.pushState(null, '', window.location.href);
+                setIncompleteRows(currentIncompleteRows);
+                setShowNavigationWarning(true);
+            }
+        };
+
+        // Add history listener for browser navigation
+        window.addEventListener('popstate', handlePopState);
+
+        // Cleanup on unmount
+        return () => {
+            router.push = originalPush;
+            router.replace = originalReplace;
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [router, userConfirmedLeave]);
+
+    // Handle search
+    const handleSearch = () => {
+        setAppliedSearchTerm(searchTerm);
+    };
+
+    const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
+
+    // Handle save all - exactly like Manage Users
+    const handleSaveAll = async () => {
+        console.log('💾 Save all clicked - validating and saving Connectors...');
+        
+        // Reset duplicate detection flag at the start of manual save
+        duplicateDetectedRef.current = false;
+        
+        // Clear auto-save timer since user is manually saving
+        if (autoSaveTimerRef.current) {
+            console.log('🛑 Manual save clicked - clearing auto-save timer');
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+            setAutoSaveCountdown(null);
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+            }
+        }
+        
+        // Get temporary (unsaved) and existing rows
+        const temporaryRows = connectors.filter((connector: any) => 
+            String(connector.id).startsWith('tmp-')
+        );
+        const existingRows = connectors.filter((connector: any) => 
+            !String(connector.id).startsWith('tmp-')
+        );
+
+        // Check for incomplete temporary rows (including completely blank rows) - exactly like Manage Users
+        const incompleteTemporaryRows = temporaryRows.filter((connector: any) => {
+            const hasconnectorName = connector.connectorName?.trim();
+            const hasEntity = connector.entity?.trim();
+            const hasProduct = connector.product?.trim();
+            const hasService = connector.service?.trim();
+
+            // Row is incomplete if any required field is missing (including completely blank rows)
+            return !hasconnectorName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Check for incomplete existing rows (including completely blank rows) - exactly like Manage Users
+        const incompleteExistingRows = existingRows.filter((connector: any) => {
+            const hasconnectorName = connector.connectorName?.trim();
+            const hasEntity = connector.entity?.trim();
+            const hasProduct = connector.product?.trim();
+            const hasService = connector.service?.trim();
+
+            // Row is incomplete if any required field is missing (including completely blank rows)
+            return !hasconnectorName || !hasEntity || !hasProduct || !hasService;
+        });
+
+        // Combine all incomplete rows
+        const incompleteRowsData = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        
+        // Get count of modified existing rows
+        const modifiedExistingRowsCount = existingRows.filter((connector: any) => 
+            modifiedExistingRecords.has(connector.id)
+        ).length;
+        
+        if (temporaryRows.length === 0 && modifiedExistingRowsCount === 0) {
+            showBlueNotification('No unsaved entries to save.', 3000, false);
+            return;
+        }
+
+        if (incompleteRowsData.length > 0) {
+            const allMissingFields = new Set<string>();
+            
+            console.log('🔍 Checking missing fields for incomplete rows:', incompleteRowsData);
+            incompleteRowsData.forEach((connector) => {
+                console.log('📋 Checking connector:', {
+                    id: connector.id,
+                    connectorName: connector.connectorName || '(empty)',
+                    entity: connector.entity || '(empty)',
+                    product: connector.product || '(empty)',
+                    service: connector.service || '(empty)'
+                });
+                
+                // Check for missing fields
+                if (!connector.connectorName?.trim()) allMissingFields.add('Connector Name');
+                if (!connector.entity?.trim()) allMissingFields.add('Workstream');
+                if (!connector.product?.trim()) allMissingFields.add('Product');
+                if (!connector.service?.trim()) allMissingFields.add('Service');
+            });
+            
+            console.log('📝 All missing fields:', Array.from(allMissingFields));
+            
+            const incompleteCount = incompleteRowsData.length;
+            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
+            
+            setValidationMessage(message);
+            setShowValidationErrors(true); // Enable red border highlighting for validation errors
+            
+            // Set incomplete row IDs for highlighting
+            const incompleteRowIds = incompleteRowsData.map(r => r.id);
+            console.log('🎯 Setting incomplete row IDs for highlighting:', incompleteRowIds);
+            setIncompleteRows(incompleteRowIds); // Store incomplete row IDs for highlighting
+            
+            setShowValidationModal(true);
+            return;
+        }
+
+        // Save all complete temporary rows
+        try {
+            let savedCount = 0;
+            const completeTemporaryRows = temporaryRows.filter((connector: any) => {
+                const hasconnectorName = connector.connectorName?.trim();
+                const hasEntity = connector.entity?.trim();
+                const hasProduct = connector.product?.trim();
+                const hasService = connector.service?.trim();
+                return hasconnectorName && hasEntity && hasProduct && hasService;
+            });
+            
+            console.log('✅ Complete temporary rows to save:', completeTemporaryRows.length, completeTemporaryRows);
+            
+            // Get complete modified existing rows
+            const completeModifiedRows = existingRows.filter((connector: any) => {
+                const hasconnectorName = connector.connectorName?.trim();
+                const hasEntity = connector.entity?.trim();
+                const hasProduct = connector.product?.trim();
+                const hasService = connector.service?.trim();
+                const isModified = modifiedExistingRecords.has(connector.id);
+                return hasconnectorName && hasEntity && hasProduct && hasService && isModified;
+            });
+            
+            console.log('✅ Complete modified rows to save:', completeModifiedRows.length, completeModifiedRows);
+            
+            let failedCount = 0;
+            
+            // Save temporary rows to database
+            for (const tempGroup of completeTemporaryRows) {
+                try {
+                    // Check for duplicate entry (same connectorName + entity + product + service)
+                    const isDuplicate = connectors.some((existingRole: any) => {
+                        // Skip the current temporary row being saved
+                        if (existingRole.id === tempGroup.id) return false;
+                        
+                        // Check if all key fields match
+                        return existingRole.connectorName?.toLowerCase().trim() === tempGroup.connectorName?.toLowerCase().trim() &&
+                               existingRole.entity?.toLowerCase().trim() === tempGroup.entity?.toLowerCase().trim() &&
+                               existingRole.product?.toLowerCase().trim() === tempGroup.product?.toLowerCase().trim() &&
+                               existingRole.service?.toLowerCase().trim() === tempGroup.service?.toLowerCase().trim();
+                    });
+
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for:', tempGroup.connectorName);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Connector Name (${tempGroup.connectorName}), Workstream (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
+                        );
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
+                    }
+                    
+                    // Check if a connector with this name already exists in the database (created via + Add button)
+                    // NOTE: API calls removed - connectors should use connector-specific APIs instead
+                    console.log('⚠️ [Connectors] Save API calls removed - use connector APIs instead');
+                    console.log('🔍 Would check if connector exists:', tempGroup.connectorName);
+                    
+                    // API calls removed - connectors should use connector-specific APIs
+                    // Original APIs: GET /api/user-management/roles, PUT /api/user-management/roles/:id, POST /api/user-management/roles
+                    
+                    // For now, just update local state without API calls
+                    const newId = `group-${Date.now()}-${Math.random()}`;
+                    
+                    // Update the row ID in state
+                    setConnectors((prev) => {
+                        const updated = prev.map((g) =>
+                            g.id === tempGroup.id
+                                ? {...g, id: newId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}
+                                : g,
+                        );
+                        // Update ref immediately so it's available for checks
+                        connectorsRef.current = updated;
+                        // Immediately save to localStorage to ensure persistence (bypass loading flag)
+                        if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId) {
+                            // Use direct save, bypassing the loading flag check
+                            try {
+                                const key = getLocalStorageKey(selectedAccountId, selectedEnterpriseId);
+                                window.localStorage.setItem(key, JSON.stringify(updated));
+                                console.log('💾 [Save] Immediately saved to localStorage:', updated.length, 'rows for account:', selectedAccountId, 'enterprise:', selectedEnterpriseId);
+                                console.log('💾 [Save] Row details:', updated.map(r => ({ id: r.id, connectorName: r.connectorName, entity: r.entity, product: r.product, service: r.service })));
+                            } catch (error) {
+                                console.error('❌ [Save] Failed to save to localStorage:', error);
+                            }
+                        }
+                        return updated;
+                    });
+                    
+                    savedCount++;
+                    console.log('🎉 Connector updated locally (API calls removed)');
+                } catch (error) {
+                    console.error('❌ Failed to save new Connector:', error);
+                    failedCount++;
+                }
+            }
+            
+            // Save modified existing rows to database
+            for (const modifiedRole of completeModifiedRows) {
+                try {
+                    // Check for duplicate entry (same connectorName + entity + product + service as another record)
+                    const isDuplicate = connectors.some((existingRole: any) => {
+                        // Skip the current row being updated
+                        if (existingRole.id === modifiedRole.id) return false;
+                        
+                        // Check if all key fields match with another existing record
+                        return existingRole.connectorName?.toLowerCase().trim() === modifiedRole.connectorName?.toLowerCase().trim() &&
+                               existingRole.entity?.toLowerCase().trim() === modifiedRole.entity?.toLowerCase().trim() &&
+                               existingRole.product?.toLowerCase().trim() === modifiedRole.product?.toLowerCase().trim() &&
+                               existingRole.service?.toLowerCase().trim() === modifiedRole.service?.toLowerCase().trim();
+                    });
+
+                    if (isDuplicate) {
+                        console.error('❌ Duplicate entry detected for update:', modifiedRole.connectorName);
+                        
+                        // Mark that duplicate was detected
+                        duplicateDetectedRef.current = true;
+                        
+                        // Show duplicate modal
+                        setDuplicateMessage(
+                            `This combination of Connector Name (${modifiedRole.connectorName}), Workstream (${modifiedRole.entity}), Product (${modifiedRole.product}), and Service (${modifiedRole.service}) already exists in another row. Please use a different combination.`
+                        );
+                        setShowDuplicateModal(true);
+                        
+                        failedCount++;
+                        continue; // Skip this row and continue with others
+                    }
+                    
+                    // NOTE: API call removed - connectors should use connector-specific APIs instead
+                    console.log('⚠️ [Connectors] Update API call removed - use connector APIs instead');
+                    console.log('💾 Would update existing connector:', modifiedRole.id);
+                    
+                    // API call removed - connectors should use connector-specific APIs
+                    // Original API: PUT /api/user-management/roles/:id
+                    // await api.put(`/api/user-management/roles/${modifiedRole.id}`, roleData); // REMOVED
+                    
+                    // Update the row's updatedAt timestamp in state
+                    setConnectors((prev) =>
+                        prev.map((g) =>
+                            g.id === modifiedRole.id
+                                ? {...g, updatedAt: new Date().toISOString()}
+                                : g,
+                        ),
+                    );
+                    
+                    savedCount++;
+                    console.log('🎉 Connector updated locally (API calls removed)');
+                } catch (error) {
+                    console.error('❌ Failed to update Connector:', error);
+                    failedCount++;
+                }
+            }
+            
+            // Clear the modified records tracking after successful saves
+            if (completeModifiedRows.length > 0 && failedCount === 0) {
+                setModifiedExistingRecords(new Set());
+                console.log('✨ Cleared modified records tracking');
+            }
+            
+            if (savedCount > 0 && failedCount === 0) {
+                const newCount = completeTemporaryRows.length;
+                const updatedCount = completeModifiedRows.length;
+                const message = newCount > 0 && updatedCount > 0
+                    ? `Successfully saved ${newCount} new and ${updatedCount} updated entries.`
+                    : newCount > 0
+                    ? `Successfully saved ${newCount} new entries.`
+                    : `Successfully saved ${updatedCount} updated entries.`;
+                
+                showBlueNotification(message);
+                setShowValidationErrors(false); // Clear validation errors on successful save
+                setExternalFieldErrors({});
+                setIncompleteRows([]);
+                
+                // Reload data from backend to get real IDs and clear unsaved state
+                // NOTE: API call removed - connectors should use connector-specific APIs instead
+                console.log('⚠️ [Connectors] Reload API call removed - use connector APIs instead');
+                // await loadConnectors({...}); // REMOVED
+                
+                // ============================================================================
+                // TEMPORARY: Ensure localStorage is up to date after save (REVERT WHEN APIs ARE READY)
+                // ============================================================================
+                // Force a save to localStorage to ensure the updated IDs are persisted
+                // Also reload from localStorage to ensure we have the latest data
+                if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId) {
+                    // Use a small delay to ensure state has updated
+                    setTimeout(() => {
+                        // Get current state (should have updated IDs by now)
+                        const currentRoles = connectorsRef.current;
+                        if (currentRoles.length > 0) {
+                            // Save current state to localStorage
+                            saveConnectorsToLocalStorage(currentRoles, selectedAccountId, selectedEnterpriseId);
+                            console.log('💾 [Save] Forced localStorage save after manual save:', currentRoles.length, 'rows');
+                            console.log('💾 [Save] Saved row IDs:', currentRoles.map(r => r.id));
+                        } else {
+                            // If ref is empty, try to get from state directly
+                            console.warn('⚠️ [Save] connectorsRef is empty, checking state...');
+                        }
+                    }, 200);
+                }
+                // ============================================================================
+                
+                console.log('✅ Reload complete after manual save - checking state:', {
+                    autoSaveTimerRef: autoSaveTimerRef.current,
+                    modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
+                    userGroupsCount: connectorsRef.current.length,
+                    hasTempRows: connectorsRef.current.some(g => String(g.id).startsWith('tmp-'))
+                });
+            } else if (duplicateDetectedRef.current && savedCount === 0 && failedCount === 0) {
+                // Only duplicate detected - modal already shown, no notification needed
+                console.log('ℹ️ Duplicate modal shown - skipping all notifications');
+            } else if (savedCount > 0 && failedCount > 0) {
+                // Don't show notification if duplicate modal was shown
+                if (!duplicateDetectedRef.current) {
+                    showBlueNotification(`Partially saved: ${savedCount} succeeded, ${failedCount} failed. Please check console for errors.`, 5000, false);
+                }
+            } else if (failedCount > 0 && !duplicateDetectedRef.current) {
+                // Only show error notification if duplicate modal was NOT shown
+                showBlueNotification(`Failed to save ${failedCount} entries. Please check console for errors.`, 5000, false);
+            } else if (savedCount === 0 && failedCount === 0 && !duplicateDetectedRef.current) {
+                // No failures and no duplicates - just nothing to save
+                showBlueNotification('No complete entries to save.', 3000, false);
+            }
+        } catch (error) {
+            console.error('Failed to save entries:', error);
+            showBlueNotification('Failed to save some entries. Please try again.', 3000, false);
+        }
+    };
+
+    // Filter form state
+    const [filterForm, setFilterForm] = useState({
+        connectorName: '',
+        description: '',
+        entity: '',
+        product: '',
+        service: '',
+    });
+
+    // Update filterFormRef whenever filterForm changes
+    useEffect(() => {
+        filterFormRef.current = filterForm;
+    }, [filterForm]);
+
+    // Track if Clear All was clicked to allow closing filter panel on outside click
+    const filterClearedRef = useRef(false);
+
+    // Filter dropdown suggestions state - exactly like Manage Users
+    const [showGroupNameSuggestions, setShowGroupNameSuggestions] = useState(false);
+    const [showEntitySuggestions, setShowEntitySuggestions] = useState(false);
+    const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+    const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
+    
+    const [filteredGroupNames, setFilteredGroupNames] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredEntities, setFilteredEntities] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredProducts, setFilteredProducts] = useState<Array<{id: string; name: string}>>([]);
+    const [filteredServices, setFilteredServices] = useState<Array<{id: string; name: string}>>([]);
+    
+    const [selectedGroupNameIndex, setSelectedGroupNameIndex] = useState(-1);
+    const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
+    const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
+    const [selectedServiceIndex, setSelectedServiceIndex] = useState(-1);
+
+    // Apply and clear filter handlers
+    const handleApplyFilters = () => {
+        const filters: Record<string, any> = {};
+        if (filterForm.connectorName) filters.connectorName = filterForm.connectorName;
+        if (filterForm.description) filters.description = filterForm.description;
+        if (filterForm.entity) filters.entity = filterForm.entity;
+        if (filterForm.product) filters.product = filterForm.product;
+        if (filterForm.service) filters.service = filterForm.service;
+        
+        setActiveFilters(filters);
+        closeAllDialogs();
+        
+        // Reset the cleared flag when panel is closed via Apply
+        filterClearedRef.current = false;
+    };
+
+    const handleClearFilters = () => {
+        setFilterForm({
+            connectorName: '',
+            description: '',
+            entity: '',
+            product: '',
+            service: '',
+        });
+        setActiveFilters({});
+        
+        // Mark that filters were cleared - allow closing on outside click
+        filterClearedRef.current = true;
+    };
+
+    // Handler to show all columns
+    const handleShowAllColumns = () => {
+        setVisibleCols(allCols);
+    };
 
     return (
-        <div className='h-full bg-white flex flex-col relative -mx-4 -my-3'>
-            {/* Save Notifications */}
-            <div
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    right: '20px',
-                    zIndex: 10000,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                }}
-            >
-                {saveNotifications.map((notification, index) => (
-                    <div
-                        key={notification.id}
-                        className='save-notification-toast'
-                        style={{
-                            animationDelay: `${index * 100}ms`,
-                        }}
-                    >
-                        {notification.message}
-                    </div>
-                ))}
-            </div>
-
-            {/* Header */}
-            <div className='bg-white border-b border-gray-200 px-8 py-3'>
-                <div>
-                    <h1 className='text-xl font-bold text-gray-900'>
-                        Connectors: Account Name
+        <div className='h-full bg-secondary flex flex-col'>
+            {/* Header Section */}
+            <div className='bg-white px-3 py-4 border-b border-slate-200'>
+                <div className='w-full'>
+                    <h1 className='text-2xl font-bold text-slate-900'>
+                        Manage Connectors
                     </h1>
-                    <p className='text-sm text-gray-600 mt-0.5'>
-                        Manage system integrations and data connectors
+                    <p className='mt-2 text-sm text-slate-600 leading-relaxed'>
+                        Securely store, manage, and govern enterprise connectors including API keys, tokens, and authentication secrets.
                     </p>
                 </div>
             </div>
 
-            {/* Action Bar */}
-            <div className='bg-white border-b border-gray-200 px-8 py-3'>
-                <div className='flex items-center justify-between'>
-                    <div className='flex items-center space-x-2'>
-                        {/* Create Connector Button */}
-                        <motion.button
-                            onClick={handleCreateConnector}
-                            className='inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <PlusIcon className='w-4 h-4 mr-2' />
-                            Create Connector
-                        </motion.button>
-
-                        {/* Search Button */}
-                        <motion.button
-                            onClick={() => setShowSearchBar(!showSearchBar)}
-                            className={`inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium transition-colors duration-200 ${
-                                showSearchBar
-                                    ? 'bg-blue-50 text-blue-700 border-blue-300'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+            {/* Toolbar Section */}
+            <div className='bg-sap-light-gray px-3 py-3 text-primary border-y border-light'>
+                <div className='flex items-center justify-between gap-3'>
+                    <div className='flex items-center gap-3 flex-wrap'>
+                        {/* Create New Connector Button */}
+                        <button
+                            onClick={handleAddNewRow}
+                            disabled={isLoading}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm ${
+                                isLoading
+                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                    : 'bg-primary-600 text-white hover:bg-primary-700'
                             }`}
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
                         >
-                            <MagnifyingGlassIcon className='w-4 h-4 mr-1' />
-                            Search
-                        </motion.button>
+                            {isLoading ? (
+                                <div className='h-4 w-4 animate-spin'>
+                                    <svg
+                                        className='h-full w-full'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <circle
+                                            className='opacity-25'
+                                            cx='12'
+                                            cy='12'
+                                            r='10'
+                                            stroke='currentColor'
+                                            strokeWidth='4'
+                                        />
+                                        <path
+                                            className='opacity-75'
+                                            fill='currentColor'
+                                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                        />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <PlusIcon className='h-4 w-4' />
+                            )}
+                            <span className='text-sm'>
+                                {isLoading ? 'Loading...' : 'Create New Connector'}
+                            </span>
+                        </button>
+
+                        {/* Search Input - Always Visible */}
+                        <div ref={searchRef} className='flex items-center'>
+                            <div className='relative w-60'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <MagnifyingGlassIcon className='h-5 w-5 text-secondary' />
+                                </div>
+                                <input
+                                    type='text'
+                                    placeholder='Global Search'
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setAppliedSearchTerm(e.target.value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            setAppliedSearchTerm(searchTerm);
+                                        }
+                                    }}
+                                    className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
+                                    style={{ fontSize: '14px' }}
+                                />
+                                {appliedSearchTerm && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setAppliedSearchTerm('');
+                                        }}
+                                        className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
+                                        title='Clear search'
+                                    >
+                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
 
                         {/* Filter Button */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <FunnelIcon className='w-4 h-4 mr-1' />
-                            Filter
-                        </motion.button>
+                        <div ref={filterRef} className='relative'>
+                            <button
+                                onClick={() =>
+                                    filterVisible
+                                        ? closeAllDialogs()
+                                        : toggleDialog('filter')
+                                }
+                                className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                    filterVisible ||
+                                    Object.keys(activeFilters).length > 0
+                                        ? 'border-purple-300 bg-purple-50 text-purple-600 shadow-purple-200 shadow-lg'
+                                        : 'border-blue-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50 hover:text-purple-600 hover:shadow-lg'
+                                }`}
+                            >
+                                <svg
+                                    className='w-4 h-4 transition-transform duration-300 group-hover:scale-110'
+                                    fill='none'
+                                    viewBox='0 0 24 24'
+                                    stroke='currentColor'
+                                >
+                                    <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z'
+                                    />
+                                </svg>
+                                <span className='text-sm'>Filter</span>
+                                {Object.keys(activeFilters).length > 0 && (
+                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full animate-bounce'></div>
+                                )}
+                            </button>
 
-                        {/* Sort Button */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <ArrowsUpDownIcon className='w-4 h-4 mr-1' />
-                            Sort
-                        </motion.button>
+                            {/* Filter Dropdown */}
+                            {filterVisible && (
+                                <div className='absolute top-full mt-2 left-0 bg-card text-primary shadow-xl border border-blue-200 rounded-lg z-50 min-w-80'>
+                                    <div className='flex items-center justify-between px-3 py-1.5 border-b border-blue-200'>
+                                        <div className='text-xs font-semibold'>
+                                            Filters
+                                        </div>
+                                        <div className='flex items-center gap-2'>
+                                            <button
+                                                onClick={handleClearFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Clear All
+                                            </button>
+                                            <button
+                                                onClick={handleApplyFilters}
+                                                className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                            >
+                                                Apply
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className='p-2'>
+                                        <div className='space-y-2'>
+                                            {/* Connector Name Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Connector Name
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.connectorName}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                connectorName: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter connector names
+                                                            const filtered = (dropdownOptions.connectorNames || []).filter(connectorName =>
+                                                                connectorName.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredGroupNames(filtered);
+                                                            setShowGroupNameSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedGroupNameIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedGroupNameIndex(prev => 
+                                                                    prev < filteredGroupNames.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedGroupNameIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedGroupNameIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredGroupNames[selectedGroupNameIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    connectorName: selected.name,
+                                                                });
+                                                                setShowGroupNameSuggestions(false);
+                                                                setSelectedGroupNameIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowGroupNameSuggestions(false);
+                                                                setSelectedGroupNameIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowGroupNameSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.connectorName && filteredGroupNames.length > 0) {
+                                                                setShowGroupNameSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showGroupNameSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredGroupNames.map((connectorName, index) => (
+                                                                <div
+                                                                    key={connectorName.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedGroupNameIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            connectorName: connectorName.name,
+                                                                        });
+                                                                        setShowGroupNameSuggestions(false);
+                                                                        setSelectedGroupNameIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {connectorName.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                        {/* Hide Button */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <Squares2X2Icon className='w-4 h-4 mr-1' />
-                            Hide
-                        </motion.button>
+                                            {/* Description Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Description
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.description}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                description: value,
+                                                            });
+                                                            filterClearedRef.current = false;
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                </div>
+                                            </div>
 
-                        {/* Group By Button */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <Squares2X2Icon className='w-4 h-4 mr-1' />
-                            Group by
-                        </motion.button>
+                                            {/* Entity Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Workstream
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.entity}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                entity: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter entities
+                                                            const filtered = (dropdownOptions.entities || []).filter(entity =>
+                                                                entity.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredEntities(filtered);
+                                                            setShowEntitySuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedEntityIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => 
+                                                                    prev < filteredEntities.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedEntityIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedEntityIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredEntities[selectedEntityIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    entity: selected.name,
+                                                                });
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowEntitySuggestions(false);
+                                                                setSelectedEntityIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowEntitySuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.entity && filteredEntities.length > 0) {
+                                                                setShowEntitySuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showEntitySuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredEntities.map((entity, index) => (
+                                                                <div
+                                                                    key={entity.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedEntityIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            entity: entity.name,
+                                                                        });
+                                                                        setShowEntitySuggestions(false);
+                                                                        setSelectedEntityIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {entity.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                        {/* Views Button */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            Views
-                        </motion.button>
+                                            {/* Product Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Product
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.product}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                product: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter products
+                                                            const filtered = (dropdownOptions.products || []).filter(product =>
+                                                                product.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredProducts(filtered);
+                                                            setShowProductSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedProductIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedProductIndex(prev => 
+                                                                    prev < filteredProducts.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedProductIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedProductIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredProducts[selectedProductIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    product: selected.name,
+                                                                });
+                                                                setShowProductSuggestions(false);
+                                                                setSelectedProductIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowProductSuggestions(false);
+                                                                setSelectedProductIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowProductSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.product && filteredProducts.length > 0) {
+                                                                setShowProductSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showProductSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredProducts.map((product, index) => (
+                                                                <div
+                                                                    key={product.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedProductIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            product: product.name,
+                                                                        });
+                                                                        setShowProductSuggestions(false);
+                                                                        setSelectedProductIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {product.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                        {/* More Options */}
-                        <motion.button
-                            className='inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition-colors duration-200 text-sm font-medium'
-                            whileHover={{scale: 1.02}}
-                            whileTap={{scale: 0.98}}
-                        >
-                            <EllipsisVerticalIcon className='w-4 h-4' />
-                        </motion.button>
+                                            {/* Service Filter */}
+                                            <div>
+                                                <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                    Service
+                                                </label>
+                                                <div className='relative'>
+                                                    <input
+                                                        type='text'
+                                                        value={filterForm.service}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setFilterForm({
+                                                                ...filterForm,
+                                                                service: value,
+                                                            });
+                                                            
+                                                            // Reset cleared flag when user starts typing again
+                                                            filterClearedRef.current = false;
+                                                            
+                                                            // Filter services
+                                                            const filtered = (dropdownOptions.services || []).filter(service =>
+                                                                service.name.toLowerCase().includes(value.toLowerCase())
+                                                            );
+                                                            setFilteredServices(filtered);
+                                                            setShowServiceSuggestions(value.length > 0 && filtered.length > 0);
+                                                            setSelectedServiceIndex(-1);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'ArrowDown') {
+                                                                e.preventDefault();
+                                                                setSelectedServiceIndex(prev => 
+                                                                    prev < filteredServices.length - 1 ? prev + 1 : prev
+                                                                );
+                                                            } else if (e.key === 'ArrowUp') {
+                                                                e.preventDefault();
+                                                                setSelectedServiceIndex(prev => prev > 0 ? prev - 1 : -1);
+                                                            } else if (e.key === 'Enter' && selectedServiceIndex >= 0) {
+                                                                e.preventDefault();
+                                                                const selected = filteredServices[selectedServiceIndex];
+                                                                setFilterForm({
+                                                                    ...filterForm,
+                                                                    service: selected.name,
+                                                                });
+                                                                setShowServiceSuggestions(false);
+                                                                setSelectedServiceIndex(-1);
+                                                            } else if (e.key === 'Escape') {
+                                                                setShowServiceSuggestions(false);
+                                                                setSelectedServiceIndex(-1);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            setTimeout(() => setShowServiceSuggestions(false), 150);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (filterForm.service && filteredServices.length > 0) {
+                                                                setShowServiceSuggestions(true);
+                                                            }
+                                                        }}
+                                                        className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                    />
+                                                    {showServiceSuggestions && (
+                                                        <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
+                                                            {filteredServices.map((service, index) => (
+                                                                <div
+                                                                    key={service.id}
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                        index === selectedServiceIndex ? 'bg-blue-100' : ''
+                                                                    }`}
+                                                                    onMouseDown={(e) => {
+                                                                        e.preventDefault();
+                                                                        setFilterForm({
+                                                                            ...filterForm,
+                                                                            service: service.name,
+                                                                        });
+                                                                        setShowServiceSuggestions(false);
+                                                                        setSelectedServiceIndex(-1);
+                                                                    }}
+                                                                >
+                                                                    {service.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
-                        {/* Trash Button */}
-                        <ToolbarTrashButton
-                            onClick={() => console.log('Trash clicked')}
-                        />
+                    {/* Sort Button */}
+                    <div ref={sortRef} className='relative'>
+                        <button
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                sortOpen || sortColumn
+                                    ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                sortOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('sort')
+                            }
+                        >
+                            <ArrowsUpDownIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Sort</span>
+                            {sortColumn && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {sortOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Sort by
+                                    </div>
+                                    {sortColumn && (
+                                        <button
+                                            onClick={clearSort}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortColumn}
+                                                    onChange={(e) =>
+                                                        setSortColumn(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>
+                                                        Select column...
+                                                    </option>
+                                                    {sortableCols.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {columnLabels[c]}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Direction
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={sortDirection}
+                                                    onChange={(e) => {
+                                                        const newDirection = e.target.value as 'asc' | 'desc' | '';
+                                                        setSortDirection(newDirection);
+                                                        // Only apply sorting if both column and valid direction are selected
+                                                        if (sortColumn && (newDirection === 'asc' || newDirection === 'desc')) {
+                                                            applySorting(sortColumn, newDirection);
+                                                        }
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select direction...</option>
+                                                    <option value='asc'>
+                                                        Ascending (A-Z, 0-9)
+                                                    </option>
+                                                    <option value='desc'>
+                                                        Descending (Z-A, 9-0)
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Current Sort Display */}
+                                        {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
+                                            <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
+                                                <span className='font-medium text-blue-800'>
+                                                    {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
 
-            {/* Content Area */}
-            <div className='flex-1 overflow-hidden bg-white'>
-                {loading ? (
-                    // Loading State - Same as Enterprise Configuration
-                    <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
-                        <div className='mx-auto max-w-md'>
-                            <div className='mx-auto h-12 w-12 text-blue-600 animate-spin'>
+                    {/* Hide Columns Button */}
+                    <div ref={hideRef} className='relative'>
+                        <button
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                hideOpen || visibleCols.length < allCols.length
+                                    ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                hideOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('hide')
+                            }
+                        >
+                            <EyeSlashIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Show/Hide</span>
+                            {visibleCols.length < allCols.length && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {hideOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[280px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Displayed Columns
+                                    </div>
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <div className='relative'>
+                                                <input
+                                                    value={hideQuery}
+                                                    onChange={(e) =>
+                                                        setHideQuery(e.target.value)
+                                                    }
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Columns List */}
+                                    <div className='max-h-40 overflow-auto divide-y divide-light mt-2'>
+                                        {allCols
+                                            .filter((c) =>
+                                                c
+                                                    .toLowerCase()
+                                                    .includes(
+                                                        hideQuery.toLowerCase(),
+                                                    ),
+                                            )
+                                            .map((c) => (
+                                                <label
+                                                    key={c}
+                                                    className='flex items-center justify-between py-1.5 cursor-pointer hover:bg-blue-50'
+                                                >
+                                                    <span className='text-sm'>
+                                                        {columnLabels[c] || c}
+                                                    </span>
+                                                    <input
+                                                        type='checkbox'
+                                                        checked={visibleCols.includes(c as ColumnType)}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            setVisibleCols((prev) => {
+                                                                if (checked)
+                                                                    return Array.from(
+                                                                        new Set([
+                                                                            ...prev,
+                                                                            c as ColumnType,
+                                                                        ]),
+                                                                    );
+                                                                return prev.filter(
+                                                                    (x) => x !== c,
+                                                                );
+                                                            });
+                                                        }}
+                                                        className='rounded border-blue-300 text-blue-600 focus:ring-blue-500'
+                                                    />
+                                                </label>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Group By Button */}
+                    <div ref={groupRef} className='relative flex items-center'>
+                        <button
+                            className={`role relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
+                                groupOpen || ActiveGroupLabel !== 'None'
+                                    ? 'border-orange-300 bg-orange-50 text-orange-600 shadow-orange-200 shadow-lg'
+                                    : 'border-blue-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-lg'
+                            }`}
+                            onClick={() =>
+                                groupOpen
+                                    ? closeAllDialogs()
+                                    : toggleDialog('group')
+                            }
+                        >
+                            <RectangleStackIcon className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' />
+                            <span className='text-sm'>Group by</span>
+                            {ActiveGroupLabel !== 'None' && (
+                                <div className='absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-bounce'></div>
+                            )}
+                        </button>
+                        {groupOpen && (
+                            <div className='absolute left-0 top-full z-50 mt-2 w-[260px] rounded-lg bg-card text-primary shadow-xl border border-blue-200'>
+                                <div className='flex items-center justify-between px-3 py-2 border-b border-blue-200'>
+                                    <div className='text-xs font-semibold'>
+                                        Group by
+                                    </div>
+                                    {ActiveGroupLabel !== 'None' && (
+                                        <button
+                                            onClick={clearGroupBy}
+                                            className='text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 transition-colors'
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className='p-3'>
+                                    <div className='space-y-3'>
+                                        <div>
+                                            <label className='block text-xs font-medium text-gray-700 mb-1'>
+                                                Column
+                                            </label>
+                                            <div className='relative'>
+                                                <select
+                                                    value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setGroupByFromLabel(value || 'None');
+                                                    }}
+                                                    className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
+                                                >
+                                                    <option value=''>Select column...</option>
+                                                    <option value='Connector Name'>Connector Name</option>
+                                                    <option value='Description'>Description</option>
+                                                    <option value='Workstream'>Workstream</option>
+                                                    <option value='Product'>Product</option>
+                                                    <option value='Service'>Service</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Current group Display */}
+                                        {ActiveGroupLabel !== 'None' && (
+                                            <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
+                                                <span className='font-medium text-orange-800'>
+                                                    Grouped by: {ActiveGroupLabel}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                        onClick={handleSaveAll}
+                        disabled={isLoading || isAutoSaving}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md shadow-sm transition-all duration-300 relative overflow-hidden ${
+                            isLoading || isAutoSaving
+                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                : showAutoSaveSuccess
+                                ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 text-white shadow-lg animate-pulse'
+                                : autoSaveCountdown
+                                ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
+                                : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
+                        }`}
+                        title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                    >
+                        {/* Progress bar animation for auto-save countdown */}
+                        {autoSaveCountdown && (
+                            <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
+                                    style={{
+                                        width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
+                                    }}
+                                ></div>
+                            </div>
+                        )}
+                        
+                        {/* Auto-save success wave animation */}
+                        {showAutoSaveSuccess && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
+                        )}
+                        
+                        {isAutoSaving ? (
+                            <div className='h-4 w-4 animate-spin'>
                                 <svg
                                     className='h-full w-full'
                                     fill='none'
@@ -1469,117 +3097,599 @@ export default function Connectors() {
                                     />
                                 </svg>
                             </div>
-                            <h3 className='mt-4 text-lg font-semibold text-slate-900'>
-                                Loading Connectors
-                            </h3>
-                            <p className='mt-2 text-sm text-slate-500'>
-                                Please wait while we fetch your connectors...
-                            </p>
-                        </div>
+                        ) : (
+                            <BookmarkIcon className='h-4 w-4 relative z-10' />
+                        )}
+                        <span className='text-sm relative z-10'>
+                            {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                        </span>
+                    </button>
                     </div>
-                ) : connectors.length === 0 ? (
-                    <div className='flex flex-col items-center justify-center flex-1 px-4 py-8'>
-                        <div className='w-96 h-auto mb-8'>
-                            <img
-                                src="/images/Infographics/SG-no-connectors-yet.jpg"
-                                alt="No connectors illustration"
-                                className='w-full h-full object-contain'
-                            />
-                        </div>
-                        <div className='text-center max-w-md'>
-                            <h3 className='text-xl font-semibold text-gray-900 mb-2'>
-                                No connectors yet
-                            </h3>
-                            <p className='text-gray-500 mb-6'>
-                                Add your first connector to start integrating with external tools and services
-                            </p>
-                            <motion.button
-                                onClick={handleCreateConnector}
-                                className='inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200'
-                                whileHover={{scale: 1.02}}
-                                whileTap={{scale: 0.98}}
-                            >
-                                <PlusIcon className='w-4 h-4 mr-2' />
-                                Add Connector
-                            </motion.button>
-                        </div>
-                    </div>
-                ) : (
-                    /* Connectors Table - TODO: Implement table component */
-                    <div className='h-full w-full overflow-hidden px-4'>
-                        <div className='p-8 text-center text-gray-500'>
-                            Connectors table will be implemented here
-                        </div>
-                    </div>
-                )}
+                </div>
             </div>
 
-            {/* Create Connector Sidebar */}
-            <CreateConnectorSidebar
-                isOpen={showCreateSidebar}
-                onClose={() => setShowCreateSidebar(false)}
-                onSave={handleSaveConnector}
-                onConnectorSelect={handleConnectorSelect}
-                shouldResetSelection={shouldResetSelection}
-            />
+            {/* Content Area */}
+            <div className='flex-1 p-3 overflow-hidden'>
+                <div className='h-full space-y-3'>
+                    {/* Connectors Table */}
+                    <div className='bg-card border border-light rounded-lg p-3 h-full flex flex-col'>
+                        {isLoading ? (
+                            // Loading State
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <div className='mx-auto h-12 w-12 text-primary-600 animate-spin'>
+                                        <svg
+                                            className='h-full w-full'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                        >
+                                            <circle
+                                                className='opacity-25'
+                                                cx='12'
+                                                cy='12'
+                                                r='10'
+                                                stroke='currentColor'
+                                                strokeWidth='4'
+                                            />
+                                            <path
+                                                className='opacity-75'
+                                                fill='currentColor'
+                                                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                            />
+                                        </svg>
+                                    </div>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        Loading Manage Connectors configurations
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        Please wait while we fetch your
+                                        connector management data...
+                                    </p>
+                                </div>
+                            </div>
+                        ) : connectors.length === 0 && !isLoading ? (
+                            // Empty State - No Connectors - exactly like AssignedUserGroupModal
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <div className='mb-6 flex justify-center'>
+                                        <Image
+                                            src='/images/Infographics/SG-no-connectors-yet.jpg'
+                                            alt='No Connectors Configured'
+                                            width={400}
+                                            height={300}
+                                            className='mx-auto object-contain'
+                                        />
+                                    </div>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        No Connectors Configured
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        No connectors have been created yet for the selected Account and Enterprise combination. Create a new connector to get started.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleAddNewRow}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <PlusIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Create New Connector
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : visibleCols.length === 0 ? (
+                            // Empty State for Hidden Columns
+                            <div className='bg-white rounded-lg border border-slate-200 p-12 text-center'>
+                                <div className='mx-auto max-w-md'>
+                                    <svg
+                                        className='mx-auto h-12 w-12 text-slate-400'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                        aria-hidden='true'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                        />
+                                    </svg>
+                                    <h3 className='mt-4 text-lg font-semibold text-slate-900'>
+                                        All Columns Hidden
+                                    </h3>
+                                    <p className='mt-2 text-sm text-slate-500'>
+                                        All table columns are currently hidden. Click the button below to show all columns.
+                                    </p>
+                                    <div className='mt-6'>
+                                        <button
+                                            onClick={handleShowAllColumns}
+                                            className='inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+                                        >
+                                            <EyeIcon className='-ml-1 mr-2 h-5 w-5' />
+                                            Show All Columns
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className='flex-1 overflow-auto'>
+                                <ManageConnectorsTable
+                                    rows={processedConfigs}
+                                    onEdit={(id: string) => console.log('Edit connector:', id)}
+                                    onDelete={handleDeleteClick}
+                                    highlightQuery={appliedSearchTerm}
+                                    compressingRowId={compressingRowId}
+                                    foldingRowId={foldingRowId}
+                                    groupByExternal={
+                                        ActiveGroupLabel === 'Connector Name' ? 'connectorName' :
+                                        ActiveGroupLabel === 'Description' ? 'description' :
+                                        ActiveGroupLabel === 'Workstream' ? 'entity' :
+                                        ActiveGroupLabel === 'Product' ? 'product' :
+                                        ActiveGroupLabel === 'Service' ? 'service' :
+                                        'none'
+                                    }
+                                    onGroupByChange={(g: string) => {
+                                        setActiveGroupLabel(
+                                            g === 'connectorName' ? 'Connector Name' :
+                                            g === 'description' ? 'Description' :
+                                            g === 'entity' ? 'Workstream' :
+                                            g === 'product' ? 'Product' :
+                                            g === 'service' ? 'Service' :
+                                            'None'
+                                        );
+                                    }}
+                                    incompleteRowIds={showValidationErrors ? incompleteRows : []}
+                                    showValidationErrors={showValidationErrors}
+                                    externalFieldErrors={externalFieldErrors}
+                                    onAddNewRow={handleAddNewRow}
+                                    enableDropdownChips={true}
+                                    dropdownOptions={dropdownOptions}
+                                    onUpdateField={handleUpdateField}
+                                    onDuplicateDetected={(message: string) => {
+                                        duplicateDetectedRef.current = true;
+                                        setDuplicateMessage(message);
+                                        setShowDuplicateModal(true);
+                                    }}
+                                    visibleColumns={visibleCols}
+                                    externalSortColumn={sortColumn}
+                                    externalSortDirection={sortDirection}
+                                    onSortChange={(column: string, direction: string) => {
+                                        setSortColumn(column);
+                                        setSortDirection(direction as '' | 'asc' | 'desc');
+                                    }}
+                                    onShowAllColumns={handleShowAllColumns}
+                                    customColumnLabels={columnLabels}
+                                    selectedEnterprise={selectedEnterprise}
+                                    selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
+                                    selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
+                                    selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
+                                    onOpenScopeModal={(row: ConnectorRow) => {
+                                        setSelectedRowForConnector(row);
+                                        setIsConnectorModalOpen(true);
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
-            {/* Connector Details Panel */}
-            <ConnectorDetailsPanel
-                isOpen={showConnectorDetails}
-                onClose={() => {
-                    setShowConnectorDetails(false);
-                    setSelectedConnectorForDetails(null);
-                    // Reset the selection in the create sidebar to expand it back
-                    setShouldResetSelection(true);
-                    setTimeout(() => setShouldResetSelection(false), 100); // Reset the flag
-                }}
-                connector={selectedConnectorForDetails}
-                sidebarWidth={0} // No main sidebar on this page
-            />
+            {/* Blue-themed Notification Component - Positioned above Save button - exactly like Manage Users */}
+            {showNotification && (
+                <motion.div
+                    key={`notification-${isAIPanelCollapsed ? 'collapsed' : 'expanded'}`}
+                    initial={{opacity: 0, y: -50, scale: 0.9}}
+                    animate={{opacity: 1, y: 0, scale: 1}}
+                    exit={{opacity: 0, y: -50, scale: 0.9}}
+                    transition={{duration: 0.3, ease: 'easeOut'}}
+                    className="fixed z-50 max-w-sm"
+                    style={{
+                        // Position well above the toolbar with significant spacing
+                        // Header height (~80px) + more gap above toolbar (40px)
+                        top: '40px',
+                        // Right positioning: 320px when expanded (300px panel + 20px margin), 84px when collapsed (64px panel + 20px margin)
+                        right: isAIPanelCollapsed ? '84px' : '320px',
+                        transition: 'right 0.3s ease-out'
+                    }}
+                >
+                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
+                        {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
+                        <div className='absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-100'></div>
+                        <div className='p-4'>
+                            <div className='flex items-start'>
+                                <div className='flex-shrink-0'>
+                                    <svg
+                                        className='h-5 w-5 text-blue-600'
+                                        fill='currentColor'
+                                        viewBox='0 0 20 20'
+                                    >
+                                        <path
+                                            fillRule='evenodd'
+                                            d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+                                            clipRule='evenodd'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='ml-3 flex-1'>
+                                    <p className='text-sm font-medium text-blue-800'>
+                                        {notificationMessage}
+                                    </p>
+                                </div>
+                                <div className='ml-4 flex-shrink-0 flex'>
+                                    <button
+                                        className='inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors duration-200'
+                                        onClick={() =>
+                                            setShowNotification(false)
+                                        }
+                                    >
+                                        <svg
+                                            className='h-5 w-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
+                                                clipRule='evenodd'
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {/* Animated progress bar */}
+                        <div className='bg-blue-200 h-1'>
+                            <motion.div
+                                initial={{width: '100%'}}
+                                animate={{width: '0%'}}
+                                transition={{duration: 3, ease: 'linear'}}
+                                className='bg-blue-500 h-full'
+                            />
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
-            {/* Delete Confirmation Modal */}
-            {pendingDeleteId && (
+            {/* Validation Modal - exactly like Manage Users */}
+            {showValidationModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowValidationModal(false);
+                                setShowValidationErrors(true);
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Fill Required Fields
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {validationMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        setShowValidationModal(false);
+                                        setShowValidationErrors(true);
+                                        // The incompleteRows state already contains the IDs of rows that failed validation
+                                        console.log('✅ Validation modal dismissed - enabling row highlighting for incomplete rows:', incompleteRows);
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Duplicate Entry Modal - exactly like Validation Modal */}
+            {showDuplicateModal && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setShowDuplicateModal(false);
+                                duplicateDetectedRef.current = false; // Reset flag
+                            }}
+                        ></div>
+
+                        <div className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'>
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-yellow-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-medium leading-6 text-gray-900'>
+                                        Duplicate Entry Detected
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-500 whitespace-pre-line'>
+                                            {duplicateMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        setShowDuplicateModal(false);
+                                        duplicateDetectedRef.current = false; // Reset flag
+                                    }}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal - match Manage Users styling */}
+            {showDeleteConfirmation && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => {
+                                setPendingDeleteRowId(null);
+                                setShowDeleteConfirmation(false);
+                                setCompressingRowId(null);
+                                setFoldingRowId(null);
+                            }}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-red-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-900'>
+                                            Are you sure you want to delete this Connector?
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    onClick={confirmDelete}
+                                >
+                                    {deletingRow ? (
+                                        <>
+                                            <svg
+                                                className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                            >
+                                                <circle
+                                                    className='opacity-25'
+                                                    cx='12'
+                                                    cy='12'
+                                                    r='10'
+                                                    stroke='currentColor'
+                                                    strokeWidth='4'
+                                                ></circle>
+                                                <path
+                                                    className='opacity-75'
+                                                    fill='currentColor'
+                                                    d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                                                ></path>
+                                            </svg>
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Yes'
+                                    )}
+                                </button>
+                                <button
+                                    type='button'
+                                    disabled={deletingRow}
+                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    onClick={() => {
+                                        setPendingDeleteRowId(null);
+                                        setShowDeleteConfirmation(false);
+                                        setCompressingRowId(null);
+                                        setFoldingRowId(null);
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            )}
+
+            {/* Navigation Warning Modal - exactly like Manage Users */}
+            {showNavigationWarning && (
                 <ConfirmModal
-                    open={!!pendingDeleteId}
-                    onCancel={() => setPendingDeleteId(null)}
-                    onConfirm={confirmDelete}
-                    title='Delete Connector'
-                    message='Are you sure you want to delete this connector? This action cannot be undone.'
-                    confirmText='Delete'
-                    cancelText='Cancel'
+                    open={showNavigationWarning}
+                    title="Unsaved Changes"
+                    message="You have unsaved changes that will be lost if you leave. Are you sure you want to continue?"
+                    confirmText="Leave Anyway"
+                    cancelText="Stay Here"
+                    onConfirm={() => {
+                        console.log('🔄 User confirmed navigation - clearing states and executing navigation');
+                        setShowNavigationWarning(false);
+                        
+                        // Clear all unsaved states IMMEDIATELY
+                        setIncompleteRows([]);
+                        setHasUnsavedChanges(false);
+                        setPreventNavigation(false);
+                        setUserConfirmedLeave(true);
+                        
+                        // Execute navigation immediately after state update
+                        if (pendingNavigationUrl) {
+                            console.log('🔄 Executing pending navigation to:', pendingNavigationUrl);
+                            // Clear the pending URL first
+                            const targetUrl = pendingNavigationUrl;
+                            setPendingNavigationUrl(null);
+                            
+                            // Use setTimeout to ensure state updates are processed first
+                            setTimeout(() => {
+                                if (originalRouterRef.current) {
+                                    originalRouterRef.current.push(targetUrl);
+                                } else {
+                                    // Fallback: router should now allow navigation since userConfirmedLeave is true
+                                    router.push(targetUrl);
+                                }
+                            }, 0);
+                        } else if (pendingNavigation) {
+                            // Fallback for legacy navigation handling
+                            const navFn = pendingNavigation;
+                            setPendingNavigation(null);
+                            setTimeout(() => {
+                                navFn();
+                            }, 0);
+                        }
+                    }}
+                    onCancel={() => {
+                        setShowNavigationWarning(false);
+                        setPendingNavigationUrl(null);
+                        setPendingNavigation(null);
+                        setPreventNavigation(false);
+                    }}
                 />
             )}
 
-            {/* CSS for save notifications */}
-            <style jsx>{`
-                .save-notification-toast {
-                    background: linear-gradient(
-                        135deg,
-                        #10b981 0%,
-                        #059669 100%
-                    );
-                    color: white;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                    font-size: 14px;
-                    font-weight: 500;
-                    animation: slideInFromRight 0.3s ease-out forwards;
-                    max-width: 300px;
-                    word-wrap: break-word;
-                }
-
-                @keyframes slideInFromRight {
-                    from {
-                        opacity: 0;
-                        transform: translateX(100%);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
-                }
-            `}</style>
+            {/* Connector Modal */}
+            {selectedRowForConnector && (() => {
+                // Get the latest row from connectors to ensure we have the most up-to-date data
+                const latestRow = connectors.find(row => row.id === selectedRowForConnector.id) || selectedRowForConnector;
+                
+                return (
+                    <ConnectorDetailsModal
+                        isOpen={isConnectorModalOpen}
+                        onClose={() => {
+                            setIsConnectorModalOpen(false);
+                            setSelectedRowForConnector(null);
+                        }}
+                        onSave={(connectors: Connector[]) => {
+                            // Handle bulk save
+                            console.log('Saving connectors:', connectors);
+                            // TODO: Implement API call to save connectors
+                        }}
+                        onSaveIndividual={(connectors: Connector[]) => {
+                            // Handle individual save
+                            console.log('💾 [Connectors Page] Saving individual connector:', connectors);
+                            // Update the row with the connector icon name and full connector data
+                            if (latestRow && connectors.length > 0) {
+                                const updatedRow = { 
+                                    ...latestRow, 
+                                    connectorIconName: connectors[0].connectorIconName || latestRow.connectorIconName,
+                                    connectors: connectors // Store full connector data
+                                };
+                                console.log('💾 [Connectors Page] Updated row with connectors:', updatedRow.id, 'connectors count:', updatedRow.connectors?.length || 0);
+                                console.log('💾 [Connectors Page] Connector details:', JSON.stringify(updatedRow.connectors, null, 2));
+                                // ============================================================================
+                                // TEMPORARY: Save to localStorage (REVERT WHEN APIs ARE READY)
+                                // ============================================================================
+                                setConnectors(prev => {
+                                    const updated = prev.map(row => 
+                                        row.id === latestRow.id ? updatedRow : row
+                                    );
+                                    // Immediately save to localStorage to ensure persistence
+                                    if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId) {
+                                        setTimeout(() => {
+                                            saveConnectorsToLocalStorage(updated, selectedAccountId, selectedEnterpriseId);
+                                            console.log('💾 [Connectors Page] Immediately saved to localStorage after connector update');
+                                            // Verify what was saved
+                                            const saved = loadConnectorsFromLocalStorage(selectedAccountId, selectedEnterpriseId);
+                                            const savedRow = saved.find(r => r.id === latestRow.id);
+                                            console.log('💾 [Connectors Page] Verification - connectors in saved row:', savedRow?.connectors?.length || 0);
+                                        }, 50);
+                                    }
+                                    return updated;
+                                });
+                                // Update selectedRowForConnector to the latest row
+                                setSelectedRowForConnector(updatedRow);
+                                // ============================================================================
+                            }
+                            // TODO: Implement API call to save individual connector when backend is ready
+                        }}
+                        connectorName={latestRow.connectorName || ''}
+                        initialConnectors={(() => {
+                            const savedConnectors = latestRow.connectors || [];
+                            console.log('📥 [Connectors Page] Loading initialConnectors for row:', latestRow.id, 'connectors:', savedConnectors.length);
+                            return savedConnectors;
+                        })()}
+                        key={latestRow.id} // Force remount when different row is selected
+                        selectedEnterprise={selectedEnterprise}
+                        selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
+                        selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
+                        selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
+                        workstream={latestRow.entity || ''}
+                        product={latestRow.product || ''}
+                        service={latestRow.service || ''}
+                    />
+                );
+            })()}
         </div>
     );
 }
+
