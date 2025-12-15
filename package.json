@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "generate-cube-gif": "node scripts/generate-cube-gif.js"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
@@ -47,8 +48,12 @@
     "autoprefixer": "^10.4.0",
     "eslint": "^8.55.0",
     "eslint-config-next": "14.0.4",
+    "gif.js": "^0.2.0",
+    "pngjs": "^7.0.0",
     "postcss": "^8.4.0",
+    "puppeteer": "^24.31.0",
     "tailwindcss": "^3.3.0",
+    "three": "^0.181.2",
     "typescript": "^5.3.0"
   }
 }
