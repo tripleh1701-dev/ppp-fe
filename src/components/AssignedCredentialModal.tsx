@@ -125,13 +125,14 @@ function EncryptionTypeDropdown({
             {open && dropdownPos && !disabled && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
+                    className="rounded-xl border border-slate-200 bg-white shadow-2xl"
                     style={{
                         position: 'fixed',
                         top: dropdownPos.top,
                         left: dropdownPos.left,
                         width: dropdownPos.width,
                         maxHeight: '240px',
+                        zIndex: 10001, // Higher than modal z-index (10000 for stackLevel=1)
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -250,13 +251,14 @@ function AuthenticationTypeDropdown({
             {open && dropdownPos && !disabled && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
+                    className="rounded-xl border border-slate-200 bg-white shadow-2xl"
                     style={{
                         position: 'fixed',
                         top: dropdownPos.top,
                         left: dropdownPos.left,
                         width: dropdownPos.width,
                         maxHeight: '240px',
+                        zIndex: 10001, // Higher than modal z-index (10000 for stackLevel=1)
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -634,6 +636,25 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                         <div className="h-full overflow-y-auto px-6 py-6">
                             <div className="space-y-6">
                                 <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                    {/* Header with Save Button */}
+                                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2 bg-blue-100 rounded-lg">
+                                                <Key className="h-4 w-4 text-blue-600" />
+                                            </div>
+                                            <h3 className="text-base font-semibold text-gray-900">
+                                                Credential Details
+                                            </h3>
+                                        </div>
+                                        <button
+                                            onClick={handleSave}
+                                            className="flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50"
+                                        >
+                                            <BookmarkIcon className="h-4 w-4" />
+                                            <span>Save</span>
+                                        </button>
+                                    </div>
+
                                     {/* Credential Name Field */}
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -690,8 +711,8 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                                             <AuthenticationTypeDropdown
                                                 value={credential.authenticationType || ''}
                                                 onChange={(newValue) => handleAuthenticationTypeChange(newValue)}
-                                                options={getAuthTypesForConnector(connectorName)}
-                                                disabled={!connectorName || getAuthTypesForConnector(connectorName).length === 0}
+                                                options={getAuthTypesForConnector(connector || connectorName)}
+                                                disabled={(!connector && !connectorName) || getAuthTypesForConnector(connector || connectorName).length === 0}
                                                 isError={validationErrors.authenticationType || false}
                                                 placeholder="Select authentication type..."
                                             />
@@ -933,17 +954,6 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-
-                                    {/* Save Button */}
-                                    <div className="border-t border-gray-200 pt-4 mt-6 flex justify-end">
-                                        <button
-                                            onClick={handleSave}
-                                            className="flex items-center space-x-2 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors shadow-sm bg-blue-600 hover:bg-blue-700"
-                                        >
-                                            <BookmarkIcon className="h-4 w-4" />
-                                            <span>Save</span>
-                                        </button>
                                     </div>
                                 </div>
                             </div>

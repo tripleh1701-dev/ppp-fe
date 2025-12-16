@@ -3679,6 +3679,7 @@ export default function ManageConnectors() {
                             return savedConnectors;
                         })()}
                         key={latestRow.id} // Force remount when different row is selected
+                        rowId={latestRow.id} // Pass row ID for storing test results
                         selectedEnterprise={selectedEnterprise}
                         selectedEnterpriseId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') || '' : ''}
                         selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}

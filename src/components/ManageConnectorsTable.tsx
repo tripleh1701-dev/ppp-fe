@@ -460,6 +460,8 @@ export interface ConnectorRow {
         connector: string;
         connectorIconName?: string;
         authenticationType: string;
+        url?: string; // URL field for connectivity
+        credentialName?: string; // Credential name from Manage Credentials
         username?: string;
         usernameEncryption?: string;
         apiKey?: string;
@@ -6016,13 +6018,89 @@ function AsyncChipSelectService({
 interface ConnectivityStatusCellProps {
     connectorName: string;
     rowId: string;
+    row: ConnectorRow;
+    selectedAccountId?: string;
+    selectedEnterpriseId?: string;
 }
 
-function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCellProps) {
+interface TestResult {
+    status: 'success' | 'failed';
+    timestamp: number;
+}
+
+function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, selectedEnterpriseId }: ConnectivityStatusCellProps) {
     const [isTesting, setIsTesting] = useState(false);
     const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'failed'>('idle');
     const [testTime, setTestTime] = useState<Date | null>(null);
     const [timeAgo, setTimeAgo] = useState<string>('');
+
+    // Track connector data changes to ensure we always use the latest data
+    useEffect(() => {
+        if (row.connectors && row.connectors.length > 0) {
+            const connector = row.connectors.find(
+                c => c.connector === connectorName || c.connector.toLowerCase() === connectorName.toLowerCase()
+            ) || row.connectors[0];
+            
+            console.log('🔄 [ConnectivityStatusCell] Row connectors updated:', {
+                rowId,
+                connectorName,
+                connectorCount: row.connectors.length,
+                connector: {
+                    connector: connector.connector,
+                    url: connector.url,
+                    credentialName: connector.credentialName,
+                    authenticationType: connector.authenticationType
+                },
+                allConnectors: row.connectors.map(c => ({
+                    connector: c.connector,
+                    credentialName: c.credentialName
+                }))
+            });
+        }
+    }, [row.connectors, rowId, connectorName]);
+
+    // Load stored test result from localStorage on mount and when storage changes
+    const loadTestResult = useCallback(() => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+        
+        try {
+            const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+            if (stored) {
+                const results: Record<string, TestResult> = JSON.parse(stored);
+                const result = results[rowId];
+                if (result) {
+                    setTestStatus(result.status);
+                    setTestTime(new Date(result.timestamp));
+                } else {
+                    // Clear status if result was removed
+                    setTestStatus('idle');
+                    setTestTime(null);
+                }
+            } else {
+                setTestStatus('idle');
+                setTestTime(null);
+            }
+        } catch (error) {
+            console.error('❌ [ConnectivityStatusCell] Error loading test result:', error);
+        }
+    }, [rowId, selectedAccountId, selectedEnterpriseId]);
+
+    useEffect(() => {
+        loadTestResult();
+    }, [loadTestResult]);
+
+    // Listen for test result updates from ConnectorDetailsModal
+    useEffect(() => {
+        const handleTestResultUpdate = () => {
+            loadTestResult();
+        };
+
+        window.addEventListener('connectorTestResultUpdated', handleTestResultUpdate);
+        return () => {
+            window.removeEventListener('connectorTestResultUpdated', handleTestResultUpdate);
+        };
+    }, [loadTestResult]);
 
     // Calculate time ago string
     const getTimeAgo = (date: Date): string => {
@@ -6062,6 +6140,105 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
     }, [testTime]);
 
     const testConnectivity = async () => {
+        if (!selectedAccountId || !selectedEnterpriseId) {
+            console.error('❌ [ConnectivityStatusCell] Missing accountId or enterpriseId');
+            return;
+        }
+
+        // Read connector data directly from localStorage to ensure we have the latest saved data
+        // This is important because the row prop might be stale after a save operation
+        let connector = null;
+        try {
+            const LOCAL_STORAGE_CONNECTORS_KEY = 'connectors_connectors_data';
+            const storageKey = `${LOCAL_STORAGE_CONNECTORS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+            
+            if (stored) {
+                const allRows: ConnectorRow[] = JSON.parse(stored);
+                const savedRow = allRows.find(r => r.id === rowId);
+                
+                if (savedRow && savedRow.connectors && savedRow.connectors.length > 0) {
+                    // Find connector matching the connectorName prop
+                    connector = savedRow.connectors.find(
+                        c => c.connector === connectorName || c.connector.toLowerCase() === connectorName.toLowerCase()
+                    );
+                    // Fallback to first connector if no match found
+                    if (!connector) {
+                        connector = savedRow.connectors[0];
+                        console.warn('⚠️ [ConnectivityStatusCell] Connector name mismatch - using first connector:', {
+                            expectedConnectorName: connectorName,
+                            foundConnectorName: connector.connector,
+                            availableConnectors: savedRow.connectors.map(c => c.connector)
+                        });
+                    }
+                    console.log('✅ [ConnectivityStatusCell] Loaded connector from localStorage:', {
+                        rowId,
+                        connectorName: connector.connector,
+                        credentialName: connector.credentialName,
+                        url: connector.url,
+                        authenticationType: connector.authenticationType
+                    });
+                } else {
+                    console.warn('⚠️ [ConnectivityStatusCell] Row not found in localStorage or has no connectors:', {
+                        rowId,
+                        foundRow: !!savedRow,
+                        connectorsCount: savedRow?.connectors?.length || 0
+                    });
+                }
+            } else {
+                console.warn('⚠️ [ConnectivityStatusCell] No connectors found in localStorage for storage key:', storageKey);
+            }
+        } catch (error) {
+            console.error('❌ [ConnectivityStatusCell] Error loading connector from localStorage:', error);
+        }
+        
+        // Fallback to row prop if localStorage read failed
+        if (!connector && row.connectors && row.connectors.length > 0) {
+            connector = row.connectors.find(
+                c => c.connector === connectorName || c.connector.toLowerCase() === connectorName.toLowerCase()
+            ) || row.connectors[0];
+            console.warn('⚠️ [ConnectivityStatusCell] Using fallback connector from row prop:', {
+                connectorName: connector.connector,
+                credentialName: connector.credentialName
+            });
+        }
+        
+        if (!connector) {
+            console.warn('⚠️ [ConnectivityStatusCell] No connector found:', {
+                rowId,
+                connectorName,
+                hasRowConnectors: !!(row.connectors && row.connectors.length > 0),
+                connectorsCount: row.connectors?.length || 0
+            });
+            alert('Cannot test connectivity. No connector details found for this row.');
+            return;
+        }
+
+        console.log('🔍 [ConnectivityStatusCell] Using connector (from localStorage):', {
+            rowId,
+            connectorName: connector.connector,
+            url: connector.url,
+            credentialName: connector.credentialName,
+            authenticationType: connector.authenticationType,
+            connectorId: connector.id,
+            timestamp: new Date().toISOString(),
+            source: 'localStorage'
+        });
+
+        // Check if required fields are filled
+        if (!connector.connector || !connector.credentialName || !connector.url) {
+            console.warn('⚠️ [ConnectivityStatusCell] Cannot test connectivity - missing required fields:', {
+                hasConnector: !!connector.connector,
+                hasCredentialName: !!connector.credentialName,
+                hasUrl: !!connector.url,
+                connector: connector.connector || '(empty)',
+                credentialName: connector.credentialName || '(empty)',
+                url: connector.url || '(empty)'
+            });
+            alert('Cannot test connectivity. Please ensure URL and Credential Name are filled in the connector details.');
+            return;
+        }
+
         setIsTesting(true);
         setTestStatus('idle');
         setTestTime(null);
@@ -6071,12 +6248,173 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
         const testStartTime = Date.now();
 
         try {
+            // Load credential details from localStorage to get username and API token
+            let username = '';
+            let apiToken = '';
+            let foundCredentialConnector: any = null;
+            let authType = connector.authenticationType || '';
+            
+            console.log('🔑 [ConnectivityStatusCell] Starting connectivity test:', {
+                connectorName: connector.connector,
+                url: connector.url,
+                credentialName: connector.credentialName,
+                authenticationType: connector.authenticationType,
+                hasAccountId: !!selectedAccountId,
+                hasEnterpriseId: !!selectedEnterpriseId
+            });
+            
+            if (connector.credentialName && selectedAccountId && selectedEnterpriseId) {
+                try {
+                    const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                    const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                    
+                    if (stored) {
+                        const allCredentials: any[] = JSON.parse(stored);
+                        console.log('🔑 [ConnectivityStatusCell] Loaded', allCredentials.length, 'credentials from localStorage');
+                        
+                        const credential = allCredentials.find(
+                            cred => cred.credentialName === connector.credentialName
+                        );
+                        
+                        if (credential && credential.connectors && credential.connectors.length > 0) {
+                            console.log('🔑 [ConnectivityStatusCell] Found credential:', credential.credentialName, 'with', credential.connectors.length, 'connectors');
+                            
+                            // Find connector matching the current connector name
+                            foundCredentialConnector = credential.connectors.find(
+                                (c: { connector: string; [key: string]: any }) => c.connector === connector.connector || c.connector.toLowerCase() === connector.connector.toLowerCase()
+                            );
+                            
+                            if (foundCredentialConnector) {
+                                console.log('🔑 [ConnectivityStatusCell] Found credential connector:', {
+                                    credentialConnector: foundCredentialConnector.connector,
+                                    authenticationType: foundCredentialConnector.authenticationType,
+                                    hasUsername: !!foundCredentialConnector.username,
+                                    hasApiKey: !!foundCredentialConnector.apiKey,
+                                    hasPersonalAccessToken: !!foundCredentialConnector.personalAccessToken
+                                });
+                                
+                                // Determine authentication type from credential connector if not set in connector
+                                authType = connector.authenticationType || foundCredentialConnector.authenticationType || '';
+                                
+                                // For JIRA with Username and API Key authentication
+                                if (authType === 'Username and API Key' || (!authType && foundCredentialConnector.username && foundCredentialConnector.apiKey)) {
+                                    username = foundCredentialConnector.username || connector.username || '';
+                                    apiToken = foundCredentialConnector.apiKey || connector.apiKey || '';
+                                } else if (authType === 'Personal Access Token' || (!authType && foundCredentialConnector.personalAccessToken)) {
+                                    apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
+                                }
+                                
+                                console.log('🔑 [ConnectivityStatusCell] Extracted credential details:', {
+                                    credentialName: connector.credentialName,
+                                    authenticationType: authType,
+                                    hasUsername: !!username,
+                                    hasApiToken: !!apiToken,
+                                    username: username ? `${username.substring(0, 5)}...` : 'none',
+                                    apiTokenLength: apiToken ? apiToken.length : 0,
+                                    apiTokenPreview: apiToken ? `${apiToken.substring(0, 10)}...${apiToken.substring(apiToken.length - 5)}` : 'none'
+                                });
+                                
+                                // Log full values for verification
+                                console.log('✅ [ConnectivityStatusCell] FULL VALUES EXTRACTED (for verification):', {
+                                    credentialName: connector.credentialName,
+                                    connectorName: connector.connector,
+                                    username: username || '(empty)',
+                                    apiToken: apiToken ? `${apiToken.substring(0, 20)}...${apiToken.substring(apiToken.length - 10)}` : '(empty)',
+                                    apiTokenLength: apiToken ? apiToken.length : 0,
+                                    authenticationType: authType || '(empty)',
+                                    source: 'credentialConnector',
+                                    credentialConnectorFound: true
+                                });
+                            } else {
+                                console.warn('⚠️ [ConnectivityStatusCell] No matching connector found in credential:', {
+                                    credentialName: connector.credentialName,
+                                    connectorName: connector.connector,
+                                    availableConnectors: credential.connectors.map((c: any) => c.connector)
+                                });
+                            }
+                        } else {
+                            console.warn('⚠️ [ConnectivityStatusCell] Credential found but no connectors array:', {
+                                credentialName: connector.credentialName,
+                                hasConnectors: !!(credential && credential.connectors),
+                                connectorsLength: credential?.connectors?.length || 0
+                            });
+                        }
+                    } else {
+                        console.warn('⚠️ [ConnectivityStatusCell] No credentials found in localStorage for storage key:', storageKey);
+                    }
+                } catch (error) {
+                    console.error('❌ [ConnectivityStatusCell] Error loading credential from localStorage:', error);
+                }
+            } else {
+                console.warn('⚠️ [ConnectivityStatusCell] Cannot load credentials - missing credentialName, accountId, or enterpriseId:', {
+                    hasCredentialName: !!connector.credentialName,
+                    hasAccountId: !!selectedAccountId,
+                    hasEnterpriseId: !!selectedEnterpriseId
+                });
+            }
+
+            // Build test connection payload
+            const testPayload: any = {
+                connectorName: connector.connector,
+                url: connector.url || '',
+                credentialName: connector.credentialName,
+            };
+
+            // Add authentication details based on authentication type
+            // For JIRA: Username and API Key (API Token)
+            if (authType === 'Username and API Key' || (!authType && username && apiToken)) {
+                testPayload.username = username || connector.username || '';
+                testPayload.apiToken = apiToken || connector.apiKey || ''; // JIRA uses API Token, not API Key
+            } else if (authType === 'Personal Access Token' || (!authType && apiToken && !username)) {
+                testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
+            }
+            
+            console.log('🧪 [ConnectivityStatusCell] Sending test request:', {
+                connector: connector.connector,
+                url: connector.url,
+                credentialName: connector.credentialName,
+                authenticationType: authType,
+                hasUsername: !!testPayload.username,
+                hasApiToken: !!testPayload.apiToken,
+                username: testPayload.username ? `${testPayload.username.substring(0, 5)}...` : 'none',
+                apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
+                apiTokenPreview: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 10)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 5)}` : 'none',
+                payloadKeys: Object.keys(testPayload)
+            });
+            
+            // Log full payload values for verification
+            console.log('📤 [ConnectivityStatusCell] FULL PAYLOAD VALUES (for verification):', {
+                connectorName: testPayload.connectorName,
+                url: testPayload.url,
+                credentialName: testPayload.credentialName,
+                username: testPayload.username || '(empty)',
+                apiToken: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 20)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 10)}` : '(empty)',
+                apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
+                personalAccessToken: testPayload.personalAccessToken ? `${testPayload.personalAccessToken.substring(0, 20)}...${testPayload.personalAccessToken.substring(testPayload.personalAccessToken.length - 10)}` : '(empty)',
+                authenticationType: authType || '(empty)',
+                fullPayload: {
+                    ...testPayload,
+                    // Mask sensitive values in full payload log
+                    apiToken: testPayload.apiToken ? `[MASKED - Length: ${testPayload.apiToken.length}]` : undefined,
+                    personalAccessToken: testPayload.personalAccessToken ? `[MASKED - Length: ${testPayload.personalAccessToken.length}]` : undefined
+                }
+            });
+            
+            // Validate that we have the required fields
+            if (!testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
+                throw new Error('Missing authentication credentials. Please ensure the credential contains username and API token.');
+            }
 
             // Call connectivity test API endpoint
-            // TODO: Update endpoint path when backend API is ready
-            const response = await api.post<{success?: boolean; status?: string; connected?: boolean}>(`/api/connectors/${rowId}/test-connection`, {
-                connectorName: connectorName,
-            });
+            // For JIRA: /api/connectors/jira/test-connection
+            const connectorNameLower = connector.connector.toLowerCase().replace(/\s+/g, '-');
+            const response = await api.post<{success?: boolean; status?: string; connected?: boolean; message?: string}>(
+                `/api/connectors/${connectorNameLower}/test-connection`,
+                testPayload
+            );
+
+            console.log('🧪 [ConnectivityStatusCell] Response received:', response);
 
             // Ensure minimum test duration has passed
             const elapsedTime = Date.now() - testStartTime;
@@ -6088,8 +6426,31 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
 
             // Check if response indicates success
             const success = response && (response.success || response.status === 'success' || response.connected);
+            const timestamp = Date.now();
             setTestStatus(success ? 'success' : 'failed');
-            setTestTime(new Date());
+            setTestTime(new Date(timestamp));
+            
+            console.log('✅ [ConnectivityStatusCell] Test completed:', {
+                success,
+                status: success ? 'success' : 'failed',
+                timestamp: new Date(timestamp).toISOString()
+            });
+
+            // Store test result in localStorage
+            try {
+                const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                const results: Record<string, TestResult> = stored ? JSON.parse(stored) : {};
+                results[rowId] = {
+                    status: success ? 'success' : 'failed',
+                    timestamp: timestamp
+                };
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                }
+            } catch (error) {
+                console.error('❌ [ConnectivityStatusCell] Error saving test result:', error);
+            }
         } catch (error) {
             // Ensure minimum test duration even on error
             const elapsedTime = Date.now() - testStartTime;
@@ -6099,8 +6460,26 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
                 await new Promise(resolve => setTimeout(resolve, remainingTime));
             }
 
+            const timestamp = Date.now();
             setTestStatus('failed');
-            setTestTime(new Date());
+            setTestTime(new Date(timestamp));
+
+            // Store failed test result in localStorage
+            try {
+                const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                const results: Record<string, TestResult> = stored ? JSON.parse(stored) : {};
+                results[rowId] = {
+                    status: 'failed',
+                    timestamp: timestamp
+                };
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                }
+            } catch (error) {
+                console.error('❌ [ConnectivityStatusCell] Error saving test result:', error);
+            }
+
             console.error('Connectivity test failed:', error);
         } finally {
             setIsTesting(false);
@@ -6940,8 +7319,12 @@ function SortableConnectorRow({
                         style={{width: '100%', overflow: 'visible'}}
                     >
                         <ConnectivityStatusCell 
+                            key={`${row.id}-${row.connectors?.map(c => `${c.connector}-${c.credentialName}`).join('-') || 'no-connectors'}`}
                             connectorName={row.connectorName || 'Connector'} 
                             rowId={row.id}
+                            row={row}
+                            selectedAccountId={selectedAccountId}
+                            selectedEnterpriseId={selectedEnterpriseId}
                         />
                     </div>
                 </div>
