@@ -8,6 +8,7 @@ import { api } from '@/utils/api';
 import { Icon } from '@/components/Icons';
 import { TOOLS_CONFIG, getToolConfig, CATEGORY_ORDER } from '@/config/toolsConfig';
 import AssignedCredentialModal from './AssignedCredentialModal';
+import { CredentialRow } from './ManageCredentialsTable';
 
 export interface Connector {
     id: string;
@@ -569,46 +570,116 @@ function CredentialNameDropdown({
         }
     }, [open, calculateDropdownPosition]);
 
-    // Load credentials filtered by Account, Enterprise, Workstream, Product, and Service
-    const loadCredentials = useCallback(async () => {
+    // Load credentials from localStorage filtered by Account, Enterprise, Workstream (Entity), Product, and Service
+    const loadCredentials = useCallback(() => {
         setLoading(true);
         try {
-            // Build API URL with filters
-            let apiUrl = '/api/credentials';
-            const params = new URLSearchParams();
-            
-            if (selectedAccountId) params.append('accountId', selectedAccountId);
-            if (selectedAccountName) params.append('accountName', selectedAccountName);
-            if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
-            if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise);
-            if (workstream) params.append('workstream', workstream);
-            if (product) params.append('product', product);
-            if (service) params.append('service', service);
-            
-            if (params.toString()) apiUrl += `?${params.toString()}`;
+            // Check if we have required account and enterprise info
+            if (!selectedAccountId || !selectedEnterpriseId) {
+                console.log('⚠️ [CredentialDropdown] Cannot load - missing accountId or enterpriseId');
+                setOptions([]);
+                setLoading(false);
+                return;
+            }
 
-            const response = await api.get<Array<{id: string; credentialName: string; name?: string}>>(apiUrl) || [];
+            // Get localStorage key matching Manage Credentials screen
+            const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+            const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
             
-            // Extract credential names from response
-            const credentialOptions = response.map((item: any) => ({
-                id: item.id || String(Math.random()),
-                name: item.credentialName || item.name || ''
-            })).filter((item: any) => item.name);
-            
+            // Load credentials from localStorage
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+            if (!stored) {
+                console.log('📦 [CredentialDropdown] No credentials found in localStorage for:', storageKey);
+                setOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            const allCredentials: CredentialRow[] = JSON.parse(stored);
+            console.log('📦 [CredentialDropdown] Loaded', allCredentials.length, 'credentials from localStorage');
+            console.log('📦 [CredentialDropdown] Sample credential structure:', allCredentials.length > 0 ? allCredentials[0] : 'No credentials');
+
+            // Filter credentials by account, enterprise, entity (workstream), product, and service
+            const filteredCredentials = allCredentials.filter((credential) => {
+                // Match entity (workstream) - case-insensitive
+                const entityMatch = !workstream || !credential.entity || 
+                    credential.entity.toLowerCase() === workstream.toLowerCase();
+                
+                // Match product - case-insensitive
+                const productMatch = !product || !credential.product || 
+                    credential.product.toLowerCase() === product.toLowerCase();
+                
+                // Match service - case-insensitive
+                const serviceMatch = !service || !credential.service || 
+                    credential.service.toLowerCase() === service.toLowerCase();
+                
+                return entityMatch && productMatch && serviceMatch;
+            });
+
+            console.log('🔍 [CredentialDropdown] Filtered to', filteredCredentials.length, 'credentials matching filters:', {
+                workstream,
+                product,
+                service
+            });
+            console.log('🔍 [CredentialDropdown] Filtered credentials:', filteredCredentials);
+
+            // Extract unique credential names
+            const credentialMap = new Map<string, {id: string; name: string}>();
+            filteredCredentials.forEach((credential) => {
+                console.log('🔍 [CredentialDropdown] Processing credential:', {
+                    id: credential.id,
+                    credentialName: credential.credentialName,
+                    entity: credential.entity,
+                    product: credential.product,
+                    service: credential.service
+                });
+                
+                // Handle credentialName - check multiple possible field names
+                const credentialName = credential.credentialName || (credential as any).name || '';
+                if (credentialName && typeof credentialName === 'string' && credentialName.trim()) {
+                    const name = credentialName.trim();
+                    if (!credentialMap.has(name.toLowerCase())) {
+                        credentialMap.set(name.toLowerCase(), {
+                            id: credential.id || String(Math.random()),
+                            name: name
+                        });
+                        console.log('✅ [CredentialDropdown] Added credential name to map:', name);
+                    }
+                } else {
+                    console.log('⚠️ [CredentialDropdown] Skipping credential - no credentialName or empty:', {
+                        credential,
+                        credentialName: credential.credentialName,
+                        hasCredentialName: !!credential.credentialName,
+                        credentialNameType: typeof credential.credentialName
+                    });
+                }
+            });
+
+            const credentialOptions = Array.from(credentialMap.values());
+            console.log('📋 [CredentialDropdown] Final credential options:', credentialOptions);
+            console.log('📋 [CredentialDropdown] Setting options with', credentialOptions.length, 'items');
             setOptions(credentialOptions);
+            console.log('📋 [CredentialDropdown] Options set, state should update soon');
         } catch (error) {
-            console.error('Error loading credentials:', error);
+            console.error('❌ [CredentialDropdown] Error loading credentials from localStorage:', error);
             setOptions([]);
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service]);
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service]);
 
     useEffect(() => {
         if (open) {
             loadCredentials();
         }
     }, [open, loadCredentials]);
+
+    // Refresh credentials when filters change (even if dropdown is already open)
+    useEffect(() => {
+        if (open && selectedAccountId && selectedEnterpriseId) {
+            loadCredentials();
+        }
+    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

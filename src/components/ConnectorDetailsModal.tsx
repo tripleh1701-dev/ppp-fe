@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Plug, Save, Edit2, XCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, Plug, Save, Edit2, XCircle, ChevronDown, CheckCircle2, Loader2 } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import { api } from '@/utils/api';
 import { Icon } from '@/components/Icons';
 import { TOOLS_CONFIG, getToolConfig, CATEGORY_ORDER } from '@/config/toolsConfig';
 import AssignedCredentialModal from './AssignedCredentialModal';
+import { CredentialRow } from './ManageCredentialsTable';
 
 export interface Connector {
     id: string;
@@ -46,6 +47,7 @@ interface ConnectorModalProps {
     workstream?: string; // Entity/workstream name
     product?: string; // Product name
     service?: string; // Service name
+    rowId?: string; // ConnectorRow ID for storing test results
 }
 
 // OAuth Button Component - Uses native event listener to bypass popup blockers
@@ -547,68 +549,161 @@ function CredentialNameDropdown({
     const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number} | null>(null);
 
     const calculateDropdownPosition = useCallback(() => {
-        if (!containerRef.current) return;
+        if (!containerRef.current) {
+            console.log('⚠️ [CredentialDropdown] Cannot calculate position - containerRef.current is null');
+            return;
+        }
         const rect = containerRef.current.getBoundingClientRect();
-        setDropdownPos({
+        const position = {
             top: rect.bottom + 2,
             left: rect.left,
             width: Math.max(200, rect.width),
-        });
+        };
+        console.log('📍 [CredentialDropdown] Calculated dropdown position:', position, 'from container rect:', rect);
+        setDropdownPos(position);
     }, []);
 
     useEffect(() => {
         if (open) {
-            calculateDropdownPosition();
-            const handleReposition = () => calculateDropdownPosition();
+            // Small delay to ensure container is rendered
+            const timer = setTimeout(() => {
+                calculateDropdownPosition();
+            }, 0);
+            const handleReposition = () => {
+                if (open) {
+                    calculateDropdownPosition();
+                }
+            };
             window.addEventListener('resize', handleReposition);
             window.addEventListener('scroll', handleReposition, true);
             return () => {
+                clearTimeout(timer);
                 window.removeEventListener('resize', handleReposition);
                 window.removeEventListener('scroll', handleReposition, true);
             };
+        } else {
+            setDropdownPos(null);
         }
     }, [open, calculateDropdownPosition]);
 
-    // Load credentials filtered by Account, Enterprise, Workstream, Product, and Service
-    const loadCredentials = useCallback(async () => {
+    // Load credentials from localStorage filtered by Account, Enterprise, Workstream (Entity), Product, and Service
+    const loadCredentials = useCallback(() => {
         setLoading(true);
         try {
-            // Build API URL with filters
-            let apiUrl = '/api/credentials';
-            const params = new URLSearchParams();
-            
-            if (selectedAccountId) params.append('accountId', selectedAccountId);
-            if (selectedAccountName) params.append('accountName', selectedAccountName);
-            if (selectedEnterpriseId) params.append('enterpriseId', selectedEnterpriseId);
-            if (selectedEnterprise) params.append('enterpriseName', selectedEnterprise);
-            if (workstream) params.append('workstream', workstream);
-            if (product) params.append('product', product);
-            if (service) params.append('service', service);
-            
-            if (params.toString()) apiUrl += `?${params.toString()}`;
+            // Check if we have required account and enterprise info
+            if (!selectedAccountId || !selectedEnterpriseId) {
+                console.log('⚠️ [CredentialDropdown] Cannot load - missing accountId or enterpriseId');
+                setOptions([]);
+                setLoading(false);
+                return;
+            }
 
-            const response = await api.get<Array<{id: string; credentialName: string; name?: string}>>(apiUrl) || [];
+            // Get localStorage key matching Manage Credentials screen
+            const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+            const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
             
-            // Extract credential names from response
-            const credentialOptions = response.map((item: any) => ({
-                id: item.id || String(Math.random()),
-                name: item.credentialName || item.name || ''
-            })).filter((item: any) => item.name);
-            
+            // Load credentials from localStorage
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+            if (!stored) {
+                console.log('📦 [CredentialDropdown] No credentials found in localStorage for:', storageKey);
+                setOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            const allCredentials: CredentialRow[] = JSON.parse(stored);
+            console.log('📦 [CredentialDropdown] Loaded', allCredentials.length, 'credentials from localStorage');
+            console.log('📦 [CredentialDropdown] Sample credential structure:', allCredentials.length > 0 ? allCredentials[0] : 'No credentials');
+
+            // Filter credentials by account, enterprise, entity (workstream), product, and service
+            const filteredCredentials = allCredentials.filter((credential) => {
+                // Match entity (workstream) - case-insensitive
+                const entityMatch = !workstream || !credential.entity || 
+                    credential.entity.toLowerCase() === workstream.toLowerCase();
+                
+                // Match product - case-insensitive
+                const productMatch = !product || !credential.product || 
+                    credential.product.toLowerCase() === product.toLowerCase();
+                
+                // Match service - case-insensitive
+                const serviceMatch = !service || !credential.service || 
+                    credential.service.toLowerCase() === service.toLowerCase();
+                
+                return entityMatch && productMatch && serviceMatch;
+            });
+
+            console.log('🔍 [CredentialDropdown] Filtered to', filteredCredentials.length, 'credentials matching filters:', {
+                workstream,
+                product,
+                service
+            });
+            console.log('🔍 [CredentialDropdown] Filtered credentials:', filteredCredentials);
+
+            // Extract unique credential names
+            const credentialMap = new Map<string, {id: string; name: string}>();
+            filteredCredentials.forEach((credential) => {
+                console.log('🔍 [CredentialDropdown] Processing credential:', {
+                    id: credential.id,
+                    credentialName: credential.credentialName,
+                    entity: credential.entity,
+                    product: credential.product,
+                    service: credential.service
+                });
+                
+                // Handle credentialName - check multiple possible field names
+                const credentialName = credential.credentialName || (credential as any).name || '';
+                if (credentialName && typeof credentialName === 'string' && credentialName.trim()) {
+                    const name = credentialName.trim();
+                    if (!credentialMap.has(name.toLowerCase())) {
+                        credentialMap.set(name.toLowerCase(), {
+                            id: credential.id || String(Math.random()),
+                            name: name
+                        });
+                        console.log('✅ [CredentialDropdown] Added credential name to map:', name);
+                    }
+                } else {
+                    console.log('⚠️ [CredentialDropdown] Skipping credential - no credentialName or empty:', {
+                        credential,
+                        credentialName: credential.credentialName,
+                        hasCredentialName: !!credential.credentialName,
+                        credentialNameType: typeof credential.credentialName
+                    });
+                }
+            });
+
+            const credentialOptions = Array.from(credentialMap.values());
+            console.log('📋 [CredentialDropdown] Final credential options:', credentialOptions);
+            console.log('📋 [CredentialDropdown] Setting options with', credentialOptions.length, 'items');
             setOptions(credentialOptions);
+            console.log('📋 [CredentialDropdown] Options set, state should update soon');
         } catch (error) {
-            console.error('Error loading credentials:', error);
+            console.error('❌ [CredentialDropdown] Error loading credentials from localStorage:', error);
             setOptions([]);
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service]);
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service]);
 
+    // Load credentials when dropdown opens
     useEffect(() => {
         if (open) {
             loadCredentials();
         }
     }, [open, loadCredentials]);
+
+    // Load credentials when component mounts or value changes (to ensure selected value is available)
+    useEffect(() => {
+        if (value && selectedAccountId && selectedEnterpriseId) {
+            loadCredentials();
+        }
+    }, [value, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
+
+    // Refresh credentials when filters change (even if dropdown is already open)
+    useEffect(() => {
+        if (open && selectedAccountId && selectedEnterpriseId) {
+            loadCredentials();
+        }
+    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -623,7 +718,90 @@ function CredentialNameDropdown({
         }
     }, [open]);
 
+    // Listen for storage changes to refresh credentials when they're deleted/modified in Manage Credentials
+    useEffect(() => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+
+        const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+        const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+
+        const handleStorageChange = (e: StorageEvent) => {
+            // Only react to changes in our credentials storage key
+            if (e.key === storageKey) {
+                console.log('🔄 [CredentialDropdown] Storage changed - refreshing credentials');
+                // Reload credentials when storage changes
+                loadCredentials();
+                
+                // If the currently selected credential was deleted, clear the selection
+                if (value && e.newValue) {
+                    try {
+                        const updatedCredentials: CredentialRow[] = JSON.parse(e.newValue);
+                        const credentialExists = updatedCredentials.some(
+                            cred => cred.credentialName === value
+                        );
+                        if (!credentialExists) {
+                            console.log('🗑️ [CredentialDropdown] Selected credential was deleted - clearing selection');
+                            onChange(''); // Clear the selection
+                        }
+                    } catch (error) {
+                        console.error('❌ [CredentialDropdown] Error parsing storage change:', error);
+                    }
+                } else if (value && !e.newValue) {
+                    // Storage was cleared - clear selection
+                    console.log('🗑️ [CredentialDropdown] Storage cleared - clearing selection');
+                    onChange('');
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Also listen for custom events (for same-tab updates)
+        const handleCustomStorageChange = () => {
+            console.log('🔄 [CredentialDropdown] Custom storage event - refreshing credentials');
+            loadCredentials();
+            
+            // Check if selected credential still exists
+            if (value) {
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                if (stored) {
+                    try {
+                        const updatedCredentials: CredentialRow[] = JSON.parse(stored);
+                        const credentialExists = updatedCredentials.some(
+                            cred => cred.credentialName === value
+                        );
+                        if (!credentialExists) {
+                            console.log('🗑️ [CredentialDropdown] Selected credential was deleted - clearing selection');
+                            onChange('');
+                        }
+                    } catch (error) {
+                        console.error('❌ [CredentialDropdown] Error checking credential existence:', error);
+                    }
+                } else {
+                    onChange('');
+                }
+            }
+        };
+
+        // Listen for custom event dispatched when credentials are saved/deleted
+        window.addEventListener('credentialsStorageChanged', handleCustomStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('credentialsStorageChanged', handleCustomStorageChange);
+        };
+    }, [selectedAccountId, selectedEnterpriseId, value, onChange, loadCredentials]);
+
+    // Debug: Log when options change
+    useEffect(() => {
+        console.log('📋 [CredentialDropdown] Options state updated:', options.length, 'options', options);
+    }, [options]);
+
     const selectedOption = options.find(opt => opt.name === value);
+    
+    // If value is set but not in options, show the value anyway (it might be from saved state)
+    // This ensures the selected credential name is always displayed even if options haven't loaded yet
+    const displayValue = value && (selectedOption ? selectedOption.name : value);
 
     return (
         <div ref={containerRef} className="relative w-full">
@@ -637,8 +815,8 @@ function CredentialNameDropdown({
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-                <span className={value ? 'text-gray-900' : 'text-gray-500'}>
-                    {selectedOption ? selectedOption.name : placeholder}
+                <span className={displayValue ? 'text-gray-900' : 'text-gray-500'}>
+                    {displayValue || placeholder}
                 </span>
                 <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'transform rotate-180' : ''}`} />
             </button>
@@ -646,33 +824,51 @@ function CredentialNameDropdown({
             {open && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                    className="fixed z-[9999] mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
                     style={dropdownPos ? {
                         top: `${dropdownPos.top}px`,
                         left: `${dropdownPos.left}px`,
                         width: `${dropdownPos.width}px`,
-                    } : undefined}
+                        position: 'fixed',
+                    } : {
+                        display: 'none',
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
                 >
+                    {(() => {
+                        console.log('🎨 [CredentialDropdown] Rendering dropdown:', { 
+                            loading, 
+                            optionsLength: options.length, 
+                            options,
+                            dropdownPos,
+                            hasDropdownPos: !!dropdownPos
+                        });
+                        return null;
+                    })()}
                     {loading ? (
                         <div className="px-3 py-2 text-sm text-gray-500">Loading...</div>
                     ) : options.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-gray-500">No credentials found</div>
                     ) : (
-                        options.map((option) => (
-                            <button
-                                key={option.id}
-                                type="button"
-                                onClick={() => {
-                                    onChange(option.name);
-                                    setOpen(false);
-                                }}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors ${
-                                    value === option.name ? 'bg-blue-100 font-medium' : ''
-                                }`}
-                            >
-                                {option.name}
-                            </button>
-                        ))
+                        options.map((option) => {
+                            console.log('🎨 [CredentialDropdown] Rendering option:', option);
+                            return (
+                                <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => {
+                                        console.log('🖱️ [CredentialDropdown] Option clicked:', option.name);
+                                        onChange(option.name);
+                                        setOpen(false);
+                                    }}
+                                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors ${
+                                        value === option.name ? 'bg-blue-100 font-medium' : ''
+                                    }`}
+                                >
+                                    {option.name}
+                                </button>
+                            );
+                        })
                     )}
                 </div>,
                 document.body
@@ -946,7 +1142,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     selectedAccountName = '',
     workstream = '',
     product = '',
-    service = ''
+    service = '',
+    rowId = ''
 }) => {
     const [connectors, setConnectors] = useState<Connector[]>([{
         id: generateId(),
@@ -988,6 +1185,9 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     // Ref to track OAuth status for preserving during modal reopen
     const oauthStatusRef = useRef<{[connectorId: string]: 'idle' | 'pending' | 'success' | 'error'}>({});
     
+    // Test connectivity state per connector
+    const [testConnectivityStatus, setTestConnectivityStatus] = useState<{[connectorId: string]: 'idle' | 'testing' | 'success' | 'failed'}>({});
+    
     // Sync ref with state whenever status changes
     useEffect(() => {
         oauthStatusRef.current = oauthStatus;
@@ -997,6 +1197,76 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     const isConnectorComplete = (connector: Connector): boolean => {
         return !!(connector.category?.trim() && connector.connector?.trim());
     };
+
+    // Helper function to validate and clean credential names in connectors
+    const validateAndCleanCredentialNames = useCallback(() => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+        
+        try {
+            const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+            const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+            
+            if (!stored) {
+                // No credentials in storage - clear all credential names
+                console.log('🗑️ [CredentialValidation] No credentials found - clearing all credential names');
+                setConnectors(prev => prev.map(connector => {
+                    if (connector.credentialName) {
+                        console.log('🗑️ [CredentialValidation] Clearing credential name from connector:', connector.id, connector.credentialName);
+                        return {
+                            ...connector,
+                            credentialName: '',
+                            authenticationType: '',
+                            username: '',
+                            usernameEncryption: 'Plaintext',
+                            apiKey: '',
+                            apiKeyEncryption: 'Encrypted',
+                            personalAccessToken: '',
+                            tokenEncryption: 'Plaintext',
+                            githubInstallationId: '',
+                            githubInstallationIdEncryption: 'Plaintext',
+                            githubApplicationId: '',
+                            githubApplicationIdEncryption: 'Plaintext',
+                            githubPrivateKey: ''
+                        };
+                    }
+                    return connector;
+                }));
+                return;
+            }
+            
+            const allCredentials: CredentialRow[] = JSON.parse(stored);
+            const availableCredentialNames = new Set(
+                allCredentials.map(cred => cred.credentialName).filter(Boolean)
+            );
+            
+            // Check each connector and clear credentialName if it doesn't exist
+            setConnectors(prev => prev.map(connector => {
+                if (connector.credentialName && !availableCredentialNames.has(connector.credentialName)) {
+                    console.log('🗑️ [CredentialValidation] Credential name not found - clearing:', connector.credentialName, 'from connector:', connector.id);
+                    return {
+                        ...connector,
+                        credentialName: '',
+                        authenticationType: '',
+                        username: '',
+                        usernameEncryption: 'Plaintext',
+                        apiKey: '',
+                        apiKeyEncryption: 'Encrypted',
+                        personalAccessToken: '',
+                        tokenEncryption: 'Plaintext',
+                        githubInstallationId: '',
+                        githubInstallationIdEncryption: 'Plaintext',
+                        githubApplicationId: '',
+                        githubApplicationIdEncryption: 'Plaintext',
+                        githubPrivateKey: ''
+                    };
+                }
+                return connector;
+            }));
+        } catch (error) {
+            console.error('❌ [CredentialValidation] Error validating credential names:', error);
+        }
+    }, [selectedAccountId, selectedEnterpriseId]);
 
     const validateConnector = (connector: Connector): { errors: string[]; messages: Record<string, string> } => {
         const errors: string[] = [];
@@ -1029,7 +1299,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         // Validate Authentication Type - optional now (kept for backward compatibility)
         
         // Validate Username and API Key - required if authentication type is Username and API Key (Jira)
-        if (connector.authenticationType === 'Username and API Key') {
+        // BUT: Skip validation if credentialName is provided (credentials are stored separately)
+        if (connector.authenticationType === 'Username and API Key' && !connector.credentialName) {
             if (!connector.username || !connector.username.trim()) {
                 errors.push('username');
                 messages.username = 'Username is required';
@@ -1041,7 +1312,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         }
         
         // Validate Username and Token - required if authentication type is Username and Token (GitHub)
-        if (connector.authenticationType === 'Username and Token') {
+        // BUT: Skip validation if credentialName is provided (credentials are stored separately)
+        if (connector.authenticationType === 'Username and Token' && !connector.credentialName) {
             if (!connector.username || !connector.username.trim()) {
                 errors.push('username');
                 messages.username = 'Username is required';
@@ -1053,7 +1325,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         }
         
         // Validate Personal Access Token - required if authentication type is Personal Access Token (Jira)
-        if (connector.authenticationType === 'Personal Access Token') {
+        // BUT: Skip validation if credentialName is provided (credentials are stored separately)
+        if (connector.authenticationType === 'Personal Access Token' && !connector.credentialName) {
             if (!connector.personalAccessToken || !connector.personalAccessToken.trim()) {
                 errors.push('personalAccessToken');
                 messages.personalAccessToken = 'Personal Access Token is required';
@@ -1061,7 +1334,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         }
         
         // Validate GitHub App - required if authentication type is GitHub App
-        if (connector.authenticationType === 'GitHub App') {
+        // BUT: Skip validation if credentialName is provided (credentials are stored separately)
+        if (connector.authenticationType === 'GitHub App' && !connector.credentialName) {
             if (!connector.githubInstallationId || !connector.githubInstallationId.trim()) {
                 errors.push('githubInstallationId');
                 messages.githubInstallationId = 'GitHub Installation Id is required';
@@ -1241,6 +1515,11 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                     setActivelyEditingNewConnector(new Set());
                     setEditingConnectorId(null); // Clear any editing state to show summary view
                     console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    
+                    // Validate credential names after loading
+                    setTimeout(() => {
+                        validateAndCleanCredentialNames();
+                    }, 100);
                 } else if (connectors.length === 0) {
                     // Only create new connector if we don't have any connectors yet
                     const newId = generateId();
@@ -1265,6 +1544,10 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                 } else {
                     // Modal staying open with existing connectors - preserve them
                     console.log('🔍 ConnectorModal staying open - preserving existing connectors:', connectors.length);
+                    // Validate credential names even when preserving existing connectors
+                    setTimeout(() => {
+                        validateAndCleanCredentialNames();
+                    }, 100);
                 }
                 setHasUnsavedChanges(false);
                 
@@ -1328,6 +1611,11 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                     setOriginalConnectors(JSON.parse(JSON.stringify(initialConnectors))); // Deep copy
                     setActivelyEditingNewConnector(new Set());
                     setEditingConnectorId(null);
+                    
+                    // Validate credential names after loading
+                    setTimeout(() => {
+                        validateAndCleanCredentialNames();
+                    }, 100);
                 } else {
                     // Modal is staying open - preserve state, don't reset
                     console.log('🔍 ConnectorModal staying open - preserving state');
@@ -1338,7 +1626,23 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             wasOpenRef.current = false;
             console.log('🔍 ConnectorModal closed - reset wasOpenRef');
         }
-    }, [isOpen, initialConnectors, connectors, connectorName]);
+    }, [isOpen, initialConnectors, connectors, connectorName, validateAndCleanCredentialNames]);
+    
+    // Listen for credential storage changes to validate and clean credential names
+    useEffect(() => {
+        if (!isOpen || !selectedAccountId || !selectedEnterpriseId) return;
+        
+        const handleCredentialStorageChange = () => {
+            console.log('🔄 [ConnectorModal] Credential storage changed - validating credential names');
+            validateAndCleanCredentialNames();
+        };
+        
+        window.addEventListener('credentialsStorageChanged', handleCredentialStorageChange);
+        
+        return () => {
+            window.removeEventListener('credentialsStorageChanged', handleCredentialStorageChange);
+        };
+    }, [isOpen, selectedAccountId, selectedEnterpriseId, validateAndCleanCredentialNames]);
 
     // Track changes to detect unsaved changes
     useEffect(() => {
@@ -1525,7 +1829,12 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                     
                     // Extract available categories (only categories that have tools)
                     // Order categories using CATEGORY_ORDER to match Global Settings modal
+                    // Exclude "deploy" category from the list
                     const allCategories = Object.keys(configDetails).filter(category => {
+                        // Exclude "deploy" category
+                        if (category.toLowerCase() === 'deploy') {
+                            return false;
+                        }
                         const tools = configDetails[category];
                         const hasTools = Array.isArray(tools) && tools.length > 0;
                         if (hasTools) {
@@ -1535,9 +1844,10 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                     });
                     
                     // Sort categories according to CATEGORY_ORDER, then add any others at the end
+                    // Filter out "deploy" from CATEGORY_ORDER as well
                     const orderedCategories = [
-                        ...CATEGORY_ORDER.filter(cat => allCategories.includes(cat)),
-                        ...allCategories.filter(cat => !CATEGORY_ORDER.includes(cat as any))
+                        ...CATEGORY_ORDER.filter(cat => allCategories.includes(cat) && cat.toLowerCase() !== 'deploy'),
+                        ...allCategories.filter(cat => !CATEGORY_ORDER.includes(cat as any) && cat.toLowerCase() !== 'deploy')
                     ];
                     
                     setAvailableCategories(orderedCategories);
@@ -1685,6 +1995,16 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                         const toolConfig = getToolConfig(value);
                         updatedConnector.connectorIconName = toolConfig?.iconName || undefined;
                     }
+                    // Reset test status when connector, credentialName, or url changes
+                    if (field === 'connector' || field === 'credentialName' || field === 'url') {
+                        setTestConnectivityStatus(prevStatus => {
+                            const updatedStatus = { ...prevStatus };
+                            if (updatedStatus[id] !== 'idle') {
+                                updatedStatus[id] = 'idle';
+                            }
+                            return updatedStatus;
+                        });
+                    }
                     return updatedConnector;
                 }
                 return connector;
@@ -1697,6 +2017,277 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     const removeConnector = (id: string) => {
         if (connectors.length > 1) {
             setConnectors(prev => prev.filter(connector => connector.id !== id));
+        }
+    };
+
+    // Test connectivity for a connector
+    const testConnectivity = async (connectorId: string) => {
+        const connector = connectors.find(c => c.id === connectorId);
+        if (!connector) return;
+
+        // Check if required fields are filled
+        if (!connector.connector || !connector.credentialName || !connector.url) {
+            console.warn('Cannot test connectivity - missing required fields');
+            return;
+        }
+
+        // Set testing status
+        setTestConnectivityStatus(prev => ({
+            ...prev,
+            [connectorId]: 'testing'
+        }));
+
+        // Simulate minimum test duration (2-3 seconds) for better UX
+        const minTestDuration = 2500; // 2.5 seconds minimum
+        const testStartTime = Date.now();
+
+        try {
+            // Load credential details from localStorage to get username and API token
+            let username = '';
+            let apiToken = '';
+            let foundCredentialConnector: any = null;
+            let authType = connector.authenticationType || '';
+            
+            if (connector.credentialName && selectedAccountId && selectedEnterpriseId) {
+                try {
+                    const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                    const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                    
+                    if (stored) {
+                        const allCredentials: CredentialRow[] = JSON.parse(stored);
+                        const credential = allCredentials.find(
+                            cred => cred.credentialName === connector.credentialName
+                        );
+                        
+                        if (credential && credential.connectors && credential.connectors.length > 0) {
+                            // Find connector matching the current connector name
+                            foundCredentialConnector = credential.connectors.find(
+                                c => c.connector === connector.connector || c.connector.toLowerCase() === connector.connector.toLowerCase()
+                            );
+                            
+                            if (foundCredentialConnector) {
+                                console.log('🔑 [Test Connectivity] Found credential connector:', {
+                                    credentialConnector: foundCredentialConnector.connector,
+                                    authenticationType: foundCredentialConnector.authenticationType,
+                                    hasUsername: !!foundCredentialConnector.username,
+                                    hasApiKey: !!foundCredentialConnector.apiKey,
+                                    hasPersonalAccessToken: !!foundCredentialConnector.personalAccessToken
+                                });
+                                
+                                // Determine authentication type from credential connector if not set in connector
+                                authType = connector.authenticationType || foundCredentialConnector.authenticationType || '';
+                                
+                                // For JIRA with Username and API Key authentication
+                                if (authType === 'Username and API Key' || (!authType && foundCredentialConnector.username && foundCredentialConnector.apiKey)) {
+                                    username = foundCredentialConnector.username || connector.username || '';
+                                    apiToken = foundCredentialConnector.apiKey || connector.apiKey || '';
+                                    
+                                    // Also update the connector's authentication type if not set
+                                    if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
+                                        updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
+                                    }
+                                } else if (authType === 'Personal Access Token' || (!authType && foundCredentialConnector.personalAccessToken)) {
+                                    apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
+                                    
+                                    // Also update the connector's authentication type if not set
+                                    if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
+                                        updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
+                                    }
+                                }
+                                
+                                console.log('🔑 [Test Connectivity] Extracted credential details:', {
+                                    credentialName: connector.credentialName,
+                                    authenticationType: authType,
+                                    hasUsername: !!username,
+                                    hasApiToken: !!apiToken,
+                                    username: username ? `${username.substring(0, 5)}...` : 'none',
+                                    apiTokenLength: apiToken ? apiToken.length : 0,
+                                    apiTokenPreview: apiToken ? `${apiToken.substring(0, 10)}...${apiToken.substring(apiToken.length - 5)}` : 'none'
+                                });
+                                
+                                // Log full values for verification (be careful with sensitive data in production)
+                                console.log('✅ [Test Connectivity] FULL VALUES EXTRACTED (for verification):', {
+                                    credentialName: connector.credentialName,
+                                    connectorName: connector.connector,
+                                    username: username || '(empty)',
+                                    apiToken: apiToken ? `${apiToken.substring(0, 20)}...${apiToken.substring(apiToken.length - 10)}` : '(empty)',
+                                    apiTokenLength: apiToken ? apiToken.length : 0,
+                                    authenticationType: authType || '(empty)',
+                                    source: 'credentialConnector',
+                                    credentialConnectorFound: true
+                                });
+                            } else {
+                                console.warn('⚠️ [Test Connectivity] No matching connector found in credential:', {
+                                    credentialName: connector.credentialName,
+                                    connectorName: connector.connector,
+                                    availableConnectors: credential.connectors.map(c => c.connector)
+                                });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ [Test Connectivity] Error loading credential from localStorage:', error);
+                }
+            }
+
+            // Build test connection payload
+            const testPayload: any = {
+                connectorName: connector.connector,
+                url: connector.url || '',
+                credentialName: connector.credentialName,
+            };
+
+            // Add authentication details based on authentication type
+            // For JIRA: Username and API Key (API Token)
+            if (authType === 'Username and API Key' || (!authType && username && apiToken)) {
+                testPayload.username = username || connector.username || '';
+                testPayload.apiToken = apiToken || connector.apiKey || ''; // JIRA uses API Token, not API Key
+            } else if (authType === 'Personal Access Token' || (!authType && apiToken && !username)) {
+                testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
+            }
+            
+            // Validate that we have the required fields
+            if (!testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
+                throw new Error('Missing authentication credentials. Please ensure the credential contains username and API token.');
+            }
+
+            console.log('🧪 [Test Connectivity] Sending test request:', {
+                connector: connector.connector,
+                url: connector.url,
+                credentialName: connector.credentialName,
+                authenticationType: authType,
+                hasUsername: !!testPayload.username,
+                hasApiToken: !!testPayload.apiToken,
+                username: testPayload.username ? `${testPayload.username.substring(0, 5)}...` : 'none',
+                apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
+                apiTokenPreview: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 10)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 5)}` : 'none',
+                payloadKeys: Object.keys(testPayload)
+            });
+            
+            // Log full payload values for verification
+            console.log('📤 [Test Connectivity] FULL PAYLOAD VALUES (for verification):', {
+                connectorName: testPayload.connectorName,
+                url: testPayload.url,
+                credentialName: testPayload.credentialName,
+                username: testPayload.username || '(empty)',
+                apiToken: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 20)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 10)}` : '(empty)',
+                apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
+                personalAccessToken: testPayload.personalAccessToken ? `${testPayload.personalAccessToken.substring(0, 20)}...${testPayload.personalAccessToken.substring(testPayload.personalAccessToken.length - 10)}` : '(empty)',
+                authenticationType: authType || '(empty)',
+                fullPayload: {
+                    ...testPayload,
+                    // Mask sensitive values in full payload log
+                    apiToken: testPayload.apiToken ? `[MASKED - Length: ${testPayload.apiToken.length}]` : undefined,
+                    personalAccessToken: testPayload.personalAccessToken ? `[MASKED - Length: ${testPayload.personalAccessToken.length}]` : undefined
+                }
+            });
+
+            // Call connectivity test API endpoint
+            // For JIRA: /api/connectors/jira/test-connection
+            const connectorNameLower = connector.connector.toLowerCase().replace(/\s+/g, '-');
+            const response = await api.post<{success?: boolean; status?: string; connected?: boolean; message?: string}>(
+                `/api/connectors/${connectorNameLower}/test-connection`,
+                testPayload
+            );
+
+            console.log('🧪 [Test Connectivity] Response received:', response);
+
+            // Ensure minimum test duration has passed
+            const elapsedTime = Date.now() - testStartTime;
+            const remainingTime = Math.max(0, minTestDuration - elapsedTime);
+            
+            if (remainingTime > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingTime));
+            }
+
+            // Check if response indicates success
+            const success = response && (response.success || response.status === 'success' || response.connected);
+            setTestConnectivityStatus(prev => ({
+                ...prev,
+                [connectorId]: success ? 'success' : 'failed'
+            }));
+
+            // Store test result in localStorage for Status column in Manage Connectors screen
+            if (rowId && selectedAccountId && selectedEnterpriseId) {
+                try {
+                    const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                    const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
+                    results[rowId] = {
+                        status: success ? 'success' : 'failed',
+                        timestamp: Date.now()
+                    };
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                        console.log('💾 [ConnectorDetailsModal] Saved test result to localStorage for row:', rowId, 'status:', success ? 'success' : 'failed');
+                        // Dispatch event to notify Status column to refresh
+                        window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                    }
+                } catch (error) {
+                    console.error('❌ [ConnectorDetailsModal] Error saving test result to localStorage:', error);
+                }
+            }
+
+            // Auto-clear success status after 5 seconds
+            if (success) {
+                setTimeout(() => {
+                    setTestConnectivityStatus(prev => {
+                        const updated = { ...prev };
+                        if (updated[connectorId] === 'success') {
+                            updated[connectorId] = 'idle';
+                        }
+                        return updated;
+                    });
+                }, 5000);
+            }
+        } catch (error) {
+            // Ensure minimum test duration even on error
+            const elapsedTime = Date.now() - testStartTime;
+            const remainingTime = Math.max(0, minTestDuration - elapsedTime);
+            
+            if (remainingTime > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingTime));
+            }
+
+            setTestConnectivityStatus(prev => ({
+                ...prev,
+                [connectorId]: 'failed'
+            }));
+
+            // Store failed test result in localStorage for Status column in Manage Connectors screen
+            if (rowId && selectedAccountId && selectedEnterpriseId) {
+                try {
+                    const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                    const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
+                    results[rowId] = {
+                        status: 'failed',
+                        timestamp: Date.now()
+                    };
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                        console.log('💾 [ConnectorDetailsModal] Saved failed test result to localStorage for row:', rowId);
+                        // Dispatch event to notify Status column to refresh
+                        window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                    }
+                } catch (error) {
+                    console.error('❌ [ConnectorDetailsModal] Error saving test result to localStorage:', error);
+                }
+            }
+
+            console.error('Connectivity test failed:', error);
+
+            // Auto-clear failed status after 5 seconds
+            setTimeout(() => {
+                setTestConnectivityStatus(prev => {
+                    const updated = { ...prev };
+                    if (updated[connectorId] === 'failed') {
+                        updated[connectorId] = 'idle';
+                    }
+                    return updated;
+                });
+            }, 5000);
         }
     };
 
@@ -1773,8 +2364,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             category: connectorToSave.category,
             connector: connectorToSave.connector,
             isComplete: isConnectorComplete(connectorToSave),
-            currentlyActivelyEditing: activelyEditingNewConnector.has(connectorToSave.id),
-            currentlyExplicitlyEditing: editingConnectorId === connectorToSave.id
+            connectorCategory: connectorToSave.category,
+            connectorName: connectorToSave.connector
         });
         
         // Update originalConnectors to reflect that this connector is now saved
@@ -2096,21 +2687,134 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                                 <span>Create Credential</span>
                                                             </button>
                                                         </div>
-                                                        <CredentialNameDropdown
-                                                            value={connector.credentialName || ''}
-                                                            onChange={(newValue) => {
-                                                                updateConnector(connector.id, 'credentialName', newValue);
-                                                            }}
-                                                            selectedAccountId={selectedAccountId}
-                                                            selectedAccountName={selectedAccountName}
-                                                            selectedEnterpriseId={selectedEnterpriseId}
-                                                            selectedEnterprise={selectedEnterprise}
-                                                            workstream={workstream}
-                                                            product={product}
-                                                            service={service}
-                                                            isError={validationErrors[connector.id]?.includes('credentialName') || false}
-                                                            placeholder="Select credential name..."
-                                                        />
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex-1">
+                                                                <CredentialNameDropdown
+                                                                    value={connector.credentialName || ''}
+                                                                    onChange={(newValue) => {
+                                                                        updateConnector(connector.id, 'credentialName', newValue);
+                                                                        
+                                                                        // Clear authentication fields when credential name is cleared
+                                                                        if (!newValue) {
+                                                                            updateConnector(connector.id, 'authenticationType', '');
+                                                                            updateConnector(connector.id, 'username', '');
+                                                                            updateConnector(connector.id, 'usernameEncryption', 'Plaintext');
+                                                                            updateConnector(connector.id, 'apiKey', '');
+                                                                            updateConnector(connector.id, 'apiKeyEncryption', 'Encrypted');
+                                                                            updateConnector(connector.id, 'personalAccessToken', '');
+                                                                            updateConnector(connector.id, 'tokenEncryption', 'Plaintext');
+                                                                            updateConnector(connector.id, 'githubInstallationId', '');
+                                                                            updateConnector(connector.id, 'githubInstallationIdEncryption', 'Plaintext');
+                                                                            updateConnector(connector.id, 'githubApplicationId', '');
+                                                                            updateConnector(connector.id, 'githubApplicationIdEncryption', 'Plaintext');
+                                                                            updateConnector(connector.id, 'githubPrivateKey', '');
+                                                                        }
+                                                                        
+                                                                        // Auto-populate username, API token, and authentication type from credential
+                                                                        if (newValue && selectedAccountId && selectedEnterpriseId && connector.connector) {
+                                                                            try {
+                                                                                const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                                                                                const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+                                                                                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                                                                                
+                                                                                if (stored) {
+                                                                                    const allCredentials: CredentialRow[] = JSON.parse(stored);
+                                                                                    const credential = allCredentials.find(
+                                                                                        cred => cred.credentialName === newValue
+                                                                                    );
+                                                                                    
+                                                                                    if (credential && credential.connectors && credential.connectors.length > 0) {
+                                                                                        // Find connector matching the current connector name
+                                                                                        const credentialConnector = credential.connectors.find(
+                                                                                            c => c.connector === connector.connector
+                                                                                        );
+                                                                                        
+                                                                                        if (credentialConnector) {
+                                                                                            console.log('🔑 [Credential] Auto-populating fields from credential:', {
+                                                                                                credentialName: newValue,
+                                                                                                connector: connector.connector,
+                                                                                                hasUsername: !!credentialConnector.username,
+                                                                                                hasApiKey: !!credentialConnector.apiKey,
+                                                                                                authenticationType: credentialConnector.authenticationType
+                                                                                            });
+                                                                                            
+                                                                                            // Log the actual values for verification
+                                                                                            console.log('📋 [Credential] Extracted values for verification:', {
+                                                                                                credentialName: newValue,
+                                                                                                connector: connector.connector,
+                                                                                                username: credentialConnector.username || '(empty)',
+                                                                                                apiKey: credentialConnector.apiKey ? `${credentialConnector.apiKey.substring(0, 20)}...${credentialConnector.apiKey.substring(credentialConnector.apiKey.length - 10)}` : '(empty)',
+                                                                                                apiKeyLength: credentialConnector.apiKey ? credentialConnector.apiKey.length : 0,
+                                                                                                authenticationType: credentialConnector.authenticationType || '(empty)',
+                                                                                                fullCredentialConnector: credentialConnector // Full object for debugging
+                                                                                            });
+                                                                                            
+                                                                                            // Store authentication type internally (fields will be hidden when credential name is selected)
+                                                                                            // Credentials will be pulled from localStorage when testing connectivity
+                                                                                            if (credentialConnector.authenticationType) {
+                                                                                                updateConnector(connector.id, 'authenticationType', credentialConnector.authenticationType);
+                                                                                            }
+                                                                                            
+                                                                                            // Note: We don't populate username/apiKey fields here since they're hidden when credential name is selected
+                                                                                            // These will be pulled from localStorage when testing connectivity
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            } catch (error) {
+                                                                                console.error('❌ [Credential] Error auto-populating fields:', error);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    selectedAccountId={selectedAccountId}
+                                                                    selectedAccountName={selectedAccountName}
+                                                                    selectedEnterpriseId={selectedEnterpriseId}
+                                                                    selectedEnterprise={selectedEnterprise}
+                                                                    workstream={workstream}
+                                                                    product={product}
+                                                                    service={service}
+                                                                    isError={validationErrors[connector.id]?.includes('credentialName') || false}
+                                                                    placeholder="Select credential name..."
+                                                                />
+                                                            </div>
+                                                            {/* Test Connectivity Button */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => testConnectivity(connector.id)}
+                                                                disabled={
+                                                                    testConnectivityStatus[connector.id] === 'testing' ||
+                                                                    !connector.connector ||
+                                                                    !connector.credentialName ||
+                                                                    !connector.url
+                                                                }
+                                                                className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                                                                    testConnectivityStatus[connector.id] === 'testing'
+                                                                        ? 'bg-blue-100 text-blue-700 cursor-wait'
+                                                                        : testConnectivityStatus[connector.id] === 'success'
+                                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                        : testConnectivityStatus[connector.id] === 'failed'
+                                                                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                                                } ${
+                                                                    (!connector.connector || !connector.credentialName || !connector.url)
+                                                                        ? 'opacity-50 cursor-not-allowed'
+                                                                        : 'cursor-pointer'
+                                                                }`}
+                                                            >
+                                                                {testConnectivityStatus[connector.id] === 'testing' ? (
+                                                                    <>
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        <span>Test in Progress</span>
+                                                                    </>
+                                                                ) : testConnectivityStatus[connector.id] === 'success' ? (
+                                                                    <>
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                        <span>Success</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span>Test</span>
+                                                                )}
+                                                            </button>
+                                                        </div>
                                                         {validationErrors[connector.id]?.includes('credentialName') && (
                                                             <p className="text-red-500 text-xs mt-1">
                                                                 {validationMessages[connector.id]?.credentialName || 'Credential Name is required'}
@@ -2118,8 +2822,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         )}
                                                     </div>
                                                     
-                                                    {/* Conditional fields for Username and API Key (Jira) */}
-                                                    {connector.authenticationType === 'Username and API Key' && (
+                                                    {/* Conditional fields for Username and API Key (Jira) - Hide when credential name is selected */}
+                                                    {connector.authenticationType === 'Username and API Key' && !connector.credentialName && (
                                                         <div className="mt-4 space-y-4">
                                                             {/* Username field with encryption dropdown */}
                                                             <div>
@@ -2179,8 +2883,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         </div>
                                                     )}
                                                     
-                                                    {/* Conditional fields for Username and Token (GitHub) */}
-                                                    {connector.authenticationType === 'Username and Token' && (
+                                                    {/* Conditional fields for Username and Token (GitHub) - Hide when credential name is selected */}
+                                                    {connector.authenticationType === 'Username and Token' && !connector.credentialName && (
                                                         <div className="mt-4 space-y-4">
                                                             {/* Username field with encryption dropdown */}
                                                             <div>
@@ -2237,8 +2941,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         </div>
                                                     )}
                                                     
-                                                    {/* Conditional fields for Personal Access Token (Jira) */}
-                                                    {connector.authenticationType === 'Personal Access Token' && (
+                                                    {/* Conditional fields for Personal Access Token (Jira) - Hide when credential name is selected */}
+                                                    {connector.authenticationType === 'Personal Access Token' && !connector.credentialName && (
                                                         <div className="mt-4">
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                                 Personal Access Token *
@@ -2261,8 +2965,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         </div>
                                                     )}
                                                     
-                                                    {/* Conditional fields for GitHub App */}
-                                                    {connector.authenticationType === 'GitHub App' && (
+                                                    {/* Conditional fields for GitHub App - Hide when credential name is selected */}
+                                                    {connector.authenticationType === 'GitHub App' && !connector.credentialName && (
                                                         <div className="mt-4 space-y-4">
                                                             {/* GitHub Installation Id field with encryption dropdown */}
                                                             <div>
@@ -2350,8 +3054,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         </div>
                                                     )}
                                                     
-                                                    {/* Conditional fields for OAuth */}
-                                                    {connector.authenticationType === 'OAuth' && (
+                                                    {/* Conditional fields for OAuth - Hide when credential name is selected */}
+                                                    {connector.authenticationType === 'OAuth' && !connector.credentialName && (
                                                         <div className="mt-4">
                                                             <div className="flex items-center justify-between mb-4">
                                                                 <div>
@@ -2469,11 +3173,15 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* Authentication Details */}
-                                                <div className="border-t border-slate-200 pt-4 mt-4">
+                                                {/* URL and Credential Details */}
+                                                <div className="border-t border-slate-200 pt-4 mt-4 space-y-4">
                                                     <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Authentication Type</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.authenticationType || 'N/A'}</div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">URL</div>
+                                                        <div className="text-sm font-medium text-slate-600 break-words">{connector.url || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Credential Name</div>
+                                                        <div className="text-sm font-medium text-slate-600">{connector.credentialName || 'N/A'}</div>
                                                     </div>
                                                 </div>
 
@@ -2541,24 +3249,36 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                 onClose={() => setShowCredentialModal(false)}
                 onSave={async (credentials) => {
                     try {
+                        // Get account and enterprise IDs for local storage key
+                        const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') || '';
+                        const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') || '';
+                        
+                        if (!accountId || !enterpriseId) {
+                            console.error('❌ [Credential Save] Missing accountId or enterpriseId');
+                            alert('Failed to save credential. Missing account or enterprise information.');
+                            return;
+                        }
+                        
                         // Get the current connector to get category and connector name
                         const currentConnector = connectors.length > 0 ? connectors[0] : null;
                         const connectorCategory = currentConnector?.category || '';
                         const connectorConnector = currentConnector?.connector || connectorName || '';
                         
-                        // Save each credential to the API
+                        // Load existing credentials from local storage
+                        const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                        const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${accountId}_${enterpriseId}`;
+                        const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                        const existingCredentials: CredentialRow[] = stored ? JSON.parse(stored) : [];
+                        
+                        console.log('💾 [Credential Save] Loaded', existingCredentials.length, 'existing credentials from localStorage');
+                        
+                        // Process each credential to save
                         for (const credential of credentials) {
-                            // Build the credential payload with all required context
-                            const credentialPayload = {
-                                credentialName: credential.credentialName,
-                                description: credential.description || '',
-                                entity: credential.entity || workstream || '',
-                                product: credential.product || product || '',
-                                service: credential.service || service || '',
-                                scope: credential.scope || credential.connector || connectorConnector || '',
+                            // Build connector object for the credential row
+                            const connectorData = {
+                                id: generateId(),
                                 category: credential.category || connectorCategory || '',
                                 connector: credential.connector || connectorConnector || '',
-                                // Authentication fields
                                 authenticationType: credential.authenticationType || '',
                                 username: credential.username || '',
                                 usernameEncryption: credential.usernameEncryption || 'Plaintext',
@@ -2571,22 +3291,78 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                 githubApplicationId: credential.githubApplicationId || '',
                                 githubApplicationIdEncryption: credential.githubApplicationIdEncryption || 'Plaintext',
                                 githubPrivateKey: credential.githubPrivateKey || '',
-                                // Context fields for filtering
-                                accountId: selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') || '',
-                                accountName: selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : '') || '',
-                                enterpriseId: selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') || '',
-                                enterpriseName: selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : '') || '',
+                                status: true, // Default to Active
+                                description: credential.description || ''
                             };
                             
-                            console.log('💾 Saving credential to API:', credentialPayload);
+                            // Check if credential row already exists (by credentialName)
+                            const existingIndex = existingCredentials.findIndex(
+                                cred => cred.credentialName === credential.credentialName
+                            );
                             
-                            // Save credential via API
-                            const savedCredential = await api.post('/api/credentials', credentialPayload);
-                            console.log('✅ Credential saved successfully:', savedCredential);
+                            if (existingIndex >= 0) {
+                                // Update existing credential row
+                                const existingRow = existingCredentials[existingIndex];
+                                
+                                // Check if connector already exists in this credential row
+                                const connectorIndex = existingRow.connectors?.findIndex(
+                                    c => c.connector === connectorData.connector
+                                ) ?? -1;
+                                
+                                if (connectorIndex >= 0 && existingRow.connectors) {
+                                    // Update existing connector
+                                    existingRow.connectors[connectorIndex] = connectorData;
+                                    console.log('🔄 [Credential Save] Updated existing connector in credential:', credential.credentialName);
+                                } else {
+                                    // Add new connector to existing credential row
+                                    existingRow.connectors = existingRow.connectors || [];
+                                    existingRow.connectors.push(connectorData);
+                                    console.log('➕ [Credential Save] Added new connector to existing credential:', credential.credentialName);
+                                }
+                                
+                                // Update other fields if provided
+                                if (credential.description !== undefined) {
+                                    existingRow.description = credential.description;
+                                }
+                                if (credential.entity) {
+                                    existingRow.entity = credential.entity;
+                                }
+                                if (credential.product) {
+                                    existingRow.product = credential.product;
+                                }
+                                if (credential.service) {
+                                    existingRow.service = credential.service;
+                                }
+                            } else {
+                                // Create new credential row
+                                const newCredentialRow: CredentialRow = {
+                                    id: generateId(),
+                                    credentialName: credential.credentialName,
+                                    description: credential.description || '',
+                                    entity: credential.entity || workstream || '',
+                                    product: credential.product || product || '',
+                                    service: credential.service || service || '',
+                                    scope: credential.scope || credential.connector || connectorConnector || '',
+                                    connectors: [connectorData]
+                                };
+                                
+                                existingCredentials.push(newCredentialRow);
+                                console.log('➕ [Credential Save] Created new credential row:', credential.credentialName);
+                            }
+                        }
+                        
+                        // Save updated credentials back to local storage
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(storageKey, JSON.stringify(existingCredentials));
+                            console.log('✅ [Credential Save] Saved', existingCredentials.length, 'credentials to localStorage');
+                            console.log('✅ [Credential Save] Storage key:', storageKey);
                         }
                         
                         // Close the modal after successful save
                         setShowCredentialModal(false);
+                        
+                        // Show success message
+                        console.log('✅ Credential saved successfully to local storage');
                     } catch (error) {
                         console.error('❌ Error saving credential:', error);
                         alert('Failed to save credential. Please try again.');

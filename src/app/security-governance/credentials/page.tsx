@@ -97,6 +97,11 @@ export default function ManageCredentials() {
             const key = getLocalStorageKey(accountId, enterpriseId);
             window.localStorage.setItem(key, JSON.stringify(roles));
             console.log('💾 [LocalStorage] Saved credentials to localStorage:', roles.length, 'rows for account/enterprise:', accountId, enterpriseId);
+            
+            // Dispatch custom event to notify other components (like ConnectorDetailsModal) about the change
+            window.dispatchEvent(new CustomEvent('credentialsStorageChanged', {
+                detail: { accountId, enterpriseId, key }
+            }));
         } catch (error) {
             console.error('❌ [LocalStorage] Failed to save credentials to localStorage:', error);
         }
@@ -784,9 +789,20 @@ export default function ManageCredentials() {
             // TEMPORARY: Load from localStorage (REVERT WHEN APIs ARE READY)
             // ============================================================================
             if (USE_LOCAL_STORAGE) {
-                const loadedRoles = loadCredentialsFromLocalStorage();
+                // Use filters if provided, otherwise use current state values
+                const accountIdToUse = filters?.accountId || selectedAccountId;
+                const enterpriseIdToUse = filters?.enterpriseId || selectedEnterpriseId;
+                
+                if (!accountIdToUse || !enterpriseIdToUse) {
+                    console.log('⚠️ [Credentials] Cannot load - missing accountId or enterpriseId');
+                    setCredentials([]);
+                    setIsLoading(false);
+                    return;
+                }
+                
+                const loadedRoles = loadCredentialsFromLocalStorage(accountIdToUse, enterpriseIdToUse);
                 setCredentials(loadedRoles);
-                console.log('📦 [Credentials] Loaded from localStorage:', loadedRoles.length, 'rows');
+                console.log('📦 [Credentials] Loaded from localStorage:', loadedRoles.length, 'rows for account:', accountIdToUse, 'enterprise:', enterpriseIdToUse);
             } else {
                 // TODO: Replace with actual API call when backend is ready
                 // API call removed - credentials should use credential-specific APIs
@@ -805,7 +821,7 @@ export default function ManageCredentials() {
                 isLoadingRef.current = false;
             }, 100);
         }
-    }, [loadCredentialsFromLocalStorage]);
+    }, [loadCredentialsFromLocalStorage, selectedAccountId, selectedEnterpriseId]);
 
     // Initial load from localStorage on mount (if enabled and account/enterprise selected)
     useEffect(() => {
@@ -1391,6 +1407,18 @@ export default function ManageCredentials() {
             // Apply stable sorting to maintain display order
             return sortConfigsByDisplayOrder(updated);
         });
+
+        // Update selectedRowForConnector if it's pointing to the row that was just converted
+        if (selectedRowForConnector && selectedRowForConnector.id === tempRowId) {
+            setSelectedRowForConnector((prev) => {
+                if (prev && prev.id === tempRowId) {
+                    const updated = {...prev, id: newId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()};
+                    console.log(`🔄 [AutoSave] Updated selectedRowForConnector ID from ${tempRowId} to ${newId}`);
+                    return updated;
+                }
+                return prev;
+            });
+        }
 
         // Update display order reference with the new ID
         if (oldDisplayOrder !== undefined) {
@@ -3640,7 +3668,8 @@ export default function ManageCredentials() {
                                 const updatedRow = { 
                                     ...latestRow, 
                                     connectorIconName: connectors[0].connectorIconName || latestRow.connectorIconName,
-                                    connectors: connectors // Store full connector data
+                                    connectors: connectors, // Store full connector data
+                                    updatedAt: new Date().toISOString() // Update timestamp
                                 };
                                 console.log('💾 [Credentials Page] Updated row with connectors:', updatedRow.id, 'connectors count:', updatedRow.connectors?.length || 0);
                                 console.log('💾 [Credentials Page] Connector details:', JSON.stringify(updatedRow.connectors, null, 2));
@@ -3648,6 +3677,38 @@ export default function ManageCredentials() {
                                 // TEMPORARY: Save to localStorage (REVERT WHEN APIs ARE READY)
                                 // ============================================================================
                                 setCredentials(prev => {
+                                    // Find the row by ID (handles both temp and permanent IDs)
+                                    const rowIndex = prev.findIndex(row => row.id === latestRow.id);
+                                    if (rowIndex === -1) {
+                                        console.warn('⚠️ [Credentials Page] Row not found in credentials state:', latestRow.id);
+                                        console.log('🔍 [Credentials Page] Available row IDs:', prev.map(r => r.id));
+                                        // Try to find by credentialName as fallback
+                                        const fallbackIndex = prev.findIndex(row => row.credentialName === latestRow.credentialName);
+                                        if (fallbackIndex !== -1) {
+                                            console.log('✅ [Credentials Page] Found row by credentialName fallback');
+                                            const updated = [...prev];
+                                            updated[fallbackIndex] = {...updated[fallbackIndex], ...updatedRow};
+                                            // Immediately save to localStorage
+                                            if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId) {
+                                                setTimeout(() => {
+                                                    saveCredentialsToLocalStorage(updated, selectedAccountId, selectedEnterpriseId);
+                                                    console.log('💾 [Credentials Page] Immediately saved to localStorage after connector update (fallback)');
+                                                }, 50);
+                                            }
+                                            return updated;
+                                        }
+                                        // If still not found, add the row
+                                        console.log('➕ [Credentials Page] Adding row as it was not found in state');
+                                        const updated = [...prev, updatedRow];
+                                        // Immediately save to localStorage
+                                        if (USE_LOCAL_STORAGE && selectedAccountId && selectedEnterpriseId) {
+                                            setTimeout(() => {
+                                                saveCredentialsToLocalStorage(updated, selectedAccountId, selectedEnterpriseId);
+                                                console.log('💾 [Credentials Page] Immediately saved to localStorage after connector update (new row)');
+                                            }, 50);
+                                        }
+                                        return updated;
+                                    }
                                     const updated = prev.map(row => 
                                         row.id === latestRow.id ? updatedRow : row
                                     );
@@ -3658,8 +3719,9 @@ export default function ManageCredentials() {
                                             console.log('💾 [Credentials Page] Immediately saved to localStorage after connector update');
                                             // Verify what was saved
                                             const saved = loadCredentialsFromLocalStorage(selectedAccountId, selectedEnterpriseId);
-                                            const savedRow = saved.find(r => r.id === latestRow.id);
+                                            const savedRow = saved.find(r => r.id === updatedRow.id);
                                             console.log('💾 [Credentials Page] Verification - connectors in saved row:', savedRow?.connectors?.length || 0);
+                                            console.log('💾 [Credentials Page] Verification - saved row ID:', savedRow?.id);
                                         }, 50);
                                     }
                                     return updated;
