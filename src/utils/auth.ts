@@ -3,8 +3,11 @@ const AUTH_TOKEN_KEY = 'systiva_auth_token';
 const AUTH_REFRESH_TOKEN_KEY = 'systiva_refresh_token';
 const AUTH_USER_KEY = 'systiva_user';
 const PASSWORD_CHALLENGE_KEY = 'systiva_password_challenge';
+// API_BASE_URL should be the base URL without /api/v1 (e.g., https://xxx.execute-api.../prod)
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+// API version prefix for all API calls
+const API_VERSION = '/api/v1';
 
 export interface User {
     id: string;
@@ -39,13 +42,16 @@ export const login = async (
     password: string,
 ): Promise<User | null> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        const response = await fetch(
+            `${API_BASE_URL}${API_VERSION}/auth/login`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({email, password, username: email}),
             },
-            body: JSON.stringify({email, password, username: email}),
-        });
+        );
 
         const result = await response.json();
 
@@ -57,7 +63,10 @@ export const login = async (
                     username: email,
                     session: result.session,
                 };
-                localStorage.setItem(PASSWORD_CHALLENGE_KEY, JSON.stringify(challengeData));
+                localStorage.setItem(
+                    PASSWORD_CHALLENGE_KEY,
+                    JSON.stringify(challengeData),
+                );
             }
             // Return null but the caller should check for password change requirement
             return null;
@@ -66,14 +75,21 @@ export const login = async (
         if (response.ok && result.success) {
             const userData: User = {
                 id: result.data.user.id,
-                email: result.data.user.emailAddress || result.data.user.email || email,
+                email:
+                    result.data.user.emailAddress ||
+                    result.data.user.email ||
+                    email,
                 firstName: result.data.user.firstName || '',
                 middleName: result.data.user.middleName || '',
                 lastName: result.data.user.lastName || '',
-                name: result.data.user.firstName && result.data.user.lastName
-                    ? `${result.data.user.firstName} ${result.data.user.lastName}`
-                    : result.data.user.emailAddress || email,
-                role: result.data.user.role || result.data.user.userRoles?.[0] || 'User',
+                name:
+                    result.data.user.firstName && result.data.user.lastName
+                        ? `${result.data.user.firstName} ${result.data.user.lastName}`
+                        : result.data.user.emailAddress || email,
+                role:
+                    result.data.user.role ||
+                    result.data.user.userRoles?.[0] ||
+                    'User',
                 status: result.data.user.status || 'active',
                 technicalUser: result.data.user.technicalUser || false,
                 tenantId: result.data.user.tenantId,
@@ -85,7 +101,10 @@ export const login = async (
             if (typeof window !== 'undefined') {
                 localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
                 if (result.data.refreshToken) {
-                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, result.data.refreshToken);
+                    localStorage.setItem(
+                        AUTH_REFRESH_TOKEN_KEY,
+                        result.data.refreshToken,
+                    );
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear any pending password challenge
@@ -132,32 +151,42 @@ export const completePasswordChallenge = async (
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/complete-password-challenge`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        const response = await fetch(
+            `${API_BASE_URL}${API_VERSION}/auth/complete-password-challenge`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: challengeData.username,
+                    email: challengeData.username,
+                    newPassword,
+                    session: challengeData.session,
+                }),
             },
-            body: JSON.stringify({
-                username: challengeData.username,
-                email: challengeData.username,
-                newPassword,
-                session: challengeData.session,
-            }),
-        });
+        );
 
         const result = await response.json();
 
         if (response.ok && result.success) {
             const userData: User = {
                 id: result.data.user.id,
-                email: result.data.user.emailAddress || result.data.user.email || challengeData.username,
+                email:
+                    result.data.user.emailAddress ||
+                    result.data.user.email ||
+                    challengeData.username,
                 firstName: result.data.user.firstName || '',
                 middleName: result.data.user.middleName || '',
                 lastName: result.data.user.lastName || '',
-                name: result.data.user.firstName && result.data.user.lastName
-                    ? `${result.data.user.firstName} ${result.data.user.lastName}`
-                    : challengeData.username,
-                role: result.data.user.role || result.data.user.userRoles?.[0] || 'User',
+                name:
+                    result.data.user.firstName && result.data.user.lastName
+                        ? `${result.data.user.firstName} ${result.data.user.lastName}`
+                        : challengeData.username,
+                role:
+                    result.data.user.role ||
+                    result.data.user.userRoles?.[0] ||
+                    'User',
                 status: result.data.user.status || 'active',
                 technicalUser: result.data.user.technicalUser || false,
                 tenantId: result.data.user.tenantId,
@@ -169,7 +198,10 @@ export const completePasswordChallenge = async (
             if (typeof window !== 'undefined') {
                 localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
                 if (result.data.refreshToken) {
-                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, result.data.refreshToken);
+                    localStorage.setItem(
+                        AUTH_REFRESH_TOKEN_KEY,
+                        result.data.refreshToken,
+                    );
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear the password challenge
@@ -199,7 +231,7 @@ export const logout = async () => {
     try {
         const token = getAuthToken();
         if (token) {
-            await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            await fetch(`${API_BASE_URL}${API_VERSION}/auth/logout`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
