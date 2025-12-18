@@ -3,13 +3,16 @@
 import React, {useState, useEffect} from 'react';
 import {useRouter} from 'next/navigation';
 import Image from 'next/image';
-import {login, isAuthenticated} from '@/utils/auth';
+import {login, isAuthenticated, getPasswordChallengeData, completePasswordChallenge, clearPasswordChallenge} from '@/utils/auth';
 
 export default function LoginPage() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
+    const [showPasswordChange, setShowPasswordChange] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -17,6 +20,12 @@ export default function LoginPage() {
         // If already authenticated, redirect to dashboard
         if (isAuthenticated()) {
             router.push('/dashboard');
+        }
+        // Check if there's a pending password change
+        const challengeData = getPasswordChallengeData();
+        if (challengeData) {
+            setEmail(challengeData.username);
+            setShowPasswordChange(true);
         }
     }, [router]);
 
@@ -33,14 +42,62 @@ export default function LoginPage() {
                 // Success - redirect to dashboard
                 router.push('/dashboard');
             } else {
-                // Failed - show error
-                setError('Invalid email or password. Please try again.');
-                setIsLoading(false);
+                // Check if password change is required
+                const challengeData = getPasswordChallengeData();
+                if (challengeData) {
+                    setShowPasswordChange(true);
+                    setError('');
+                    setIsLoading(false);
+                } else {
+                    // Failed - show error
+                    setError('Invalid email or password. Please try again.');
+                    setIsLoading(false);
+                }
             }
         } catch (err) {
             setError('An error occurred during login. Please try again.');
             setIsLoading(false);
         }
+    };
+
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        // Validate passwords match
+        if (newPassword !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        // Validate password strength
+        if (newPassword.length < 8) {
+            setError('Password must be at least 8 characters long');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const user = await completePasswordChallenge(newPassword);
+            if (user) {
+                router.push('/dashboard');
+            } else {
+                setError('Failed to update password. Please try again.');
+                setIsLoading(false);
+            }
+        } catch (err) {
+            setError('An error occurred. Please try again.');
+            setIsLoading(false);
+        }
+    };
+
+    const handleCancelPasswordChange = () => {
+        clearPasswordChallenge();
+        setShowPasswordChange(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setPassword('');
     };
 
     const handleGoogleLogin = () => {
@@ -249,7 +306,102 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {/* Email Login Form */}
+                    {/* Password Change Form (for first-time login) */}
+                    {showPasswordChange ? (
+                        <form onSubmit={handlePasswordChange} className='space-y-4'>
+                            <div className='p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4'>
+                                <p className='text-sm text-blue-800 font-medium'>
+                                    🔐 Password Change Required
+                                </p>
+                                <p className='text-sm text-blue-600 mt-1'>
+                                    This is your first login. Please create a new password.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label
+                                    htmlFor='email-display'
+                                    className='block text-sm font-medium text-slate-700 mb-1'
+                                >
+                                    Email
+                                </label>
+                                <input
+                                    id='email-display'
+                                    type='email'
+                                    value={email}
+                                    disabled
+                                    className='w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-100 text-slate-500'
+                                />
+                            </div>
+
+                            <div>
+                                <label
+                                    htmlFor='newPassword'
+                                    className='block text-sm font-medium text-slate-700 mb-1'
+                                >
+                                    New Password
+                                </label>
+                                <input
+                                    id='newPassword'
+                                    type='password'
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
+                                    placeholder='Enter new password (min 8 characters)'
+                                    required
+                                    minLength={8}
+                                />
+                            </div>
+
+                            <div>
+                                <label
+                                    htmlFor='confirmPassword'
+                                    className='block text-sm font-medium text-slate-700 mb-1'
+                                >
+                                    Confirm Password
+                                </label>
+                                <input
+                                    id='confirmPassword'
+                                    type='password'
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
+                                    placeholder='Confirm new password'
+                                    required
+                                    minLength={8}
+                                />
+                            </div>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
+                                    <p className='text-sm text-red-600 flex items-center gap-2'>
+                                        <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 20 20'>
+                                            <path fillRule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' clipRule='evenodd' />
+                                        </svg>
+                                        {error}
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                type='submit'
+                                disabled={isLoading}
+                                className='w-full px-4 py-3 bg-[#0171EC] hover:bg-[#005fca] disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md'
+                            >
+                                {isLoading ? 'Updating Password...' : 'Update Password & Sign In'}
+                            </button>
+
+                            <button
+                                type='button'
+                                onClick={handleCancelPasswordChange}
+                                className='w-full px-4 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors'
+                            >
+                                Cancel
+                            </button>
+                        </form>
+                    ) : (
+                    /* Email Login Form */
                     <form onSubmit={handleEmailLogin} className='space-y-4'>
                         {isSignUp && (
                             <div>
@@ -356,6 +508,7 @@ export default function LoginPage() {
                                 : 'Sign in'}
                         </button>
                     </form>
+                    )}
 
                     {/* Toggle Sign Up/Sign In */}
                     <div className='text-center text-sm'>
