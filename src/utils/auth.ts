@@ -17,6 +17,8 @@ export interface User {
     lastName: string;
     name: string;
     role: string;
+    roles?: any[]; // Array of role objects from IMS
+    userRoles?: any[]; // Alias for roles
     status?: string;
     technicalUser?: boolean;
     tenantId?: string;
@@ -77,29 +79,43 @@ export const login = async (
             // IMS format: { success, tokens: { AccessToken, RefreshToken }, user: {...} }
             // Legacy format: { success, data: { token, refreshToken, user: {...} } }
             const userFromResponse = result.user || result.data?.user;
-            const tokenFromResponse = result.tokens?.AccessToken || result.data?.token;
-            const refreshTokenFromResponse = result.tokens?.RefreshToken || result.data?.refreshToken;
+            const tokenFromResponse =
+                result.tokens?.AccessToken || result.data?.token;
+            const refreshTokenFromResponse =
+                result.tokens?.RefreshToken || result.data?.refreshToken;
 
             if (!userFromResponse) {
                 console.error('No user data in response:', result);
                 return null;
             }
 
+            // Get roles array from response
+            const rolesArray =
+                userFromResponse.userRoles || userFromResponse.roles || [];
+
             const userData: User = {
                 id: userFromResponse.id || userFromResponse.username || email,
-                email: userFromResponse.emailAddress || userFromResponse.email || email,
+                email:
+                    userFromResponse.emailAddress ||
+                    userFromResponse.email ||
+                    email,
                 firstName: userFromResponse.firstName || '',
                 middleName: userFromResponse.middleName || '',
                 lastName: userFromResponse.lastName || '',
                 name:
                     userFromResponse.firstName && userFromResponse.lastName
                         ? `${userFromResponse.firstName} ${userFromResponse.lastName}`
-                        : userFromResponse.username || userFromResponse.emailAddress || email,
+                        : userFromResponse.username ||
+                          userFromResponse.emailAddress ||
+                          email,
                 role:
                     userFromResponse.role ||
-                    userFromResponse.userRoles?.[0]?.name ||
-                    userFromResponse.userRoles?.[0] ||
-                    'User',
+                    rolesArray[0]?.name ||
+                    (typeof rolesArray[0] === 'string'
+                        ? rolesArray[0]
+                        : 'User'),
+                roles: rolesArray,
+                userRoles: rolesArray,
                 status: userFromResponse.status || 'active',
                 technicalUser: userFromResponse.technicalUser || false,
                 tenantId: userFromResponse.tenantId,
@@ -113,7 +129,10 @@ export const login = async (
                     localStorage.setItem(AUTH_TOKEN_KEY, tokenFromResponse);
                 }
                 if (refreshTokenFromResponse) {
-                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshTokenFromResponse);
+                    localStorage.setItem(
+                        AUTH_REFRESH_TOKEN_KEY,
+                        refreshTokenFromResponse,
+                    );
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear any pending password challenge
@@ -181,17 +200,29 @@ export const completePasswordChallenge = async (
         if (response.ok && result.success) {
             // Handle both IMS response format and legacy format
             const userFromResponse = result.user || result.data?.user;
-            const tokenFromResponse = result.tokens?.AccessToken || result.data?.token;
-            const refreshTokenFromResponse = result.tokens?.RefreshToken || result.data?.refreshToken;
+            const tokenFromResponse =
+                result.tokens?.AccessToken || result.data?.token;
+            const refreshTokenFromResponse =
+                result.tokens?.RefreshToken || result.data?.refreshToken;
 
             if (!userFromResponse) {
                 console.error('No user data in response:', result);
                 return null;
             }
 
+            // Get roles array from response
+            const rolesArray =
+                userFromResponse.userRoles || userFromResponse.roles || [];
+
             const userData: User = {
-                id: userFromResponse.id || userFromResponse.username || challengeData.username,
-                email: userFromResponse.emailAddress || userFromResponse.email || challengeData.username,
+                id:
+                    userFromResponse.id ||
+                    userFromResponse.username ||
+                    challengeData.username,
+                email:
+                    userFromResponse.emailAddress ||
+                    userFromResponse.email ||
+                    challengeData.username,
                 firstName: userFromResponse.firstName || '',
                 middleName: userFromResponse.middleName || '',
                 lastName: userFromResponse.lastName || '',
@@ -201,9 +232,12 @@ export const completePasswordChallenge = async (
                         : userFromResponse.username || challengeData.username,
                 role:
                     userFromResponse.role ||
-                    userFromResponse.userRoles?.[0]?.name ||
-                    userFromResponse.userRoles?.[0] ||
-                    'User',
+                    rolesArray[0]?.name ||
+                    (typeof rolesArray[0] === 'string'
+                        ? rolesArray[0]
+                        : 'User'),
+                roles: rolesArray,
+                userRoles: rolesArray,
                 status: userFromResponse.status || 'active',
                 technicalUser: userFromResponse.technicalUser || false,
                 tenantId: userFromResponse.tenantId,
@@ -217,7 +251,10 @@ export const completePasswordChallenge = async (
                     localStorage.setItem(AUTH_TOKEN_KEY, tokenFromResponse);
                 }
                 if (refreshTokenFromResponse) {
-                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshTokenFromResponse);
+                    localStorage.setItem(
+                        AUTH_REFRESH_TOKEN_KEY,
+                        refreshTokenFromResponse,
+                    );
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear the password challenge
