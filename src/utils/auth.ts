@@ -73,38 +73,47 @@ export const login = async (
         }
 
         if (response.ok && result.success) {
+            // Handle both IMS response format and legacy format
+            // IMS format: { success, tokens: { AccessToken, RefreshToken }, user: {...} }
+            // Legacy format: { success, data: { token, refreshToken, user: {...} } }
+            const userFromResponse = result.user || result.data?.user;
+            const tokenFromResponse = result.tokens?.AccessToken || result.data?.token;
+            const refreshTokenFromResponse = result.tokens?.RefreshToken || result.data?.refreshToken;
+
+            if (!userFromResponse) {
+                console.error('No user data in response:', result);
+                return null;
+            }
+
             const userData: User = {
-                id: result.data.user.id,
-                email:
-                    result.data.user.emailAddress ||
-                    result.data.user.email ||
-                    email,
-                firstName: result.data.user.firstName || '',
-                middleName: result.data.user.middleName || '',
-                lastName: result.data.user.lastName || '',
+                id: userFromResponse.id || userFromResponse.username || email,
+                email: userFromResponse.emailAddress || userFromResponse.email || email,
+                firstName: userFromResponse.firstName || '',
+                middleName: userFromResponse.middleName || '',
+                lastName: userFromResponse.lastName || '',
                 name:
-                    result.data.user.firstName && result.data.user.lastName
-                        ? `${result.data.user.firstName} ${result.data.user.lastName}`
-                        : result.data.user.emailAddress || email,
+                    userFromResponse.firstName && userFromResponse.lastName
+                        ? `${userFromResponse.firstName} ${userFromResponse.lastName}`
+                        : userFromResponse.username || userFromResponse.emailAddress || email,
                 role:
-                    result.data.user.role ||
-                    result.data.user.userRoles?.[0] ||
+                    userFromResponse.role ||
+                    userFromResponse.userRoles?.[0]?.name ||
+                    userFromResponse.userRoles?.[0] ||
                     'User',
-                status: result.data.user.status || 'active',
-                technicalUser: result.data.user.technicalUser || false,
-                tenantId: result.data.user.tenantId,
-                permissions: result.data.user.permissions || [],
-                groups: result.data.user.groups || [],
+                status: userFromResponse.status || 'active',
+                technicalUser: userFromResponse.technicalUser || false,
+                tenantId: userFromResponse.tenantId,
+                permissions: userFromResponse.permissions || [],
+                groups: userFromResponse.groups || [],
             };
 
             // Store token and user info
             if (typeof window !== 'undefined') {
-                localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
-                if (result.data.refreshToken) {
-                    localStorage.setItem(
-                        AUTH_REFRESH_TOKEN_KEY,
-                        result.data.refreshToken,
-                    );
+                if (tokenFromResponse) {
+                    localStorage.setItem(AUTH_TOKEN_KEY, tokenFromResponse);
+                }
+                if (refreshTokenFromResponse) {
+                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshTokenFromResponse);
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear any pending password challenge
@@ -170,38 +179,45 @@ export const completePasswordChallenge = async (
         const result = await response.json();
 
         if (response.ok && result.success) {
+            // Handle both IMS response format and legacy format
+            const userFromResponse = result.user || result.data?.user;
+            const tokenFromResponse = result.tokens?.AccessToken || result.data?.token;
+            const refreshTokenFromResponse = result.tokens?.RefreshToken || result.data?.refreshToken;
+
+            if (!userFromResponse) {
+                console.error('No user data in response:', result);
+                return null;
+            }
+
             const userData: User = {
-                id: result.data.user.id,
-                email:
-                    result.data.user.emailAddress ||
-                    result.data.user.email ||
-                    challengeData.username,
-                firstName: result.data.user.firstName || '',
-                middleName: result.data.user.middleName || '',
-                lastName: result.data.user.lastName || '',
+                id: userFromResponse.id || userFromResponse.username || challengeData.username,
+                email: userFromResponse.emailAddress || userFromResponse.email || challengeData.username,
+                firstName: userFromResponse.firstName || '',
+                middleName: userFromResponse.middleName || '',
+                lastName: userFromResponse.lastName || '',
                 name:
-                    result.data.user.firstName && result.data.user.lastName
-                        ? `${result.data.user.firstName} ${result.data.user.lastName}`
-                        : challengeData.username,
+                    userFromResponse.firstName && userFromResponse.lastName
+                        ? `${userFromResponse.firstName} ${userFromResponse.lastName}`
+                        : userFromResponse.username || challengeData.username,
                 role:
-                    result.data.user.role ||
-                    result.data.user.userRoles?.[0] ||
+                    userFromResponse.role ||
+                    userFromResponse.userRoles?.[0]?.name ||
+                    userFromResponse.userRoles?.[0] ||
                     'User',
-                status: result.data.user.status || 'active',
-                technicalUser: result.data.user.technicalUser || false,
-                tenantId: result.data.user.tenantId,
-                permissions: result.data.user.permissions || [],
-                groups: result.data.user.groups || [],
+                status: userFromResponse.status || 'active',
+                technicalUser: userFromResponse.technicalUser || false,
+                tenantId: userFromResponse.tenantId,
+                permissions: userFromResponse.permissions || [],
+                groups: userFromResponse.groups || [],
             };
 
             // Store token and user info
             if (typeof window !== 'undefined') {
-                localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
-                if (result.data.refreshToken) {
-                    localStorage.setItem(
-                        AUTH_REFRESH_TOKEN_KEY,
-                        result.data.refreshToken,
-                    );
+                if (tokenFromResponse) {
+                    localStorage.setItem(AUTH_TOKEN_KEY, tokenFromResponse);
+                }
+                if (refreshTokenFromResponse) {
+                    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshTokenFromResponse);
                 }
                 localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
                 // Clear the password challenge
