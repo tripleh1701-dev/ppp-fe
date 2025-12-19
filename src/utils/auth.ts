@@ -4,6 +4,7 @@ const AUTH_REFRESH_TOKEN_KEY = 'systiva_refresh_token';
 const AUTH_USER_KEY = 'systiva_user';
 const PASSWORD_CHALLENGE_KEY = 'systiva_password_challenge';
 // API_BASE_URL should be the base URL without /api/v1 (e.g., https://xxx.execute-api.../prod)
+declare const process: {env: Record<string, string | undefined>};
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 // API version prefix for all API calls
