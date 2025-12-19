@@ -155,9 +155,16 @@ export default function DashboardHome() {
                 api.get<typeof aiInsights>('/api/ai/insights'),
                 api.get<typeof aiSeries>('/api/ai/trends/builds'),
             ]);
-            setAiInsights(ins as any);
-            setAiSeries(series as any);
-        } catch {}
+            // Ensure we only set arrays (API might return HTML/string on error)
+            if (Array.isArray(ins)) {
+                setAiInsights(ins as any);
+            }
+            if (Array.isArray(series)) {
+                setAiSeries(series as any);
+            }
+        } catch (e) {
+            console.warn('Failed to fetch dashboard data:', e);
+        }
         setRefreshing(false);
     };
 
@@ -227,25 +234,27 @@ export default function DashboardHome() {
             <div className='flex-1 p-4 space-y-4 overflow-hidden'>
                 {/* AI Insight Cards - Compact grid */}
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'>
-                    {aiInsights.slice(0, 3).map((c, i) => (
-                        <div
-                            key={i}
-                            className={`rounded-md border p-3 shadow-sm hover:shadow-md transition-all duration-200 ease-in-out ${
-                                c.severity === 'warning'
-                                    ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50'
-                                    : c.severity === 'success'
-                                    ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
-                                    : 'border-sky-200 bg-sky-50/60 hover:bg-sky-50'
-                            }`}
-                        >
-                            <div className='text-xs font-semibold text-slate-900 mb-1'>
-                                {c.title}
+                    {(Array.isArray(aiInsights) ? aiInsights : [])
+                        .slice(0, 3)
+                        .map((c, i) => (
+                            <div
+                                key={i}
+                                className={`rounded-md border p-3 shadow-sm hover:shadow-md transition-all duration-200 ease-in-out ${
+                                    c.severity === 'warning'
+                                        ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50'
+                                        : c.severity === 'success'
+                                        ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                                        : 'border-sky-200 bg-sky-50/60 hover:bg-sky-50'
+                                }`}
+                            >
+                                <div className='text-xs font-semibold text-slate-900 mb-1'>
+                                    {c.title}
+                                </div>
+                                <div className='text-xs text-slate-700 leading-relaxed'>
+                                    {c.body}
+                                </div>
                             </div>
-                            <div className='text-xs text-slate-700 leading-relaxed'>
-                                {c.body}
-                            </div>
-                        </div>
-                    ))}
+                        ))}
                 </div>
 
                 {/* Metrics Grid - Compact layout */}

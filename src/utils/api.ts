@@ -1,12 +1,27 @@
-// Ensure the API base doesn't end with /api to avoid double /api/ prefixes
-const rawApiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
-export const API_BASE = rawApiBase.endsWith('/api')
-    ? rawApiBase.slice(0, -4)
-    : rawApiBase;
+// API_BASE should be the base URL (e.g., https://xxx.execute-api.../prod)
+// All API calls will add /api/v1 prefix
+const rawApiBase =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    'http://localhost:3000';
+// Remove trailing /api or /api/v1 if present to normalize
+let cleanBase = rawApiBase;
+if (cleanBase.endsWith('/api/v1')) {
+    cleanBase = cleanBase.slice(0, -7);
+} else if (cleanBase.endsWith('/api')) {
+    cleanBase = cleanBase.slice(0, -4);
+}
+export const API_BASE = cleanBase;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    let cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+    // Add /api/v1 prefix if path starts with /api/ but not /api/v1/
+    if (cleanPath.startsWith('/api/') && !cleanPath.startsWith('/api/v1/')) {
+        cleanPath = '/api/v1' + cleanPath.slice(4); // Replace /api/ with /api/v1/
+    }
+
     const url = `${API_BASE}${cleanPath}`;
 
     const res = await fetch(url, {
@@ -21,21 +36,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         throw new Error(`API ${res.status}: ${text}`);
     }
     if (res.status === 204) return undefined as unknown as T;
-    
+
     // Check if response has content before trying to parse JSON
     const contentType = res.headers.get('content-type');
     const text = await res.text();
-    
+
     // If response is empty or not JSON, return undefined
     if (!text || !text.trim()) {
         return undefined as unknown as T;
     }
-    
+
     // If content-type is not JSON, return the text as-is
     if (contentType && !contentType.includes('application/json')) {
         return text as unknown as T;
     }
-    
+
     try {
         return JSON.parse(text) as T;
     } catch (e) {
