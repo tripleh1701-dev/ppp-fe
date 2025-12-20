@@ -183,7 +183,9 @@ export const completePasswordChallenge = async (
 
     try {
         const response = await fetch(
+
             `${API_BASE_URL}${API_VERSION}/auth/challenge`,
+
             {
                 method: 'POST',
                 headers: {
