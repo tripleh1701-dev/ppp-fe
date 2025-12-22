@@ -542,37 +542,58 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
             throw new Error(`API ${res.status}: ${text}`);
         }
 
-        const data = await res.json();
-        console.log('📊 API response:', data);
+        const responseData = await res.json();
+        console.log('📊 API response:', responseData);
 
-        // Handle both array and object with accounts property
-        const accounts: ExternalAccount[] = Array.isArray(data)
-            ? data
-            : data.accounts || data.items || [];
+        // Handle the nested response structure:
+        // { msg: "...", data: { accounts: [...] }, result: "success" }
+        // Or direct array
+        // Or { accounts: [...] }
+        let accounts: ExternalAccount[] = [];
 
-        // Map external API fields to frontend expected format
+        if (Array.isArray(responseData)) {
+            // Direct array response
+            accounts = responseData;
+        } else if (responseData.data && Array.isArray(responseData.data.accounts)) {
+            // Nested structure: { data: { accounts: [...] } }
+            accounts = responseData.data.accounts;
+        } else if (Array.isArray(responseData.accounts)) {
+            // Simple structure: { accounts: [...] }
+            accounts = responseData.accounts;
+        } else if (Array.isArray(responseData.items)) {
+            // Alternative structure: { items: [...] }
+            accounts = responseData.items;
+        }
+
+        console.log('📊 Extracted accounts array:', accounts.length, 'accounts');
+
+        // Map API fields to frontend expected format
         const mappedAccounts: MappedAccount[] = accounts.map(
-            (account: ExternalAccount) => ({
-                id: account.accountId || account.id || '',
-                accountName: account.accountName || '',
-                // masterAccount is same as accountName per user requirement
-                masterAccount: account.accountName || '',
-                // cloudType maps to subscriptionTier per user requirement
-                cloudType: account.subscriptionTier || account.cloudType || '',
-                address: account.address || '',
-                country: account.country || '',
-                addresses: account.addresses || [],
-                licenses: account.licenses || [],
-                technicalUsers: account.technicalUsers || [],
-                createdAt: account.createdAt || account.created_date,
-                updatedAt: account.updatedAt || account.updated_date,
-            }),
+            (account: ExternalAccount) => {
+                const mapped = {
+                    id: account.accountId || account.id || '',
+                    accountName: account.accountName || '',
+                    // masterAccount is same as accountName per user requirement
+                    masterAccount: account.accountName || '',
+                    // cloudType maps to subscriptionTier per user requirement
+                    cloudType: account.subscriptionTier || account.cloudType || '',
+                    address: account.address || '',
+                    country: account.country || '',
+                    addresses: account.addresses || [],
+                    licenses: account.licenses || [],
+                    technicalUsers: account.technicalUsers || [],
+                    createdAt: account.createdAt || account.registeredOn || account.created_date,
+                    updatedAt: account.updatedAt || account.lastModified || account.updated_date,
+                };
+                console.log('📝 Mapped account:', account.accountName, '→', mapped);
+                return mapped;
+            },
         );
 
         console.log(
             '✅ Mapped',
             mappedAccounts.length,
-            'accounts from external API',
+            'accounts from API',
         );
         return mappedAccounts;
     } catch (error) {
