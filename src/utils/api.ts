@@ -468,43 +468,24 @@ export interface MappedAccount {
  * - accountName from API → accountName (displayed as "Account" on frontend)
  * - accountName from API → masterAccount (same value)
  * - subscriptionTier from API → cloudType
- *
- * Uses Next.js proxy rewrite (/admin-portal-api) to avoid CORS issues,
- * falls back to direct URL if proxy doesn't work.
  */
 export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
-    // Try proxy URL first (for CORS avoidance), then direct URL as fallback
-    const proxyUrl = '/admin-portal-api/api/v1/accounts';
-    const directUrl = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts`;
-
-    let url = proxyUrl;
-    let usedProxy = true;
+    // Use direct URL - the API Gateway should have CORS enabled
+    // URL format: https://xxx.execute-api.us-east-1.amazonaws.com/prod/api/v1/accounts
+    const url = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts`;
 
     try {
         console.log(
-            '🔄 Fetching accounts from external Admin Portal API via proxy:',
+            '🔄 Fetching accounts from external Admin Portal API:',
             url,
         );
 
-        let res = await fetch(url, {
+        const res = await fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             },
         });
-
-        // If proxy fails, try direct URL
-        if (!res.ok && res.status >= 500) {
-            console.warn('⚠️ Proxy failed, trying direct URL:', directUrl);
-            url = directUrl;
-            usedProxy = false;
-            res = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-        }
 
         if (!res.ok) {
             const text = await res.text().catch(() => '');
@@ -513,12 +494,7 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
         }
 
         const data = await res.json();
-        console.log(
-            '📊 External API response (via ' +
-                (usedProxy ? 'proxy' : 'direct') +
-                '):',
-            data,
-        );
+        console.log('📊 External API response:', data);
 
         // Handle both array and object with accounts property
         const accounts: ExternalAccount[] = Array.isArray(data)
