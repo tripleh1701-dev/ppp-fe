@@ -8,6 +8,17 @@ declare const process: {
     };
 };
 
+// Auth token key - same as in auth.ts
+const AUTH_TOKEN_KEY = 'systiva_auth_token';
+
+// Get auth token from localStorage (inline to avoid circular dependency with auth.ts)
+const getAuthToken = (): string | null => {
+    if (typeof window !== 'undefined') {
+        return localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+    return null;
+};
+
 // API_BASE should be the base URL (e.g., https://xxx.execute-api.../prod)
 // All API calls will add /api/v1 prefix
 const rawApiBase =
@@ -24,9 +35,12 @@ if (cleanBase.endsWith('/api/v1')) {
 export const API_BASE = cleanBase;
 
 // External Admin Portal API for fetching accounts from admin-portal infrastructure
+// This should be the same as API_BASE since accounts endpoint is on the same API Gateway
 export const ADMIN_PORTAL_API_BASE =
     process.env.NEXT_PUBLIC_ADMIN_PORTAL_API_URL ||
-    'https://hnm7u7id73.execute-api.us-east-1.amazonaws.com/prod';
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    'http://localhost:3000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
@@ -463,51 +477,73 @@ export interface MappedAccount {
 }
 
 /**
- * Fetch accounts from the external Admin Portal API
+ * Fetch accounts from the Admin Portal API
+ * Uses the same API Gateway as other endpoints, with JWT authentication
+ *
  * Maps external API fields to frontend expected format:
  * - accountName from API → accountName (displayed as "Account" on frontend)
  * - accountName from API → masterAccount (same value)
  * - subscriptionTier from API → cloudType
  */
 export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
-    // Hardcode the correct URL to avoid any environment variable issues
-    // The API Gateway endpoint for fetching accounts
-    const baseUrl = 'https://hnm7u7id73.execute-api.us-east-1.amazonaws.com/prod';
+    // Use the same API base as other endpoints
+    // Clean the base URL (remove /api/v1 suffix if present)
+    let baseUrl = ADMIN_PORTAL_API_BASE;
+    if (baseUrl.endsWith('/api/v1')) {
+        baseUrl = baseUrl.slice(0, -7);
+    } else if (baseUrl.endsWith('/api')) {
+        baseUrl = baseUrl.slice(0, -4);
+    }
+
     const url = `${baseUrl}/api/v1/accounts`;
 
-    // Debug: log what values we're using
-    console.log('🔧 ADMIN_PORTAL_API_BASE env:', ADMIN_PORTAL_API_BASE);
-    console.log('🔧 Using hardcoded baseUrl:', baseUrl);
+    // Get JWT token for authentication
+    const token = getAuthToken();
+
+    // Debug: log configuration
+    console.log('🔧 ADMIN_PORTAL_API_BASE:', ADMIN_PORTAL_API_BASE);
+    console.log('🔧 Cleaned baseUrl:', baseUrl);
+    console.log('🔧 Final URL:', url);
+    console.log('🔐 Auth token present:', !!token);
 
     try {
         console.log(
-            '🔄 Fetching accounts from external Admin Portal API:',
+            '🔄 Fetching accounts from Admin Portal API:',
             url,
         );
 
+        // Build headers with authentication
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        // Add Authorization header if token is available
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        } else {
+            console.warn('⚠️ No auth token found. API call may fail with 401.');
+        }
+
         const res = await fetch(url, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                // Add CORS mode
-            },
-            mode: 'cors',
+            headers,
         });
 
         if (!res.ok) {
             const text = await res.text().catch(() => '');
-            console.error('❌ External API error:', res.status, text);
+            console.error('❌ API error:', res.status, text);
 
-            // If 401, the API requires authentication
+            // If 401, the token might be expired or missing
             if (res.status === 401) {
-                console.error('🔐 API requires authentication. Check if JWT token is needed.');
+                console.error('🔐 Authentication failed. Token may be expired or missing.');
+                console.error('🔐 Token was:', token ? 'present' : 'missing');
             }
 
-            throw new Error(`External API ${res.status}: ${text}`);
+            throw new Error(`API ${res.status}: ${text}`);
         }
 
         const data = await res.json();
-        console.log('📊 External API response:', data);
+        console.log('📊 API response:', data);
 
         // Handle both array and object with accounts property
         const accounts: ExternalAccount[] = Array.isArray(data)
