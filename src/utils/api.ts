@@ -470,9 +470,14 @@ export interface MappedAccount {
  * - subscriptionTier from API → cloudType
  */
 export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
-    // Use direct URL - the API Gateway should have CORS enabled
-    // URL format: https://xxx.execute-api.us-east-1.amazonaws.com/prod/api/v1/accounts
-    const url = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts`;
+    // Hardcode the correct URL to avoid any environment variable issues
+    // The API Gateway endpoint for fetching accounts
+    const baseUrl = 'https://hnm7u7id73.execute-api.us-east-1.amazonaws.com/prod';
+    const url = `${baseUrl}/api/v1/accounts`;
+
+    // Debug: log what values we're using
+    console.log('🔧 ADMIN_PORTAL_API_BASE env:', ADMIN_PORTAL_API_BASE);
+    console.log('🔧 Using hardcoded baseUrl:', baseUrl);
 
     try {
         console.log(
@@ -484,12 +489,20 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                // Add CORS mode
             },
+            mode: 'cors',
         });
 
         if (!res.ok) {
             const text = await res.text().catch(() => '');
             console.error('❌ External API error:', res.status, text);
+
+            // If 401, the API requires authentication
+            if (res.status === 401) {
+                console.error('🔐 API requires authentication. Check if JWT token is needed.');
+            }
+
             throw new Error(`External API ${res.status}: ${text}`);
         }
 
