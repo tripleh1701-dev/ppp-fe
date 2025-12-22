@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import {useRouter} from 'next/navigation';
 
 // Extend window interface for license deletion completion
 declare global {
@@ -26,7 +26,7 @@ import AddressModal from '@/components/AddressModal';
 import TechnicalUserModal, {
     TechnicalUser,
 } from '@/components/TechnicalUserModal';
-import {api, fetchExternalAccounts} from '@/utils/api';
+import {api, fetchExternalAccounts, onboardAccount} from '@/utils/api';
 
 export default function ManageAccounts() {
     // Component mounting debug (temporarily disabled)
@@ -130,7 +130,9 @@ export default function ManageAccounts() {
     // Enhanced unsaved changes detection
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [preventNavigation, setPreventNavigation] = useState(false);
-    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+    const [pendingNavigationUrl, setPendingNavigationUrl] = useState<
+        string | null
+    >(null);
     const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
 
     // State to track AI panel collapse state for notification positioning
@@ -255,21 +257,27 @@ export default function ManageAccounts() {
                 ]);
 
             // Extract unique account names from existing accounts
-            const uniqueAccountNames = Array.from(new Set(accounts
-                .map(account => account.accountName)
-                .filter(Boolean)
-            )).map((name, index) => ({
+            const uniqueAccountNames = Array.from(
+                new Set(
+                    accounts
+                        .map((account) => account.accountName)
+                        .filter(Boolean),
+                ),
+            ).map((name, index) => ({
                 id: `account-${name}-${index}`,
-                name: name
+                name: name,
             }));
 
             // Extract unique master account names from existing accounts
-            const uniqueMasterAccounts = Array.from(new Set(accounts
-                .map(account => account.masterAccount)
-                .filter(Boolean)
-            )).map((name, index) => ({
+            const uniqueMasterAccounts = Array.from(
+                new Set(
+                    accounts
+                        .map((account) => account.masterAccount)
+                        .filter(Boolean),
+                ),
+            ).map((name, index) => ({
                 id: `master-${name}-${index}`,
-                name: name
+                name: name,
             }));
 
             setDropdownOptions({
@@ -318,7 +326,9 @@ export default function ManageAccounts() {
                 groupRef.current && !groupRef.current.contains(target);
 
             // Check if click is on a filter suggestion dropdown
-            const isOnFilterSuggestion = (target as Element).closest('.filter-suggestions-dropdown');
+            const isOnFilterSuggestion = (target as Element).closest(
+                '.filter-suggestions-dropdown',
+            );
 
             // If click is outside all dialogs and not on a filter suggestion, close them (search remains open)
             if (
@@ -386,11 +396,26 @@ export default function ManageAccounts() {
     };
 
     // All available columns
-    type ColumnType = 'accountName' | 'masterAccount' | 'cloudType' | 'address' | 'technicalUser';
-    const allCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType', 'address', 'technicalUser'];
+    type ColumnType =
+        | 'accountName'
+        | 'masterAccount'
+        | 'cloudType'
+        | 'address'
+        | 'technicalUser';
+    const allCols: ColumnType[] = [
+        'accountName',
+        'masterAccount',
+        'cloudType',
+        'address',
+        'technicalUser',
+    ];
 
     // Columns available in toolbar panels (excludes address and technicalUser)
-    const toolbarCols: ColumnType[] = ['accountName', 'masterAccount', 'cloudType'];
+    const toolbarCols: ColumnType[] = [
+        'accountName',
+        'masterAccount',
+        'cloudType',
+    ];
 
     // Process account data with filtering, sorting, and search
     const processedConfigs = React.useMemo(() => {
@@ -562,11 +587,17 @@ export default function ManageAccounts() {
 
     // Autocomplete states
     const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
-    const [showMasterAccountSuggestions, setShowMasterAccountSuggestions] = useState(false);
-    const [filteredAccountNames, setFilteredAccountNames] = useState<Array<{id: string; name: string}>>([]);
-    const [filteredMasterAccounts, setFilteredMasterAccounts] = useState<Array<{id: string; name: string}>>([]);
+    const [showMasterAccountSuggestions, setShowMasterAccountSuggestions] =
+        useState(false);
+    const [filteredAccountNames, setFilteredAccountNames] = useState<
+        Array<{id: string; name: string}>
+    >([]);
+    const [filteredMasterAccounts, setFilteredMasterAccounts] = useState<
+        Array<{id: string; name: string}>
+    >([]);
     const [selectedAccountIndex, setSelectedAccountIndex] = useState(-1);
-    const [selectedMasterAccountIndex, setSelectedMasterAccountIndex] = useState(-1);
+    const [selectedMasterAccountIndex, setSelectedMasterAccountIndex] =
+        useState(-1);
 
     const handleApplyFilters = () => {
         const newFilters: Record<string, any> = {};
@@ -609,21 +640,31 @@ export default function ManageAccounts() {
     const saveAccountsToStorage = async (accountsData: any[]) => {
         try {
             // Filter out temporary rows before saving to localStorage
-            const persistentAccountsData = accountsData.filter((account: any) => {
-                const isTemporary = String(account.id).startsWith('tmp-');
-                if (isTemporary) {
-                    console.log('🧹 Not saving temporary row to localStorage:', account.id);
-                }
-                return !isTemporary;
-            });
+            const persistentAccountsData = accountsData.filter(
+                (account: any) => {
+                    const isTemporary = String(account.id).startsWith('tmp-');
+                    if (isTemporary) {
+                        console.log(
+                            '🧹 Not saving temporary row to localStorage:',
+                            account.id,
+                        );
+                    }
+                    return !isTemporary;
+                },
+            );
 
             // Save to localStorage for now (until proper API implementation)
-            localStorage.setItem('accountsData', JSON.stringify(persistentAccountsData));
+            localStorage.setItem(
+                'accountsData',
+                JSON.stringify(persistentAccountsData),
+            );
             console.log(
                 '💾 Saved accounts to localStorage:',
                 persistentAccountsData.length,
                 'persistent accounts',
-                `(filtered out ${accountsData.length - persistentAccountsData.length} temporary rows)`
+                `(filtered out ${
+                    accountsData.length - persistentAccountsData.length
+                } temporary rows)`,
             );
         } catch (error) {
             console.error('Error in saveAccountsToStorage:', error);
@@ -792,57 +833,106 @@ export default function ManageAccounts() {
 
             console.log('💾 Auto-saving new account:', account);
 
-            // Create account via API
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-
-            // Transform licenses from frontend format to backend format
-            const transformedLicenses = (account.licenses || []).map(
-                (license: any) => ({
-                    enterprise: license.enterprise || '',
-                    product: license.product || '',
-                    service: license.service || '',
-                    licenseStart:
-                        license.licenseStartDate || license.licenseStart || '',
-                    licenseEnd:
-                        license.licenseEndDate || license.licenseEnd || '',
-                    users: license.numberOfUsers || license.users || '',
-                    renewalNotice: license.renewalNotice || false,
-                    noticePeriod: parseInt(
-                        license.noticePeriodDays || license.noticePeriod || '0',
-                        10,
-                    ),
-                    contacts: license.contactDetails || license.contacts || [],
-                }),
-            );
-
-            const accountData = {
-                accountName: account.accountName || '',
-                masterAccount: account.masterAccount || '',
-                cloudType: account.cloudType || '',
-                address: account.address || '',
-                country: account.country || '',
-                addresses: account.addresses || [],
-                licenses: transformedLicenses,
+            // Map cloudType display value back to subscriptionTier for API
+            const mapCloudTypeToSubscriptionTier = (
+                cloudType: string,
+            ): string => {
+                if (!cloudType) return '';
+                const lowerType = cloudType.toLowerCase();
+                if (lowerType.includes('private')) {
+                    return 'private';
+                } else if (
+                    lowerType.includes('public') ||
+                    lowerType.includes('platform')
+                ) {
+                    return 'public';
+                }
+                return cloudType; // Return original if not recognized
             };
 
-            console.log('💾 Creating new account via API:', accountData);
+            // Build address details from account data
+            const addressDetails = account.addresses?.[0]
+                ? {
+                      addressLine1:
+                          account.addresses[0].addressLine1 ||
+                          account.addresses[0].street ||
+                          '',
+                      addressLine2: account.addresses[0].addressLine2 || '',
+                      city: account.addresses[0].city || '',
+                      state: account.addresses[0].state || '',
+                      zipCode:
+                          account.addresses[0].zipCode ||
+                          account.addresses[0].postalCode ||
+                          '',
+                      country:
+                          account.addresses[0].country || account.country || '',
+                  }
+                : undefined;
 
-            const response = await fetch(`${apiBase}/api/accounts`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(accountData),
-            });
+            // Build technical user from account data
+            const technicalUser = account.technicalUsers?.[0]
+                ? {
+                      firstName: account.technicalUsers[0].firstName || '',
+                      middleName: account.technicalUsers[0].middleName || '',
+                      lastName: account.technicalUsers[0].lastName || '',
+                      adminUsername:
+                          account.technicalUsers[0].adminUsername ||
+                          account.technicalUsers[0].username ||
+                          '',
+                      adminEmail:
+                          account.technicalUsers[0].adminEmail ||
+                          account.technicalUsers[0].email ||
+                          '',
+                      adminPassword:
+                          account.technicalUsers[0].adminPassword || '',
+                      assignedUserGroup:
+                          account.technicalUsers[0].assignedUserGroup || '',
+                      assignedRole:
+                          account.technicalUsers[0].assignedRole || '',
+                      assignmentStartDate:
+                          account.technicalUsers[0].assignmentStartDate || '',
+                      assignmentEndDate:
+                          account.technicalUsers[0].assignmentEndDate || '',
+                      status: account.technicalUsers[0].status || 'Active',
+                      createdBy: account.technicalUsers[0].createdBy || 'admin',
+                  }
+                : undefined;
 
-            if (!response.ok) {
-                throw new Error('Failed to create account');
-            }
+            // Build onboard payload for external Admin Portal API
+            const onboardPayload = {
+                accountName: account.accountName || '',
+                masterAccount:
+                    account.masterAccount || account.accountName || '',
+                subscriptionTier: mapCloudTypeToSubscriptionTier(
+                    account.cloudType || '',
+                ),
+                ...(addressDetails && {addressDetails}),
+                ...(technicalUser && {technicalUser}),
+            };
 
-            const savedAccount = await response.json();
-            const newId = savedAccount.id || savedAccount.SK; // Handle both ID formats
-            console.log('✅ Account saved via API with ID:', newId);
+            console.log(
+                '💾 Creating new account via External Admin Portal API:',
+                onboardPayload,
+            );
+
+            // Call external Admin Portal API to onboard account
+            const apiResponse = await onboardAccount(onboardPayload);
+
+            // Extract account ID from response - handle different response structures
+            // API may return: { accountId: "..." } or { data: { accountId: "..." } }
+            const newId =
+                apiResponse.accountId ||
+                apiResponse.data?.accountId ||
+                apiResponse.data?.account?.accountId ||
+                apiResponse.id ||
+                apiResponse.SK ||
+                tempRowId; // Fallback to temp ID if no ID returned
+
+            console.log(
+                '✅ Account saved via External Admin Portal API with ID:',
+                newId,
+            );
+            console.log('📊 Full API response:', apiResponse);
 
             // Preserve display order for the new ID
             const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
@@ -855,11 +945,15 @@ export default function ManageAccounts() {
                               ...acc,
                               id: newId,
                               createdAt:
-                                  savedAccount.createdAt ||
-                                  savedAccount.created_date,
+                                  apiResponse.data?.createdAt ||
+                                  apiResponse.data?.registeredOn ||
+                                  apiResponse.createdAt ||
+                                  new Date().toISOString(),
                               updatedAt:
-                                  savedAccount.updatedAt ||
-                                  savedAccount.updated_date,
+                                  apiResponse.data?.updatedAt ||
+                                  apiResponse.data?.lastModified ||
+                                  apiResponse.updatedAt ||
+                                  new Date().toISOString(),
                           }
                         : acc,
                 );
@@ -1044,14 +1138,24 @@ export default function ManageAccounts() {
                         const hasEnterprise = license.enterprise?.trim();
                         const hasProduct = license.product?.trim();
                         const hasService = license.service?.trim();
-                        const hasLicenseStartDate = license.licenseStartDate?.trim();
-                        const hasLicenseEndDate = license.licenseEndDate?.trim();
+                        const hasLicenseStartDate =
+                            license.licenseStartDate?.trim();
+                        const hasLicenseEndDate =
+                            license.licenseEndDate?.trim();
                         const hasNumberOfUsers = license.numberOfUsers?.trim();
-                        const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                        const hasValidNoticePeriod =
+                            !license.renewalNotice ||
+                            license.noticePeriodDays?.trim();
 
-                        return !hasEnterprise || !hasProduct || !hasService ||
-                               !hasLicenseStartDate || !hasLicenseEndDate ||
-                               !hasNumberOfUsers || !hasValidNoticePeriod;
+                        return (
+                            !hasEnterprise ||
+                            !hasProduct ||
+                            !hasService ||
+                            !hasLicenseStartDate ||
+                            !hasLicenseEndDate ||
+                            !hasNumberOfUsers ||
+                            !hasValidNoticePeriod
+                        );
                     });
 
                 // When validation errors are being shown, include completely blank rows for highlighting
@@ -1102,11 +1206,17 @@ export default function ManageAccounts() {
             const hasMasterAccount = config.masterAccount?.trim();
             const hasCloudType = config.cloudType?.trim();
             const hasAddress = config.address?.trim();
-            const hasTechnicalUsers = config.technicalUsers && config.technicalUsers.length > 0;
+            const hasTechnicalUsers =
+                config.technicalUsers && config.technicalUsers.length > 0;
 
             // Check if it's a new row (temporary ID) with any data
             const isNewRow = String(config.id).startsWith('tmp-');
-            const hasAnyData = hasAccountName || hasMasterAccount || hasCloudType || hasAddress || hasTechnicalUsers;
+            const hasAnyData =
+                hasAccountName ||
+                hasMasterAccount ||
+                hasCloudType ||
+                hasAddress ||
+                hasTechnicalUsers;
 
             // If it's a new row with any data, it's unsaved
             if (isNewRow && hasAnyData) {
@@ -1115,13 +1225,15 @@ export default function ManageAccounts() {
                     hasMasterAccount: !!hasMasterAccount,
                     hasCloudType: !!hasCloudType,
                     hasAddress: !!hasAddress,
-                    hasTechnicalUsers: !!hasTechnicalUsers
+                    hasTechnicalUsers: !!hasTechnicalUsers,
                 });
                 return true;
             }
 
             // Check for incomplete existing rows that have been modified
-            const isIncomplete = hasAnyData && (!hasAccountName || !hasMasterAccount || !hasCloudType);
+            const isIncomplete =
+                hasAnyData &&
+                (!hasAccountName || !hasMasterAccount || !hasCloudType);
             if (isIncomplete) {
                 console.log('🔍 Found incomplete existing row:', config.id);
             }
@@ -1139,7 +1251,7 @@ export default function ManageAccounts() {
             hasPendingChanges,
             hasModifiedRecords,
             pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
-            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords)
+            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
         });
 
         return hasPartialData || hasPendingChanges || hasModifiedRecords;
@@ -1443,15 +1555,28 @@ export default function ManageAccounts() {
                     }, 3000); // Show for 3 seconds
 
                     // Clear unsaved changes state after successful auto-save
-                    console.log('🧹 Clearing unsaved changes state after successful auto-save');
-                    console.log('🧹 Before clearing - pendingLocalChanges:', Object.keys(pendingLocalChanges));
-                    console.log('🧹 Before clearing - modifiedExistingRecords:', Array.from(modifiedExistingRecords));
-                    console.log('🧹 Before clearing - hasUnsavedChanges:', hasUnsavedChanges);
+                    console.log(
+                        '🧹 Clearing unsaved changes state after successful auto-save',
+                    );
+                    console.log(
+                        '🧹 Before clearing - pendingLocalChanges:',
+                        Object.keys(pendingLocalChanges),
+                    );
+                    console.log(
+                        '🧹 Before clearing - modifiedExistingRecords:',
+                        Array.from(modifiedExistingRecords),
+                    );
+                    console.log(
+                        '🧹 Before clearing - hasUnsavedChanges:',
+                        hasUnsavedChanges,
+                    );
 
                     setPendingLocalChanges({});
                     setHasUnsavedChanges(false);
 
-                    console.log('🧹 After clearing - all unsaved state should be clear');
+                    console.log(
+                        '🧹 After clearing - all unsaved state should be clear',
+                    );
 
                     console.log(
                         `✅ Auto-saved ${totalRowsToSave} entries successfully`,
@@ -1641,15 +1766,28 @@ export default function ManageAccounts() {
                 }, 3000); // Show for 3 seconds
 
                 // Clear unsaved changes state after successful auto-save
-                console.log('🧹 Clearing unsaved changes state after successful auto-save');
-                console.log('🧹 Before clearing - pendingLocalChanges:', Object.keys(pendingLocalChanges));
-                console.log('🧹 Before clearing - modifiedExistingRecords:', Array.from(modifiedExistingRecords));
-                console.log('🧹 Before clearing - hasUnsavedChanges:', hasUnsavedChanges);
+                console.log(
+                    '🧹 Clearing unsaved changes state after successful auto-save',
+                );
+                console.log(
+                    '🧹 Before clearing - pendingLocalChanges:',
+                    Object.keys(pendingLocalChanges),
+                );
+                console.log(
+                    '🧹 Before clearing - modifiedExistingRecords:',
+                    Array.from(modifiedExistingRecords),
+                );
+                console.log(
+                    '🧹 Before clearing - hasUnsavedChanges:',
+                    hasUnsavedChanges,
+                );
 
                 setPendingLocalChanges({});
                 setHasUnsavedChanges(false);
 
-                console.log('🧹 After clearing - all unsaved state should be clear');
+                console.log(
+                    '🧹 After clearing - all unsaved state should be clear',
+                );
 
                 console.log(
                     `✅ Auto-saved ${totalRowsToSave} entries successfully`,
@@ -1694,12 +1832,15 @@ export default function ManageAccounts() {
 
         console.log('📊 Current state before save:', {
             accountsCount: accounts.length,
-            modifiedExistingRecordsSize: modifiedExistingRecordsRef.current.size,
-            modifiedExistingRecordsArray: Array.from(modifiedExistingRecordsRef.current),
+            modifiedExistingRecordsSize:
+                modifiedExistingRecordsRef.current.size,
+            modifiedExistingRecordsArray: Array.from(
+                modifiedExistingRecordsRef.current,
+            ),
             pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
             pendingLocalChangesValues: pendingLocalChanges,
             hasUnsavedChanges,
-            preventNavigation
+            preventNavigation,
         });
         const effectiveConfigs = getEffectiveAccounts();
 
@@ -1707,19 +1848,27 @@ export default function ManageAccounts() {
         const currentLicenseState =
             accountsTableRef.current?.getCurrentLicenseState?.() || {};
 
-        console.log('📋 Current license state from AccountsTable:', currentLicenseState);
-        console.log('📋 License state breakdown:', Object.keys(currentLicenseState).map(rowId => ({
-            rowId,
-            licenseCount: currentLicenseState[rowId]?.length || 0,
-            licenses: currentLicenseState[rowId]
-        })));
+        console.log(
+            '📋 Current license state from AccountsTable:',
+            currentLicenseState,
+        );
+        console.log(
+            '📋 License state breakdown:',
+            Object.keys(currentLicenseState).map((rowId) => ({
+                rowId,
+                licenseCount: currentLicenseState[rowId]?.length || 0,
+                licenses: currentLicenseState[rowId],
+            })),
+        );
 
         // Update effectiveConfigs with current license state
         const configsWithCurrentLicenses = effectiveConfigs.map(
             (config: any) => {
                 const currentLicenses = currentLicenseState[config.id];
                 if (currentLicenses) {
-                    console.log(`📋 Updating config ${config.id} with ${currentLicenses.length} licenses`);
+                    console.log(
+                        `📋 Updating config ${config.id} with ${currentLicenses.length} licenses`,
+                    );
                     return {...config, licenses: currentLicenses};
                 }
                 console.log(`📋 No licenses found for config ${config.id}`);
@@ -2131,32 +2280,62 @@ export default function ManageAccounts() {
             // Save temporary rows
             for (const tempRow of completeTemporaryRows) {
                 // Find the corresponding row with current license data
-                const tempRowWithLicenses = configsWithCurrentLicenses.find(config => config.id === tempRow.id) || tempRow;
-                console.log(`💾 Saving temporary row ${tempRow.id} with current license data:`, tempRowWithLicenses.licenses?.length || 0, 'licenses');
+                const tempRowWithLicenses =
+                    configsWithCurrentLicenses.find(
+                        (config) => config.id === tempRow.id,
+                    ) || tempRow;
+                console.log(
+                    `💾 Saving temporary row ${tempRow.id} with current license data:`,
+                    tempRowWithLicenses.licenses?.length || 0,
+                    'licenses',
+                );
 
                 await autoSaveNewAccount(tempRow.id, tempRowWithLicenses);
                 savedCount++;
             }
 
             // IMPORTANT: Clean up phantom modified records before processing
-            console.log('🧹 Cleaning up phantom modified records before save...');
-            console.log('🔍 Current modifiedExistingRecords:', Array.from(modifiedExistingRecordsRef.current));
-            console.log('🔍 Current pendingLocalChanges:', Object.keys(pendingLocalChanges));
-            console.log('🔍 Detailed pendingLocalChanges:', pendingLocalChanges);
+            console.log(
+                '🧹 Cleaning up phantom modified records before save...',
+            );
+            console.log(
+                '🔍 Current modifiedExistingRecords:',
+                Array.from(modifiedExistingRecordsRef.current),
+            );
+            console.log(
+                '🔍 Current pendingLocalChanges:',
+                Object.keys(pendingLocalChanges),
+            );
+            console.log(
+                '🔍 Detailed pendingLocalChanges:',
+                pendingLocalChanges,
+            );
 
             // Filter out records that don't actually have pending changes
-            const actuallyModifiedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => {
-                const hasPendingChanges = pendingLocalChanges[recordId] && Object.keys(pendingLocalChanges[recordId]).length > 0;
+            const actuallyModifiedRecords = Array.from(
+                modifiedExistingRecordsRef.current,
+            ).filter((recordId) => {
+                const hasPendingChanges =
+                    pendingLocalChanges[recordId] &&
+                    Object.keys(pendingLocalChanges[recordId]).length > 0;
 
                 // CRITICAL FIX: Also check if this record has license changes
-                const currentLicenseState = accountsTableRef.current?.getCurrentLicenseState?.() || {};
-                const hasLicenseChanges = currentLicenseState[recordId] && currentLicenseState[recordId].length > 0;
+                const currentLicenseState =
+                    accountsTableRef.current?.getCurrentLicenseState?.() || {};
+                const hasLicenseChanges =
+                    currentLicenseState[recordId] &&
+                    currentLicenseState[recordId].length > 0;
 
                 // Find the original account to compare license counts
-                const originalAccount = configsWithCurrentLicenses.find(config => config.id === recordId);
-                const originalLicenseCount = originalAccount?.licenses?.length || 0;
-                const currentLicenseCount = currentLicenseState[recordId]?.length || 0;
-                const hasLicenseCountChanged = currentLicenseCount !== originalLicenseCount;
+                const originalAccount = configsWithCurrentLicenses.find(
+                    (config) => config.id === recordId,
+                );
+                const originalLicenseCount =
+                    originalAccount?.licenses?.length || 0;
+                const currentLicenseCount =
+                    currentLicenseState[recordId]?.length || 0;
+                const hasLicenseCountChanged =
+                    currentLicenseCount !== originalLicenseCount;
 
                 console.log(`🔍 Checking record ${recordId}:`, {
                     hasPendingChanges,
@@ -2164,24 +2343,37 @@ export default function ManageAccounts() {
                     hasLicenseChanges,
                     hasLicenseCountChanged,
                     originalLicenseCount,
-                    currentLicenseCount
+                    currentLicenseCount,
                 });
 
-                const shouldKeep = hasPendingChanges || hasLicenseChanges || hasLicenseCountChanged;
+                const shouldKeep =
+                    hasPendingChanges ||
+                    hasLicenseChanges ||
+                    hasLicenseCountChanged;
                 if (!shouldKeep) {
-                    console.log(`❌ Removing phantom modified record: ${recordId} (no pending changes or license changes)`);
+                    console.log(
+                        `❌ Removing phantom modified record: ${recordId} (no pending changes or license changes)`,
+                    );
                 } else if (hasLicenseChanges || hasLicenseCountChanged) {
-                    console.log(`✅ Keeping record ${recordId} due to license changes`);
+                    console.log(
+                        `✅ Keeping record ${recordId} due to license changes`,
+                    );
                 }
                 return shouldKeep;
             });
 
             // Update the sets to only contain actually modified records
-            if (actuallyModifiedRecords.length !== modifiedExistingRecordsRef.current.size) {
+            if (
+                actuallyModifiedRecords.length !==
+                modifiedExistingRecordsRef.current.size
+            ) {
                 const cleanedSet = new Set(actuallyModifiedRecords);
                 setModifiedExistingRecords(cleanedSet);
                 modifiedExistingRecordsRef.current = cleanedSet;
-                console.log('🧹 Cleaned up phantom records, new count:', cleanedSet.size);
+                console.log(
+                    '🧹 Cleaned up phantom records, new count:',
+                    cleanedSet.size,
+                );
             }
 
             // Re-check hasModifiedExistingRecords after cleanup
@@ -2194,20 +2386,31 @@ export default function ManageAccounts() {
                     {
                         hasActiveAutoSave,
                         hasActualModifiedRecords,
-                        actuallyModifiedRecordsCount: actuallyModifiedRecords.length
-                    }
+                        actuallyModifiedRecordsCount:
+                            actuallyModifiedRecords.length,
+                    },
                 );
 
                 // Only proceed if there are actual changes
-                if (hasActiveAutoSave || actuallyModifiedRecords.length > 0 || Object.keys(pendingLocalChanges).length > 0) {
+                if (
+                    hasActiveAutoSave ||
+                    actuallyModifiedRecords.length > 0 ||
+                    Object.keys(pendingLocalChanges).length > 0
+                ) {
                     // CRITICAL FIX: Update accountsRef with current license state before calling executeAutoSave
-                    console.log('🔄 Updating accountsRef with current license state before save...');
+                    console.log(
+                        '🔄 Updating accountsRef with current license state before save...',
+                    );
                     accountsRef.current = configsWithCurrentLicenses;
-                    console.log('✅ Updated accountsRef with current license data');
+                    console.log(
+                        '✅ Updated accountsRef with current license data',
+                    );
 
                     // Also update the main accounts state to ensure consistency
                     setAccounts(configsWithCurrentLicenses);
-                    console.log('✅ Updated main accounts state with current license data');
+                    console.log(
+                        '✅ Updated main accounts state with current license data',
+                    );
 
                     // Trigger the auto-save process immediately instead of waiting for timer
                     const pendingSavedCount = await executeAutoSave();
@@ -2221,19 +2424,28 @@ export default function ManageAccounts() {
             }
 
             if (savedCount > 0) {
-                console.log('🎉 About to show success notification for savedCount:', savedCount);
+                console.log(
+                    '🎉 About to show success notification for savedCount:',
+                    savedCount,
+                );
                 console.log('🎉 Breaking down savedCount:', {
                     completeTemporaryRowsCount: completeTemporaryRows.length,
-                    actualPendingSavedCount: savedCount - completeTemporaryRows.length
+                    actualPendingSavedCount:
+                        savedCount - completeTemporaryRows.length,
                 });
 
                 // Only show notification if we actually saved something meaningful
-                if (completeTemporaryRows.length > 0 || actuallyModifiedRecords.length > 0) {
+                if (
+                    completeTemporaryRows.length > 0 ||
+                    actuallyModifiedRecords.length > 0
+                ) {
                     showBlueNotification(
                         `Successfully saved ${savedCount} entries.`,
                     );
                 } else {
-                    console.log('❌ Not showing notification - no actual changes were saved');
+                    console.log(
+                        '❌ Not showing notification - no actual changes were saved',
+                    );
                 }
 
                 setShowValidationErrors(false); // Clear validation errors on successful save
@@ -2246,10 +2458,13 @@ export default function ManageAccounts() {
 
                 // Update localStorage with the current state including license data
                 await saveAccountsToStorage(configsWithCurrentLicenses);
-                console.log('💾 Updated localStorage with current license data after manual save');
+                console.log(
+                    '💾 Updated localStorage with current license data after manual save',
+                );
 
-                console.log('🧹 Cleared all unsaved changes state after successful save');
-
+                console.log(
+                    '🧹 Cleared all unsaved changes state after successful save',
+                );
             } else if (hasPendingChanges) {
                 showBlueNotification('Pending changes saved successfully.');
                 setShowValidationErrors(false); // Clear validation errors on successful save
@@ -2262,10 +2477,13 @@ export default function ManageAccounts() {
 
                 // Update localStorage with the current state including license data
                 await saveAccountsToStorage(configsWithCurrentLicenses);
-                console.log('💾 Updated localStorage with current license data after pending changes save');
+                console.log(
+                    '💾 Updated localStorage with current license data after pending changes save',
+                );
 
-                console.log('🧹 Cleared all unsaved changes state after saving pending changes');
-
+                console.log(
+                    '🧹 Cleared all unsaved changes state after saving pending changes',
+                );
             } else {
                 showBlueNotification(
                     'No complete entries to save.',
@@ -2295,26 +2513,37 @@ export default function ManageAccounts() {
             pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
             modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
             autoSaveTimerActive: !!autoSaveTimerRef.current,
-            effectiveAccounts: getEffectiveAccounts().map(acc => ({
+            effectiveAccounts: getEffectiveAccounts().map((acc) => ({
                 id: acc.id,
                 accountName: acc.accountName,
                 masterAccount: acc.masterAccount,
                 cloudType: acc.cloudType,
                 licensesCount: acc.licenses?.length || 0,
-                licensesComplete: acc.licenses?.every((license: any) => {
-                    const hasEnterprise = license.enterprise?.trim();
-                    const hasProduct = license.product?.trim();
-                    const hasService = license.service?.trim();
-                    const hasLicenseStartDate = license.licenseStartDate?.trim();
-                    const hasLicenseEndDate = license.licenseEndDate?.trim();
-                    const hasNumberOfUsers = license.numberOfUsers?.trim();
-                    const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                licensesComplete:
+                    acc.licenses?.every((license: any) => {
+                        const hasEnterprise = license.enterprise?.trim();
+                        const hasProduct = license.product?.trim();
+                        const hasService = license.service?.trim();
+                        const hasLicenseStartDate =
+                            license.licenseStartDate?.trim();
+                        const hasLicenseEndDate =
+                            license.licenseEndDate?.trim();
+                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                        const hasValidNoticePeriod =
+                            !license.renewalNotice ||
+                            license.noticePeriodDays?.trim();
 
-                    return hasEnterprise && hasProduct && hasService &&
-                           hasLicenseStartDate && hasLicenseEndDate &&
-                           hasNumberOfUsers && hasValidNoticePeriod;
-                }) || true
-            }))
+                        return (
+                            hasEnterprise &&
+                            hasProduct &&
+                            hasService &&
+                            hasLicenseStartDate &&
+                            hasLicenseEndDate &&
+                            hasNumberOfUsers &&
+                            hasValidNoticePeriod
+                        );
+                    }) || true,
+            })),
         });
 
         if (incomplete.length > 0 || hasChanges) {
@@ -2347,9 +2576,10 @@ export default function ManageAccounts() {
 
             if (incomplete.length > 0 || hasChanges) {
                 e.preventDefault();
-                const message = incomplete.length > 0
-                    ? 'You have incomplete account configurations. Your changes will be lost if you leave.'
-                    : 'You have unsaved changes. Your changes will be lost if you leave.';
+                const message =
+                    incomplete.length > 0
+                        ? 'You have incomplete account configurations. Your changes will be lost if you leave.'
+                        : 'You have unsaved changes. Your changes will be lost if you leave.';
                 e.returnValue = message;
                 return e.returnValue;
             }
@@ -2444,13 +2674,19 @@ export default function ManageAccounts() {
         const originalReplace = router.replace;
 
         router.push = (href: string, options?: any) => {
-            if (typeof href === 'string' && (hasUnsavedChanges || getIncompleteRows().length > 0) && !userConfirmedLeave) {
+            if (
+                typeof href === 'string' &&
+                (hasUnsavedChanges || getIncompleteRows().length > 0) &&
+                !userConfirmedLeave
+            ) {
                 console.log('🚨 Navigation intercepted - push method:', {
                     hasUnsavedChanges,
                     incompleteRows: getIncompleteRows().length,
                     pendingLocalChanges: Object.keys(pendingLocalChanges),
-                    modifiedExistingRecords: Array.from(modifiedExistingRecords),
-                    userConfirmedLeave
+                    modifiedExistingRecords: Array.from(
+                        modifiedExistingRecords,
+                    ),
+                    userConfirmedLeave,
                 });
                 const incomplete = getIncompleteRows();
                 if (incomplete.length > 0 || hasUnsavedChanges) {
@@ -2464,13 +2700,19 @@ export default function ManageAccounts() {
         };
 
         router.replace = (href: string, options?: any) => {
-            if (typeof href === 'string' && (hasUnsavedChanges || getIncompleteRows().length > 0) && !userConfirmedLeave) {
+            if (
+                typeof href === 'string' &&
+                (hasUnsavedChanges || getIncompleteRows().length > 0) &&
+                !userConfirmedLeave
+            ) {
                 console.log('🚨 Navigation intercepted - replace method:', {
                     hasUnsavedChanges,
                     incompleteRows: getIncompleteRows().length,
                     pendingLocalChanges: Object.keys(pendingLocalChanges),
-                    modifiedExistingRecords: Array.from(modifiedExistingRecords),
-                    userConfirmedLeave
+                    modifiedExistingRecords: Array.from(
+                        modifiedExistingRecords,
+                    ),
+                    userConfirmedLeave,
                 });
                 const incomplete = getIncompleteRows();
                 if (incomplete.length > 0 || hasUnsavedChanges) {
@@ -2485,7 +2727,10 @@ export default function ManageAccounts() {
 
         // Handle browser history navigation (back/forward buttons)
         const handlePopState = (event: PopStateEvent) => {
-            if ((hasUnsavedChanges || getIncompleteRows().length > 0) && !userConfirmedLeave) {
+            if (
+                (hasUnsavedChanges || getIncompleteRows().length > 0) &&
+                !userConfirmedLeave
+            ) {
                 event.preventDefault();
                 // Push current state back to prevent navigation
                 window.history.pushState(null, '', window.location.href);
@@ -2639,7 +2884,9 @@ export default function ManageAccounts() {
                 console.log('🔄 Loading enterprise linkages...');
 
                 // Clear any existing unsaved changes state on component mount
-                console.log('🧹 Clearing unsaved changes state on component mount');
+                console.log(
+                    '🧹 Clearing unsaved changes state on component mount',
+                );
                 setPendingLocalChanges({});
                 setModifiedExistingRecords(new Set());
                 setHasUnsavedChanges(false);
@@ -2650,7 +2897,9 @@ export default function ManageAccounts() {
                 console.log('🧹 Cleared all refs and state on mount');
 
                 // Load accounts data from External Admin Portal API
-                console.log('🔄 Loading accounts from External Admin Portal API...');
+                console.log(
+                    '🔄 Loading accounts from External Admin Portal API...',
+                );
 
                 const apiBase =
                     process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
@@ -2658,7 +2907,9 @@ export default function ManageAccounts() {
 
                 try {
                     // First, try to fetch from external Admin Portal API
-                    console.log('🌐 Calling external Admin Portal API for accounts...');
+                    console.log(
+                        '🌐 Calling external Admin Portal API for accounts...',
+                    );
                     const externalAccounts = await fetchExternalAccounts();
 
                     console.log(
@@ -2678,12 +2929,18 @@ export default function ManageAccounts() {
                         if (!uniqueAccountsMap.has(account.id)) {
                             uniqueAccountsMap.set(account.id, account);
                         } else {
-                            console.log(`🔄 Skipping duplicate account: ${account.accountName} (${account.id})`);
+                            console.log(
+                                `🔄 Skipping duplicate account: ${account.accountName} (${account.id})`,
+                            );
                         }
                     }
 
-                    const uniqueAccounts = Array.from(uniqueAccountsMap.values());
-                    console.log(`📊 After deduplication: ${rawAccounts.length} → ${uniqueAccounts.length} accounts`);
+                    const uniqueAccounts = Array.from(
+                        uniqueAccountsMap.values(),
+                    );
+                    console.log(
+                        `📊 After deduplication: ${rawAccounts.length} → ${uniqueAccounts.length} accounts`,
+                    );
 
                     // Ensure all accounts have required fields
                     // Note: External API mapping already done in fetchExternalAccounts:
@@ -2704,13 +2961,16 @@ export default function ManageAccounts() {
                             {
                                 count: (account.technicalUsers || []).length,
                                 users: account.technicalUsers || [],
-                                allFields: Object.keys(account)
-                            }
+                                allFields: Object.keys(account),
+                            },
                         );
                         return {
                             ...account,
                             // masterAccount already mapped from accountName in fetchExternalAccounts
-                            masterAccount: account.masterAccount || account.accountName || '',
+                            masterAccount:
+                                account.masterAccount ||
+                                account.accountName ||
+                                '',
                             // cloudType already mapped from subscriptionTier in fetchExternalAccounts
                             cloudType: account.cloudType || '',
                             country: account.country || '',
@@ -2719,45 +2979,73 @@ export default function ManageAccounts() {
                             // Transform license field names from backend to frontend format
                             licenses: (account.licenses || []).map(
                                 (license: any) => {
-                                    console.log(`📋 Processing license ${license.id} for account ${account.accountName}`);
+                                    console.log(
+                                        `📋 Processing license ${license.id} for account ${account.accountName}`,
+                                    );
 
                                     // Create a stable license identifier based on business properties
                                     // instead of relying on potentially unstable API-generated IDs
-                                    const stableLicenseKey = `${account.id}-${license.enterprise || ''}-${license.product || ''}-${license.service || ''}`;
+                                    const stableLicenseKey = `${account.id}-${
+                                        license.enterprise || ''
+                                    }-${license.product || ''}-${
+                                        license.service || ''
+                                    }`;
 
                                     return {
-                                    id: license.id, // Keep original ID for API operations
-                                    stableId: stableLicenseKey, // Add stable identifier for localStorage
-                                    enterprise: license.enterprise || '',
-                                    product: license.product || '',
-                                    service: license.service || '',
-                                    licenseStartDate:
-                                        license.licenseStart ||
-                                        license.licenseStartDate ||
-                                        '',
-                                    licenseEndDate:
-                                        license.licenseEnd ||
-                                        license.licenseEndDate ||
-                                        '',
-                                    numberOfUsers:
-                                        license.users ||
-                                        license.numberOfUsers ||
-                                        '',
-                                    contactDetails: (() => {
-                                        // Handle different contact data structures from API
-                                        let contactDetails;
+                                        id: license.id, // Keep original ID for API operations
+                                        stableId: stableLicenseKey, // Add stable identifier for localStorage
+                                        enterprise: license.enterprise || '',
+                                        product: license.product || '',
+                                        service: license.service || '',
+                                        licenseStartDate:
+                                            license.licenseStart ||
+                                            license.licenseStartDate ||
+                                            '',
+                                        licenseEndDate:
+                                            license.licenseEnd ||
+                                            license.licenseEndDate ||
+                                            '',
+                                        numberOfUsers:
+                                            license.users ||
+                                            license.numberOfUsers ||
+                                            '',
+                                        contactDetails: (() => {
+                                            // Handle different contact data structures from API
+                                            let contactDetails;
 
-                                        if (license.contactDetails) {
-                                            // Direct contactDetails object
-                                            contactDetails = license.contactDetails;
-                                        } else if (license.contacts) {
-                                            // contacts might be an array, take first item
-                                            if (Array.isArray(license.contacts) && license.contacts.length > 0) {
-                                                contactDetails = license.contacts[0];
-                                            } else if (typeof license.contacts === 'object') {
-                                                // contacts is an object
-                                                contactDetails = license.contacts;
+                                            if (license.contactDetails) {
+                                                // Direct contactDetails object
+                                                contactDetails =
+                                                    license.contactDetails;
+                                            } else if (license.contacts) {
+                                                // contacts might be an array, take first item
+                                                if (
+                                                    Array.isArray(
+                                                        license.contacts,
+                                                    ) &&
+                                                    license.contacts.length > 0
+                                                ) {
+                                                    contactDetails =
+                                                        license.contacts[0];
+                                                } else if (
+                                                    typeof license.contacts ===
+                                                    'object'
+                                                ) {
+                                                    // contacts is an object
+                                                    contactDetails =
+                                                        license.contacts;
+                                                } else {
+                                                    contactDetails = {
+                                                        id: '',
+                                                        name: '',
+                                                        email: '',
+                                                        phone: '',
+                                                        department: '',
+                                                        designation: '',
+                                                    };
+                                                }
                                             } else {
+                                                // No contact data, create empty structure
                                                 contactDetails = {
                                                     id: '',
                                                     name: '',
@@ -2767,50 +3055,64 @@ export default function ManageAccounts() {
                                                     designation: '',
                                                 };
                                             }
-                                        } else {
-                                            // No contact data, create empty structure
-                                            contactDetails = {
-                                                id: '',
-                                                name: '',
-                                                email: '',
-                                                phone: '',
-                                                department: '',
-                                                designation: '',
-                                            };
-                                        }
 
-                                        // Check localStorage for contact data using stable ID
-                                        const contactKey = `contact-${stableLicenseKey}`;
-                                        try {
-                                            const savedContact = localStorage.getItem(contactKey);
-                                            if (savedContact) {
-                                                const parsedContact = JSON.parse(savedContact);
-                                                console.log(`📞 Found saved contact data for stable key ${contactKey}:`, parsedContact);
-                                                contactDetails = { ...contactDetails, ...parsedContact };
+                                            // Check localStorage for contact data using stable ID
+                                            const contactKey = `contact-${stableLicenseKey}`;
+                                            try {
+                                                const savedContact =
+                                                    localStorage.getItem(
+                                                        contactKey,
+                                                    );
+                                                if (savedContact) {
+                                                    const parsedContact =
+                                                        JSON.parse(
+                                                            savedContact,
+                                                        );
+                                                    console.log(
+                                                        `📞 Found saved contact data for stable key ${contactKey}:`,
+                                                        parsedContact,
+                                                    );
+                                                    contactDetails = {
+                                                        ...contactDetails,
+                                                        ...parsedContact,
+                                                    };
+                                                }
+                                            } catch (error) {
+                                                console.warn(
+                                                    `⚠️ Error loading saved contact for ${contactKey}:`,
+                                                    error,
+                                                );
                                             }
-                                        } catch (error) {
-                                            console.warn(`⚠️ Error loading saved contact for ${contactKey}:`, error);
-                                        }
 
-                                        // Debug log for contact details
-                                        console.log(`📞 Contact details processing for license ${license.id}:`, {
-                                            rawContactDetails: license.contactDetails,
-                                            rawContacts: license.contacts,
-                                            processedContactDetails: contactDetails,
-                                            hasContactData: !!(contactDetails.name || contactDetails.email),
-                                            stableLicenseKey: stableLicenseKey
-                                        });
+                                            // Debug log for contact details
+                                            console.log(
+                                                `📞 Contact details processing for license ${license.id}:`,
+                                                {
+                                                    rawContactDetails:
+                                                        license.contactDetails,
+                                                    rawContacts:
+                                                        license.contacts,
+                                                    processedContactDetails:
+                                                        contactDetails,
+                                                    hasContactData: !!(
+                                                        contactDetails.name ||
+                                                        contactDetails.email
+                                                    ),
+                                                    stableLicenseKey:
+                                                        stableLicenseKey,
+                                                },
+                                            );
 
-                                        return contactDetails;
-                                    })(),
-                                    renewalNotice:
-                                        license.renewalNotice || false,
-                                    noticePeriodDays:
-                                        license.noticePeriod?.toString() ||
-                                        license.noticePeriodDays ||
-                                        '',
+                                            return contactDetails;
+                                        })(),
+                                        renewalNotice:
+                                            license.renewalNotice || false,
+                                        noticePeriodDays:
+                                            license.noticePeriod?.toString() ||
+                                            license.noticePeriodDays ||
+                                            '',
                                     };
-                                }
+                                },
                             ),
                         };
                     });
@@ -2825,28 +3127,43 @@ export default function ManageAccounts() {
                 // Check localStorage for more recent data
                 let localStorageAccountsData = [];
                 try {
-                    const localStorageData = localStorage.getItem('accountsData');
+                    const localStorageData =
+                        localStorage.getItem('accountsData');
                     if (localStorageData) {
                         const parsedLocalData = JSON.parse(localStorageData);
-                        console.log('📊 Found localStorage accounts:', parsedLocalData?.length || 0);
+                        console.log(
+                            '📊 Found localStorage accounts:',
+                            parsedLocalData?.length || 0,
+                        );
 
                         // Get localStorage data for merging with API data
                         if (parsedLocalData && parsedLocalData.length > 0) {
-                            console.log('📊 Found localStorage data for merging');
+                            console.log(
+                                '📊 Found localStorage data for merging',
+                            );
 
                             // Filter out temporary rows from localStorage - they should not persist across sessions
-                            localStorageAccountsData = parsedLocalData.filter((account: any) => {
-                                const isTemporary = String(account.id).startsWith('tmp-');
-                                if (isTemporary) {
-                                    console.log('🧹 Filtering out temporary row from localStorage:', account.id);
-                                }
-                                return !isTemporary;
-                            });
+                            localStorageAccountsData = parsedLocalData.filter(
+                                (account: any) => {
+                                    const isTemporary = String(
+                                        account.id,
+                                    ).startsWith('tmp-');
+                                    if (isTemporary) {
+                                        console.log(
+                                            '🧹 Filtering out temporary row from localStorage:',
+                                            account.id,
+                                        );
+                                    }
+                                    return !isTemporary;
+                                },
+                            );
 
                             console.log('📊 After filtering temp rows:', {
                                 originalCount: parsedLocalData.length,
                                 filteredCount: localStorageAccountsData.length,
-                                removedTempRows: parsedLocalData.length - localStorageAccountsData.length
+                                removedTempRows:
+                                    parsedLocalData.length -
+                                    localStorageAccountsData.length,
                             });
                         }
                     }
@@ -2861,120 +3178,231 @@ export default function ManageAccounts() {
 
                     // Update accounts that exist in localStorage with localStorage data
                     localStorageAccountsData.forEach((localAccount: any) => {
-                        const apiAccountIndex = mergedData.findIndex(acc => acc.id === localAccount.id);
+                        const apiAccountIndex = mergedData.findIndex(
+                            (acc) => acc.id === localAccount.id,
+                        );
                         if (apiAccountIndex >= 0) {
                             // Smart merge: use API licenses as primary (to preserve deletions), but merge with localStorage for edits
                             const apiAccount = mergedData[apiAccountIndex];
                             const localLicenses = localAccount.licenses || [];
                             const apiLicenses = apiAccount.licenses || [];
 
-                            console.log(`🔍 Merging licenses for ${localAccount.accountName}:`, {
-                                apiLicenseIds: apiLicenses.map((l: any) => l.id),
-                                localLicenseIds: localLicenses.map((l: any) => l.id),
-                                apiLicensesCount: apiLicenses.length,
-                                localLicensesCount: localLicenses.length
-                            });
+                            console.log(
+                                `🔍 Merging licenses for ${localAccount.accountName}:`,
+                                {
+                                    apiLicenseIds: apiLicenses.map(
+                                        (l: any) => l.id,
+                                    ),
+                                    localLicenseIds: localLicenses.map(
+                                        (l: any) => l.id,
+                                    ),
+                                    apiLicensesCount: apiLicenses.length,
+                                    localLicensesCount: localLicenses.length,
+                                },
+                            );
 
                             // IMPORTANT: Use API licenses as the base to ensure deletions are respected
                             // Only merge in localStorage changes for licenses that still exist in the API
-                            const mergedLicenses = apiLicenses.map((apiLicense: any) => {
-                                // Find matching local license using stable identifier first, then fallback to other methods
-                                const matchingLocalLicense = localLicenses.find((localLicense: any) => {
-                                    // Try stable ID first (if both have it)
-                                    if (apiLicense.stableId && localLicense.stableId) {
-                                        return apiLicense.stableId === localLicense.stableId;
-                                    }
-                                    // Try to match by API ID
-                                    if (apiLicense.id === localLicense.id) {
-                                        return true;
-                                    }
-                                    // Fallback to content similarity
-                                    return (apiLicense.enterprise === localLicense.enterprise &&
-                                            apiLicense.product === localLicense.product &&
-                                            apiLicense.service === localLicense.service);
-                                });
+                            const mergedLicenses = apiLicenses.map(
+                                (apiLicense: any) => {
+                                    // Find matching local license using stable identifier first, then fallback to other methods
+                                    const matchingLocalLicense =
+                                        localLicenses.find(
+                                            (localLicense: any) => {
+                                                // Try stable ID first (if both have it)
+                                                if (
+                                                    apiLicense.stableId &&
+                                                    localLicense.stableId
+                                                ) {
+                                                    return (
+                                                        apiLicense.stableId ===
+                                                        localLicense.stableId
+                                                    );
+                                                }
+                                                // Try to match by API ID
+                                                if (
+                                                    apiLicense.id ===
+                                                    localLicense.id
+                                                ) {
+                                                    return true;
+                                                }
+                                                // Fallback to content similarity
+                                                return (
+                                                    apiLicense.enterprise ===
+                                                        localLicense.enterprise &&
+                                                    apiLicense.product ===
+                                                        localLicense.product &&
+                                                    apiLicense.service ===
+                                                        localLicense.service
+                                                );
+                                            },
+                                        );
 
-                                if (matchingLocalLicense) {
-                                    // Merge localStorage edits into API data (but preserve API structure)
-                                    return {
-                                        ...apiLicense, // API data as base
-                                        // Only merge specific fields that might have been edited locally
-                                        enterprise: matchingLocalLicense.enterprise || apiLicense.enterprise,
-                                        product: matchingLocalLicense.product || apiLicense.product,
-                                        service: matchingLocalLicense.service || apiLicense.service,
-                                        licenseStartDate: matchingLocalLicense.licenseStartDate || apiLicense.licenseStartDate || apiLicense.licenseStart,
-                                        licenseEndDate: matchingLocalLicense.licenseEndDate || apiLicense.licenseEndDate || apiLicense.licenseEnd,
-                                        numberOfUsers: matchingLocalLicense.numberOfUsers || apiLicense.numberOfUsers || apiLicense.users,
-                                        renewalNotice: matchingLocalLicense.renewalNotice !== undefined ? matchingLocalLicense.renewalNotice : apiLicense.renewalNotice,
-                                        noticePeriodDays: matchingLocalLicense.noticePeriodDays || apiLicense.noticePeriodDays || apiLicense.noticePeriod,
-                                        // Handle contact details with preference for API data (database) as source of truth
-                                        contactDetails: (() => {
-                                            const apiContactDetails = apiLicense.contactDetails || (Array.isArray(apiLicense.contacts) && apiLicense.contacts.length > 0 ? apiLicense.contacts[0] : apiLicense.contacts);
+                                    if (matchingLocalLicense) {
+                                        // Merge localStorage edits into API data (but preserve API structure)
+                                        return {
+                                            ...apiLicense, // API data as base
+                                            // Only merge specific fields that might have been edited locally
+                                            enterprise:
+                                                matchingLocalLicense.enterprise ||
+                                                apiLicense.enterprise,
+                                            product:
+                                                matchingLocalLicense.product ||
+                                                apiLicense.product,
+                                            service:
+                                                matchingLocalLicense.service ||
+                                                apiLicense.service,
+                                            licenseStartDate:
+                                                matchingLocalLicense.licenseStartDate ||
+                                                apiLicense.licenseStartDate ||
+                                                apiLicense.licenseStart,
+                                            licenseEndDate:
+                                                matchingLocalLicense.licenseEndDate ||
+                                                apiLicense.licenseEndDate ||
+                                                apiLicense.licenseEnd,
+                                            numberOfUsers:
+                                                matchingLocalLicense.numberOfUsers ||
+                                                apiLicense.numberOfUsers ||
+                                                apiLicense.users,
+                                            renewalNotice:
+                                                matchingLocalLicense.renewalNotice !==
+                                                undefined
+                                                    ? matchingLocalLicense.renewalNotice
+                                                    : apiLicense.renewalNotice,
+                                            noticePeriodDays:
+                                                matchingLocalLicense.noticePeriodDays ||
+                                                apiLicense.noticePeriodDays ||
+                                                apiLicense.noticePeriod,
+                                            // Handle contact details with preference for API data (database) as source of truth
+                                            contactDetails: (() => {
+                                                const apiContactDetails =
+                                                    apiLicense.contactDetails ||
+                                                    (Array.isArray(
+                                                        apiLicense.contacts,
+                                                    ) &&
+                                                    apiLicense.contacts.length >
+                                                        0
+                                                        ? apiLicense.contacts[0]
+                                                        : apiLicense.contacts);
 
-                                            // Always prefer API data if it has meaningful contact information
-                                            if (apiContactDetails && (apiContactDetails.name || apiContactDetails.email)) {
-                                                console.log(`📞 Using API contact data for license ${apiLicense.id} (database source of truth):`, apiContactDetails);
-                                                return apiContactDetails;
-                                            }
+                                                // Always prefer API data if it has meaningful contact information
+                                                if (
+                                                    apiContactDetails &&
+                                                    (apiContactDetails.name ||
+                                                        apiContactDetails.email)
+                                                ) {
+                                                    console.log(
+                                                        `📞 Using API contact data for license ${apiLicense.id} (database source of truth):`,
+                                                        apiContactDetails,
+                                                    );
+                                                    return apiContactDetails;
+                                                }
 
-                                            // Only use stable localStorage as fallback when API has no meaningful contact data
-                                            if (apiLicense.stableId) {
-                                                const stableKey = `contact-${apiLicense.stableId}`;
-                                                const savedContactData = localStorage.getItem(stableKey);
+                                                // Only use stable localStorage as fallback when API has no meaningful contact data
+                                                if (apiLicense.stableId) {
+                                                    const stableKey = `contact-${apiLicense.stableId}`;
+                                                    const savedContactData =
+                                                        localStorage.getItem(
+                                                            stableKey,
+                                                        );
 
-                                                if (savedContactData) {
-                                                    try {
-                                                        const parsedContactData = JSON.parse(savedContactData);
-                                                        console.log(`📞 Using stable localStorage contact data as fallback for license ${apiLicense.id} (key: ${stableKey}):`, parsedContactData);
-                                                        return parsedContactData;
-                                                    } catch (error) {
-                                                        console.error(`❌ Error parsing stable contact data for ${stableKey}:`, error);
+                                                    if (savedContactData) {
+                                                        try {
+                                                            const parsedContactData =
+                                                                JSON.parse(
+                                                                    savedContactData,
+                                                                );
+                                                            console.log(
+                                                                `📞 Using stable localStorage contact data as fallback for license ${apiLicense.id} (key: ${stableKey}):`,
+                                                                parsedContactData,
+                                                            );
+                                                            return parsedContactData;
+                                                        } catch (error) {
+                                                            console.error(
+                                                                `❌ Error parsing stable contact data for ${stableKey}:`,
+                                                                error,
+                                                            );
+                                                        }
                                                     }
                                                 }
-                                            }
 
-                                            // Legacy localStorage fallback
-                                            const localContactDetails = matchingLocalLicense?.contactDetails;
-                                            if (localContactDetails && (localContactDetails.name || localContactDetails.email)) {
-                                                console.log(`📞 Using legacy localStorage contact data as fallback for license ${apiLicense.id}:`, localContactDetails);
-                                                return localContactDetails;
-                                            }
+                                                // Legacy localStorage fallback
+                                                const localContactDetails =
+                                                    matchingLocalLicense?.contactDetails;
+                                                if (
+                                                    localContactDetails &&
+                                                    (localContactDetails.name ||
+                                                        localContactDetails.email)
+                                                ) {
+                                                    console.log(
+                                                        `📞 Using legacy localStorage contact data as fallback for license ${apiLicense.id}:`,
+                                                        localContactDetails,
+                                                    );
+                                                    return localContactDetails;
+                                                }
 
-                                            // Return empty contact structure if no data available
-                                            if (apiContactDetails && (apiContactDetails.name || apiContactDetails.email)) {
-                                                console.log(`📞 Using API contact data for license ${apiLicense.id}:`, apiContactDetails);
-                                                return apiContactDetails;
-                                            }
+                                                // Return empty contact structure if no data available
+                                                if (
+                                                    apiContactDetails &&
+                                                    (apiContactDetails.name ||
+                                                        apiContactDetails.email)
+                                                ) {
+                                                    console.log(
+                                                        `📞 Using API contact data for license ${apiLicense.id}:`,
+                                                        apiContactDetails,
+                                                    );
+                                                    return apiContactDetails;
+                                                }
 
-                                            // Default empty structure
-                                            return {
-                                                id: '',
-                                                name: '',
-                                                email: '',
-                                                phone: '',
-                                                department: '',
-                                                designation: '',
-                                            };
-                                        })()
-                                    };
-                                }
+                                                // Default empty structure
+                                                return {
+                                                    id: '',
+                                                    name: '',
+                                                    email: '',
+                                                    phone: '',
+                                                    department: '',
+                                                    designation: '',
+                                                };
+                                            })(),
+                                        };
+                                    }
 
-                                // No localStorage counterpart - use API data as-is
-                                return apiLicense;
-                            });
+                                    // No localStorage counterpart - use API data as-is
+                                    return apiLicense;
+                                },
+                            );
 
-                            console.log(`📊 License merge for ${localAccount.accountName}: API(${apiLicenses.length}) → Merged(${mergedLicenses.length})`);
-                            console.log(`🔍 Merged license IDs:`, mergedLicenses.map((l: any) => l.id));
+                            console.log(
+                                `📊 License merge for ${localAccount.accountName}: API(${apiLicenses.length}) → Merged(${mergedLicenses.length})`,
+                            );
+                            console.log(
+                                `🔍 Merged license IDs:`,
+                                mergedLicenses.map((l: any) => l.id),
+                            );
 
                             // Check for duplicate IDs in merged licenses
-                            const mergedLicenseIds = mergedLicenses.map((l: any) => l.id);
-                            const uniqueMergedIds = Array.from(new Set(mergedLicenseIds));
-                            if (mergedLicenseIds.length !== uniqueMergedIds.length) {
-                                console.error(`❌ Duplicate license IDs after merge for ${localAccount.accountName}:`, {
-                                    total: mergedLicenseIds.length,
-                                    unique: uniqueMergedIds.length,
-                                    duplicates: mergedLicenseIds.filter((id: any, index: number) => mergedLicenseIds.indexOf(id) !== index)
-                                });
+                            const mergedLicenseIds = mergedLicenses.map(
+                                (l: any) => l.id,
+                            );
+                            const uniqueMergedIds = Array.from(
+                                new Set(mergedLicenseIds),
+                            );
+                            if (
+                                mergedLicenseIds.length !==
+                                uniqueMergedIds.length
+                            ) {
+                                console.error(
+                                    `❌ Duplicate license IDs after merge for ${localAccount.accountName}:`,
+                                    {
+                                        total: mergedLicenseIds.length,
+                                        unique: uniqueMergedIds.length,
+                                        duplicates: mergedLicenseIds.filter(
+                                            (id: any, index: number) =>
+                                                mergedLicenseIds.indexOf(id) !==
+                                                index,
+                                        ),
+                                    },
+                                );
                             }
 
                             mergedData[apiAccountIndex] = {
@@ -2982,34 +3410,62 @@ export default function ManageAccounts() {
                                 ...localAccount, // localStorage data for account-level fields
                                 licenses: mergedLicenses, // Use API-primary merged licenses
                                 // Ensure critical fields from API are preserved
-                                createdAt: mergedData[apiAccountIndex].createdAt || localAccount.createdAt,
-                                updatedAt: localAccount.updatedAt || mergedData[apiAccountIndex].updatedAt,
+                                createdAt:
+                                    mergedData[apiAccountIndex].createdAt ||
+                                    localAccount.createdAt,
+                                updatedAt:
+                                    localAccount.updatedAt ||
+                                    mergedData[apiAccountIndex].updatedAt,
                             };
-                            console.log(`📊 Merged localStorage data for account: ${localAccount.accountName}`);
+                            console.log(
+                                `📊 Merged localStorage data for account: ${localAccount.accountName}`,
+                            );
                         } else {
                             // Account exists in localStorage but not in API - this means it was deleted from database
                             // Do NOT re-add it to prevent deleted accounts from reappearing
-                            console.log(`🗑️ Account "${localAccount.accountName}" exists in localStorage but not in API - it was likely deleted. Not re-adding.`);
+                            console.log(
+                                `🗑️ Account "${localAccount.accountName}" exists in localStorage but not in API - it was likely deleted. Not re-adding.`,
+                            );
                         }
                     });
 
                     // Clean up localStorage by removing accounts that no longer exist in the database
-                    const accountsToRemoveFromLocalStorage = localStorageAccountsData
-                        .filter((localAccount: any) => !mergedData.find(acc => acc.id === localAccount.id))
-                        .map((localAccount: any) => localAccount.id);
+                    const accountsToRemoveFromLocalStorage =
+                        localStorageAccountsData
+                            .filter(
+                                (localAccount: any) =>
+                                    !mergedData.find(
+                                        (acc) => acc.id === localAccount.id,
+                                    ),
+                            )
+                            .map((localAccount: any) => localAccount.id);
 
                     if (accountsToRemoveFromLocalStorage.length > 0) {
-                        console.log(`🧹 Cleaning up ${accountsToRemoveFromLocalStorage.length} deleted accounts from localStorage`);
-                        const cleanedLocalStorageData = localStorageAccountsData.filter(
-                            (localAccount: any) => !accountsToRemoveFromLocalStorage.includes(localAccount.id)
+                        console.log(
+                            `🧹 Cleaning up ${accountsToRemoveFromLocalStorage.length} deleted accounts from localStorage`,
                         );
+                        const cleanedLocalStorageData =
+                            localStorageAccountsData.filter(
+                                (localAccount: any) =>
+                                    !accountsToRemoveFromLocalStorage.includes(
+                                        localAccount.id,
+                                    ),
+                            );
 
                         // Update localStorage with cleaned data
                         try {
-                            localStorage.setItem('accountsData', JSON.stringify(cleanedLocalStorageData));
-                            console.log(`✅ Updated localStorage: removed ${accountsToRemoveFromLocalStorage.length} deleted accounts`);
+                            localStorage.setItem(
+                                'accountsData',
+                                JSON.stringify(cleanedLocalStorageData),
+                            );
+                            console.log(
+                                `✅ Updated localStorage: removed ${accountsToRemoveFromLocalStorage.length} deleted accounts`,
+                            );
                         } catch (error) {
-                            console.error('❌ Error updating localStorage during cleanup:', error);
+                            console.error(
+                                '❌ Error updating localStorage during cleanup:',
+                                error,
+                            );
                         }
                     }
 
@@ -3038,7 +3494,9 @@ export default function ManageAccounts() {
                 // This ensures technical users are always up-to-date from the API
                 // Skip fetching if localStorage has recent technical user data
                 console.log('🔄 Fetching technical users for all accounts...');
-                console.log(`📊 Processing ${accountsData.length} unique accounts for technical users`);
+                console.log(
+                    `📊 Processing ${accountsData.length} unique accounts for technical users`,
+                );
                 const accountsWithTechnicalUsers: any[] = [];
                 let skipCount = 0;
                 let fetchCount = 0;
@@ -3048,11 +3506,17 @@ export default function ManageAccounts() {
 
                     // Check if localStorage already has technical users for this account
                     const localStorageData = localStorageAccountsData.find(
-                        (localAccount: any) => localAccount.id === account.id
+                        (localAccount: any) => localAccount.id === account.id,
                     );
 
-                    if (localStorageData && localStorageData.technicalUsers && localStorageData.technicalUsers.length > 0) {
-                        console.log(`👤 Using localStorage technical users for ${account.accountName} (${localStorageData.technicalUsers.length} users)`);
+                    if (
+                        localStorageData &&
+                        localStorageData.technicalUsers &&
+                        localStorageData.technicalUsers.length > 0
+                    ) {
+                        console.log(
+                            `👤 Using localStorage technical users for ${account.accountName} (${localStorageData.technicalUsers.length} users)`,
+                        );
                         accountsWithTechnicalUsers.push({
                             ...account,
                             technicalUsers: localStorageData.technicalUsers,
@@ -3063,7 +3527,9 @@ export default function ManageAccounts() {
 
                     try {
                         fetchCount++;
-                        console.log(`👤 Fetching technical users for account: ${account.accountName} (${account.id})`);
+                        console.log(
+                            `👤 Fetching technical users for account: ${account.accountName} (${account.id})`,
+                        );
                         const techUsersResponse = await fetch(
                             `${apiBase}/api/users?accountId=${
                                 account.id
@@ -3078,9 +3544,14 @@ export default function ManageAccounts() {
                             technicalUsers = allUsers.filter(
                                 (u: any) => u.technicalUser === true,
                             );
-                            console.log(`👤 Found ${technicalUsers.length} technical users for ${account.accountName}`);
+                            console.log(
+                                `👤 Found ${technicalUsers.length} technical users for ${account.accountName}`,
+                            );
                         } else {
-                            console.warn(`⚠️ Technical users API response not OK for ${account.accountName}:`, techUsersResponse.status);
+                            console.warn(
+                                `⚠️ Technical users API response not OK for ${account.accountName}:`,
+                                techUsersResponse.status,
+                            );
                         }
 
                         // Merge technical users from API with account data
@@ -3109,7 +3580,9 @@ export default function ManageAccounts() {
                     }
                 }
 
-                console.log(`📊 Technical user fetching summary: skipped ${skipCount}, fetched ${fetchCount}, total ${accountsData.length}`);
+                console.log(
+                    `📊 Technical user fetching summary: skipped ${skipCount}, fetched ${fetchCount}, total ${accountsData.length}`,
+                );
 
                 // Transform account data to AccountRow format
                 const transformedAccounts = accountsWithTechnicalUsers
@@ -3261,8 +3734,12 @@ export default function ManageAccounts() {
         let accountIdToUpdate: string | null = null;
 
         // Find which account contains this license
-        const targetAccount = accounts.find((account) =>
-            account.licenses && account.licenses.some((license: any) => license.id === licenseId)
+        const targetAccount = accounts.find(
+            (account) =>
+                account.licenses &&
+                account.licenses.some(
+                    (license: any) => license.id === licenseId,
+                ),
         );
 
         if (!targetAccount) {
@@ -3271,16 +3748,25 @@ export default function ManageAccounts() {
         }
 
         accountIdToUpdate = targetAccount.id;
-        console.log(`🎯 Found license ${licenseId} in account ${accountIdToUpdate}`);
-        console.log(`📊 Account ${targetAccount.accountName} has ${targetAccount.licenses.length} licenses before deletion`);
+        console.log(
+            `🎯 Found license ${licenseId} in account ${accountIdToUpdate}`,
+        );
+        console.log(
+            `📊 Account ${targetAccount.accountName} has ${targetAccount.licenses.length} licenses before deletion`,
+        );
 
         // Delete from database first
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
 
             // Get the updated account data with license removed
-            const updatedLicenses = targetAccount.licenses.filter((license: any) => license.id !== licenseId);
-            console.log(`📊 After filtering: ${updatedLicenses.length} licenses remaining`);
+            const updatedLicenses = targetAccount.licenses.filter(
+                (license: any) => license.id !== licenseId,
+            );
+            console.log(
+                `📊 After filtering: ${updatedLicenses.length} licenses remaining`,
+            );
 
             // Transform licenses to backend format
             const transformedLicenses = updatedLicenses.map((license: any) => ({
@@ -3288,15 +3774,21 @@ export default function ManageAccounts() {
                 enterprise: license.enterprise || '',
                 product: license.product || '',
                 service: license.service || '',
-                licenseStart: license.licenseStartDate || license.licenseStart || '',
+                licenseStart:
+                    license.licenseStartDate || license.licenseStart || '',
                 licenseEnd: license.licenseEndDate || license.licenseEnd || '',
                 users: license.numberOfUsers || license.users || '',
                 renewalNotice: license.renewalNotice || false,
-                noticePeriod: parseInt(license.noticePeriodDays || license.noticePeriod || '0', 10),
+                noticePeriod: parseInt(
+                    license.noticePeriodDays || license.noticePeriod || '0',
+                    10,
+                ),
                 contacts: license.contactDetails || license.contacts || [],
             }));
 
-            console.log(`🔄 Making API call to update account ${targetAccount.id}...`);
+            console.log(
+                `🔄 Making API call to update account ${targetAccount.id}...`,
+            );
             const response = await fetch(`${apiBase}/api/accounts`, {
                 method: 'PUT',
                 headers: {
@@ -3316,15 +3808,28 @@ export default function ManageAccounts() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`❌ API response error:`, { status: response.status, statusText: response.statusText, errorText });
-                throw new Error(`Failed to delete license from database: ${response.statusText} - ${errorText}`);
+                console.error(`❌ API response error:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorText,
+                });
+                throw new Error(
+                    `Failed to delete license from database: ${response.statusText} - ${errorText}`,
+                );
             }
 
             const responseData = await response.json();
-            console.log(`✅ License ${licenseId} deleted from database via API:`, responseData);
+            console.log(
+                `✅ License ${licenseId} deleted from database via API:`,
+                responseData,
+            );
         } catch (error) {
             console.error('❌ Error deleting license from database:', error);
-            throw new Error(`Failed to delete license from database: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+                `Failed to delete license from database: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
         }
 
         // Update local state after successful database deletion
@@ -3347,18 +3852,27 @@ export default function ManageAccounts() {
 
             // Update localStorage with the modified accounts immediately
             try {
-                const filteredAccounts = updatedAccounts.filter((account: any) => {
-                    const isTemporary = String(account.id).startsWith('tmp-');
-                    return !isTemporary;
-                });
+                const filteredAccounts = updatedAccounts.filter(
+                    (account: any) => {
+                        const isTemporary = String(account.id).startsWith(
+                            'tmp-',
+                        );
+                        return !isTemporary;
+                    },
+                );
 
                 localStorage.setItem(
                     'accountsData',
                     JSON.stringify(filteredAccounts),
                 );
-                console.log(`✅ License ${licenseId} deleted from accounts and localStorage (${filteredAccounts.length} accounts saved)`);
+                console.log(
+                    `✅ License ${licenseId} deleted from accounts and localStorage (${filteredAccounts.length} accounts saved)`,
+                );
             } catch (error) {
-                console.error('❌ Error updating localStorage after license deletion:', error);
+                console.error(
+                    '❌ Error updating localStorage after license deletion:',
+                    error,
+                );
             }
 
             return updatedAccounts;
@@ -3491,23 +4005,26 @@ export default function ManageAccounts() {
                         console.log('✅ License deletion confirmed');
                     } catch (error) {
                         console.error('Error deleting license:', error);
-                        throw new Error('Failed to delete license from database');
+                        throw new Error(
+                            'Failed to delete license from database',
+                        );
                     }
                 }
             }
 
             // Show success notification
-            const deletedItemName = deleteType === 'account' ? 'account' : 'license';
-            showBlueNotification(
-                `Successfully deleted 1 ${deletedItemName}.`,
-            );
+            const deletedItemName =
+                deleteType === 'account' ? 'account' : 'license';
+            showBlueNotification(`Successfully deleted 1 ${deletedItemName}.`);
 
             // Clear all unsaved changes state after successful deletion
             setPendingLocalChanges({});
             setModifiedExistingRecords(new Set());
             setHasUnsavedChanges(false);
             setPreventNavigation(false);
-            console.log('🧹 Cleared all unsaved changes state after successful deletion');
+            console.log(
+                '🧹 Cleared all unsaved changes state after successful deletion',
+            );
 
             // Close modal and reset state
             setShowDeleteConfirmation(false);
@@ -3644,7 +4161,7 @@ export default function ManageAccounts() {
         });
 
         // Get the most current data from accounts state instead of using potentially stale row data
-        const currentAccount = accounts.find(acc => acc.id === row.id);
+        const currentAccount = accounts.find((acc) => acc.id === row.id);
         console.log('📍 Current account data from state:', {
             id: currentAccount?.id,
             accountName: currentAccount?.accountName,
@@ -3655,9 +4172,11 @@ export default function ManageAccounts() {
         setSelectedAccountForAddress({
             id: row.id,
             accountName: currentAccount?.accountName || row.accountName || '',
-            masterAccount: currentAccount?.masterAccount || row.masterAccount || '',
+            masterAccount:
+                currentAccount?.masterAccount || row.masterAccount || '',
             address: currentAccount?.address || row.address || '',
-            addressData: currentAccount?.addressData || (row as any).addressData,
+            addressData:
+                currentAccount?.addressData || (row as any).addressData,
             addresses: currentAccount?.addresses || (row as any).addresses,
         } as any);
 
@@ -3665,7 +4184,8 @@ export default function ManageAccounts() {
         console.log('📍 Setting selectedAccountForAddress with:', {
             id: row.id,
             addresses: currentAccount?.addresses || (row as any).addresses,
-            addressData: currentAccount?.addressData || (row as any).addressData,
+            addressData:
+                currentAccount?.addressData || (row as any).addressData,
         });
         setIsAddressModalOpen(true);
     };
@@ -3676,7 +4196,7 @@ export default function ManageAccounts() {
 
         // 🔄 Force table re-render to ensure address icons update immediately
         console.log('🔄 Forcing table re-render after modal close');
-        setAccounts(prevAccounts => [...prevAccounts]);
+        setAccounts((prevAccounts) => [...prevAccounts]);
     };
 
     const handleSaveAddresses = async (addresses: any[]) => {
@@ -3693,9 +4213,16 @@ export default function ManageAccounts() {
         );
 
         // Format address string
-        const formattedAddressString = addresses.length > 0
-            ? `${addresses[0].addressLine1 || ''}, ${addresses[0].city || ''}, ${addresses[0].state || ''} ${addresses[0].zipCode || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^\s*,\s*/, '')
-            : '';
+        const formattedAddressString =
+            addresses.length > 0
+                ? `${addresses[0].addressLine1 || ''}, ${
+                      addresses[0].city || ''
+                  }, ${addresses[0].state || ''} ${addresses[0].zipCode || ''}`
+                      .trim()
+                      .replace(/,\s*,/g, ',')
+                      .replace(/,\s*$/, '')
+                      .replace(/^\s*,\s*/, '')
+                : '';
 
         // Update local state
         setAccounts((prev) => {
@@ -3705,7 +4232,8 @@ export default function ManageAccounts() {
                           ...account,
                           addresses: addresses,
                           address: formattedAddressString,
-                          addressData: addresses.length > 0 ? addresses[0] : null,
+                          addressData:
+                              addresses.length > 0 ? addresses[0] : null,
                           updatedAt: new Date().toISOString(),
                       }
                     : account,
@@ -3732,25 +4260,35 @@ export default function ManageAccounts() {
         );
 
         // Format address string - use primary address if available, otherwise first address
-        const primaryAddress = addresses.find(addr => addr.isPrimary) || addresses[0];
+        const primaryAddress =
+            addresses.find((addr) => addr.isPrimary) || addresses[0];
         const formattedAddressString = primaryAddress
-            ? `${primaryAddress.addressLine1 || ''}, ${primaryAddress.city || ''}, ${primaryAddress.state || ''} ${primaryAddress.zipCode || ''}`.trim().replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^\s*,\s*/, '')
+            ? `${primaryAddress.addressLine1 || ''}, ${
+                  primaryAddress.city || ''
+              }, ${primaryAddress.state || ''} ${primaryAddress.zipCode || ''}`
+                  .trim()
+                  .replace(/,\s*,/g, ',')
+                  .replace(/,\s*$/, '')
+                  .replace(/^\s*,\s*/, '')
             : '';
 
         console.log('📍 Individual save - Address formatting:', {
             addressesLength: addresses.length,
             primaryAddress: primaryAddress,
-            formattedAddressString: formattedAddressString
+            formattedAddressString: formattedAddressString,
         });
 
         try {
             // Save to backend API first
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+            const apiBase =
+                process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
 
             // Get the current account data to preserve other fields
-            const currentAccount = accounts.find(acc => acc.id === accountId);
+            const currentAccount = accounts.find((acc) => acc.id === accountId);
             if (!currentAccount) {
-                console.error('❌ Current account not found for individual save');
+                console.error(
+                    '❌ Current account not found for individual save',
+                );
                 return;
             }
 
@@ -3772,11 +4310,12 @@ export default function ManageAccounts() {
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to save address to API: ${response.statusText}`);
+                throw new Error(
+                    `Failed to save address to API: ${response.statusText}`,
+                );
             }
 
             console.log('✅ Individual address saved to API successfully');
-
         } catch (error) {
             console.error('❌ Error saving individual address to API:', error);
             // Continue with local save even if API fails
@@ -3789,7 +4328,11 @@ export default function ManageAccounts() {
                     ? {
                           ...account,
                           addresses: addresses,
-                          address: formattedAddressString || (primaryAddress?.addressLine1 ? 'Address Configured' : ''),
+                          address:
+                              formattedAddressString ||
+                              (primaryAddress?.addressLine1
+                                  ? 'Address Configured'
+                                  : ''),
                           addressData: primaryAddress || null,
                           updatedAt: new Date().toISOString(),
                       }
@@ -3799,13 +4342,13 @@ export default function ManageAccounts() {
             saveAccountsToStorage(sorted);
 
             // Debug: Log the updated account data
-            const updatedAccount = updated.find(acc => acc.id === accountId);
+            const updatedAccount = updated.find((acc) => acc.id === accountId);
             console.log('📍 Individual save - Updated account in state:', {
                 id: updatedAccount?.id,
                 addresses: updatedAccount?.addresses,
                 addressData: updatedAccount?.addressData,
                 address: updatedAccount?.address,
-                formattedAddressString: formattedAddressString
+                formattedAddressString: formattedAddressString,
             });
 
             return sorted;
@@ -3813,29 +4356,34 @@ export default function ManageAccounts() {
 
         // CRITICAL: Update selectedAccountForAddress to reflect the new address data
         // This ensures the modal displays the saved addresses correctly
-        setSelectedAccountForAddress(prev => {
+        setSelectedAccountForAddress((prev) => {
             if (!prev) return prev;
 
             const updatedSelected = {
                 ...prev,
                 addresses: addresses,
-                address: formattedAddressString || (primaryAddress?.addressLine1 ? 'Address Configured' : ''),
+                address:
+                    formattedAddressString ||
+                    (primaryAddress?.addressLine1 ? 'Address Configured' : ''),
                 addressData: primaryAddress || null,
             };
 
-            console.log('📍 Individual save - Updated selectedAccountForAddress:', {
-                id: updatedSelected.id,
-                addresses: updatedSelected.addresses,
-                addressData: updatedSelected.addressData,
-                address: updatedSelected.address
-            });
+            console.log(
+                '📍 Individual save - Updated selectedAccountForAddress:',
+                {
+                    id: updatedSelected.id,
+                    addresses: updatedSelected.addresses,
+                    addressData: updatedSelected.addressData,
+                    address: updatedSelected.address,
+                },
+            );
 
             return updatedSelected;
         });
 
         // Force table re-render by incrementing refresh key
         // This ensures the table component re-renders with updated address data
-        setTableRefreshKey(prev => prev + 1);
+        setTableRefreshKey((prev) => prev + 1);
 
         // Note: Do NOT call handleCloseAddressModal() here - keep modal open
     };
@@ -3852,7 +4400,7 @@ export default function ManageAccounts() {
         });
 
         // Get the most current data from accounts state instead of using potentially stale row data
-        const currentAccount = accounts.find(acc => acc.id === row.id);
+        const currentAccount = accounts.find((acc) => acc.id === row.id);
         console.log('👤 Current account data from state:', {
             id: currentAccount?.id,
             accountName: currentAccount?.accountName,
@@ -3863,7 +4411,10 @@ export default function ManageAccounts() {
             id: row.id,
             accountName: row.accountName || '',
             masterAccount: row.masterAccount || '',
-            technicalUsers: currentAccount?.technicalUsers || (row as any).technicalUsers || [],
+            technicalUsers:
+                currentAccount?.technicalUsers ||
+                (row as any).technicalUsers ||
+                [],
         });
         setIsTechnicalUserModalOpen(true);
     };
@@ -3873,8 +4424,10 @@ export default function ManageAccounts() {
         setSelectedAccountForTechnicalUser(null);
 
         // 🔄 Force table re-render to ensure technical user icons update immediately
-        console.log('🔄 Forcing table re-render after technical user modal close');
-        setAccounts(prevAccounts => [...prevAccounts]);
+        console.log(
+            '🔄 Forcing table re-render after technical user modal close',
+        );
+        setAccounts((prevAccounts) => [...prevAccounts]);
     };
 
     const handleSaveTechnicalUsers = async (users: TechnicalUser[]) => {
@@ -3891,12 +4444,17 @@ export default function ManageAccounts() {
             // Skip API call for temporary accounts (not yet in database)
             if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
                 // Save to backend API first
-                const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                const apiBase =
+                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
 
                 // Get the current account data to preserve other fields
-                const currentAccount = accounts.find(acc => acc.id === selectedAccountForTechnicalUser.id);
+                const currentAccount = accounts.find(
+                    (acc) => acc.id === selectedAccountForTechnicalUser.id,
+                );
                 if (!currentAccount) {
-                    console.error('❌ Current account not found for technical user save');
+                    console.error(
+                        '❌ Current account not found for technical user save',
+                    );
                     return;
                 }
 
@@ -3933,21 +4491,27 @@ export default function ManageAccounts() {
                     console.error('❌ API Error Response:', {
                         status: response.status,
                         statusText: response.statusText,
-                        errorText: errorText
+                        errorText: errorText,
                     });
-                    throw new Error(`Failed to save technical users to API: ${response.statusText} - ${errorText}`);
+                    throw new Error(
+                        `Failed to save technical users to API: ${response.statusText} - ${errorText}`,
+                    );
                 }
 
                 const responseData = await response.json();
                 console.log('✅ Technical users saved to API successfully', {
                     response: responseData,
-                    technicalUsersInResponse: responseData?.technicalUsers || 'Not present',
-                    willRefetchFromUsersAPI: 'Technical users will be refreshed from /api/users on next page load'
+                    technicalUsersInResponse:
+                        responseData?.technicalUsers || 'Not present',
+                    willRefetchFromUsersAPI:
+                        'Technical users will be refreshed from /api/users on next page load',
                 });
             } else {
-                console.log('⏭️ Skipping API save for temporary account:', selectedAccountForTechnicalUser.id);
+                console.log(
+                    '⏭️ Skipping API save for temporary account:',
+                    selectedAccountForTechnicalUser.id,
+                );
             }
-
         } catch (error) {
             console.error('❌ Error saving technical users to API:', error);
             // Continue with local save even if API fails
@@ -3970,12 +4534,14 @@ export default function ManageAccounts() {
         });
 
         // Force table refresh for blue dot visibility
-        setTableRefreshKey(prev => prev + 1);
+        setTableRefreshKey((prev) => prev + 1);
 
         handleCloseTechnicalUserModal();
     };
 
-    const handleSaveIndividualTechnicalUser = async (users: TechnicalUser[]) => {
+    const handleSaveIndividualTechnicalUser = async (
+        users: TechnicalUser[],
+    ) => {
         if (!selectedAccountForTechnicalUser) return;
 
         console.log(
@@ -3986,7 +4552,9 @@ export default function ManageAccounts() {
         );
 
         // Helper function to check if a user should be inactive based on end date
-        const shouldBeInactive = (endDate: string | null | undefined): boolean => {
+        const shouldBeInactive = (
+            endDate: string | null | undefined,
+        ): boolean => {
             if (!endDate) return false;
             const currentDate = new Date();
             const userEndDate = new Date(endDate);
@@ -3994,12 +4562,14 @@ export default function ManageAccounts() {
         };
 
         // Validate and update user status based on end date before saving
-        const validatedUsers = users.map(user => {
+        const validatedUsers = users.map((user) => {
             if (shouldBeInactive(user.endDate) && user.status === true) {
-                console.log(`🔄 Auto-setting user ${user.firstName} ${user.lastName} to Inactive due to expired end date: ${user.endDate}`);
+                console.log(
+                    `🔄 Auto-setting user ${user.firstName} ${user.lastName} to Inactive due to expired end date: ${user.endDate}`,
+                );
                 return {
                     ...user,
-                    status: false // false = Inactive
+                    status: false, // false = Inactive
                 };
             }
             return user;
@@ -4009,12 +4579,17 @@ export default function ManageAccounts() {
             // Skip API call for temporary accounts (not yet in database)
             if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
                 // Save to backend API first
-                const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                const apiBase =
+                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
 
                 // Get the current account data to preserve other fields
-                const currentAccount = accounts.find(acc => acc.id === selectedAccountForTechnicalUser.id);
+                const currentAccount = accounts.find(
+                    (acc) => acc.id === selectedAccountForTechnicalUser.id,
+                );
                 if (!currentAccount) {
-                    console.error('❌ Current account not found for individual technical user save');
+                    console.error(
+                        '❌ Current account not found for individual technical user save',
+                    );
                     return;
                 }
 
@@ -4051,23 +4626,35 @@ export default function ManageAccounts() {
                     console.error('❌ Individual API Error Response:', {
                         status: response.status,
                         statusText: response.statusText,
-                        errorText: errorText
+                        errorText: errorText,
                     });
-                    throw new Error(`Failed to save technical user to API: ${response.statusText} - ${errorText}`);
+                    throw new Error(
+                        `Failed to save technical user to API: ${response.statusText} - ${errorText}`,
+                    );
                 }
 
                 const responseData = await response.json();
-                console.log('✅ Individual technical user saved to API successfully', {
-                    response: responseData,
-                    technicalUsersInResponse: responseData?.technicalUsers || 'Not present',
-                    willRefetchFromUsersAPI: 'Technical users will be refreshed from /api/users on next page load'
-                });
+                console.log(
+                    '✅ Individual technical user saved to API successfully',
+                    {
+                        response: responseData,
+                        technicalUsersInResponse:
+                            responseData?.technicalUsers || 'Not present',
+                        willRefetchFromUsersAPI:
+                            'Technical users will be refreshed from /api/users on next page load',
+                    },
+                );
             } else {
-                console.log('⏭️ Skipping API save for temporary account:', selectedAccountForTechnicalUser.id);
+                console.log(
+                    '⏭️ Skipping API save for temporary account:',
+                    selectedAccountForTechnicalUser.id,
+                );
             }
-
         } catch (error) {
-            console.error('❌ Error saving individual technical user to API:', error);
+            console.error(
+                '❌ Error saving individual technical user to API:',
+                error,
+            );
             // Continue with local save even if API fails
         }
 
@@ -4088,7 +4675,7 @@ export default function ManageAccounts() {
         });
 
         // Force table refresh for immediate blue dot visibility
-        setTableRefreshKey(prev => prev + 1);
+        setTableRefreshKey((prev) => prev + 1);
 
         showBlueNotification('Technical user saved successfully');
     };
@@ -4270,92 +4857,223 @@ export default function ManageAccounts() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.accountName}
+                                                        value={
+                                                            filterForm.accountName
+                                                        }
                                                         onChange={(e) => {
-                                                            const value = e.target.value;
-                                                            console.log('🔍 Account filter onChange:', {
-                                                                value,
-                                                                dropdownOptionsLength: dropdownOptions.accountNames.length,
-                                                                availableAccountNames: dropdownOptions.accountNames.map(a => a.name)
-                                                            });
+                                                            const value =
+                                                                e.target.value;
+                                                            console.log(
+                                                                '🔍 Account filter onChange:',
+                                                                {
+                                                                    value,
+                                                                    dropdownOptionsLength:
+                                                                        dropdownOptions
+                                                                            .accountNames
+                                                                            .length,
+                                                                    availableAccountNames:
+                                                                        dropdownOptions.accountNames.map(
+                                                                            (
+                                                                                a,
+                                                                            ) =>
+                                                                                a.name,
+                                                                        ),
+                                                                },
+                                                            );
 
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                accountName: value,
+                                                                accountName:
+                                                                    value,
                                                             });
 
                                                             // Filter account names and ensure uniqueness
-                                                            const filtered = dropdownOptions.accountNames.filter(account =>
-                                                                account.name.toLowerCase().includes(value.toLowerCase())
+                                                            const filtered =
+                                                                dropdownOptions.accountNames.filter(
+                                                                    (account) =>
+                                                                        account.name
+                                                                            .toLowerCase()
+                                                                            .includes(
+                                                                                value.toLowerCase(),
+                                                                            ),
+                                                                );
+                                                            console.log(
+                                                                '🔍 Filtered accounts:',
+                                                                filtered.map(
+                                                                    (a) =>
+                                                                        a.name,
+                                                                ),
                                                             );
-                                                            console.log('🔍 Filtered accounts:', filtered.map(a => a.name));
 
                                                             // Remove duplicates based on name
-                                                            const uniqueFiltered = filtered.filter((account, index, self) =>
-                                                                index === self.findIndex(a => a.name === account.name)
+                                                            const uniqueFiltered =
+                                                                filtered.filter(
+                                                                    (
+                                                                        account,
+                                                                        index,
+                                                                        self,
+                                                                    ) =>
+                                                                        index ===
+                                                                        self.findIndex(
+                                                                            (
+                                                                                a,
+                                                                            ) =>
+                                                                                a.name ===
+                                                                                account.name,
+                                                                        ),
+                                                                );
+                                                            setFilteredAccountNames(
+                                                                uniqueFiltered,
                                                             );
-                                                            setFilteredAccountNames(uniqueFiltered);
 
-                                                            const shouldShow = value.length > 0 && filtered.length > 0;
-                                                            console.log('🔍 Should show suggestions:', shouldShow, { valueLength: value.length, filteredLength: filtered.length });
-                                                            setShowAccountSuggestions(shouldShow);
-                                                            setSelectedAccountIndex(-1);
+                                                            const shouldShow =
+                                                                value.length >
+                                                                    0 &&
+                                                                filtered.length >
+                                                                    0;
+                                                            console.log(
+                                                                '🔍 Should show suggestions:',
+                                                                shouldShow,
+                                                                {
+                                                                    valueLength:
+                                                                        value.length,
+                                                                    filteredLength:
+                                                                        filtered.length,
+                                                                },
+                                                            );
+                                                            setShowAccountSuggestions(
+                                                                shouldShow,
+                                                            );
+                                                            setSelectedAccountIndex(
+                                                                -1,
+                                                            );
                                                         }}
                                                         onKeyDown={(e) => {
-                                                            if (e.key === 'ArrowDown') {
+                                                            if (
+                                                                e.key ===
+                                                                'ArrowDown'
+                                                            ) {
                                                                 e.preventDefault();
-                                                                setSelectedAccountIndex(prev =>
-                                                                    prev < filteredAccountNames.length - 1 ? prev + 1 : prev
+                                                                setSelectedAccountIndex(
+                                                                    (prev) =>
+                                                                        prev <
+                                                                        filteredAccountNames.length -
+                                                                            1
+                                                                            ? prev +
+                                                                              1
+                                                                            : prev,
                                                                 );
-                                                            } else if (e.key === 'ArrowUp') {
+                                                            } else if (
+                                                                e.key ===
+                                                                'ArrowUp'
+                                                            ) {
                                                                 e.preventDefault();
-                                                                setSelectedAccountIndex(prev => prev > 0 ? prev - 1 : -1);
-                                                            } else if (e.key === 'Enter' && selectedAccountIndex >= 0) {
+                                                                setSelectedAccountIndex(
+                                                                    (prev) =>
+                                                                        prev > 0
+                                                                            ? prev -
+                                                                              1
+                                                                            : -1,
+                                                                );
+                                                            } else if (
+                                                                e.key ===
+                                                                    'Enter' &&
+                                                                selectedAccountIndex >=
+                                                                    0
+                                                            ) {
                                                                 e.preventDefault();
-                                                                const selected = filteredAccountNames[selectedAccountIndex];
+                                                                const selected =
+                                                                    filteredAccountNames[
+                                                                        selectedAccountIndex
+                                                                    ];
                                                                 setFilterForm({
                                                                     ...filterForm,
-                                                                    accountName: selected.name,
+                                                                    accountName:
+                                                                        selected.name,
                                                                 });
-                                                                setShowAccountSuggestions(false);
-                                                                setSelectedAccountIndex(-1);
-                                                            } else if (e.key === 'Escape') {
-                                                                setShowAccountSuggestions(false);
-                                                                setSelectedAccountIndex(-1);
+                                                                setShowAccountSuggestions(
+                                                                    false,
+                                                                );
+                                                                setSelectedAccountIndex(
+                                                                    -1,
+                                                                );
+                                                            } else if (
+                                                                e.key ===
+                                                                'Escape'
+                                                            ) {
+                                                                setShowAccountSuggestions(
+                                                                    false,
+                                                                );
+                                                                setSelectedAccountIndex(
+                                                                    -1,
+                                                                );
                                                             }
                                                         }}
                                                         onBlur={() => {
                                                             // Delay hiding suggestions to allow clicking
-                                                            setTimeout(() => setShowAccountSuggestions(false), 150);
+                                                            setTimeout(
+                                                                () =>
+                                                                    setShowAccountSuggestions(
+                                                                        false,
+                                                                    ),
+                                                                150,
+                                                            );
                                                         }}
                                                         onFocus={() => {
-                                                            if (filterForm.accountName && filteredAccountNames.length > 0) {
-                                                                setShowAccountSuggestions(true);
+                                                            if (
+                                                                filterForm.accountName &&
+                                                                filteredAccountNames.length >
+                                                                    0
+                                                            ) {
+                                                                setShowAccountSuggestions(
+                                                                    true,
+                                                                );
                                                             }
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                     {showAccountSuggestions && (
                                                         <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
-                                                            {filteredAccountNames.map((account, index) => (
-                                                                <div
-                                                                    key={account.id}
-                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
-                                                                        index === selectedAccountIndex ? 'bg-blue-100' : ''
-                                                                    }`}
-                                                                    onMouseDown={(e) => {
-                                                                        e.preventDefault(); // Prevent input blur
-                                                                        setFilterForm({
-                                                                            ...filterForm,
-                                                                            accountName: account.name,
-                                                                        });
-                                                                        setShowAccountSuggestions(false);
-                                                                        setSelectedAccountIndex(-1);
-                                                                    }}
-                                                                >
-                                                                    {account.name}
-                                                                </div>
-                                                            ))}
+                                                            {filteredAccountNames.map(
+                                                                (
+                                                                    account,
+                                                                    index,
+                                                                ) => (
+                                                                    <div
+                                                                        key={
+                                                                            account.id
+                                                                        }
+                                                                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                            index ===
+                                                                            selectedAccountIndex
+                                                                                ? 'bg-blue-100'
+                                                                                : ''
+                                                                        }`}
+                                                                        onMouseDown={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.preventDefault(); // Prevent input blur
+                                                                            setFilterForm(
+                                                                                {
+                                                                                    ...filterForm,
+                                                                                    accountName:
+                                                                                        account.name,
+                                                                                },
+                                                                            );
+                                                                            setShowAccountSuggestions(
+                                                                                false,
+                                                                            );
+                                                                            setSelectedAccountIndex(
+                                                                                -1,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            account.name
+                                                                        }
+                                                                    </div>
+                                                                ),
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -4369,92 +5087,223 @@ export default function ManageAccounts() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.masterAccount}
+                                                        value={
+                                                            filterForm.masterAccount
+                                                        }
                                                         onChange={(e) => {
-                                                            const value = e.target.value;
-                                                            console.log('🔍 Master Account filter onChange:', {
-                                                                value,
-                                                                dropdownOptionsLength: dropdownOptions.masterAccounts.length,
-                                                                availableMasterAccounts: dropdownOptions.masterAccounts.map(m => m.name)
-                                                            });
+                                                            const value =
+                                                                e.target.value;
+                                                            console.log(
+                                                                '🔍 Master Account filter onChange:',
+                                                                {
+                                                                    value,
+                                                                    dropdownOptionsLength:
+                                                                        dropdownOptions
+                                                                            .masterAccounts
+                                                                            .length,
+                                                                    availableMasterAccounts:
+                                                                        dropdownOptions.masterAccounts.map(
+                                                                            (
+                                                                                m,
+                                                                            ) =>
+                                                                                m.name,
+                                                                        ),
+                                                                },
+                                                            );
 
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                masterAccount: value,
+                                                                masterAccount:
+                                                                    value,
                                                             });
 
                                                             // Filter master account names and ensure uniqueness
-                                                            const filtered = dropdownOptions.masterAccounts.filter(master =>
-                                                                master.name.toLowerCase().includes(value.toLowerCase())
+                                                            const filtered =
+                                                                dropdownOptions.masterAccounts.filter(
+                                                                    (master) =>
+                                                                        master.name
+                                                                            .toLowerCase()
+                                                                            .includes(
+                                                                                value.toLowerCase(),
+                                                                            ),
+                                                                );
+                                                            console.log(
+                                                                '🔍 Filtered master accounts:',
+                                                                filtered.map(
+                                                                    (m) =>
+                                                                        m.name,
+                                                                ),
                                                             );
-                                                            console.log('🔍 Filtered master accounts:', filtered.map(m => m.name));
 
                                                             // Remove duplicates based on name
-                                                            const uniqueFiltered = filtered.filter((master, index, self) =>
-                                                                index === self.findIndex(m => m.name === master.name)
+                                                            const uniqueFiltered =
+                                                                filtered.filter(
+                                                                    (
+                                                                        master,
+                                                                        index,
+                                                                        self,
+                                                                    ) =>
+                                                                        index ===
+                                                                        self.findIndex(
+                                                                            (
+                                                                                m,
+                                                                            ) =>
+                                                                                m.name ===
+                                                                                master.name,
+                                                                        ),
+                                                                );
+                                                            setFilteredMasterAccounts(
+                                                                uniqueFiltered,
                                                             );
-                                                            setFilteredMasterAccounts(uniqueFiltered);
 
-                                                            const shouldShow = value.length > 0 && filtered.length > 0;
-                                                            console.log('🔍 Should show master account suggestions:', shouldShow, { valueLength: value.length, filteredLength: filtered.length });
-                                                            setShowMasterAccountSuggestions(shouldShow);
-                                                            setSelectedMasterAccountIndex(-1);
+                                                            const shouldShow =
+                                                                value.length >
+                                                                    0 &&
+                                                                filtered.length >
+                                                                    0;
+                                                            console.log(
+                                                                '🔍 Should show master account suggestions:',
+                                                                shouldShow,
+                                                                {
+                                                                    valueLength:
+                                                                        value.length,
+                                                                    filteredLength:
+                                                                        filtered.length,
+                                                                },
+                                                            );
+                                                            setShowMasterAccountSuggestions(
+                                                                shouldShow,
+                                                            );
+                                                            setSelectedMasterAccountIndex(
+                                                                -1,
+                                                            );
                                                         }}
                                                         onKeyDown={(e) => {
-                                                            if (e.key === 'ArrowDown') {
+                                                            if (
+                                                                e.key ===
+                                                                'ArrowDown'
+                                                            ) {
                                                                 e.preventDefault();
-                                                                setSelectedMasterAccountIndex(prev =>
-                                                                    prev < filteredMasterAccounts.length - 1 ? prev + 1 : prev
+                                                                setSelectedMasterAccountIndex(
+                                                                    (prev) =>
+                                                                        prev <
+                                                                        filteredMasterAccounts.length -
+                                                                            1
+                                                                            ? prev +
+                                                                              1
+                                                                            : prev,
                                                                 );
-                                                            } else if (e.key === 'ArrowUp') {
+                                                            } else if (
+                                                                e.key ===
+                                                                'ArrowUp'
+                                                            ) {
                                                                 e.preventDefault();
-                                                                setSelectedMasterAccountIndex(prev => prev > 0 ? prev - 1 : -1);
-                                                            } else if (e.key === 'Enter' && selectedMasterAccountIndex >= 0) {
+                                                                setSelectedMasterAccountIndex(
+                                                                    (prev) =>
+                                                                        prev > 0
+                                                                            ? prev -
+                                                                              1
+                                                                            : -1,
+                                                                );
+                                                            } else if (
+                                                                e.key ===
+                                                                    'Enter' &&
+                                                                selectedMasterAccountIndex >=
+                                                                    0
+                                                            ) {
                                                                 e.preventDefault();
-                                                                const selected = filteredMasterAccounts[selectedMasterAccountIndex];
+                                                                const selected =
+                                                                    filteredMasterAccounts[
+                                                                        selectedMasterAccountIndex
+                                                                    ];
                                                                 setFilterForm({
                                                                     ...filterForm,
-                                                                    masterAccount: selected.name,
+                                                                    masterAccount:
+                                                                        selected.name,
                                                                 });
-                                                                setShowMasterAccountSuggestions(false);
-                                                                setSelectedMasterAccountIndex(-1);
-                                                            } else if (e.key === 'Escape') {
-                                                                setShowMasterAccountSuggestions(false);
-                                                                setSelectedMasterAccountIndex(-1);
+                                                                setShowMasterAccountSuggestions(
+                                                                    false,
+                                                                );
+                                                                setSelectedMasterAccountIndex(
+                                                                    -1,
+                                                                );
+                                                            } else if (
+                                                                e.key ===
+                                                                'Escape'
+                                                            ) {
+                                                                setShowMasterAccountSuggestions(
+                                                                    false,
+                                                                );
+                                                                setSelectedMasterAccountIndex(
+                                                                    -1,
+                                                                );
                                                             }
                                                         }}
                                                         onBlur={() => {
                                                             // Delay hiding suggestions to allow clicking
-                                                            setTimeout(() => setShowMasterAccountSuggestions(false), 150);
+                                                            setTimeout(
+                                                                () =>
+                                                                    setShowMasterAccountSuggestions(
+                                                                        false,
+                                                                    ),
+                                                                150,
+                                                            );
                                                         }}
                                                         onFocus={() => {
-                                                            if (filterForm.masterAccount && filteredMasterAccounts.length > 0) {
-                                                                setShowMasterAccountSuggestions(true);
+                                                            if (
+                                                                filterForm.masterAccount &&
+                                                                filteredMasterAccounts.length >
+                                                                    0
+                                                            ) {
+                                                                setShowMasterAccountSuggestions(
+                                                                    true,
+                                                                );
                                                             }
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
                                                     {showMasterAccountSuggestions && (
                                                         <div className='filter-suggestions-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto'>
-                                                            {filteredMasterAccounts.map((master, index) => (
-                                                                <div
-                                                                    key={master.id}
-                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
-                                                                        index === selectedMasterAccountIndex ? 'bg-blue-100' : ''
-                                                                    }`}
-                                                                    onMouseDown={(e) => {
-                                                                        e.preventDefault(); // Prevent input blur
-                                                                        setFilterForm({
-                                                                            ...filterForm,
-                                                                            masterAccount: master.name,
-                                                                        });
-                                                                        setShowMasterAccountSuggestions(false);
-                                                                        setSelectedMasterAccountIndex(-1);
-                                                                    }}
-                                                                >
-                                                                    {master.name}
-                                                                </div>
-                                                            ))}
+                                                            {filteredMasterAccounts.map(
+                                                                (
+                                                                    master,
+                                                                    index,
+                                                                ) => (
+                                                                    <div
+                                                                        key={
+                                                                            master.id
+                                                                        }
+                                                                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                            index ===
+                                                                            selectedMasterAccountIndex
+                                                                                ? 'bg-blue-100'
+                                                                                : ''
+                                                                        }`}
+                                                                        onMouseDown={(
+                                                                            e,
+                                                                        ) => {
+                                                                            e.preventDefault(); // Prevent input blur
+                                                                            setFilterForm(
+                                                                                {
+                                                                                    ...filterForm,
+                                                                                    masterAccount:
+                                                                                        master.name,
+                                                                                },
+                                                                            );
+                                                                            setShowMasterAccountSuggestions(
+                                                                                false,
+                                                                            );
+                                                                            setSelectedMasterAccountIndex(
+                                                                                -1,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            master.name
+                                                                        }
+                                                                    </div>
+                                                                ),
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -4483,8 +5332,6 @@ export default function ManageAccounts() {
                                                     />
                                                 </div>
                                             </div>
-
-
                                         </div>
                                     </div>
                                 </div>
@@ -4561,12 +5408,23 @@ export default function ManageAccounts() {
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select column...</option>
-                                                        {toolbarCols.map((col) => (
-                                                            <option key={col} value={col}>
-                                                                {columnLabels[col]}
-                                                            </option>
-                                                        ))}
+                                                        <option value=''>
+                                                            Select column...
+                                                        </option>
+                                                        {toolbarCols.map(
+                                                            (col) => (
+                                                                <option
+                                                                    key={col}
+                                                                    value={col}
+                                                                >
+                                                                    {
+                                                                        columnLabels[
+                                                                            col
+                                                                        ]
+                                                                    }
+                                                                </option>
+                                                            ),
+                                                        )}
                                                     </select>
                                                 </div>
                                             </div>
@@ -4801,17 +5659,33 @@ export default function ManageAccounts() {
                                                 </label>
                                                 <div className='relative'>
                                                     <select
-                                                        value={ActiveGroupLabel === 'None' ? '' : ActiveGroupLabel}
+                                                        value={
+                                                            ActiveGroupLabel ===
+                                                            'None'
+                                                                ? ''
+                                                                : ActiveGroupLabel
+                                                        }
                                                         onChange={(e) => {
-                                                            const value = e.target.value;
-                                                            setGroupByFromLabel(value || 'None');
+                                                            const value =
+                                                                e.target.value;
+                                                            setGroupByFromLabel(
+                                                                value || 'None',
+                                                            );
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select column...</option>
-                                                        <option value='Account'>Account</option>
-                                                        <option value='Master Account'>Master Account</option>
-                                                        <option value='Cloud Type'>Cloud Type</option>
+                                                        <option value=''>
+                                                            Select column...
+                                                        </option>
+                                                        <option value='Account'>
+                                                            Account
+                                                        </option>
+                                                        <option value='Master Account'>
+                                                            Master Account
+                                                        </option>
+                                                        <option value='Cloud Type'>
+                                                            Cloud Type
+                                                        </option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -4820,7 +5694,8 @@ export default function ManageAccounts() {
                                             {ActiveGroupLabel !== 'None' && (
                                                 <div className='mt-1 p-2 bg-orange-50 rounded border text-xs'>
                                                     <span className='font-medium text-orange-800'>
-                                                        Grouped by: {ActiveGroupLabel}
+                                                        Grouped by:{' '}
+                                                        {ActiveGroupLabel}
                                                     </span>
                                                 </div>
                                             )}
@@ -4915,36 +5790,80 @@ export default function ManageAccounts() {
                         {/* Expand All Button */}
                         <button
                             onClick={expandAllRows}
-                            className="group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-emerald-300 bg-emerald-50 text-emerald-600 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-lg"
-                            title="Expand All Accounts"
+                            className='group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-emerald-300 bg-emerald-50 text-emerald-600 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-lg'
+                            title='Expand All Accounts'
                         >
-                            <svg className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='1.5' viewBox='0 0 16 16'>
+                            <svg
+                                className='h-4 w-4 transition-transform duration-300 group-hover:scale-110'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='1.5'
+                                viewBox='0 0 16 16'
+                            >
                                 {/* Top-left arrow */}
-                                <path d='M2 2 L6 6 M2 2 L2 6 M2 2 L6 2' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M2 2 L6 6 M2 2 L2 6 M2 2 L6 2'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Top-right arrow */}
-                                <path d='M14 2 L10 6 M14 2 L14 6 M14 2 L10 2' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M14 2 L10 6 M14 2 L14 6 M14 2 L10 2'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Bottom-left arrow */}
-                                <path d='M2 14 L6 10 M2 14 L2 10 M2 14 L6 14' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M2 14 L6 10 M2 14 L2 10 M2 14 L6 14'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Bottom-right arrow */}
-                                <path d='M14 14 L10 10 M14 14 L14 10 M14 14 L10 14' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M14 14 L10 10 M14 14 L14 10 M14 14 L10 14'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                             </svg>
                         </button>
 
                         {/* Collapse All Button */}
                         <button
                             onClick={collapseAllRows}
-                            className="group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 hover:shadow-lg"
-                            title="Collapse All Accounts"
+                            className='group relative flex items-center justify-center p-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 hover:shadow-lg'
+                            title='Collapse All Accounts'
                         >
-                            <svg className='h-4 w-4 transition-transform duration-300 group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='1.5' viewBox='0 0 16 16'>
+                            <svg
+                                className='h-4 w-4 transition-transform duration-300 group-hover:scale-110'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='1.5'
+                                viewBox='0 0 16 16'
+                            >
                                 {/* Top-left arrow pointing inward */}
-                                <path d='M6 6 L2 2 M6 6 L6 2 M6 6 L2 6' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M6 6 L2 2 M6 6 L6 2 M6 6 L2 6'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Top-right arrow pointing inward */}
-                                <path d='M10 6 L14 2 M10 6 L10 2 M10 6 L14 6' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M10 6 L14 2 M10 6 L10 2 M10 6 L14 6'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Bottom-left arrow pointing inward */}
-                                <path d='M6 10 L2 14 M6 10 L6 14 M6 10 L2 10' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M6 10 L2 14 M6 10 L6 14 M6 10 L2 10'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                                 {/* Bottom-right arrow pointing inward */}
-                                <path d='M10 10 L14 14 M10 10 L10 14 M10 10 L14 10' strokeLinecap='round' strokeLinejoin='round' />
+                                <path
+                                    d='M10 10 L14 14 M10 10 L10 14 M10 10 L14 10'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                />
                             </svg>
                         </button>
                     </div>
@@ -5195,26 +6114,48 @@ export default function ManageAccounts() {
                                                 const hasCompleteLicenseData =
                                                     Array.isArray(value) &&
                                                     value.length > 0 &&
-                                                    value.every((license: any) => {
-                                                        const hasEnterprise = license.enterprise?.trim();
-                                                        const hasProduct = license.product?.trim();
-                                                        const hasService = license.service?.trim();
-                                                        const hasLicenseStartDate = license.licenseStartDate?.trim();
-                                                        const hasLicenseEndDate = license.licenseEndDate?.trim();
-                                                        const hasNumberOfUsers = license.numberOfUsers?.trim();
-                                                        const hasValidNoticePeriod = !license.renewalNotice || license.noticePeriodDays?.trim();
+                                                    value.every(
+                                                        (license: any) => {
+                                                            const hasEnterprise =
+                                                                license.enterprise?.trim();
+                                                            const hasProduct =
+                                                                license.product?.trim();
+                                                            const hasService =
+                                                                license.service?.trim();
+                                                            const hasLicenseStartDate =
+                                                                license.licenseStartDate?.trim();
+                                                            const hasLicenseEndDate =
+                                                                license.licenseEndDate?.trim();
+                                                            const hasNumberOfUsers =
+                                                                license.numberOfUsers?.trim();
+                                                            const hasValidNoticePeriod =
+                                                                !license.renewalNotice ||
+                                                                license.noticePeriodDays?.trim();
 
-                                                        return hasEnterprise && hasProduct && hasService &&
-                                                               hasLicenseStartDate && hasLicenseEndDate &&
-                                                               hasNumberOfUsers && hasValidNoticePeriod;
-                                                    });
+                                                            return (
+                                                                hasEnterprise &&
+                                                                hasProduct &&
+                                                                hasService &&
+                                                                hasLicenseStartDate &&
+                                                                hasLicenseEndDate &&
+                                                                hasNumberOfUsers &&
+                                                                hasValidNoticePeriod
+                                                            );
+                                                        },
+                                                    );
 
-                                                console.log('📊 License completeness check:', {
-                                                    rowId,
-                                                    hasCompleteLicenseData,
-                                                    licensesCount: Array.isArray(value) ? value.length : 0,
-                                                    licenses: value
-                                                });
+                                                console.log(
+                                                    '📊 License completeness check:',
+                                                    {
+                                                        rowId,
+                                                        hasCompleteLicenseData,
+                                                        licensesCount:
+                                                            Array.isArray(value)
+                                                                ? value.length
+                                                                : 0,
+                                                        licenses: value,
+                                                    },
+                                                );
 
                                                 if (hasCompleteLicenseData) {
                                                     console.log(
@@ -5223,26 +6164,56 @@ export default function ManageAccounts() {
                                                     );
 
                                                     // Check if licenses actually changed before marking as modified
-                                                    const currentAccount = accounts.find(a => a.id === rowId);
-                                                    const oldLicenses = JSON.stringify(currentAccount?.licenses || []);
-                                                    const newLicenses = JSON.stringify(value);
-                                                    const hasLicenseChanged = oldLicenses !== newLicenses;
+                                                    const currentAccount =
+                                                        accounts.find(
+                                                            (a) =>
+                                                                a.id === rowId,
+                                                        );
+                                                    const oldLicenses =
+                                                        JSON.stringify(
+                                                            currentAccount?.licenses ||
+                                                                [],
+                                                        );
+                                                    const newLicenses =
+                                                        JSON.stringify(value);
+                                                    const hasLicenseChanged =
+                                                        oldLicenses !==
+                                                        newLicenses;
 
-                                                    console.log('🔍 License change check:', {
-                                                        rowId,
-                                                        hasLicenseChanged,
-                                                        oldCount: currentAccount?.licenses?.length || 0,
-                                                        newCount: Array.isArray(value) ? value.length : 0
-                                                    });
+                                                    console.log(
+                                                        '🔍 License change check:',
+                                                        {
+                                                            rowId,
+                                                            hasLicenseChanged,
+                                                            oldCount:
+                                                                currentAccount
+                                                                    ?.licenses
+                                                                    ?.length ||
+                                                                0,
+                                                            newCount:
+                                                                Array.isArray(
+                                                                    value,
+                                                                )
+                                                                    ? value.length
+                                                                    : 0,
+                                                        },
+                                                    );
 
                                                     if (hasLicenseChanged) {
                                                         // Add to modified records set
                                                         setModifiedExistingRecords(
                                                             (prev) => {
                                                                 const newSet =
-                                                                    new Set(prev);
-                                                                newSet.add(rowId);
-                                                                console.log('✅ Added to modified records (license changed):', rowId);
+                                                                    new Set(
+                                                                        prev,
+                                                                    );
+                                                                newSet.add(
+                                                                    rowId,
+                                                                );
+                                                                console.log(
+                                                                    '✅ Added to modified records (license changed):',
+                                                                    rowId,
+                                                                );
                                                                 return newSet;
                                                             },
                                                         );
@@ -5250,7 +6221,10 @@ export default function ManageAccounts() {
                                                         // Trigger auto-save timer for visual feedback
                                                         debouncedAutoSave();
                                                     } else {
-                                                        console.log('❌ Not adding to modified records (license unchanged):', rowId);
+                                                        console.log(
+                                                            '❌ Not adding to modified records (license unchanged):',
+                                                            rowId,
+                                                        );
                                                     }
                                                 } else {
                                                     console.log(
@@ -5261,8 +6235,11 @@ export default function ManageAccounts() {
                                                     // Remove from modified records if license is incomplete
                                                     setModifiedExistingRecords(
                                                         (prev) => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.delete(rowId);
+                                                            const newSet =
+                                                                new Set(prev);
+                                                            newSet.delete(
+                                                                rowId,
+                                                            );
                                                             return newSet;
                                                         },
                                                     );
@@ -5542,31 +6519,48 @@ export default function ManageAccounts() {
                                                     }
 
                                                     // Add to modified records set ONLY if value actually changed
-                                                    const oldValue = account[field as keyof typeof account];
-                                                    const hasValueChanged = oldValue !== value;
+                                                    const oldValue =
+                                                        account[
+                                                            field as keyof typeof account
+                                                        ];
+                                                    const hasValueChanged =
+                                                        oldValue !== value;
 
-                                                    console.log('🔍 Value change check:', {
-                                                        rowId,
-                                                        field,
-                                                        oldValue,
-                                                        newValue: value,
-                                                        hasValueChanged
-                                                    });
+                                                    console.log(
+                                                        '🔍 Value change check:',
+                                                        {
+                                                            rowId,
+                                                            field,
+                                                            oldValue,
+                                                            newValue: value,
+                                                            hasValueChanged,
+                                                        },
+                                                    );
 
                                                     if (hasValueChanged) {
                                                         setModifiedExistingRecords(
                                                             (prev) => {
                                                                 const newSet =
-                                                                    new Set(prev);
-                                                                newSet.add(rowId);
-                                                                console.log('✅ Added to modified records (value changed):', rowId);
+                                                                    new Set(
+                                                                        prev,
+                                                                    );
+                                                                newSet.add(
+                                                                    rowId,
+                                                                );
+                                                                console.log(
+                                                                    '✅ Added to modified records (value changed):',
+                                                                    rowId,
+                                                                );
                                                                 return newSet;
                                                             },
                                                         );
                                                         // Trigger auto-save timer for visual feedback
                                                         debouncedAutoSave();
                                                     } else {
-                                                        console.log('❌ Not adding to modified records (value unchanged):', rowId);
+                                                        console.log(
+                                                            '❌ Not adding to modified records (value unchanged):',
+                                                            rowId,
+                                                        );
                                                     }
                                                 } else {
                                                     console.log(
@@ -5675,13 +6669,22 @@ export default function ManageAccounts() {
                     title='Unsaved Changes'
                     message={
                         incompleteRows.length > 0
-                            ? `You have ${incompleteRows.length} incomplete account ${incompleteRows.length === 1 ? 'entry' : 'entries'}. Your changes will be lost if you leave.`
+                            ? `You have ${
+                                  incompleteRows.length
+                              } incomplete account ${
+                                  incompleteRows.length === 1
+                                      ? 'entry'
+                                      : 'entries'
+                              }. Your changes will be lost if you leave.`
                             : 'You have unsaved changes that will be lost if you leave.'
                     }
                     confirmText='Leave Anyway'
                     cancelText='Stay Here'
                     onConfirm={() => {
-                        console.log('🚀 Leave Anyway clicked', { pendingNavigation, pendingNavigationUrl });
+                        console.log('🚀 Leave Anyway clicked', {
+                            pendingNavigation,
+                            pendingNavigationUrl,
+                        });
                         setShowNavigationWarning(false);
                         setIncompleteRows([]);
 
@@ -5695,17 +6698,25 @@ export default function ManageAccounts() {
                         // Execute navigation with a delay to ensure state updates
                         setTimeout(() => {
                             if (pendingNavigation) {
-                                console.log('🚀 Executing pendingNavigation function');
+                                console.log(
+                                    '🚀 Executing pendingNavigation function',
+                                );
                                 pendingNavigation();
                                 setPendingNavigation(null);
                             } else if (pendingNavigationUrl) {
-                                console.log('🚀 Navigating to pendingNavigationUrl:', pendingNavigationUrl);
+                                console.log(
+                                    '🚀 Navigating to pendingNavigationUrl:',
+                                    pendingNavigationUrl,
+                                );
                                 // Use router.push instead of window.location.href
                                 router.push(pendingNavigationUrl);
                                 setPendingNavigationUrl(null);
                             }
                             // Reset the flag after navigation attempt
-                            setTimeout(() => setUserConfirmedLeave(false), 1000);
+                            setTimeout(
+                                () => setUserConfirmedLeave(false),
+                                1000,
+                            );
                         }, 50);
                     }}
                     onCancel={() => {
@@ -5753,9 +6764,8 @@ export default function ManageAccounts() {
                                     <div className='mt-2'>
                                         <p className='text-sm text-gray-900'>
                                             {deleteType === 'account'
-                                                ? "Are you sure you want to delete this account?"
-                                                : "Are you sure you want to delete this license details?"
-                                            }
+                                                ? 'Are you sure you want to delete this account?'
+                                                : 'Are you sure you want to delete this license details?'}
                                         </p>
                                     </div>
                                 </div>
@@ -5788,7 +6798,9 @@ export default function ManageAccounts() {
                                                     d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
                                                 ></path>
                                             </svg>
-                                            {deleteType === 'license' ? 'Deleting License...' : 'Deleting...'}
+                                            {deleteType === 'license'
+                                                ? 'Deleting License...'
+                                                : 'Deleting...'}
                                         </>
                                     ) : (
                                         'Yes'
@@ -5821,7 +6833,7 @@ export default function ManageAccounts() {
                     style={{
                         // Position well above the toolbar with significant spacing
                         // Header height (~80px) + more gap above toolbar (40px)
-                        top: '40px'
+                        top: '40px',
                         // Right positioning handled by CSS classes for consistency
                     }}
                 >
@@ -5945,12 +6957,19 @@ export default function ManageAccounts() {
                 (() => {
                     const initialAddresses = (() => {
                         // Check if we have an addresses array
-                        if ((selectedAccountForAddress as any).addresses && Array.isArray((selectedAccountForAddress as any).addresses)) {
+                        if (
+                            (selectedAccountForAddress as any).addresses &&
+                            Array.isArray(
+                                (selectedAccountForAddress as any).addresses,
+                            )
+                        ) {
                             return (selectedAccountForAddress as any).addresses;
                         }
                         // Check if we have addressData object that needs to be converted to array
                         if ((selectedAccountForAddress as any).addressData) {
-                            return [(selectedAccountForAddress as any).addressData];
+                            return [
+                                (selectedAccountForAddress as any).addressData,
+                            ];
                         }
                         // No address data found
                         return [];
@@ -5960,9 +6979,11 @@ export default function ManageAccounts() {
                         initialAddresses,
                         'Raw data:',
                         {
-                            addresses: (selectedAccountForAddress as any).addresses,
-                            addressData: (selectedAccountForAddress as any).addressData
-                        }
+                            addresses: (selectedAccountForAddress as any)
+                                .addresses,
+                            addressData: (selectedAccountForAddress as any)
+                                .addressData,
+                        },
                     );
                     return (
                         <AddressModal
@@ -5991,12 +7012,14 @@ export default function ManageAccounts() {
                         selectedAccountForTechnicalUser.masterAccount
                     }
                     initialUsers={(() => {
-                        const users = selectedAccountForTechnicalUser.technicalUsers || [];
+                        const users =
+                            selectedAccountForTechnicalUser.technicalUsers ||
+                            [];
                         console.log(
                             '👤 Rendering TechnicalUserModal with initialUsers:',
                             users,
                             'Raw data:',
-                            selectedAccountForTechnicalUser
+                            selectedAccountForTechnicalUser,
                         );
                         return users;
                     })()}

@@ -574,7 +574,9 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
         );
 
         // Map subscriptionTier to display value for cloudType
-        const mapSubscriptionTierToCloudType = (tier: string | undefined): string => {
+        const mapSubscriptionTierToCloudType = (
+            tier: string | undefined,
+        ): string => {
             if (!tier) return '';
             const lowerTier = tier.toLowerCase();
             switch (lowerTier) {
@@ -630,6 +632,116 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
         return mappedAccounts;
     } catch (error) {
         console.error('❌ Error fetching external accounts:', error);
+        throw error;
+    }
+}
+
+// ==========================================
+// Account Onboarding API
+// ==========================================
+
+export interface AddressDetails {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+}
+
+export interface TechnicalUser {
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    adminUsername?: string;
+    adminEmail?: string;
+    adminPassword?: string;
+    assignedUserGroup?: string;
+    assignedRole?: string;
+    assignmentStartDate?: string;
+    assignmentEndDate?: string;
+    status?: string;
+    createdBy?: string;
+}
+
+export interface OnboardAccountPayload {
+    accountName: string; // Required
+    masterAccount?: string;
+    subscriptionTier?: 'public' | 'private' | 'platform' | string;
+    addressDetails?: AddressDetails;
+    technicalUser?: TechnicalUser;
+}
+
+export interface OnboardAccountResponse {
+    msg?: string;
+    message?: string;
+    data?: any;
+    result?: string;
+    accountId?: string;
+    [key: string]: any;
+}
+
+/**
+ * Onboard a new account via POST to Admin Portal API
+ * POST /api/v1/accounts/onboard
+ *
+ * @param payload - Account onboarding details (accountName is required, others optional)
+ * @returns API response with created account details
+ */
+export async function onboardAccount(
+    payload: OnboardAccountPayload,
+): Promise<OnboardAccountResponse> {
+    const url = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts/onboard`;
+
+    // Get authentication token
+    const token = getAuthToken();
+
+    // Build headers
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    } else {
+        console.warn('⚠️ No auth token found. API call may fail with 401.');
+    }
+
+    try {
+        console.log('🚀 Onboarding account:', payload.accountName);
+        console.log('📤 POST to:', url);
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+        });
+
+        const responseData = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            console.error('❌ Onboard API error:', res.status, responseData);
+
+            if (res.status === 401) {
+                console.error(
+                    '🔐 Authentication failed. Token may be expired or missing.',
+                );
+            }
+
+            throw new Error(
+                `Onboard API ${res.status}: ${
+                    responseData.message ||
+                    responseData.msg ||
+                    JSON.stringify(responseData)
+                }`,
+            );
+        }
+
+        console.log('✅ Account onboarded successfully:', responseData);
+        return responseData;
+    } catch (error) {
+        console.error('❌ Error onboarding account:', error);
         throw error;
     }
 }
