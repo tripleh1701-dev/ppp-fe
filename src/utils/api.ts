@@ -1,3 +1,13 @@
+// Declare process.env for TypeScript in browser environment
+declare const process: {
+    env: {
+        NEXT_PUBLIC_API_BASE_URL?: string;
+        NEXT_PUBLIC_API_BASE?: string;
+        NEXT_PUBLIC_ADMIN_PORTAL_API_URL?: string;
+        [key: string]: string | undefined;
+    };
+};
+
 // API_BASE should be the base URL (e.g., https://xxx.execute-api.../prod)
 // All API calls will add /api/v1 prefix
 const rawApiBase =
@@ -12,6 +22,11 @@ if (cleanBase.endsWith('/api/v1')) {
     cleanBase = cleanBase.slice(0, -4);
 }
 export const API_BASE = cleanBase;
+
+// External Admin Portal API for fetching accounts from admin-portal infrastructure
+export const ADMIN_PORTAL_API_BASE =
+    process.env.NEXT_PUBLIC_ADMIN_PORTAL_API_URL ||
+    'https://hnm7u7id73.execute-api.us-east-1.amazonaws.com/prod';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
@@ -415,4 +430,128 @@ export async function deleteRoleFromSystiva(roleId: string): Promise<void> {
     return request(`/api/user-management/roles/${roleId}`, {
         method: 'DELETE',
     });
+}
+
+// ==========================================
+// External Admin Portal Account API Functions
+// ==========================================
+
+export interface ExternalAccount {
+    accountId: string;
+    accountName: string;
+    subscriptionTier?: string;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    adminEmail?: string;
+    adminUsername?: string;
+    [key: string]: any; // Allow additional fields
+}
+
+export interface MappedAccount {
+    id: string;
+    accountName: string;
+    masterAccount: string;
+    cloudType: string;
+    address: string;
+    country: string;
+    addresses: any[];
+    licenses: any[];
+    technicalUsers: any[];
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+/**
+ * Fetch accounts from the external Admin Portal API
+ * Maps external API fields to frontend expected format:
+ * - accountName from API → accountName (displayed as "Account" on frontend)
+ * - accountName from API → masterAccount (same value)
+ * - subscriptionTier from API → cloudType
+ *
+ * Uses Next.js proxy rewrite (/admin-portal-api) to avoid CORS issues,
+ * falls back to direct URL if proxy doesn't work.
+ */
+export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
+    // Try proxy URL first (for CORS avoidance), then direct URL as fallback
+    const proxyUrl = '/admin-portal-api/api/v1/accounts';
+    const directUrl = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts`;
+
+    let url = proxyUrl;
+    let usedProxy = true;
+
+    try {
+        console.log(
+            '🔄 Fetching accounts from external Admin Portal API via proxy:',
+            url,
+        );
+
+        let res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        // If proxy fails, try direct URL
+        if (!res.ok && res.status >= 500) {
+            console.warn('⚠️ Proxy failed, trying direct URL:', directUrl);
+            url = directUrl;
+            usedProxy = false;
+            res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+        }
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            console.error('❌ External API error:', res.status, text);
+            throw new Error(`External API ${res.status}: ${text}`);
+        }
+
+        const data = await res.json();
+        console.log(
+            '📊 External API response (via ' +
+                (usedProxy ? 'proxy' : 'direct') +
+                '):',
+            data,
+        );
+
+        // Handle both array and object with accounts property
+        const accounts: ExternalAccount[] = Array.isArray(data)
+            ? data
+            : data.accounts || data.items || [];
+
+        // Map external API fields to frontend expected format
+        const mappedAccounts: MappedAccount[] = accounts.map(
+            (account: ExternalAccount) => ({
+                id: account.accountId || account.id || '',
+                accountName: account.accountName || '',
+                // masterAccount is same as accountName per user requirement
+                masterAccount: account.accountName || '',
+                // cloudType maps to subscriptionTier per user requirement
+                cloudType: account.subscriptionTier || account.cloudType || '',
+                address: account.address || '',
+                country: account.country || '',
+                addresses: account.addresses || [],
+                licenses: account.licenses || [],
+                technicalUsers: account.technicalUsers || [],
+                createdAt: account.createdAt || account.created_date,
+                updatedAt: account.updatedAt || account.updated_date,
+            }),
+        );
+
+        console.log(
+            '✅ Mapped',
+            mappedAccounts.length,
+            'accounts from external API',
+        );
+        return mappedAccounts;
+    } catch (error) {
+        console.error('❌ Error fetching external accounts:', error);
+        throw error;
+    }
 }
