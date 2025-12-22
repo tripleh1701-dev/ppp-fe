@@ -507,10 +507,7 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
     console.log('🔐 Auth token present:', !!token);
 
     try {
-        console.log(
-            '🔄 Fetching accounts from Admin Portal API:',
-            url,
-        );
+        console.log('🔄 Fetching accounts from Admin Portal API:', url);
 
         // Build headers with authentication
         const headers: Record<string, string> = {
@@ -535,7 +532,9 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
 
             // If 401, the token might be expired or missing
             if (res.status === 401) {
-                console.error('🔐 Authentication failed. Token may be expired or missing.');
+                console.error(
+                    '🔐 Authentication failed. Token may be expired or missing.',
+                );
                 console.error('🔐 Token was:', token ? 'present' : 'missing');
             }
 
@@ -554,7 +553,10 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
         if (Array.isArray(responseData)) {
             // Direct array response
             accounts = responseData;
-        } else if (responseData.data && Array.isArray(responseData.data.accounts)) {
+        } else if (
+            responseData.data &&
+            Array.isArray(responseData.data.accounts)
+        ) {
             // Nested structure: { data: { accounts: [...] } }
             accounts = responseData.data.accounts;
         } else if (Array.isArray(responseData.accounts)) {
@@ -565,7 +567,27 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
             accounts = responseData.items;
         }
 
-        console.log('📊 Extracted accounts array:', accounts.length, 'accounts');
+        console.log(
+            '📊 Extracted accounts array:',
+            accounts.length,
+            'accounts',
+        );
+
+        // Map subscriptionTier to display value for cloudType
+        const mapSubscriptionTierToCloudType = (tier: string | undefined): string => {
+            if (!tier) return '';
+            const lowerTier = tier.toLowerCase();
+            switch (lowerTier) {
+                case 'platform':
+                    return 'Public Cloud';
+                case 'public':
+                    return 'Public Cloud';
+                case 'private':
+                    return 'Private Cloud';
+                default:
+                    return tier; // Return original if not recognized
+            }
+        };
 
         // Map API fields to frontend expected format
         const mappedAccounts: MappedAccount[] = accounts.map(
@@ -575,26 +597,36 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
                     accountName: account.accountName || '',
                     // masterAccount is same as accountName per user requirement
                     masterAccount: account.accountName || '',
-                    // cloudType maps to subscriptionTier per user requirement
-                    cloudType: account.subscriptionTier || account.cloudType || '',
+                    // cloudType maps subscriptionTier to display value:
+                    // platform/public → "Public Cloud", private → "Private Cloud"
+                    cloudType: mapSubscriptionTierToCloudType(
+                        account.subscriptionTier || account.cloudType,
+                    ),
                     address: account.address || '',
                     country: account.country || '',
                     addresses: account.addresses || [],
                     licenses: account.licenses || [],
                     technicalUsers: account.technicalUsers || [],
-                    createdAt: account.createdAt || account.registeredOn || account.created_date,
-                    updatedAt: account.updatedAt || account.lastModified || account.updated_date,
+                    createdAt:
+                        account.createdAt ||
+                        account.registeredOn ||
+                        account.created_date,
+                    updatedAt:
+                        account.updatedAt ||
+                        account.lastModified ||
+                        account.updated_date,
                 };
-                console.log('📝 Mapped account:', account.accountName, '→', mapped);
+                console.log(
+                    '📝 Mapped account:',
+                    account.accountName,
+                    '→',
+                    mapped,
+                );
                 return mapped;
             },
         );
 
-        console.log(
-            '✅ Mapped',
-            mappedAccounts.length,
-            'accounts from API',
-        );
+        console.log('✅ Mapped', mappedAccounts.length, 'accounts from API');
         return mappedAccounts;
     } catch (error) {
         console.error('❌ Error fetching external accounts:', error);
