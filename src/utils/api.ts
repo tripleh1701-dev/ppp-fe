@@ -73,15 +73,33 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     const url = `${API_BASE}${cleanPath}`;
 
+    // Get auth token for all requests
+    const token = getAuthToken();
+
+    // Build headers with auth token
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options?.headers as Record<string, string> || {}),
+    };
+
+    // Add Authorization header if token exists
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(url, {
-        headers: {
-            'Content-Type': 'application/json',
-            ...(options?.headers || {}),
-        },
+        headers,
         ...options,
     });
     if (!res.ok) {
         const text = await res.text().catch(() => '');
+
+        // Log auth errors for debugging
+        if (res.status === 401) {
+            console.error('❌ API 401 Unauthorized:', url);
+            console.error('🔐 Token present:', !!token);
+        }
+
         throw new Error(`API ${res.status}: ${text}`);
     }
     if (res.status === 204) return undefined as unknown as T;
