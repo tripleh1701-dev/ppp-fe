@@ -665,11 +665,20 @@ export interface TechnicalUser {
 }
 
 export interface OnboardAccountPayload {
-    accountName: string; // Required
-    masterAccount?: string;
-    subscriptionTier?: 'public' | 'private' | 'platform' | string;
+    // Required fields (3)
+    accountName: string;
+    masterAccount: string;
+    subscriptionTier: 'public' | 'private' | 'platform' | string;
+    // Optional fields
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    adminUsername?: string;
+    adminEmail?: string;
+    adminPassword?: string;
     addressDetails?: AddressDetails;
     technicalUser?: TechnicalUser;
+    createdBy?: string;
 }
 
 export interface OnboardAccountResponse {
@@ -682,16 +691,20 @@ export interface OnboardAccountResponse {
 }
 
 /**
- * Onboard a new account via POST to Admin Portal API
- * POST /api/v1/accounts/onboard
+ * Onboard a new account via POST to Sys App Backend API (Workflow 10)
+ * POST /api/accounts/onboard
  *
- * @param payload - Account onboarding details (accountName is required, others optional)
+ * Required fields: accountName, masterAccount, subscriptionTier
+ * Optional fields: addressDetails, technicalUser, email, firstName, lastName, etc.
+ *
+ * @param payload - Account onboarding details
  * @returns API response with created account details
  */
 export async function onboardAccount(
     payload: OnboardAccountPayload,
 ): Promise<OnboardAccountResponse> {
-    const url = `${ADMIN_PORTAL_API_BASE}/api/v1/accounts/onboard`;
+    // Use the sys-app backend API (workflow 10) instead of admin-portal API (workflow 05)
+    const url = `${API_BASE}/api/accounts/onboard`;
 
     // Get authentication token
     const token = getAuthToken();
