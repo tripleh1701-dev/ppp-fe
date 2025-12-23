@@ -46,13 +46,28 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
     let cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-    // All API endpoints go to admin-portal backend (workflow 05) at /api/v1/*
-    // The ppp-be-main (workflow 10) is currently unstable, so we use admin-portal
-    if (
+    // Route sys-app endpoints to ppp-be-main (workflow 10) at /api/v1/app/*
+    // These are handled by the simplified Lambda handler
+    const sysAppEndpoints = [
+        '/api/accounts',
+        '/api/enterprises',
+        '/api/products',
+        '/api/services',
+    ];
+
+    const isSysAppEndpoint = sysAppEndpoints.some(
+        (endpoint) =>
+            cleanPath === endpoint || cleanPath.startsWith(`${endpoint}/`),
+    );
+
+    if (isSysAppEndpoint) {
+        // Route to ppp-be-main backend at /api/v1/app/{path}
+        cleanPath = '/api/v1/app' + cleanPath;
+    } else if (
         cleanPath.startsWith('/api/') &&
         !cleanPath.startsWith('/api/v1/')
     ) {
-        // Add /api/v1 prefix for admin-portal-be routes
+        // Other endpoints go to admin-portal-be at /api/v1/*
         cleanPath = '/api/v1' + cleanPath.slice(4); // Replace /api/ with /api/v1/
     }
 
@@ -491,8 +506,8 @@ export interface MappedAccount {
  * - subscriptionTier from API → cloudType
  */
 export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
-    // Use the admin-portal API (workflow 05) which is working and stable
-    // Endpoint: /api/v1/accounts (NOT /api/v1/app/api/accounts)
+    // Use ppp-be-main (workflow 10) backend - independent from admin-portal
+    // Endpoint: /api/v1/app/api/accounts (routes to sys-app Lambda)
     let baseUrl = API_BASE;
     if (baseUrl.endsWith('/api/v1')) {
         baseUrl = baseUrl.slice(0, -7);
@@ -500,8 +515,8 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
         baseUrl = baseUrl.slice(0, -4);
     }
 
-    // Call admin-portal backend at /api/v1/accounts (working API)
-    const url = `${baseUrl}/api/v1/accounts`;
+    // Call ppp-be-main backend at /api/v1/app/api/accounts
+    const url = `${baseUrl}/api/v1/app/api/accounts`;
 
     // Get JWT token for authentication
     const token = getAuthToken();
@@ -509,11 +524,11 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
     // Debug: log configuration
     console.log('🔧 API_BASE:', API_BASE);
     console.log('🔧 Cleaned baseUrl:', baseUrl);
-    console.log('🔧 Final URL (admin-portal):', url);
+    console.log('🔧 Final URL (ppp-be):', url);
     console.log('🔐 Auth token present:', !!token);
 
     try {
-        console.log('🔄 Fetching accounts from admin-portal backend:', url);
+        console.log('🔄 Fetching accounts from ppp-be backend:', url);
 
         // Build headers with authentication
         const headers: Record<string, string> = {
@@ -709,9 +724,10 @@ export interface OnboardAccountResponse {
 export async function onboardAccount(
     payload: OnboardAccountPayload,
 ): Promise<OnboardAccountResponse> {
-    // Use the admin-portal API (workflow 05) which is working and stable
-    // Endpoint: /api/v1/accounts/onboard
-    const url = `${API_BASE}/api/v1/accounts/onboard`;
+    // Use ppp-be-main (workflow 10) backend - independent from admin-portal
+    // Only 3 required fields: accountName, masterAccount, subscriptionTier
+    // Endpoint: /api/v1/app/api/accounts/onboard
+    const url = `${API_BASE}/api/v1/app/api/accounts/onboard`;
 
     // Get authentication token
     const token = getAuthToken();
