@@ -579,32 +579,32 @@ export default function Breadcrumbs({
 
             try {
                 console.log('🔍 [Breadcrumbs] Filtering enterprises for account:', selectedAccountId);
-                
+
                 // Fetch account's licenses/global-settings to find which enterprises it has access to
-                const accountName = typeof window !== 'undefined' 
-                    ? window.localStorage.getItem('selectedAccountName') || '' 
+                const accountName = typeof window !== 'undefined'
+                    ? window.localStorage.getItem('selectedAccountName') || ''
                     : '';
-                
+
                 // Try to get licenses from accounts API which should include license sub-rows
                 const accountsResponse = await api.get<any[]>('/api/accounts');
-                
+
                 console.log('📦 [Breadcrumbs] Accounts response:', accountsResponse);
-                
+
                 // Find the selected account and extract enterprise IDs from its licenses
-                const selectedAccount = accountsResponse?.find((acc: any) => 
+                const selectedAccount = accountsResponse?.find((acc: any) =>
                     String(acc.id || acc.accountId) === selectedAccountId
                 );
-                
+
                 console.log('🔍 [Breadcrumbs] Selected account data:', selectedAccount);
-                
+
                 const enterpriseIds = new Set<string>();
-                
+
                 // Check for licenses in the account data
                 if (selectedAccount) {
                     // Check for licenses array
                     const licenses = selectedAccount.licenses || selectedAccount.accountLicenses || [];
                     console.log('📦 [Breadcrumbs] Account licenses:', licenses);
-                    
+
                     if (Array.isArray(licenses) && licenses.length > 0) {
                         licenses.forEach((license: any) => {
                             // Try to get enterprise ID directly
@@ -623,27 +623,27 @@ export default function Breadcrumbs({
                             }
                         });
                     }
-                    
+
                     // Also check direct enterpriseId field
                     if (selectedAccount.enterpriseId) {
                         enterpriseIds.add(String(selectedAccount.enterpriseId));
                     }
                 }
-                
+
                 console.log('🔍 [Breadcrumbs] Enterprise IDs from licenses:', Array.from(enterpriseIds));
                 console.log('🔍 [Breadcrumbs] License count for account:', selectedAccount?.licenses?.length || 0);
-                
+
                 // Filter allEnterprises to only show those with licenses for this account
                 // If account has no licenses, show EMPTY list (not all enterprises)
-                const filtered = enterpriseIds.size > 0 
+                const filtered = enterpriseIds.size > 0
                     ? allEnterprises.filter(ent => enterpriseIds.has(ent.id))
                     : [];
-                
+
                 console.log(`✅ [Breadcrumbs] Filtered enterprises: ${filtered.length} of ${allEnterprises.length}`);
                 console.log(`📋 [Breadcrumbs] Account "${selectedAccount?.accountName || selectedAccount?.name}" has ${enterpriseIds.size} licensed enterprises`);
-                
+
                 setEnterprises(filtered);
-                
+
                 // If no enterprises available, clear selection
                 if (filtered.length === 0) {
                     console.log('⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection');
@@ -654,7 +654,7 @@ export default function Breadcrumbs({
                         // Dispatch enterprise change event
                         window.dispatchEvent(new Event('enterpriseChanged'));
                     } catch {}
-                } 
+                }
                 // If enterprises available, ensure one is selected
                 else {
                     // If no enterprise selected OR current enterprise not in filtered list, select first
@@ -911,22 +911,12 @@ export default function Breadcrumbs({
 
                 {/* Right aligned selections */}
                 <div className='ml-auto flex items-center gap-3'>
-                    {/* Account Selector */}
+                    {/* Account Selector - Always show dropdown if accounts exist */}
                     <div className='relative'>
                         {accounts.length === 0 ? (
                             <div className='inline-flex items-center gap-1.5 text-[12px] text-slate-400'>
                                 <Icon name='account' className='w-3.5 h-3.5' />
                                 <span>No accounts</span>
-                            </div>
-                        ) : accounts.length === 1 ? (
-                            <div className='inline-flex items-center gap-1.5 text-[12px]'>
-                                <Icon
-                                    name='account'
-                                    className='w-3.5 h-3.5 text-slate-500'
-                                />
-                                <span className='text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500'>
-                                    {accounts[0].name}
-                                </span>
                             </div>
                         ) : (
                             <button
@@ -956,52 +946,46 @@ export default function Breadcrumbs({
                                 </svg>
                             </button>
                         )}
-                        {accountMenuOpen &&
-                            accounts.length > 1 &&
-                            selectedAccountId && (
-                                <div
-                                    ref={accountMenuRef}
-                                    className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
-                                    role='listbox'
-                                >
-                                    <ul className='max-h-64 overflow-auto py-1'>
-                                        {accounts.map((a) => (
-                                            <li key={a.id}>
-                                                <button
-                                                    onClick={() => {
-                                                        if (
-                                                            a.id !==
-                                                            selectedAccountId
-                                                        ) {
-                                                            updateAccount(a.id);
-                                                            // Ensure enterprise stays selected; consumers rely on localStorage
-                                                        }
-                                                        setAccountMenuOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
-                                                        selectedAccountId ===
-                                                        a.id
-                                                            ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
-                                                            : 'text-slate-700'
-                                                    }`}
-                                                    role='option'
-                                                    aria-selected={
-                                                        selectedAccountId ===
-                                                        a.id
+                        {accountMenuOpen && accounts.length > 0 && (
+                            <div
+                                ref={accountMenuRef}
+                                className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
+                                role='listbox'
+                            >
+                                <ul className='max-h-64 overflow-auto py-1'>
+                                    {accounts.map((a) => (
+                                        <li key={a.id}>
+                                            <button
+                                                onClick={() => {
+                                                    if (
+                                                        a.id !==
+                                                        selectedAccountId
+                                                    ) {
+                                                        updateAccount(a.id);
+                                                        // Ensure enterprise stays selected; consumers rely on localStorage
                                                     }
-                                                >
-                                                    {a.name}
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                                                    setAccountMenuOpen(false);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                    selectedAccountId === a.id
+                                                        ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
+                                                        : 'text-slate-700'
+                                                }`}
+                                                role='option'
+                                                aria-selected={
+                                                    selectedAccountId === a.id
+                                                }
+                                            >
+                                                {a.name}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Enterprise Selector */}
+                    {/* Enterprise Selector - Always show dropdown if enterprises exist */}
                     <div className='relative'>
                         {enterprises.length === 0 ? (
                             <div className='inline-flex items-center gap-1.5 text-[12px] text-slate-400'>
@@ -1010,16 +994,6 @@ export default function Breadcrumbs({
                                     className='w-3.5 h-3.5'
                                 />
                                 <span>No enterprises</span>
-                            </div>
-                        ) : enterprises.length === 1 ? (
-                            <div className='inline-flex items-center gap-1.5 text-[12px]'>
-                                <Icon
-                                    name='enterprise'
-                                    className='w-3.5 h-3.5 text-slate-400'
-                                />
-                                <span className='text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500'>
-                                    {enterprises[0].name}
-                                </span>
                             </div>
                         ) : (
                             <button
@@ -1050,50 +1024,46 @@ export default function Breadcrumbs({
                                 </svg>
                             </button>
                         )}
-                        {enterpriseMenuOpen &&
-                            enterprises.length > 1 &&
-                            selectedEnterpriseId && (
-                                <div
-                                    ref={enterpriseMenuRef}
-                                    className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
-                                    role='listbox'
-                                >
-                                    <ul className='max-h-64 overflow-auto py-1'>
-                                        {enterprises.map((e) => (
-                                            <li key={e.id}>
-                                                <button
-                                                    onClick={() => {
-                                                        if (
-                                                            e.id !==
-                                                            selectedEnterpriseId
-                                                        ) {
-                                                            updateEnterprise(
-                                                                e.id,
-                                                            );
-                                                        }
-                                                        setEnterpriseMenuOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
-                                                        selectedEnterpriseId ===
-                                                        e.id
-                                                            ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
-                                                            : 'text-slate-700'
-                                                    }`}
-                                                    role='option'
-                                                    aria-selected={
-                                                        selectedEnterpriseId ===
-                                                        e.id
+                        {enterpriseMenuOpen && enterprises.length > 0 && (
+                            <div
+                                ref={enterpriseMenuRef}
+                                className='absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 origin-top-right animate-[scaleIn_120ms_ease-out]'
+                                role='listbox'
+                            >
+                                <ul className='max-h-64 overflow-auto py-1'>
+                                    {enterprises.map((e) => (
+                                        <li key={e.id}>
+                                            <button
+                                                onClick={() => {
+                                                    if (
+                                                        e.id !==
+                                                        selectedEnterpriseId
+                                                    ) {
+                                                        updateEnterprise(e.id);
                                                     }
-                                                >
-                                                    {e.name}
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                                                    setEnterpriseMenuOpen(
+                                                        false,
+                                                    );
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                    selectedEnterpriseId ===
+                                                    e.id
+                                                        ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
+                                                        : 'text-slate-700'
+                                                }`}
+                                                role='option'
+                                                aria-selected={
+                                                    selectedEnterpriseId ===
+                                                    e.id
+                                                }
+                                            >
+                                                {e.name}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
