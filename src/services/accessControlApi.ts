@@ -54,6 +54,24 @@ export interface ListUsersOptions {
     status?: 'ACTIVE' | 'INACTIVE';
     accountId?: string | null;
     accountName?: string | null;
+    enterpriseId?: string | null;
+    enterpriseName?: string | null;
+}
+
+export interface ListGroupsOptions {
+    search?: string;
+    accountId?: string | null;
+    accountName?: string | null;
+    enterpriseId?: string | null;
+    enterpriseName?: string | null;
+}
+
+export interface ListRolesOptions {
+    groupId?: string;
+    accountId?: string | null;
+    accountName?: string | null;
+    enterpriseId?: string | null;
+    enterpriseName?: string | null;
 }
 
 export interface ListUsersResponse {
@@ -88,6 +106,12 @@ export class AccessControlApiService {
         }
         if (options.accountName !== undefined) {
             params.append('accountName', options.accountName || '');
+        }
+        if (options.enterpriseId !== undefined) {
+            params.append('enterpriseId', options.enterpriseId || '');
+        }
+        if (options.enterpriseName !== undefined) {
+            params.append('enterpriseName', options.enterpriseName || '');
         }
 
         const queryString = params.toString();
@@ -154,11 +178,36 @@ export class AccessControlApiService {
     // ========================================
 
     /**
-     * List all groups with optional search
+     * List all groups with optional search and account/enterprise filtering
+     * Supports both old signature (search?: string) and new signature (options: ListGroupsOptions)
      */
-    async listGroups(search?: string): Promise<GroupRecord[]> {
-        const endpoint = search
-            ? `/api/groups?search=${encodeURIComponent(search)}`
+    async listGroups(
+        optionsOrSearch?: ListGroupsOptions | string,
+    ): Promise<GroupRecord[]> {
+        // Handle backward compatibility: if string is passed, treat as search
+        const options: ListGroupsOptions =
+            typeof optionsOrSearch === 'string'
+                ? {search: optionsOrSearch}
+                : optionsOrSearch || {};
+
+        const params = new URLSearchParams();
+        if (options.search) params.append('search', options.search);
+        if (options.accountId !== undefined) {
+            params.append('accountId', options.accountId || '');
+        }
+        if (options.accountName !== undefined) {
+            params.append('accountName', options.accountName || '');
+        }
+        if (options.enterpriseId !== undefined) {
+            params.append('enterpriseId', options.enterpriseId || '');
+        }
+        if (options.enterpriseName !== undefined) {
+            params.append('enterpriseName', options.enterpriseName || '');
+        }
+
+        const queryString = params.toString();
+        const endpoint = queryString
+            ? `/api/groups?${queryString}`
             : '/api/groups';
         return api.get<GroupRecord[]>(endpoint);
     }
@@ -230,11 +279,36 @@ export class AccessControlApiService {
     // ========================================
 
     /**
-     * List all roles with optional group filter
+     * List all roles with optional group and account/enterprise filtering
+     * Supports both old signature (groupId?: string) and new signature (options: ListRolesOptions)
      */
-    async listRoles(groupId?: string): Promise<RoleRecord[]> {
-        const endpoint = groupId
-            ? `/api/roles?groupId=${groupId}`
+    async listRoles(
+        optionsOrGroupId?: ListRolesOptions | string,
+    ): Promise<RoleRecord[]> {
+        // Handle backward compatibility: if string is passed, treat as groupId
+        const options: ListRolesOptions =
+            typeof optionsOrGroupId === 'string'
+                ? {groupId: optionsOrGroupId}
+                : optionsOrGroupId || {};
+
+        const params = new URLSearchParams();
+        if (options.groupId) params.append('groupId', options.groupId);
+        if (options.accountId !== undefined) {
+            params.append('accountId', options.accountId || '');
+        }
+        if (options.accountName !== undefined) {
+            params.append('accountName', options.accountName || '');
+        }
+        if (options.enterpriseId !== undefined) {
+            params.append('enterpriseId', options.enterpriseId || '');
+        }
+        if (options.enterpriseName !== undefined) {
+            params.append('enterpriseName', options.enterpriseName || '');
+        }
+
+        const queryString = params.toString();
+        const endpoint = queryString
+            ? `/api/roles?${queryString}`
             : '/api/roles';
         return api.get<RoleRecord[]>(endpoint);
     }

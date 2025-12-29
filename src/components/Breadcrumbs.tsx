@@ -411,7 +411,7 @@ export default function Breadcrumbs({
 
         // Add intermediate paths
         let currentPath = '';
-        segments.forEach((segment, index) => {
+        segments.forEach((segment: string, index: number) => {
             currentPath += `/${segment}`;
             const isLast = index === segments.length - 1;
 
@@ -578,31 +578,46 @@ export default function Breadcrumbs({
             }
 
             try {
-                console.log('🔍 [Breadcrumbs] Filtering enterprises for account:', selectedAccountId);
+                console.log(
+                    '🔍 [Breadcrumbs] Filtering enterprises for account:',
+                    selectedAccountId,
+                );
 
                 // Fetch account's licenses/global-settings to find which enterprises it has access to
-                const accountName = typeof window !== 'undefined'
-                    ? window.localStorage.getItem('selectedAccountName') || ''
-                    : '';
+                const accountName =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountName') ||
+                          ''
+                        : '';
 
                 // Try to get licenses from accounts API which should include license sub-rows
                 const accountsResponse = await api.get<any[]>('/api/accounts');
 
-                console.log('📦 [Breadcrumbs] Accounts response:', accountsResponse);
-
-                // Find the selected account and extract enterprise IDs from its licenses
-                const selectedAccount = accountsResponse?.find((acc: any) =>
-                    String(acc.id || acc.accountId) === selectedAccountId
+                console.log(
+                    '📦 [Breadcrumbs] Accounts response:',
+                    accountsResponse,
                 );
 
-                console.log('🔍 [Breadcrumbs] Selected account data:', selectedAccount);
+                // Find the selected account and extract enterprise IDs from its licenses
+                const selectedAccount = accountsResponse?.find(
+                    (acc: any) =>
+                        String(acc.id || acc.accountId) === selectedAccountId,
+                );
+
+                console.log(
+                    '🔍 [Breadcrumbs] Selected account data:',
+                    selectedAccount,
+                );
 
                 const enterpriseIds = new Set<string>();
 
                 // Check for licenses in the account data
                 if (selectedAccount) {
                     // Check for licenses array
-                    const licenses = selectedAccount.licenses || selectedAccount.accountLicenses || [];
+                    const licenses =
+                        selectedAccount.licenses ||
+                        selectedAccount.accountLicenses ||
+                        [];
                     console.log('📦 [Breadcrumbs] Account licenses:', licenses);
 
                     if (Array.isArray(licenses) && licenses.length > 0) {
@@ -614,11 +629,17 @@ export default function Breadcrumbs({
                             // Or match enterprise NAME to get the ID
                             else if (license.enterprise) {
                                 const matchedEnterprise = allEnterprises.find(
-                                    ent => ent.name.toLowerCase() === String(license.enterprise).toLowerCase()
+                                    (ent: {id: string; name: string}) =>
+                                        ent.name.toLowerCase() ===
+                                        String(
+                                            license.enterprise,
+                                        ).toLowerCase(),
                                 );
                                 if (matchedEnterprise) {
                                     enterpriseIds.add(matchedEnterprise.id);
-                                    console.log(`✅ [Breadcrumbs] Matched enterprise "${license.enterprise}" to ID: ${matchedEnterprise.id}`);
+                                    console.log(
+                                        `✅ [Breadcrumbs] Matched enterprise "${license.enterprise}" to ID: ${matchedEnterprise.id}`,
+                                    );
                                 }
                             }
                         });
@@ -630,27 +651,47 @@ export default function Breadcrumbs({
                     }
                 }
 
-                console.log('🔍 [Breadcrumbs] Enterprise IDs from licenses:', Array.from(enterpriseIds));
-                console.log('🔍 [Breadcrumbs] License count for account:', selectedAccount?.licenses?.length || 0);
+                console.log(
+                    '🔍 [Breadcrumbs] Enterprise IDs from licenses:',
+                    Array.from(enterpriseIds),
+                );
+                console.log(
+                    '🔍 [Breadcrumbs] License count for account:',
+                    selectedAccount?.licenses?.length || 0,
+                );
 
                 // Filter allEnterprises to only show those with licenses for this account
                 // If account has no licenses, show EMPTY list (not all enterprises)
-                const filtered = enterpriseIds.size > 0
-                    ? allEnterprises.filter(ent => enterpriseIds.has(ent.id))
-                    : [];
+                const filtered =
+                    enterpriseIds.size > 0
+                        ? allEnterprises.filter(
+                              (ent: {id: string; name: string}) =>
+                                  enterpriseIds.has(ent.id),
+                          )
+                        : [];
 
-                console.log(`✅ [Breadcrumbs] Filtered enterprises: ${filtered.length} of ${allEnterprises.length}`);
-                console.log(`📋 [Breadcrumbs] Account "${selectedAccount?.accountName || selectedAccount?.name}" has ${enterpriseIds.size} licensed enterprises`);
+                console.log(
+                    `✅ [Breadcrumbs] Filtered enterprises: ${filtered.length} of ${allEnterprises.length}`,
+                );
+                console.log(
+                    `📋 [Breadcrumbs] Account "${
+                        selectedAccount?.accountName || selectedAccount?.name
+                    }" has ${enterpriseIds.size} licensed enterprises`,
+                );
 
                 setEnterprises(filtered);
 
                 // If no enterprises available, clear selection
                 if (filtered.length === 0) {
-                    console.log('⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection');
+                    console.log(
+                        '⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection',
+                    );
                     setSelectedEnterpriseId(undefined);
                     try {
                         window.localStorage.removeItem('selectedEnterpriseId');
-                        window.localStorage.removeItem('selectedEnterpriseName');
+                        window.localStorage.removeItem(
+                            'selectedEnterpriseName',
+                        );
                         // Dispatch enterprise change event
                         window.dispatchEvent(new Event('enterpriseChanged'));
                     } catch {}
@@ -658,21 +699,44 @@ export default function Breadcrumbs({
                 // If enterprises available, ensure one is selected
                 else {
                     // If no enterprise selected OR current enterprise not in filtered list, select first
-                    if (!selectedEnterpriseId || !filtered.some(e => e.id === selectedEnterpriseId)) {
-                        console.log('⚠️ [Breadcrumbs] Auto-selecting first available enterprise:', filtered[0].name);
+                    if (
+                        !selectedEnterpriseId ||
+                        !filtered.some(
+                            (e: {id: string; name: string}) =>
+                                e.id === selectedEnterpriseId,
+                        )
+                    ) {
+                        console.log(
+                            '⚠️ [Breadcrumbs] Auto-selecting first available enterprise:',
+                            filtered[0].name,
+                        );
                         setSelectedEnterpriseId(filtered[0].id);
                         try {
-                            window.localStorage.setItem('selectedEnterpriseId', filtered[0].id);
-                            window.localStorage.setItem('selectedEnterpriseName', filtered[0].name);
+                            window.localStorage.setItem(
+                                'selectedEnterpriseId',
+                                filtered[0].id,
+                            );
+                            window.localStorage.setItem(
+                                'selectedEnterpriseName',
+                                filtered[0].name,
+                            );
                             // Dispatch enterprise change event
-                            window.dispatchEvent(new Event('enterpriseChanged'));
+                            window.dispatchEvent(
+                                new Event('enterpriseChanged'),
+                            );
                         } catch {}
                     } else {
-                        console.log('✅ [Breadcrumbs] Current enterprise is valid for this account:', selectedEnterpriseId);
+                        console.log(
+                            '✅ [Breadcrumbs] Current enterprise is valid for this account:',
+                            selectedEnterpriseId,
+                        );
                     }
                 }
             } catch (error) {
-                console.error('❌ [Breadcrumbs] Failed to filter enterprises:', error);
+                console.error(
+                    '❌ [Breadcrumbs] Failed to filter enterprises:',
+                    error,
+                );
                 // On error, show all enterprises
                 setEnterprises(allEnterprises);
             }
@@ -711,19 +775,28 @@ export default function Breadcrumbs({
     }, []);
 
     const selectedAccount = useMemo(
-        () => accounts.find((a) => a.id === selectedAccountId),
+        () =>
+            accounts.find(
+                (a: {id: string; name: string}) => a.id === selectedAccountId,
+            ),
         [accounts, selectedAccountId],
     );
     const selectedEnterprise = useMemo(
-        () => enterprises.find((e) => e.id === selectedEnterpriseId),
+        () =>
+            enterprises.find(
+                (e: {id: string; name: string}) =>
+                    e.id === selectedEnterpriseId,
+            ),
         [enterprises, selectedEnterpriseId],
     );
 
-    const updateAccount = (id: string) => {
+    const updateAccount = (id: string, skipEnterpriseSync = false) => {
         setSelectedAccountId(id);
         try {
             window.localStorage.setItem('selectedAccountId', id);
-            const acc = accounts.find((a) => a.id === id);
+            const acc = accounts.find(
+                (a: {id: string; name: string}) => a.id === id,
+            );
             if (acc)
                 window.localStorage.setItem('selectedAccountName', acc.name);
 
@@ -733,13 +806,33 @@ export default function Breadcrumbs({
                     detail: {id, name: acc?.name},
                 }),
             );
+
+            // Auto-select "Global" enterprise when "Systiva" account is selected (case insensitive)
+            if (!skipEnterpriseSync && acc?.name?.toLowerCase() === 'systiva') {
+                const globalEnterprise = enterprises.find(
+                    (e: {id: string; name: string}) =>
+                        e.name?.toLowerCase() === 'global',
+                );
+                if (
+                    globalEnterprise &&
+                    globalEnterprise.id !== selectedEnterpriseId
+                ) {
+                    console.log(
+                        '🔄 Auto-selecting Global enterprise for Systiva account',
+                    );
+                    updateEnterprise(globalEnterprise.id, true); // Skip account sync to avoid loop
+                }
+            }
         } catch {}
     };
-    const updateEnterprise = (id: string) => {
+
+    const updateEnterprise = (id: string, skipAccountSync = false) => {
         setSelectedEnterpriseId(id);
         try {
             window.localStorage.setItem('selectedEnterpriseId', id);
-            const ent = enterprises.find((e) => e.id === id);
+            const ent = enterprises.find(
+                (e: {id: string; name: string}) => e.id === id,
+            );
             if (ent)
                 window.localStorage.setItem('selectedEnterpriseName', ent.name);
 
@@ -749,6 +842,20 @@ export default function Breadcrumbs({
                     detail: {id, name: ent?.name},
                 }),
             );
+
+            // Auto-select "Systiva" account when "Global" enterprise is selected (case insensitive)
+            if (!skipAccountSync && ent?.name?.toLowerCase() === 'global') {
+                const systivaAccount = accounts.find(
+                    (a: {id: string; name: string}) =>
+                        a.name?.toLowerCase() === 'systiva',
+                );
+                if (systivaAccount && systivaAccount.id !== selectedAccountId) {
+                    console.log(
+                        '🔄 Auto-selecting Systiva account for Global enterprise',
+                    );
+                    updateAccount(systivaAccount.id, true); // Skip enterprise sync to avoid loop
+                }
+            }
         } catch {}
     };
 
@@ -820,7 +927,7 @@ export default function Breadcrumbs({
                     className='flex items-center space-x-1.5'
                     aria-label='Breadcrumb'
                 >
-                    {breadcrumbs.map((item, index) => (
+                    {breadcrumbs.map((item: BreadcrumbItem, index: number) => (
                         <div
                             key={item.href}
                             className='flex items-center space-x-2'
@@ -861,7 +968,7 @@ export default function Breadcrumbs({
                                 </div>
                             ) : item.label === 'Account Settings' ? (
                                 <button
-                                    onClick={(e) => {
+                                    onClick={(e: React.MouseEvent) => {
                                         e.preventDefault();
                                         setAccountSettingsPanelOpen(true);
                                     }}
@@ -921,7 +1028,9 @@ export default function Breadcrumbs({
                         ) : (
                             <button
                                 ref={accountBtnRef}
-                                onClick={() => setAccountMenuOpen((v) => !v)}
+                                onClick={() =>
+                                    setAccountMenuOpen((v: boolean) => !v)
+                                }
                                 className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
                                 aria-haspopup='listbox'
                                 aria-expanded={accountMenuOpen}
@@ -953,33 +1062,39 @@ export default function Breadcrumbs({
                                 role='listbox'
                             >
                                 <ul className='max-h-64 overflow-auto py-1'>
-                                    {accounts.map((a) => (
-                                        <li key={a.id}>
-                                            <button
-                                                onClick={() => {
-                                                    if (
-                                                        a.id !==
-                                                        selectedAccountId
-                                                    ) {
-                                                        updateAccount(a.id);
-                                                        // Ensure enterprise stays selected; consumers rely on localStorage
+                                    {accounts.map(
+                                        (a: {id: string; name: string}) => (
+                                            <li key={a.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        if (
+                                                            a.id !==
+                                                            selectedAccountId
+                                                        ) {
+                                                            updateAccount(a.id);
+                                                            // Ensure enterprise stays selected; consumers rely on localStorage
+                                                        }
+                                                        setAccountMenuOpen(
+                                                            false,
+                                                        );
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                        selectedAccountId ===
+                                                        a.id
+                                                            ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
+                                                            : 'text-slate-700'
+                                                    }`}
+                                                    role='option'
+                                                    aria-selected={
+                                                        selectedAccountId ===
+                                                        a.id
                                                     }
-                                                    setAccountMenuOpen(false);
-                                                }}
-                                                className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
-                                                    selectedAccountId === a.id
-                                                        ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
-                                                        : 'text-slate-700'
-                                                }`}
-                                                role='option'
-                                                aria-selected={
-                                                    selectedAccountId === a.id
-                                                }
-                                            >
-                                                {a.name}
-                                            </button>
-                                        </li>
-                                    ))}
+                                                >
+                                                    {a.name}
+                                                </button>
+                                            </li>
+                                        ),
+                                    )}
                                 </ul>
                             </div>
                         )}
@@ -998,7 +1113,9 @@ export default function Breadcrumbs({
                         ) : (
                             <button
                                 ref={enterpriseBtnRef}
-                                onClick={() => setEnterpriseMenuOpen((v) => !v)}
+                                onClick={() =>
+                                    setEnterpriseMenuOpen((v: boolean) => !v)
+                                }
                                 className='group inline-flex items-center gap-1.5 text-[12px] text-slate-700 hover:bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 hover:border-primary/30 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
                                 aria-haspopup='listbox'
                                 aria-expanded={enterpriseMenuOpen}
@@ -1031,36 +1148,40 @@ export default function Breadcrumbs({
                                 role='listbox'
                             >
                                 <ul className='max-h-64 overflow-auto py-1'>
-                                    {enterprises.map((e) => (
-                                        <li key={e.id}>
-                                            <button
-                                                onClick={() => {
-                                                    if (
-                                                        e.id !==
-                                                        selectedEnterpriseId
-                                                    ) {
-                                                        updateEnterprise(e.id);
+                                    {enterprises.map(
+                                        (e: {id: string; name: string}) => (
+                                            <li key={e.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        if (
+                                                            e.id !==
+                                                            selectedEnterpriseId
+                                                        ) {
+                                                            updateEnterprise(
+                                                                e.id,
+                                                            );
+                                                        }
+                                                        setEnterpriseMenuOpen(
+                                                            false,
+                                                        );
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
+                                                        selectedEnterpriseId ===
+                                                        e.id
+                                                            ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
+                                                            : 'text-slate-700'
+                                                    }`}
+                                                    role='option'
+                                                    aria-selected={
+                                                        selectedEnterpriseId ===
+                                                        e.id
                                                     }
-                                                    setEnterpriseMenuOpen(
-                                                        false,
-                                                    );
-                                                }}
-                                                className={`w-full text-left px-3 py-1.5 text-[12px] rounded-md transition-all duration-150 hover:bg-gradient-to-r hover:from-primary/8 hover:to-indigo-50 hover:translate-x-[1px] ${
-                                                    selectedEnterpriseId ===
-                                                    e.id
-                                                        ? 'text-primary-700 bg-gradient-to-r from-primary/12 to-indigo-50 font-semibold'
-                                                        : 'text-slate-700'
-                                                }`}
-                                                role='option'
-                                                aria-selected={
-                                                    selectedEnterpriseId ===
-                                                    e.id
-                                                }
-                                            >
-                                                {e.name}
-                                            </button>
-                                        </li>
-                                    ))}
+                                                >
+                                                    {e.name}
+                                                </button>
+                                            </li>
+                                        ),
+                                    )}
                                 </ul>
                             </div>
                         )}
