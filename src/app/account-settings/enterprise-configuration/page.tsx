@@ -15,26 +15,26 @@ import EnterpriseConfigTable, {
     EnterpriseConfigRow,
 } from '@/components/EnterpriseConfigTable';
 
-
-
 export default function EnterpriseConfiguration() {
     console.log('🏗️ EnterpriseConfiguration component mounting...');
-    
+
     // Debug: Track re-renders
     const renderCountRef = useRef(0);
     renderCountRef.current += 1;
 
     // Enterprise configuration data state
     const [enterpriseConfigs, setEnterpriseConfigs] = useState<any[]>([]);
-    
+
     // Client-side display order tracking - independent of API timestamps
     const displayOrderRef = useRef<Map<string, number>>(new Map());
 
     // Function to sort configs by client-side display order for stable UI
     const sortConfigsByDisplayOrder = useCallback((configs: any[]) => {
         return [...configs].sort((a, b) => {
-            const orderA = displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-            const orderB = displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderA =
+                displayOrderRef.current.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const orderB =
+                displayOrderRef.current.get(b.id) ?? Number.MAX_SAFE_INTEGER;
             return orderA - orderB;
         });
     }, []);
@@ -72,11 +72,20 @@ export default function EnterpriseConfiguration() {
     const modifiedExistingRecordsRef = useRef<Set<string>>(new Set());
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [showAutoSaveSuccess, setShowAutoSaveSuccess] = useState(false);
-    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(null);
-    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<Set<string>>(new Set());
-    
+    const [autoSaveCountdown, setAutoSaveCountdown] = useState<number | null>(
+        null,
+    );
+    const [modifiedExistingRecords, setModifiedExistingRecords] = useState<
+        Set<string>
+    >(new Set());
+
     // Debug auto-save state
-    console.log(`🔄 Render #${renderCountRef.current} - Auto-save timer exists:`, !!autoSaveTimerRef.current, 'Countdown:', autoSaveCountdown);
+    console.log(
+        `🔄 Render #${renderCountRef.current} - Auto-save timer exists:`,
+        !!autoSaveTimerRef.current,
+        'Countdown:',
+        autoSaveCountdown,
+    );
 
     // Update ref to track current enterpriseConfigs state
     useEffect(() => {
@@ -89,7 +98,9 @@ export default function EnterpriseConfiguration() {
     }, [modifiedExistingRecords]);
 
     // State to track user's pending local changes that haven't been saved yet
-    const [pendingLocalChanges, setPendingLocalChanges] = useState<Record<string, any>>({});
+    const [pendingLocalChanges, setPendingLocalChanges] = useState<
+        Record<string, any>
+    >({});
 
     // State to track AI panel collapse state for notification positioning
     const [isAIPanelCollapsed, setIsAIPanelCollapsed] = useState(false);
@@ -128,7 +139,6 @@ export default function EnterpriseConfiguration() {
         'services',
     ]);
 
-
     // Refs for dropdowns
     const searchRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
@@ -138,7 +148,12 @@ export default function EnterpriseConfiguration() {
 
     // Helper function to show notifications
     const showBlueNotification = (message: string, duration: number = 3000) => {
-        console.log('📢 Showing notification:', message, 'AI Panel Collapsed:', isAIPanelCollapsed);
+        console.log(
+            '📢 Showing notification:',
+            message,
+            'AI Panel Collapsed:',
+            isAIPanelCollapsed,
+        );
         setNotificationMessage(message);
         setShowNotification(true);
         setTimeout(() => {
@@ -158,27 +173,36 @@ export default function EnterpriseConfiguration() {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-            
+
             // Check if any dialog is open (excluding search since it's always visible)
             if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
                 return; // No dialog is open, nothing to do
             }
-            
+
             // Check if click is outside all dialog containers (excluding search)
-            const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
-            const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
-            const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
-            const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
-            
+            const isOutsideFilter =
+                filterRef.current && !filterRef.current.contains(target);
+            const isOutsideSort =
+                sortRef.current && !sortRef.current.contains(target);
+            const isOutsideHide =
+                hideRef.current && !hideRef.current.contains(target);
+            const isOutsideGroup =
+                groupRef.current && !groupRef.current.contains(target);
+
             // If click is outside all dialogs, close them (search remains open)
-            if (isOutsideFilter && isOutsideSort && isOutsideHide && isOutsideGroup) {
+            if (
+                isOutsideFilter &&
+                isOutsideSort &&
+                isOutsideHide &&
+                isOutsideGroup
+            ) {
                 closeAllDialogs();
             }
         };
 
         // Add event listener
         document.addEventListener('mousedown', handleClickOutside);
-        
+
         // Cleanup
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
@@ -188,19 +212,25 @@ export default function EnterpriseConfiguration() {
     // Listen for sort changes from the EnterpriseConfigTable
     useEffect(() => {
         const handleTableSortChange = (event: CustomEvent) => {
-            const { column, direction } = event.detail;
-            
+            const {column, direction} = event.detail;
+
             // Update the Sort panel state to reflect the table's sort change
             setSortColumn(column);
             setSortDirection(direction);
         };
 
         // Add event listener for custom enterprise table sort events
-        document.addEventListener('enterpriseTableSortChange', handleTableSortChange as EventListener);
-        
+        document.addEventListener(
+            'enterpriseTableSortChange',
+            handleTableSortChange as EventListener,
+        );
+
         // Cleanup
         return () => {
-            document.removeEventListener('enterpriseTableSortChange', handleTableSortChange as EventListener);
+            document.removeEventListener(
+                'enterpriseTableSortChange',
+                handleTableSortChange as EventListener,
+            );
         };
     }, []);
 
@@ -236,17 +266,13 @@ export default function EnterpriseConfiguration() {
             filtered = filtered.filter((config) => {
                 const searchLower = appliedSearchTerm.toLowerCase();
                 return (
-                    config.enterprise
-                        ?.toLowerCase()
-                        .includes(searchLower) ||
+                    config.enterprise?.toLowerCase().includes(searchLower) ||
                     config.enterpriseName
                         ?.toLowerCase()
                         .includes(searchLower) ||
                     config.product?.toLowerCase().includes(searchLower) ||
                     config.productName?.toLowerCase().includes(searchLower) ||
-                    config.services
-                        ?.toLowerCase()
-                        .includes(searchLower) ||
+                    config.services?.toLowerCase().includes(searchLower) ||
                     config.serviceName?.toLowerCase().includes(searchLower)
                 );
             });
@@ -265,8 +291,7 @@ export default function EnterpriseConfiguration() {
         }
         if (activeFilters.services && activeFilters.services.length > 0) {
             filtered = filtered.filter((config) => {
-                const configServices =
-                    config.services?.split(', ') || [];
+                const configServices = config.services?.split(', ') || [];
                 return activeFilters.services.some((service: string) =>
                     configServices.includes(service),
                 );
@@ -274,23 +299,39 @@ export default function EnterpriseConfiguration() {
         }
 
         // Apply sorting only when both column and direction are explicitly set
-        if (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc')) {
+        if (
+            sortColumn &&
+            sortDirection &&
+            (sortDirection === 'asc' || sortDirection === 'desc')
+        ) {
             filtered.sort((a, b) => {
                 let valueA = '';
                 let valueB = '';
 
                 switch (sortColumn) {
                     case 'enterprise':
-                        valueA = (a.enterprise || a.enterpriseName || '').toString().toLowerCase();
-                        valueB = (b.enterprise || b.enterpriseName || '').toString().toLowerCase();
+                        valueA = (a.enterprise || a.enterpriseName || '')
+                            .toString()
+                            .toLowerCase();
+                        valueB = (b.enterprise || b.enterpriseName || '')
+                            .toString()
+                            .toLowerCase();
                         break;
                     case 'product':
-                        valueA = (a.product || a.productName || '').toString().toLowerCase();
-                        valueB = (b.product || b.productName || '').toString().toLowerCase();
+                        valueA = (a.product || a.productName || '')
+                            .toString()
+                            .toLowerCase();
+                        valueB = (b.product || b.productName || '')
+                            .toString()
+                            .toLowerCase();
                         break;
                     case 'services':
-                        valueA = (a.services || a.serviceName || '').toString().toLowerCase();
-                        valueB = (b.services || b.serviceName || '').toString().toLowerCase();
+                        valueA = (a.services || a.serviceName || '')
+                            .toString()
+                            .toLowerCase();
+                        valueB = (b.services || b.serviceName || '')
+                            .toString()
+                            .toLowerCase();
                         break;
                 }
 
@@ -306,11 +347,11 @@ export default function EnterpriseConfiguration() {
 
         return filtered;
     }, [
-        enterpriseConfigs, 
-        appliedSearchTerm, 
-        activeFilters, 
+        enterpriseConfigs,
+        appliedSearchTerm,
+        activeFilters,
         // Create a stable sort key that only changes when both column and direction are set
-        sortColumn && sortDirection ? `${sortColumn}-${sortDirection}` : ''
+        sortColumn && sortDirection ? `${sortColumn}-${sortDirection}` : '',
     ]);
 
     // Helper functions for filter management
@@ -322,8 +363,8 @@ export default function EnterpriseConfiguration() {
     // Column label mapping
     const columnLabels: Record<string, string> = {
         enterprise: 'Enterprise',
-        product: 'Product', 
-        services: 'Services'
+        product: 'Product',
+        services: 'Services',
     };
 
     // Sort functions
@@ -342,7 +383,7 @@ export default function EnterpriseConfiguration() {
     const clearSorting = () => {
         setSortColumn('');
         setSortDirection('');
-        
+
         // Dispatch custom event to clear table sorting
         const clearEvent = new CustomEvent('clearTableSorting');
         window.dispatchEvent(clearEvent);
@@ -555,7 +596,8 @@ export default function EnterpriseConfiguration() {
 
             // Use the provided updated config or find it from current ref state
             const config =
-                updatedAccount || enterpriseConfigsRef.current.find((a) => a.id === tempRowId);
+                updatedAccount ||
+                enterpriseConfigsRef.current.find((a) => a.id === tempRowId);
             if (!config) {
                 console.error('❌ Config not found for auto-save:', tempRowId);
                 console.log(
@@ -700,9 +742,7 @@ export default function EnterpriseConfiguration() {
 
                 // Merge services: combine existing services with new ones (avoid duplicates)
                 const existingServices =
-                    existingRecord.services
-                        ?.split(', ')
-                        .filter(Boolean) || [];
+                    existingRecord.services?.split(', ').filter(Boolean) || [];
                 const allServices = Array.from(
                     new Set([...existingServices, ...serviceNames]),
                 );
@@ -788,15 +828,14 @@ export default function EnterpriseConfiguration() {
                     console.log('✅ Auto-save successful:', createdLinkage);
 
                     // Preserve display order for the new ID
-                    const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
+                    const oldDisplayOrder =
+                        displayOrderRef.current.get(tempRowId);
                     const newId = (createdLinkage as any).id;
-                    
+
                     // Update the config with the real ID from the backend
                     setEnterpriseConfigs((prev) => {
                         const updated = prev.map((cfg) =>
-                            cfg.id === tempRowId
-                                ? {...cfg, id: newId}
-                                : cfg,
+                            cfg.id === tempRowId ? {...cfg, id: newId} : cfg,
                         );
                         // Apply stable sorting to maintain display order
                         return sortConfigsByDisplayOrder(updated);
@@ -806,7 +845,9 @@ export default function EnterpriseConfiguration() {
                     if (oldDisplayOrder !== undefined) {
                         displayOrderRef.current.delete(tempRowId); // Remove old reference
                         displayOrderRef.current.set(newId, oldDisplayOrder); // Add new reference
-                        console.log(`📍 Preserved display order ${oldDisplayOrder} for new ID ${newId}`);
+                        console.log(
+                            `📍 Preserved display order ${oldDisplayOrder} for new ID ${newId}`,
+                        );
                     }
 
                     // Show success feedback
@@ -884,9 +925,7 @@ export default function EnterpriseConfiguration() {
         return enterpriseConfigs.some((config) => {
             const isTemporary = String(config.id).startsWith('tmp-');
             const isEmpty =
-                !config.enterprise &&
-                !config.product &&
-                !config.services;
+                !config.enterprise && !config.product && !config.services;
             return isTemporary && isEmpty;
         });
     };
@@ -894,25 +933,28 @@ export default function EnterpriseConfiguration() {
     // Function to validate incomplete rows and return validation details
     const validateIncompleteRows = () => {
         const effectiveConfigs = getEffectiveEnterpriseConfigs();
-        
+
         // Get all temporary (unsaved) rows using effective configs
-        const temporaryRows = effectiveConfigs.filter((config: any) => 
-            String(config.id).startsWith('tmp-')
+        const temporaryRows = effectiveConfigs.filter((config: any) =>
+            String(config.id).startsWith('tmp-'),
         );
 
         // Get all existing rows that might have incomplete data using effective configs
-        const existingRows = effectiveConfigs.filter((config: any) => 
-            !String(config.id).startsWith('tmp-')
+        const existingRows = effectiveConfigs.filter(
+            (config: any) => !String(config.id).startsWith('tmp-'),
         );
 
         // Check for incomplete temporary rows (exclude completely blank rows)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
-            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasEnterprise = (
+                config.enterprise || config.enterpriseName
+            )?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
             // Don't include completely blank rows (new rows that haven't been touched)
-            const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+            const isCompletelyBlank =
+                !hasEnterprise && !hasProduct && !hasServices;
             if (isCompletelyBlank) return false;
 
             // Row is incomplete if it has some data but not all required fields
@@ -921,12 +963,15 @@ export default function EnterpriseConfiguration() {
 
         // Check for incomplete existing rows (exclude completely blank rows)
         const incompleteExistingRows = existingRows.filter((config: any) => {
-            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasEnterprise = (
+                config.enterprise || config.enterpriseName
+            )?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
             // Don't include completely blank rows (existing rows shouldn't be blank, but just in case)
-            const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+            const isCompletelyBlank =
+                !hasEnterprise && !hasProduct && !hasServices;
             if (isCompletelyBlank) return false;
 
             // Row is incomplete if it has some data but not all required fields
@@ -934,47 +979,60 @@ export default function EnterpriseConfiguration() {
         });
 
         // Combine all incomplete rows
-        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
-        
+        const incompleteRows = [
+            ...incompleteTemporaryRows,
+            ...incompleteExistingRows,
+        ];
+
         if (incompleteRows.length > 0) {
             const missingFields = new Set<string>();
             incompleteRows.forEach((config) => {
-                if (!(config.enterprise || config.enterpriseName)?.trim()) missingFields.add('Enterprise');
-                if (!(config.product || config.productName)?.trim()) missingFields.add('Product');
-                if (!(config.services || config.serviceName)?.trim()) missingFields.add('Services');
+                if (!(config.enterprise || config.enterpriseName)?.trim())
+                    missingFields.add('Enterprise');
+                if (!(config.product || config.productName)?.trim())
+                    missingFields.add('Product');
+                if (!(config.services || config.serviceName)?.trim())
+                    missingFields.add('Services');
             });
-            
+
             const incompleteCount = incompleteRows.length;
-            const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
-            
+            const message = `Found ${incompleteCount} incomplete record${
+                incompleteCount > 1 ? 's' : ''
+            }. Please complete all required fields (${Array.from(
+                missingFields,
+            ).join(', ')}) before adding a new row.`;
+
             return {
                 hasIncomplete: true,
                 incompleteRows,
-                message
+                message,
             };
         }
-        
+
         return {
             hasIncomplete: false,
             incompleteRows: [],
-            message: ''
+            message: '',
         };
     };
 
     // Debounced auto-save function with countdown
     // Function to merge server data with pending local changes
     const getEffectiveEnterpriseConfigs = useCallback(() => {
-        return enterpriseConfigs.map(config => {
+        return enterpriseConfigs.map((config) => {
             const pendingChanges = pendingLocalChanges[config.id];
             if (pendingChanges) {
-                console.log(`🔄 Applying pending changes to record ${config.id}:`, pendingChanges);
+                console.log(
+                    `🔄 Applying pending changes to record ${config.id}:`,
+                    pendingChanges,
+                );
                 // Apply pending changes, ensuring field names match the config structure
-                const mergedConfig = { ...config };
-                Object.keys(pendingChanges).forEach(key => {
+                const mergedConfig = {...config};
+                Object.keys(pendingChanges).forEach((key) => {
                     const value = pendingChanges[key];
                     // Apply the change directly to the config
                     mergedConfig[key] = value;
-                    
+
                     // Also handle alternate field names for consistency
                     if (key === 'enterprise') {
                         mergedConfig.enterpriseName = value;
@@ -987,7 +1045,7 @@ export default function EnterpriseConfiguration() {
                 console.log(`✅ Merged config for ${config.id}:`, {
                     original: config,
                     pending: pendingChanges,
-                    merged: mergedConfig
+                    merged: mergedConfig,
                 });
                 return mergedConfig;
             }
@@ -998,16 +1056,23 @@ export default function EnterpriseConfiguration() {
     // Function to check for incomplete rows
     const getIncompleteRows = () => {
         const effectiveConfigs = getEffectiveEnterpriseConfigs();
-        
+
         return effectiveConfigs
             .filter((config: any) => {
-                const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
-                const hasProduct = (config.product || config.productName)?.trim();
-                const hasServices = (config.services || config.serviceName)?.trim();
+                const hasEnterprise = (
+                    config.enterprise || config.enterpriseName
+                )?.trim();
+                const hasProduct = (
+                    config.product || config.productName
+                )?.trim();
+                const hasServices = (
+                    config.services || config.serviceName
+                )?.trim();
 
                 // When validation errors are being shown, include completely blank rows for highlighting
                 // Otherwise, don't include completely blank rows (new rows that haven't been touched)
-                const isCompletelyBlank = !hasEnterprise && !hasProduct && !hasServices;
+                const isCompletelyBlank =
+                    !hasEnterprise && !hasProduct && !hasServices;
                 if (isCompletelyBlank && !showValidationErrors) return false;
 
                 // Row is incomplete if it has some data but not all required fields, OR if it's completely blank and validation is active
@@ -1017,8 +1082,10 @@ export default function EnterpriseConfiguration() {
     };
 
     const debouncedAutoSave = async () => {
-        console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
-        
+        console.log(
+            '🕐 debouncedAutoSave called - clearing existing timer and starting new one',
+        );
+
         // Clear existing timer
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
@@ -1027,7 +1094,7 @@ export default function EnterpriseConfiguration() {
 
         // Start countdown
         setAutoSaveCountdown(10);
-        
+
         // Countdown interval
         const countdownInterval = setInterval(() => {
             setAutoSaveCountdown((prev) => {
@@ -1043,145 +1110,224 @@ export default function EnterpriseConfiguration() {
         // Set new timer for 10 seconds
         const timer = setTimeout(async () => {
             try {
-                console.log('🔥 10-second timer triggered - starting auto-save process');
+                console.log(
+                    '🔥 10-second timer triggered - starting auto-save process',
+                );
                 setIsAutoSaving(true);
                 setAutoSaveCountdown(null);
                 clearInterval(countdownIntervalRef.current!);
-                
+
                 // Get all temporary (unsaved) rows that are complete using current ref
-                const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
-                    const isTemp = String(config.id).startsWith('tmp-');
-                    if (!isTemp) return false;
-                    
-                    // Be more strict about what constitutes a complete row
-                    const hasEnterprise = config.enterprise?.trim() && config.enterprise.trim().length > 0;
-                    const hasProduct = config.product?.trim() && config.product.trim().length > 0;
-                    const hasServices = config.services?.trim() && config.services.trim().length > 0;
-                    
-                    const isComplete = hasEnterprise && hasProduct && hasServices;
-                    
-                    if (isTemp && !isComplete) {
-                        console.log(`🚫 Skipping incomplete temporary row ${config.id}:`, {
-                            hasEnterprise: !!hasEnterprise,
-                            hasProduct: !!hasProduct,
-                            hasServices: !!hasServices,
-                            enterpriseValue: config.enterprise,
-                            productValue: config.product,
-                            servicesValue: config.services
-                        });
-                    }
-                    
-                    return isComplete;
-                });
-                
-                // Get all modified existing records that are still complete
-                const modifiedRows = enterpriseConfigsRef.current.filter((config) => {
-                    const isExisting = !String(config.id).startsWith('tmp-');
-                    const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
-                    
-                    if (isExisting && isModified) {
-                        // Double-check that the record still has all required fields
-                        const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
-                        const hasProduct = (config.product || config.productName)?.trim();
-                        
-                        // Enhanced services validation for timer
-                        const servicesValue = config.services || config.serviceName || '';
-                        const hasServices = (() => {
-                            if (typeof servicesValue === 'string') {
-                                return servicesValue.trim().length > 0;
-                            } else if (Array.isArray(servicesValue)) {
-                                return servicesValue.length > 0;
-                            }
-                            return false;
-                        })();
-                        
-                        const isComplete = hasEnterprise && hasProduct && hasServices;
-                        
-                        console.log(`🔍 Checking modified record ${config.id}: isComplete=${isComplete}`, {
-                            hasEnterprise: !!hasEnterprise,
-                            hasProduct: !!hasProduct,
-                            hasServices: !!hasServices,
-                            servicesValue: servicesValue,
-                            servicesValueType: typeof servicesValue
-                        });
-                        
+                const temporaryRows = enterpriseConfigsRef.current.filter(
+                    (config) => {
+                        const isTemp = String(config.id).startsWith('tmp-');
+                        if (!isTemp) return false;
+
+                        // Be more strict about what constitutes a complete row
+                        const hasEnterprise =
+                            config.enterprise?.trim() &&
+                            config.enterprise.trim().length > 0;
+                        const hasProduct =
+                            config.product?.trim() &&
+                            config.product.trim().length > 0;
+                        const hasServices =
+                            config.services?.trim() &&
+                            config.services.trim().length > 0;
+
+                        const isComplete =
+                            hasEnterprise && hasProduct && hasServices;
+
+                        if (isTemp && !isComplete) {
+                            console.log(
+                                `🚫 Skipping incomplete temporary row ${config.id}:`,
+                                {
+                                    hasEnterprise: !!hasEnterprise,
+                                    hasProduct: !!hasProduct,
+                                    hasServices: !!hasServices,
+                                    enterpriseValue: config.enterprise,
+                                    productValue: config.product,
+                                    servicesValue: config.services,
+                                },
+                            );
+                        }
+
                         return isComplete;
-                    }
-                    
-                    console.log(`🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
-                    return false;
-                });
-                
-            console.log(`📊 Found ${temporaryRows.length} complete temporary rows to auto-save`);
-            console.log(`📊 Found ${modifiedRows.length} modified existing rows to auto-save`);
-            console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
-            console.log('🔍 All current configs:', enterpriseConfigsRef.current.map(c => ({
-                id: c.id,
-                isTemp: String(c.id).startsWith('tmp-'),
-                isModified: modifiedExistingRecordsRef.current.has(String(c.id)),
-                enterprise: c.enterprise,
-                product: c.product,
-                services: c.services,
-                hasEnterprise: !!(c.enterprise || c.enterpriseName)?.trim(),
-                hasProduct: !!(c.product || c.productName)?.trim(),
-                hasServices: !!(c.services || c.serviceName)?.trim()
-            })));
-            
-            // Check for orphaned records in modifiedExistingRecords
-            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
-                !enterpriseConfigsRef.current.find(config => String(config.id) === recordId)
-            );
-            if (orphanedRecords.length > 0) {
-                console.log('⚠️ Found orphaned records in modifiedExistingRecords:', orphanedRecords);
-                console.log('🧹 Cleaning up orphaned records from modified set');
-                setModifiedExistingRecords(prev => {
-                    const newSet = new Set(prev);
-                    orphanedRecords.forEach(recordId => newSet.delete(recordId));
-                    return newSet;
-                });
-                // Update the ref immediately for this operation
-                const cleanedSet = new Set(modifiedExistingRecordsRef.current);
-                orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
-                modifiedExistingRecordsRef.current = cleanedSet;
-            }                const totalRowsToSave = temporaryRows.length + modifiedRows.length;
+                    },
+                );
+
+                // Get all modified existing records that are still complete
+                const modifiedRows = enterpriseConfigsRef.current.filter(
+                    (config) => {
+                        const isExisting = !String(config.id).startsWith(
+                            'tmp-',
+                        );
+                        const isModified =
+                            modifiedExistingRecordsRef.current.has(
+                                String(config.id),
+                            );
+
+                        if (isExisting && isModified) {
+                            // Double-check that the record still has all required fields
+                            const hasEnterprise = (
+                                config.enterprise || config.enterpriseName
+                            )?.trim();
+                            const hasProduct = (
+                                config.product || config.productName
+                            )?.trim();
+
+                            // Enhanced services validation for timer
+                            const servicesValue =
+                                config.services || config.serviceName || '';
+                            const hasServices = (() => {
+                                if (typeof servicesValue === 'string') {
+                                    return servicesValue.trim().length > 0;
+                                } else if (Array.isArray(servicesValue)) {
+                                    return servicesValue.length > 0;
+                                }
+                                return false;
+                            })();
+
+                            const isComplete =
+                                hasEnterprise && hasProduct && hasServices;
+
+                            console.log(
+                                `🔍 Checking modified record ${config.id}: isComplete=${isComplete}`,
+                                {
+                                    hasEnterprise: !!hasEnterprise,
+                                    hasProduct: !!hasProduct,
+                                    hasServices: !!hasServices,
+                                    servicesValue: servicesValue,
+                                    servicesValueType: typeof servicesValue,
+                                },
+                            );
+
+                            return isComplete;
+                        }
+
+                        console.log(
+                            `🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`,
+                        );
+                        return false;
+                    },
+                );
+
+                console.log(
+                    `📊 Found ${temporaryRows.length} complete temporary rows to auto-save`,
+                );
+                console.log(
+                    `📊 Found ${modifiedRows.length} modified existing rows to auto-save`,
+                );
+                console.log(
+                    '🔍 Current modifiedExistingRecords set (from ref):',
+                    Array.from(modifiedExistingRecordsRef.current),
+                );
+                console.log(
+                    '🔍 All current configs:',
+                    enterpriseConfigsRef.current.map((c) => ({
+                        id: c.id,
+                        isTemp: String(c.id).startsWith('tmp-'),
+                        isModified: modifiedExistingRecordsRef.current.has(
+                            String(c.id),
+                        ),
+                        enterprise: c.enterprise,
+                        product: c.product,
+                        services: c.services,
+                        hasEnterprise: !!(
+                            c.enterprise || c.enterpriseName
+                        )?.trim(),
+                        hasProduct: !!(c.product || c.productName)?.trim(),
+                        hasServices: !!(c.services || c.serviceName)?.trim(),
+                    })),
+                );
+
+                // Check for orphaned records in modifiedExistingRecords
+                const orphanedRecords = Array.from(
+                    modifiedExistingRecordsRef.current,
+                ).filter(
+                    (recordId) =>
+                        !enterpriseConfigsRef.current.find(
+                            (config) => String(config.id) === recordId,
+                        ),
+                );
+                if (orphanedRecords.length > 0) {
+                    console.log(
+                        '⚠️ Found orphaned records in modifiedExistingRecords:',
+                        orphanedRecords,
+                    );
+                    console.log(
+                        '🧹 Cleaning up orphaned records from modified set',
+                    );
+                    setModifiedExistingRecords((prev) => {
+                        const newSet = new Set(prev);
+                        orphanedRecords.forEach((recordId) =>
+                            newSet.delete(recordId),
+                        );
+                        return newSet;
+                    });
+                    // Update the ref immediately for this operation
+                    const cleanedSet = new Set(
+                        modifiedExistingRecordsRef.current,
+                    );
+                    orphanedRecords.forEach((recordId) =>
+                        cleanedSet.delete(recordId),
+                    );
+                    modifiedExistingRecordsRef.current = cleanedSet;
+                }
+                const totalRowsToSave =
+                    temporaryRows.length + modifiedRows.length;
                 if (totalRowsToSave > 0) {
-                    console.log('� Auto-saving rows after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
-                    
+                    console.log(
+                        '� Auto-saving rows after 10 seconds of inactivity...',
+                        temporaryRows.map((r) => r.id),
+                    );
+
                     for (const tempRow of temporaryRows) {
                         console.log(`💾 Auto-saving row: ${tempRow.id}`);
                         await autoSaveNewRow(tempRow.id);
                     }
-                    
+
                     // Save modified existing rows - they're already saved via immediate API calls
                     // but we still want to show the success animation
                     for (const modifiedRow of modifiedRows) {
-                        console.log(`💾 Modified existing row already saved: ${modifiedRow.id}`);
+                        console.log(
+                            `💾 Modified existing row already saved: ${modifiedRow.id}`,
+                        );
                     }
-                    
+
                     // Clear the modified records set (including any incomplete records that were filtered out)
-                    const modifiedRecordIds = modifiedRows.map(row => String(row.id));
-                    console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
+                    const modifiedRecordIds = modifiedRows.map((row) =>
+                        String(row.id),
+                    );
+                    console.log(
+                        '🧹 Clearing modified records set. Keeping only complete records:',
+                        modifiedRecordIds,
+                    );
                     setModifiedExistingRecords(new Set());
-                    
+
                     // Show success animation for all auto-saved entries
-                    console.log('✨ Showing auto-save success animation for all entries');
+                    console.log(
+                        '✨ Showing auto-save success animation for all entries',
+                    );
                     setShowAutoSaveSuccess(true);
-                    
+
                     // Also show notification
-                    const message = temporaryRows.length > 0 && modifiedRows.length > 0
-                        ? `✅ Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
-                        : temporaryRows.length > 0
-                        ? `✅ Auto-saved ${temporaryRows.length} new entries`
-                        : `✅ Auto-saved ${modifiedRows.length} updated entries`;
-                    
+                    const message =
+                        temporaryRows.length > 0 && modifiedRows.length > 0
+                            ? `✅ Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
+                            : temporaryRows.length > 0
+                            ? `✅ Auto-saved ${temporaryRows.length} new entries`
+                            : `✅ Auto-saved ${modifiedRows.length} updated entries`;
+
                     showBlueNotification(message);
-                    
+
                     setTimeout(() => {
                         console.log('✨ Hiding auto-save success animation');
                         setShowAutoSaveSuccess(false);
                     }, 3000); // Show for 3 seconds
-                    
-                    console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+
+                    console.log(
+                        `✅ Auto-saved ${totalRowsToSave} entries successfully`,
+                    );
                 } else {
                     console.log('ℹ️ No rows found to auto-save');
                 }
@@ -1200,92 +1346,130 @@ export default function EnterpriseConfiguration() {
     const executeAutoSave = async () => {
         console.log('🔥 Executing auto-save process');
         setIsAutoSaving(true);
-        
+
         try {
             // Get all temporary (unsaved) rows that are complete using current ref
-            const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
-                const isTemp = String(config.id).startsWith('tmp-');
-                if (!isTemp) return false;
-                
-                const hasEnterprise = config.enterprise?.trim();
-                const hasProduct = config.product?.trim();
-                const hasServices = config.services?.trim();
-                
-                return hasEnterprise && hasProduct && hasServices;
-            });
-            
+            const temporaryRows = enterpriseConfigsRef.current.filter(
+                (config) => {
+                    const isTemp = String(config.id).startsWith('tmp-');
+                    if (!isTemp) return false;
+
+                    const hasEnterprise = config.enterprise?.trim();
+                    const hasProduct = config.product?.trim();
+                    const hasServices = config.services?.trim();
+
+                    return hasEnterprise && hasProduct && hasServices;
+                },
+            );
+
             // Get all modified existing records that are still complete
-            const modifiedRows = enterpriseConfigsRef.current.filter((config) => {
-                const isExisting = !String(config.id).startsWith('tmp-');
-                const isModified = modifiedExistingRecordsRef.current.has(String(config.id));
-                
-                if (isExisting && isModified) {
-                    // Double-check that the record still has all required fields
-                    const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
-                    const hasProduct = (config.product || config.productName)?.trim();
-                    
-                    // Enhanced services validation
-                    const servicesValue = config.services || config.serviceName || '';
-                    const hasServices = (() => {
-                        if (typeof servicesValue === 'string') {
-                            return servicesValue.trim().length > 0;
-                        } else if (Array.isArray(servicesValue)) {
-                            return servicesValue.length > 0;
-                        }
-                        return false;
-                    })();
-                    
-                    const isComplete = hasEnterprise && hasProduct && hasServices;
-                    
-                    console.log(`🔍 Checking modified record ${config.id}: isComplete=${isComplete}`, {
-                        hasEnterprise: !!hasEnterprise,
-                        hasProduct: !!hasProduct,
-                        hasServices: !!hasServices,
-                        servicesValue: servicesValue,
-                        servicesValueType: typeof servicesValue
-                    });
-                    
-                    return isComplete;
-                }
-                
-                console.log(`🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`);
-                return false;
-            });
-            
-            console.log(`📊 Found ${temporaryRows.length} complete temporary rows to auto-save`);
-            console.log(`📊 Found ${modifiedRows.length} modified existing rows to auto-save`);
-            console.log('🔍 Current modifiedExistingRecords set (from ref):', Array.from(modifiedExistingRecordsRef.current));
+            const modifiedRows = enterpriseConfigsRef.current.filter(
+                (config) => {
+                    const isExisting = !String(config.id).startsWith('tmp-');
+                    const isModified = modifiedExistingRecordsRef.current.has(
+                        String(config.id),
+                    );
+
+                    if (isExisting && isModified) {
+                        // Double-check that the record still has all required fields
+                        const hasEnterprise = (
+                            config.enterprise || config.enterpriseName
+                        )?.trim();
+                        const hasProduct = (
+                            config.product || config.productName
+                        )?.trim();
+
+                        // Enhanced services validation
+                        const servicesValue =
+                            config.services || config.serviceName || '';
+                        const hasServices = (() => {
+                            if (typeof servicesValue === 'string') {
+                                return servicesValue.trim().length > 0;
+                            } else if (Array.isArray(servicesValue)) {
+                                return servicesValue.length > 0;
+                            }
+                            return false;
+                        })();
+
+                        const isComplete =
+                            hasEnterprise && hasProduct && hasServices;
+
+                        console.log(
+                            `🔍 Checking modified record ${config.id}: isComplete=${isComplete}`,
+                            {
+                                hasEnterprise: !!hasEnterprise,
+                                hasProduct: !!hasProduct,
+                                hasServices: !!hasServices,
+                                servicesValue: servicesValue,
+                                servicesValueType: typeof servicesValue,
+                            },
+                        );
+
+                        return isComplete;
+                    }
+
+                    console.log(
+                        `🔍 Checking record ${config.id}: isExisting=${isExisting}, isModified=${isModified}`,
+                    );
+                    return false;
+                },
+            );
+
+            console.log(
+                `📊 Found ${temporaryRows.length} complete temporary rows to auto-save`,
+            );
+            console.log(
+                `📊 Found ${modifiedRows.length} modified existing rows to auto-save`,
+            );
+            console.log(
+                '🔍 Current modifiedExistingRecords set (from ref):',
+                Array.from(modifiedExistingRecordsRef.current),
+            );
 
             const totalRowsToSave = temporaryRows.length + modifiedRows.length;
             if (totalRowsToSave > 0) {
-                console.log('💾 Auto-saving rows...', temporaryRows.map(r => r.id));
-                
+                console.log(
+                    '💾 Auto-saving rows...',
+                    temporaryRows.map((r) => r.id),
+                );
+
                 for (const tempRow of temporaryRows) {
                     console.log(`💾 Auto-saving row: ${tempRow.id}`);
                     await autoSaveNewRow(tempRow.id);
                 }
-                
+
                 // Save modified existing rows - they're already saved via immediate API calls
                 // but we still want to show the success animation
                 for (const modifiedRow of modifiedRows) {
-                    console.log(`💾 Modified existing row already saved: ${modifiedRow.id}`);
+                    console.log(
+                        `💾 Modified existing row already saved: ${modifiedRow.id}`,
+                    );
                 }
-                
+
                 // Clear the modified records set
-                const modifiedRecordIds = modifiedRows.map(row => String(row.id));
-                console.log('🧹 Clearing modified records set. Keeping only complete records:', modifiedRecordIds);
+                const modifiedRecordIds = modifiedRows.map((row) =>
+                    String(row.id),
+                );
+                console.log(
+                    '🧹 Clearing modified records set. Keeping only complete records:',
+                    modifiedRecordIds,
+                );
                 setModifiedExistingRecords(new Set());
-                
+
                 // Show success animation for all auto-saved entries
-                console.log('✨ Showing auto-save success animation for all entries');
+                console.log(
+                    '✨ Showing auto-save success animation for all entries',
+                );
                 setShowAutoSaveSuccess(true);
-                
+
                 setTimeout(() => {
                     console.log('✨ Hiding auto-save success animation');
                     setShowAutoSaveSuccess(false);
                 }, 3000); // Show for 3 seconds
-                
-                console.log(`✅ Auto-saved ${totalRowsToSave} entries successfully`);
+
+                console.log(
+                    `✅ Auto-saved ${totalRowsToSave} entries successfully`,
+                );
                 return totalRowsToSave;
             } else {
                 console.log('ℹ️ No rows found to auto-save');
@@ -1298,7 +1482,7 @@ export default function EnterpriseConfiguration() {
             setIsAutoSaving(false);
         }
     };
-    
+
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Clear auto-save timer on component unmount
@@ -1321,18 +1505,20 @@ export default function EnterpriseConfiguration() {
     // Handle save all entries with validation
     const handleSaveAll = async () => {
         const effectiveConfigs = getEffectiveEnterpriseConfigs();
-        
-        console.log('💾 Save button clicked - effective enterpriseConfigs state:'); 
+
+        console.log(
+            '💾 Save button clicked - effective enterpriseConfigs state:',
+        );
         effectiveConfigs.forEach((c: any, index: number) => {
             console.log(`  Record ${index + 1}:`, {
                 id: c.id,
                 enterprise: c.enterprise || c.enterpriseName,
-                product: c.product || c.productName,  
+                product: c.product || c.productName,
                 services: c.services || c.serviceName,
                 hasEnterprise: !!(c.enterprise || c.enterpriseName)?.trim(),
                 hasProduct: !!(c.product || c.productName)?.trim(),
                 hasServices: !!(c.services || c.serviceName)?.trim(),
-                hasPendingChanges: !!pendingLocalChanges[c.id]
+                hasPendingChanges: !!pendingLocalChanges[c.id],
             });
         });
 
@@ -1346,28 +1532,34 @@ export default function EnterpriseConfiguration() {
                 clearInterval(countdownIntervalRef.current);
             }
         }
-        
+
         // Clear any pending auto-save data from localStorage
         localStorage.removeItem('enterpriseAutoSave');
-        console.log('🧹 Cleared auto-save data from localStorage due to manual save');
-        
+        console.log(
+            '🧹 Cleared auto-save data from localStorage due to manual save',
+        );
+
         // Clear any pending auto-save data from localStorage
         localStorage.removeItem('enterpriseAutoSave');
-        console.log('🧹 Cleared auto-save data from localStorage due to manual save');
+        console.log(
+            '🧹 Cleared auto-save data from localStorage due to manual save',
+        );
 
         // Get all temporary (unsaved) rows using effective configs
-        const temporaryRows = effectiveConfigs.filter((config: any) => 
-            String(config.id).startsWith('tmp-')
+        const temporaryRows = effectiveConfigs.filter((config: any) =>
+            String(config.id).startsWith('tmp-'),
         );
 
         // Get all existing rows that might have incomplete data using effective configs
-        const existingRows = effectiveConfigs.filter((config: any) => 
-            !String(config.id).startsWith('tmp-')
+        const existingRows = effectiveConfigs.filter(
+            (config: any) => !String(config.id).startsWith('tmp-'),
         );
 
         // Check for incomplete temporary rows (including completely blank ones)
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
-            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasEnterprise = (
+                config.enterprise || config.enterpriseName
+            )?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
@@ -1376,7 +1568,9 @@ export default function EnterpriseConfiguration() {
 
         // Check for incomplete existing rows (including completely blank ones)
         const incompleteExistingRows = existingRows.filter((config: any) => {
-            const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
+            const hasEnterprise = (
+                config.enterprise || config.enterpriseName
+            )?.trim();
             const hasProduct = (config.product || config.productName)?.trim();
             const hasServices = (config.services || config.serviceName)?.trim();
 
@@ -1384,12 +1578,17 @@ export default function EnterpriseConfiguration() {
         });
 
         // Combine all incomplete rows
-        const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
+        const incompleteRows = [
+            ...incompleteTemporaryRows,
+            ...incompleteExistingRows,
+        ];
 
         // Check if there are any pending changes (auto-save timer or modified records)
         const hasActiveAutoSave = autoSaveTimerRef.current !== null;
-        const hasModifiedExistingRecords = modifiedExistingRecordsRef.current.size > 0;
-        const hasPendingChanges = hasActiveAutoSave || hasModifiedExistingRecords;
+        const hasModifiedExistingRecords =
+            modifiedExistingRecordsRef.current.size > 0;
+        const hasPendingChanges =
+            hasActiveAutoSave || hasModifiedExistingRecords;
 
         console.log('🔍 Save button validation check:', {
             temporaryRowsCount: temporaryRows.length,
@@ -1405,17 +1604,21 @@ export default function EnterpriseConfiguration() {
                 services: r.services || r.serviceName,
                 hasEnterprise: !!(r.enterprise || r.enterpriseName)?.trim(),
                 hasProduct: !!(r.product || r.productName)?.trim(),
-                hasServices: !!(r.services || r.serviceName)?.trim()
+                hasServices: !!(r.services || r.serviceName)?.trim(),
             })),
             incompleteExistingRows: incompleteExistingRows.map((r: any) => ({
                 id: r.id,
                 enterprise: r.enterprise,
                 product: r.product,
-                services: r.services
-            }))
+                services: r.services,
+            })),
         });
 
-        if (temporaryRows.length === 0 && incompleteExistingRows.length === 0 && !hasPendingChanges) {
+        if (
+            temporaryRows.length === 0 &&
+            incompleteExistingRows.length === 0 &&
+            !hasPendingChanges
+        ) {
             showBlueNotification('No unsaved entries to save.');
             return;
         }
@@ -1423,17 +1626,24 @@ export default function EnterpriseConfiguration() {
         if (incompleteRows.length > 0) {
             const missingFields = new Set<string>();
             incompleteRows.forEach((config) => {
-                if (!(config.enterprise || config.enterpriseName)?.trim()) missingFields.add('Enterprise');
-                if (!(config.product || config.productName)?.trim()) missingFields.add('Product');
-                if (!(config.services || config.serviceName)?.trim()) missingFields.add('Services');
+                if (!(config.enterprise || config.enterpriseName)?.trim())
+                    missingFields.add('Enterprise');
+                if (!(config.product || config.productName)?.trim())
+                    missingFields.add('Product');
+                if (!(config.services || config.serviceName)?.trim())
+                    missingFields.add('Services');
             });
-            
+
             const incompleteCount = incompleteRows.length;
             const temporaryCount = incompleteTemporaryRows.length;
             const existingCount = incompleteExistingRows.length;
-            
-            let message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(missingFields).join(', ')}`;
-            
+
+            let message = `Found ${incompleteCount} incomplete record${
+                incompleteCount > 1 ? 's' : ''
+            }.\nMissing required fields: ${Array.from(missingFields).join(
+                ', ',
+            )}`;
+
             setValidationMessage(message);
             setShowValidationErrors(true); // Enable red border highlighting for validation errors
             setShowValidationModal(true);
@@ -1443,33 +1653,45 @@ export default function EnterpriseConfiguration() {
         // Save all complete temporary rows and handle pending changes
         try {
             let savedCount = 0;
-            const completeTemporaryRows = temporaryRows.filter((config: any) => {
-                const hasEnterprise = (config.enterprise || config.enterpriseName)?.trim();
-                const hasProduct = (config.product || config.productName)?.trim();
-                const hasServices = (config.services || config.serviceName)?.trim();
-                return hasEnterprise && hasProduct && hasServices;
-            });
-            
+            const completeTemporaryRows = temporaryRows.filter(
+                (config: any) => {
+                    const hasEnterprise = (
+                        config.enterprise || config.enterpriseName
+                    )?.trim();
+                    const hasProduct = (
+                        config.product || config.productName
+                    )?.trim();
+                    const hasServices = (
+                        config.services || config.serviceName
+                    )?.trim();
+                    return hasEnterprise && hasProduct && hasServices;
+                },
+            );
+
             // Save temporary rows
             for (const tempRow of completeTemporaryRows) {
                 await autoSaveNewRow(tempRow.id);
                 savedCount++;
             }
-            
+
             // Handle pending changes from modified existing records
             if (hasActiveAutoSave || hasModifiedExistingRecords) {
-                console.log('💾 Manual save triggered - processing pending changes immediately');
-                
+                console.log(
+                    '💾 Manual save triggered - processing pending changes immediately',
+                );
+
                 // Trigger the auto-save process immediately instead of waiting for timer
                 const pendingSavedCount = await executeAutoSave();
-                
+
                 if (pendingSavedCount > 0) {
                     savedCount += pendingSavedCount;
                 }
             }
-            
+
             if (savedCount > 0) {
-                showBlueNotification(`Successfully saved ${savedCount} entries.`);
+                showBlueNotification(
+                    `Successfully saved ${savedCount} entries.`,
+                );
                 setShowValidationErrors(false); // Clear validation errors on successful save
             } else if (hasPendingChanges) {
                 showBlueNotification('Pending changes saved successfully.');
@@ -1479,7 +1701,9 @@ export default function EnterpriseConfiguration() {
             }
         } catch (error) {
             console.error('Failed to save entries:', error);
-            showBlueNotification('Failed to save some entries. Please try again.');
+            showBlueNotification(
+                'Failed to save some entries. Please try again.',
+            );
         }
     };
 
@@ -1499,7 +1723,7 @@ export default function EnterpriseConfiguration() {
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             const incomplete = getIncompleteRows();
-            
+
             // Check for pending auto-save and execute synchronously
             const storedData = localStorage.getItem('enterpriseAutoSave');
             if (storedData) {
@@ -1507,7 +1731,7 @@ export default function EnterpriseConfiguration() {
                 // We can't await in beforeunload, but we can trigger the save
                 // The user will see a warning if there are incomplete rows
             }
-            
+
             if (incomplete.length > 0) {
                 e.preventDefault();
                 e.returnValue =
@@ -1517,59 +1741,79 @@ export default function EnterpriseConfiguration() {
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
-        
+
         // Also handle when user switches tabs or minimizes window
         const handleVisibilityChange = async () => {
             if (document.hidden) {
                 console.log('📱 Page hidden - checking for pending auto-save');
                 const storedData = localStorage.getItem('enterpriseAutoSave');
                 if (storedData) {
-                    console.log('⚡ Executing auto-save due to page visibility change');
+                    console.log(
+                        '⚡ Executing auto-save due to page visibility change',
+                    );
                     // Execute auto-save inline since we can't access the function
                     try {
                         setIsAutoSaving(true);
-                        
-                        const temporaryRows = enterpriseConfigsRef.current.filter((config) => {
-                            const isTemp = String(config.id).startsWith('tmp-');
-                            if (!isTemp) return false;
-                            
-                            const hasEnterprise = config.enterprise?.trim();
-                            const hasProduct = config.product?.trim();
-                            const hasServices = config.services?.trim();
-                            
-                            return hasEnterprise && hasProduct && hasServices;
-                        });
-                        
+
+                        const temporaryRows =
+                            enterpriseConfigsRef.current.filter((config) => {
+                                const isTemp = String(config.id).startsWith(
+                                    'tmp-',
+                                );
+                                if (!isTemp) return false;
+
+                                const hasEnterprise = config.enterprise?.trim();
+                                const hasProduct = config.product?.trim();
+                                const hasServices = config.services?.trim();
+
+                                return (
+                                    hasEnterprise && hasProduct && hasServices
+                                );
+                            });
+
                         let savedCount = 0;
                         for (const tempRow of temporaryRows) {
                             try {
                                 await autoSaveNewRow(tempRow.id);
                                 savedCount++;
                             } catch (error) {
-                                console.error(`❌ Failed to auto-save row ${tempRow.id}:`, error);
+                                console.error(
+                                    `❌ Failed to auto-save row ${tempRow.id}:`,
+                                    error,
+                                );
                             }
                         }
-                        
+
                         if (savedCount > 0) {
-                            showBlueNotification(`✅ Auto-saved ${savedCount} entries before leaving page`);
-                            console.log(`✅ Auto-saved ${savedCount} entries on page hide`);
+                            showBlueNotification(
+                                `✅ Auto-saved ${savedCount} entries before leaving page`,
+                            );
+                            console.log(
+                                `✅ Auto-saved ${savedCount} entries on page hide`,
+                            );
                         }
-                        
+
                         localStorage.removeItem('enterpriseAutoSave');
                     } catch (error) {
-                        console.error('❌ Auto-save on visibility change failed:', error);
+                        console.error(
+                            '❌ Auto-save on visibility change failed:',
+                            error,
+                        );
                     } finally {
                         setIsAutoSaving(false);
                     }
                 }
             }
         };
-        
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibilityChange,
+            );
         };
     }, [enterpriseConfigs]);
 
@@ -1577,13 +1821,20 @@ export default function EnterpriseConfiguration() {
     useEffect(() => {
         const detectAIPanelState = () => {
             // Look for the AI panel by finding the motion.div with width animations
-            const aiPanel = document.querySelector('[class*="w-\\[300px\\]"], [class*="w-16"]') as HTMLElement;
+            const aiPanel = document.querySelector(
+                '[class*="w-\\[300px\\]"], [class*="w-16"]',
+            ) as HTMLElement;
             if (aiPanel) {
                 const computedStyle = window.getComputedStyle(aiPanel);
                 const width = parseInt(computedStyle.width);
                 const isCollapsed = width <= 80; // 64px + some margin for safety
                 setIsAIPanelCollapsed(isCollapsed);
-                console.log('🤖 AI Panel width detected:', width, 'Collapsed:', isCollapsed);
+                console.log(
+                    '🤖 AI Panel width detected:',
+                    width,
+                    'Collapsed:',
+                    isCollapsed,
+                );
             }
         };
 
@@ -1593,16 +1844,25 @@ export default function EnterpriseConfiguration() {
                 const width = entry.contentRect.width;
                 const isCollapsed = width <= 80;
                 setIsAIPanelCollapsed(isCollapsed);
-                console.log('🤖 AI Panel resized to:', width, 'Collapsed:', isCollapsed);
+                console.log(
+                    '🤖 AI Panel resized to:',
+                    width,
+                    'Collapsed:',
+                    isCollapsed,
+                );
             }
         });
 
         // Find and observe the AI panel
         const findAndObserveAIPanel = () => {
             // Look for the AI panel container
-            const aiPanelContainer = document.querySelector('.order-1.lg\\:order-2') as HTMLElement;
+            const aiPanelContainer = document.querySelector(
+                '.order-1.lg\\:order-2',
+            ) as HTMLElement;
             if (aiPanelContainer) {
-                const aiPanel = aiPanelContainer.querySelector('div') as HTMLElement;
+                const aiPanel = aiPanelContainer.querySelector(
+                    'div',
+                ) as HTMLElement;
                 if (aiPanel) {
                     resizeObserver.observe(aiPanel);
                     detectAIPanelState(); // Initial detection
@@ -1675,7 +1935,10 @@ export default function EnterpriseConfiguration() {
         // Test animation function
         (window as any).testAnimation = (rowId?: string) => {
             const testRowId =
-                rowId || (enterpriseConfigs.length > 0 ? enterpriseConfigs[0].id : 'test-id');
+                rowId ||
+                (enterpriseConfigs.length > 0
+                    ? enterpriseConfigs[0].id
+                    : 'test-id');
             console.log('🧪 Testing animation for row:', testRowId);
             startRowCompressionAnimation(testRowId);
         };
@@ -1800,43 +2063,57 @@ export default function EnterpriseConfiguration() {
     // Load data on component mount
     useEffect(() => {
         let mounted = true; // Prevent state updates if component unmounted
-        
+
         (async () => {
             try {
                 setIsLoading(true);
                 console.log('🔄 Loading enterprise linkages...');
 
                 // Load both linkages and dropdown options in parallel
-                const [linkagesRes] = await Promise.all([
-                    api.get<
-                        Array<{
-                            id: string;
-                            enterpriseId: string;
-                            productId: string;
-                            serviceIds: string[];
-                            enterprise: {
-                                id: string;
-                                name: string;
-                            };
-                            product: {
-                                id: string;
-                                name: string;
-                            };
-                            services: Array<{
-                                id: string;
-                                name: string;
-                            }>;
-                            createdAt: string;
-                            updatedAt: string;
-                        }>
-                    >('/api/enterprise-products-services'),
+                const [linkagesRaw] = await Promise.all([
+                    api.get<any>('/api/enterprise-products-services'),
                     loadDropdownOptions(),
                 ]);
 
                 // Only update state if component is still mounted
                 if (!mounted) {
-                    console.log('⚠️ Component unmounted during data load, skipping state update');
+                    console.log(
+                        '⚠️ Component unmounted during data load, skipping state update',
+                    );
                     return;
+                }
+
+                // Handle various response formats - API might return array directly or wrapped
+                let linkagesRes: Array<{
+                    id: string;
+                    enterpriseId: string;
+                    productId: string;
+                    serviceIds: string[];
+                    enterprise: {id: string; name: string};
+                    product: {id: string; name: string};
+                    services: Array<{id: string; name: string}>;
+                    createdAt: string;
+                    updatedAt: string;
+                }> = [];
+
+                if (Array.isArray(linkagesRaw)) {
+                    linkagesRes = linkagesRaw;
+                } else if (
+                    linkagesRaw?.data &&
+                    Array.isArray(linkagesRaw.data)
+                ) {
+                    linkagesRes = linkagesRaw.data;
+                } else if (
+                    linkagesRaw?.linkages &&
+                    Array.isArray(linkagesRaw.linkages)
+                ) {
+                    linkagesRes = linkagesRaw.linkages;
+                } else if (linkagesRaw && typeof linkagesRaw === 'object') {
+                    console.warn(
+                        '⚠️ Unexpected enterprise linkages response format:',
+                        linkagesRaw,
+                    );
+                    linkagesRes = [];
                 }
 
                 console.log(
@@ -1891,23 +2168,33 @@ export default function EnterpriseConfiguration() {
                     displayOrderRef.current.set(config.id, index);
                 });
 
-                console.log('📊 Applied stable sorting by creation time and display order to maintain row order');
-                console.log('📊 Initialized client-side display order tracking:', Object.fromEntries(displayOrderRef.current));
-                
+                console.log(
+                    '📊 Applied stable sorting by creation time and display order to maintain row order',
+                );
+                console.log(
+                    '📊 Initialized client-side display order tracking:',
+                    Object.fromEntries(displayOrderRef.current),
+                );
+
                 // Apply final stable sort by display order
-                const finalSortedConfigs = sortConfigsByDisplayOrder(transformedConfigs);
-                
+                const finalSortedConfigs =
+                    sortConfigsByDisplayOrder(transformedConfigs);
+
                 // Only set initial state if no configs exist yet (to prevent overwriting user changes)
                 setEnterpriseConfigs((prevConfigs) => {
                     // If user has already added temporary rows, preserve them
-                    const hasTemporaryRows = prevConfigs.some(config => String(config.id).startsWith('tmp-'));
+                    const hasTemporaryRows = prevConfigs.some((config) =>
+                        String(config.id).startsWith('tmp-'),
+                    );
                     if (hasTemporaryRows) {
-                        console.log('⚠️ Preserving temporary rows, not overwriting with API data');
+                        console.log(
+                            '⚠️ Preserving temporary rows, not overwriting with API data',
+                        );
                         return prevConfigs; // Keep existing state with temporary rows
                     }
                     return finalSortedConfigs; // Initial load
                 });
-                
+
                 console.log(
                     '✅ Enterprise linkages loaded and transformed successfully',
                 );
@@ -1935,19 +2222,18 @@ export default function EnterpriseConfiguration() {
             '📋 Enterprise configs data changed, current count:',
             enterpriseConfigs.length,
         );
-        console.log('📋 Current enterprise configs state:', 
-            enterpriseConfigs.map(c => ({
+        console.log(
+            '📋 Current enterprise configs state:',
+            enterpriseConfigs.map((c) => ({
                 id: c.id,
                 enterprise: c.enterprise || c.enterpriseName,
-                product: c.product || c.productName,  
+                product: c.product || c.productName,
                 services: c.services || c.serviceName,
                 hasProduct: !!(c.product || c.productName)?.trim(),
-                displayOrder: displayOrderRef.current.get(c.id)
-            }))
+                displayOrder: displayOrderRef.current.get(c.id),
+            })),
         );
     }, [enterpriseConfigs]);
-
-
 
     // Row squeeze animation sequence
     const startRowCompressionAnimation = async (rowId: string) => {
@@ -1987,7 +2273,9 @@ export default function EnterpriseConfiguration() {
 
             // Remove from local state
             setEnterpriseConfigs((prev) => {
-                const updated = prev.filter((config) => config.id !== pendingDeleteRowId);
+                const updated = prev.filter(
+                    (config) => config.id !== pendingDeleteRowId,
+                );
                 // Apply stable sorting to maintain display order
                 return sortConfigsByDisplayOrder(updated);
             });
@@ -2020,7 +2308,7 @@ export default function EnterpriseConfiguration() {
     // Reusable function to add new row (used by both toolbar button and table add row button)
     const handleAddNewRow = () => {
         console.log('➕ Add new row requested');
-        
+
         // Clear any pending autosave to prevent blank rows from being saved
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
@@ -2032,7 +2320,7 @@ export default function EnterpriseConfiguration() {
         }
         setAutoSaveCountdown(null);
         setIsAutoSaving(false);
-        
+
         // Check if there's already a blank row
         if (hasBlankRow()) {
             showBlueNotification(
@@ -2062,14 +2350,14 @@ export default function EnterpriseConfiguration() {
             // Apply stable sorting to maintain display order
             return sortConfigsByDisplayOrder(updated);
         });
-        
+
         // Clear validation errors when adding a new row to ensure new rows start with normal styling
         if (showValidationErrors) {
             setShowValidationErrors(false);
         }
-        
+
         console.log('➕ Added new blank row:', newId);
-        
+
         // Scroll to bottom where the new row is rendered
         setTimeout(() => {
             window.scrollTo({
@@ -2088,7 +2376,8 @@ export default function EnterpriseConfiguration() {
                         Enterprise Configuration
                     </h1>
                     <p className='mt-2 text-sm text-slate-600 leading-relaxed'>
-                        Build, customize, and maintain linkages that unify enterprise offerings into a single ecosystem.
+                        Build, customize, and maintain linkages that unify
+                        enterprise offerings into a single ecosystem.
                     </p>
                 </div>
             </div>
@@ -2133,7 +2422,9 @@ export default function EnterpriseConfiguration() {
                                 <PlusIcon className='h-4 w-4' />
                             )}
                             <span className='text-sm'>
-                                {isLoading ? 'Loading...' : 'Create New Enterprise'}
+                                {isLoading
+                                    ? 'Loading...'
+                                    : 'Create New Enterprise'}
                             </span>
                         </button>
 
@@ -2157,7 +2448,7 @@ export default function EnterpriseConfiguration() {
                                         }
                                     }}
                                     className='search-placeholder block w-full pl-10 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm'
-                                    style={{ fontSize: '14px' }}
+                                    style={{fontSize: '14px'}}
                                 />
                                 {appliedSearchTerm && (
                                     <button
@@ -2168,8 +2459,18 @@ export default function EnterpriseConfiguration() {
                                         className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
                                         title='Clear search'
                                     >
-                                        <svg className='h-4 w-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                                        <svg
+                                            className='h-4 w-4'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                            stroke='currentColor'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M6 18L18 6M6 6l12 12'
+                                            />
                                         </svg>
                                     </button>
                                 )}
@@ -2243,12 +2544,15 @@ export default function EnterpriseConfiguration() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.enterprise}
+                                                        value={
+                                                            filterForm.enterprise
+                                                        }
                                                         onChange={(e) =>
                                                             setFilterForm({
                                                                 ...filterForm,
                                                                 enterprise:
-                                                                    e.target.value,
+                                                                    e.target
+                                                                        .value,
                                                             })
                                                         }
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
@@ -2264,11 +2568,15 @@ export default function EnterpriseConfiguration() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.product}
+                                                        value={
+                                                            filterForm.product
+                                                        }
                                                         onChange={(e) =>
                                                             setFilterForm({
                                                                 ...filterForm,
-                                                                product: e.target.value,
+                                                                product:
+                                                                    e.target
+                                                                        .value,
                                                             })
                                                         }
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
@@ -2284,12 +2592,15 @@ export default function EnterpriseConfiguration() {
                                                 <div className='relative'>
                                                     <input
                                                         type='text'
-                                                        value={filterForm.services}
+                                                        value={
+                                                            filterForm.services
+                                                        }
                                                         onChange={(e) =>
                                                             setFilterForm({
                                                                 ...filterForm,
                                                                 services:
-                                                                    e.target.value,
+                                                                    e.target
+                                                                        .value,
                                                             })
                                                         }
                                                         className='w-full pl-2 pr-8 py-1 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
@@ -2306,7 +2617,11 @@ export default function EnterpriseConfiguration() {
                         <div ref={sortRef} className='relative'>
                             <button
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    sortOpen || (sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc'))
+                                    sortOpen ||
+                                    (sortColumn &&
+                                        sortDirection &&
+                                        (sortDirection === 'asc' ||
+                                            sortDirection === 'desc'))
                                         ? 'border-green-300 bg-green-50 text-green-600 shadow-green-200 shadow-lg'
                                         : 'border-blue-200 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-lg'
                                 }`}
@@ -2317,15 +2632,20 @@ export default function EnterpriseConfiguration() {
                                         : toggleDialog('sort')
                                 }
                             >
-                                <ArrowsUpDownIcon className={`h-4 w-4 transition-transform duration-300 ${
-                                    sortOpen
-                                        ? 'rotate-180'
-                                        : 'group-hover:rotate-180'
-                                }`} />
+                                <ArrowsUpDownIcon
+                                    className={`h-4 w-4 transition-transform duration-300 ${
+                                        sortOpen
+                                            ? 'rotate-180'
+                                            : 'group-hover:rotate-180'
+                                    }`}
+                                />
                                 <span className='text-sm'>Sort</span>
-                                {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
-                                    <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
-                                )}
+                                {sortColumn &&
+                                    sortDirection &&
+                                    (sortDirection === 'asc' ||
+                                        sortDirection === 'desc') && (
+                                        <div className='absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-bounce'></div>
+                                    )}
                                 <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400 to-blue-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10'></div>
                             </button>
                             {sortOpen && (
@@ -2354,16 +2674,28 @@ export default function EnterpriseConfiguration() {
                                                     <select
                                                         value={sortColumn}
                                                         onChange={(e) => {
-                                                            const newColumn = e.target.value;
-                                                            setSortColumn(newColumn);
+                                                            const newColumn =
+                                                                e.target.value;
+                                                            setSortColumn(
+                                                                newColumn,
+                                                            );
                                                             // Don't apply sorting here - wait for direction selection
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select column...</option>
+                                                        <option value=''>
+                                                            Select column...
+                                                        </option>
                                                         {allCols.map((col) => (
-                                                            <option key={col} value={col}>
-                                                                {columnLabels[col]}
+                                                            <option
+                                                                key={col}
+                                                                value={col}
+                                                            >
+                                                                {
+                                                                    columnLabels[
+                                                                        col
+                                                                    ]
+                                                                }
                                                             </option>
                                                         ))}
                                                     </select>
@@ -2379,31 +2711,66 @@ export default function EnterpriseConfiguration() {
                                                     <select
                                                         value={sortDirection}
                                                         onChange={(e) => {
-                                                            const newDirection = e.target.value as 'asc' | 'desc' | '';
-                                                            setSortDirection(newDirection);
+                                                            const newDirection =
+                                                                e.target
+                                                                    .value as
+                                                                    | 'asc'
+                                                                    | 'desc'
+                                                                    | '';
+                                                            setSortDirection(
+                                                                newDirection,
+                                                            );
                                                             // Only apply sorting if both column and valid direction are selected
-                                                            if (sortColumn && (newDirection === 'asc' || newDirection === 'desc')) {
-                                                                applySorting(sortColumn, newDirection);
+                                                            if (
+                                                                sortColumn &&
+                                                                (newDirection ===
+                                                                    'asc' ||
+                                                                    newDirection ===
+                                                                        'desc')
+                                                            ) {
+                                                                applySorting(
+                                                                    sortColumn,
+                                                                    newDirection,
+                                                                );
                                                             }
                                                         }}
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
-                                                        <option value=''>Select direction...</option>
-                                                        <option value='asc'>Ascending</option>
-                                                        <option value='desc'>Descending</option>
+                                                        <option value=''>
+                                                            Select direction...
+                                                        </option>
+                                                        <option value='asc'>
+                                                            Ascending
+                                                        </option>
+                                                        <option value='desc'>
+                                                            Descending
+                                                        </option>
                                                     </select>
                                                 </div>
                                             </div>
 
-
                                             {/* Current Sort Display */}
-                                            {sortColumn && sortDirection && (sortDirection === 'asc' || sortDirection === 'desc') && (
-                                                <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
-                                                    <span className='font-medium text-blue-800'>
-                                                        {columnLabels[sortColumn]} ({sortDirection === 'asc' ? 'Asc' : 'Desc'})
-                                                    </span>
-                                                </div>
-                                            )}
+                                            {sortColumn &&
+                                                sortDirection &&
+                                                (sortDirection === 'asc' ||
+                                                    sortDirection ===
+                                                        'desc') && (
+                                                    <div className='mt-1 p-2 bg-blue-50 rounded border text-xs'>
+                                                        <span className='font-medium text-blue-800'>
+                                                            {
+                                                                columnLabels[
+                                                                    sortColumn
+                                                                ]
+                                                            }{' '}
+                                                            (
+                                                            {sortDirection ===
+                                                            'asc'
+                                                                ? 'Asc'
+                                                                : 'Desc'}
+                                                            )
+                                                        </span>
+                                                    </div>
+                                                )}
                                         </div>
                                     </div>
                                 </div>
@@ -2414,7 +2781,8 @@ export default function EnterpriseConfiguration() {
                         <div ref={hideRef} className='relative'>
                             <button
                                 className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg border-2 font-medium transition-all duration-300 transform hover:scale-105 ${
-                                    hideOpen || visibleCols.length < allCols.length
+                                    hideOpen ||
+                                    visibleCols.length < allCols.length
                                         ? 'border-red-300 bg-red-50 text-red-600 shadow-red-200 shadow-lg'
                                         : 'border-blue-200 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-lg'
                                 }`}
@@ -2444,7 +2812,9 @@ export default function EnterpriseConfiguration() {
                                                     <input
                                                         value={hideQuery}
                                                         onChange={(e) =>
-                                                            setHideQuery(e.target.value)
+                                                            setHideQuery(
+                                                                e.target.value,
+                                                            )
                                                         }
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     />
@@ -2468,8 +2838,7 @@ export default function EnterpriseConfiguration() {
                                                         className='flex items-center justify-between py-1.5'
                                                     >
                                                         <span className='text-sm capitalize'>
-                                                            {c ===
-                                                            'enterprise'
+                                                            {c === 'enterprise'
                                                                 ? 'Enterprise'
                                                                 : c ===
                                                                   'product'
@@ -2564,9 +2933,13 @@ export default function EnterpriseConfiguration() {
                                                         className='w-full pl-2 pr-8 py-1.5 text-sm border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded bg-white'
                                                     >
                                                         <option>None</option>
-                                                        <option>Enterprise</option>
+                                                        <option>
+                                                            Enterprise
+                                                        </option>
                                                         <option>Product</option>
-                                                        <option>Services</option>
+                                                        <option>
+                                                            Services
+                                                        </option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -2589,25 +2962,38 @@ export default function EnterpriseConfiguration() {
                                     ? 'bg-gradient-to-r from-blue-300 to-blue-500 text-white shadow-md'
                                     : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md'
                             }`}
-                            title={isAutoSaving ? "Auto-saving..." : autoSaveCountdown ? `Auto-saving in ${autoSaveCountdown}s` : "Save all unsaved entries"}
+                            title={
+                                isAutoSaving
+                                    ? 'Auto-saving...'
+                                    : autoSaveCountdown
+                                    ? `Auto-saving in ${autoSaveCountdown}s`
+                                    : 'Save all unsaved entries'
+                            }
                         >
                             {/* Progress bar animation for auto-save countdown */}
                             {autoSaveCountdown && (
-                                <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
+                                <div className='absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden'>
+                                    <div
+                                        className='h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear'
                                         style={{
-                                            width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
+                                            width: autoSaveCountdown
+                                                ? `${
+                                                      ((10 -
+                                                          autoSaveCountdown) /
+                                                          10) *
+                                                      100
+                                                  }%`
+                                                : '0%',
                                         }}
                                     ></div>
                                 </div>
                             )}
-                            
+
                             {/* Auto-save success wave animation */}
                             {showAutoSaveSuccess && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
+                                <div className='absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping'></div>
                             )}
-                            
+
                             {isAutoSaving ? (
                                 <div className='h-4 w-4 animate-spin'>
                                     <svg
@@ -2634,7 +3020,11 @@ export default function EnterpriseConfiguration() {
                                 <BookmarkIcon className='h-4 w-4 relative z-10' />
                             )}
                             <span className='text-sm relative z-10'>
-                                {isAutoSaving ? 'Auto-saving...' : autoSaveCountdown ? `Save (${autoSaveCountdown}s)` : 'Save'}
+                                {isAutoSaving
+                                    ? 'Auto-saving...'
+                                    : autoSaveCountdown
+                                    ? `Save (${autoSaveCountdown}s)`
+                                    : 'Save'}
                             </span>
                         </button>
                     </div>
@@ -2713,24 +3103,32 @@ export default function EnterpriseConfiguration() {
                                     </h3>
                                     <p className='mt-2 text-sm text-slate-500'>
                                         No enterprise-product-service linkages
-                                        have been configured yet. Create enterprise configuration to get
-                                        started.
+                                        have been configured yet. Create
+                                        enterprise configuration to get started.
                                     </p>
                                     <div className='mt-6'>
                                         <button
                                             onClick={() => {
                                                 // Clear any pending autosave to prevent blank rows from being saved
                                                 if (autoSaveTimerRef.current) {
-                                                    clearTimeout(autoSaveTimerRef.current);
-                                                    autoSaveTimerRef.current = null;
+                                                    clearTimeout(
+                                                        autoSaveTimerRef.current,
+                                                    );
+                                                    autoSaveTimerRef.current =
+                                                        null;
                                                 }
-                                                if (countdownIntervalRef.current) {
-                                                    clearInterval(countdownIntervalRef.current);
-                                                    countdownIntervalRef.current = null;
+                                                if (
+                                                    countdownIntervalRef.current
+                                                ) {
+                                                    clearInterval(
+                                                        countdownIntervalRef.current,
+                                                    );
+                                                    countdownIntervalRef.current =
+                                                        null;
                                                 }
                                                 setAutoSaveCountdown(null);
                                                 setIsAutoSaving(false);
-                                                
+
                                                 // Trigger the "New Enterprise" action
                                                 const newId = `tmp-${Date.now()}`;
                                                 const blank = {
@@ -2772,7 +3170,9 @@ export default function EnterpriseConfiguration() {
                                     compressingRowId={compressingRowId}
                                     foldingRowId={foldingRowId}
                                     externalSortColumn={sortColumn}
-                                    externalSortDirection={sortDirection as 'asc' | 'desc' | ''}
+                                    externalSortDirection={
+                                        sortDirection as 'asc' | 'desc' | ''
+                                    }
                                     onUpdateField={async (
                                         rowId,
                                         field,
@@ -2790,12 +3190,12 @@ export default function EnterpriseConfiguration() {
                                         );
 
                                         // Store pending changes separately to preserve user input during data reloads
-                                        setPendingLocalChanges(prev => ({
+                                        setPendingLocalChanges((prev) => ({
                                             ...prev,
                                             [rowId]: {
                                                 ...prev[rowId],
-                                                [field]: value
-                                            }
+                                                [field]: value,
+                                            },
                                         }));
 
                                         // Also update main state for immediate responsiveness (but this may get overwritten)
@@ -2809,21 +3209,25 @@ export default function EnterpriseConfiguration() {
                                                     : config,
                                             );
                                             // Maintain display order during updates
-                                            return sortConfigsByDisplayOrder(updated);
+                                            return sortConfigsByDisplayOrder(
+                                                updated,
+                                            );
                                         });
 
                                         // Update local state immediately for responsiveness
                                         try {
-                                            const config = enterpriseConfigs.find(
-                                                (a) => a.id === rowId,
-                                            );
+                                            const config =
+                                                enterpriseConfigs.find(
+                                                    (a) => a.id === rowId,
+                                                );
                                             if (!config) return;
 
                                             let updateData: any = {};
 
                                             if (field === 'enterprise') {
                                                 // Enterprise field updated
-                                                updateData.enterpriseName = value;
+                                                updateData.enterpriseName =
+                                                    value;
                                             } else if (field === 'product') {
                                                 // Product field updated
                                                 updateData.productName = value;
@@ -2892,20 +3296,37 @@ export default function EnterpriseConfiguration() {
                                                         console.log(
                                                             '✅ All required fields filled, starting 10-second auto-save timer...',
                                                         );
-                                                        
+
                                                         // Clear validation errors for this row since it's now complete
-                                                        if (showValidationErrors) {
-                                                            const currentIncompleteRows = getIncompleteRows();
-                                                            if (!currentIncompleteRows.includes(rowId)) {
+                                                        if (
+                                                            showValidationErrors
+                                                        ) {
+                                                            const currentIncompleteRows =
+                                                                getIncompleteRows();
+                                                            if (
+                                                                !currentIncompleteRows.includes(
+                                                                    rowId,
+                                                                )
+                                                            ) {
                                                                 // This row is no longer incomplete, check if all rows are complete
-                                                                const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
-                                                                if (remainingIncompleteRows.length === 0) {
+                                                                const remainingIncompleteRows =
+                                                                    currentIncompleteRows.filter(
+                                                                        (id) =>
+                                                                            id !==
+                                                                            rowId,
+                                                                    );
+                                                                if (
+                                                                    remainingIncompleteRows.length ===
+                                                                    0
+                                                                ) {
                                                                     // All rows are now complete, clear validation errors
-                                                                    setShowValidationErrors(false);
+                                                                    setShowValidationErrors(
+                                                                        false,
+                                                                    );
                                                                 }
                                                             }
                                                         }
-                                                        
+
                                                         debouncedAutoSave();
                                                     } else {
                                                         console.log(
@@ -2933,130 +3354,271 @@ export default function EnterpriseConfiguration() {
                                             // For existing rows, check if we should trigger auto-save timer
                                             if (!rowId.startsWith('tmp-')) {
                                                 // Create updated config with the new value to check completeness
-                                                const config = enterpriseConfigs.find((a) => a.id === rowId);
+                                                const config =
+                                                    enterpriseConfigs.find(
+                                                        (a) => a.id === rowId,
+                                                    );
                                                 if (config) {
-                                                    const updatedConfig = { ...config, [field]: value };
-                                                    
+                                                    const updatedConfig = {
+                                                        ...config,
+                                                        [field]: value,
+                                                    };
+
                                                     // Check if all required fields are present and not empty
                                                     // Only check the updated value for the field being modified to avoid stale data
-                                                    let hasEnterprise, hasProduct, hasServices;
-                                                    
-                                                    if (field === 'enterprise') {
-                                                        hasEnterprise = updatedConfig.enterprise?.trim();
+                                                    let hasEnterprise,
+                                                        hasProduct,
+                                                        hasServices;
+
+                                                    if (
+                                                        field === 'enterprise'
+                                                    ) {
+                                                        hasEnterprise =
+                                                            updatedConfig.enterprise?.trim();
                                                     } else {
-                                                        hasEnterprise = (updatedConfig.enterprise || updatedConfig.enterpriseName)?.trim();
+                                                        hasEnterprise = (
+                                                            updatedConfig.enterprise ||
+                                                            updatedConfig.enterpriseName
+                                                        )?.trim();
                                                     }
-                                                    
+
                                                     if (field === 'product') {
-                                                        hasProduct = updatedConfig.product?.trim();
+                                                        hasProduct =
+                                                            updatedConfig.product?.trim();
                                                     } else {
-                                                        hasProduct = (updatedConfig.product || updatedConfig.productName)?.trim();
+                                                        hasProduct = (
+                                                            updatedConfig.product ||
+                                                            updatedConfig.productName
+                                                        )?.trim();
                                                     }
-                                                    
+
                                                     // More robust services validation - only check the field that's being updated
                                                     let servicesValue;
                                                     if (field === 'services') {
-                                                        servicesValue = updatedConfig.services || '';
+                                                        servicesValue =
+                                                            updatedConfig.services ||
+                                                            '';
                                                     } else {
-                                                        servicesValue = updatedConfig.services || updatedConfig.serviceName || '';
+                                                        servicesValue =
+                                                            updatedConfig.services ||
+                                                            updatedConfig.serviceName ||
+                                                            '';
                                                     }
-                                                    
+
                                                     hasServices = (() => {
-                                                        if (typeof servicesValue === 'string') {
-                                                            const trimmed = servicesValue.trim();
-                                                            console.log('🔍 Services validation (string):', {
-                                                                original: servicesValue,
-                                                                trimmed: trimmed,
-                                                                length: trimmed.length,
-                                                                hasServices: trimmed.length > 0
-                                                            });
-                                                            return trimmed.length > 0;
-                                                        } else if (Array.isArray(servicesValue)) {
-                                                            console.log('🔍 Services validation (array):', {
-                                                                array: servicesValue,
-                                                                length: servicesValue.length,
-                                                                hasServices: servicesValue.length > 0
-                                                            });
-                                                            return servicesValue.length > 0;
+                                                        if (
+                                                            typeof servicesValue ===
+                                                            'string'
+                                                        ) {
+                                                            const trimmed =
+                                                                servicesValue.trim();
+                                                            console.log(
+                                                                '🔍 Services validation (string):',
+                                                                {
+                                                                    original:
+                                                                        servicesValue,
+                                                                    trimmed:
+                                                                        trimmed,
+                                                                    length: trimmed.length,
+                                                                    hasServices:
+                                                                        trimmed.length >
+                                                                        0,
+                                                                },
+                                                            );
+                                                            return (
+                                                                trimmed.length >
+                                                                0
+                                                            );
+                                                        } else if (
+                                                            Array.isArray(
+                                                                servicesValue,
+                                                            )
+                                                        ) {
+                                                            console.log(
+                                                                '🔍 Services validation (array):',
+                                                                {
+                                                                    array: servicesValue,
+                                                                    length: servicesValue.length,
+                                                                    hasServices:
+                                                                        servicesValue.length >
+                                                                        0,
+                                                                },
+                                                            );
+                                                            return (
+                                                                servicesValue.length >
+                                                                0
+                                                            );
                                                         }
-                                                        console.log('🔍 Services validation (other):', {
-                                                            value: servicesValue,
-                                                            type: typeof servicesValue,
-                                                            hasServices: false
-                                                        });
+                                                        console.log(
+                                                            '🔍 Services validation (other):',
+                                                            {
+                                                                value: servicesValue,
+                                                                type: typeof servicesValue,
+                                                                hasServices:
+                                                                    false,
+                                                            },
+                                                        );
                                                         return false;
                                                     })();
-                                                    
-                                                    console.log('🔍 Existing record auto-save check:', {
-                                                        rowId,
-                                                        field,
-                                                        value,
-                                                        updatedConfigServices: updatedConfig.services,
-                                                        updatedConfigServiceName: updatedConfig.serviceName,
-                                                        servicesValue: servicesValue,
-                                                        servicesValueType: typeof servicesValue,
-                                                        fieldBeingUpdated: field,
-                                                        hasEnterprise: !!hasEnterprise,
-                                                        hasProduct: !!hasProduct, 
-                                                        hasServices: !!hasServices,
-                                                        willTriggerAutoSave: !!(hasEnterprise && hasProduct && hasServices),
-                                                        enterpriseCheck: { 
-                                                            field: field === 'enterprise' ? 'UPDATING' : 'existing',
-                                                            value: hasEnterprise 
+
+                                                    console.log(
+                                                        '🔍 Existing record auto-save check:',
+                                                        {
+                                                            rowId,
+                                                            field,
+                                                            value,
+                                                            updatedConfigServices:
+                                                                updatedConfig.services,
+                                                            updatedConfigServiceName:
+                                                                updatedConfig.serviceName,
+                                                            servicesValue:
+                                                                servicesValue,
+                                                            servicesValueType:
+                                                                typeof servicesValue,
+                                                            fieldBeingUpdated:
+                                                                field,
+                                                            hasEnterprise:
+                                                                !!hasEnterprise,
+                                                            hasProduct:
+                                                                !!hasProduct,
+                                                            hasServices:
+                                                                !!hasServices,
+                                                            willTriggerAutoSave:
+                                                                !!(
+                                                                    hasEnterprise &&
+                                                                    hasProduct &&
+                                                                    hasServices
+                                                                ),
+                                                            enterpriseCheck: {
+                                                                field:
+                                                                    field ===
+                                                                    'enterprise'
+                                                                        ? 'UPDATING'
+                                                                        : 'existing',
+                                                                value: hasEnterprise,
+                                                            },
+                                                            productCheck: {
+                                                                field:
+                                                                    field ===
+                                                                    'product'
+                                                                        ? 'UPDATING'
+                                                                        : 'existing',
+                                                                value: hasProduct,
+                                                            },
+                                                            servicesCheck: {
+                                                                field:
+                                                                    field ===
+                                                                    'services'
+                                                                        ? 'UPDATING'
+                                                                        : 'existing',
+                                                                value: hasServices,
+                                                                rawValue:
+                                                                    servicesValue,
+                                                            },
                                                         },
-                                                        productCheck: { 
-                                                            field: field === 'product' ? 'UPDATING' : 'existing',
-                                                            value: hasProduct 
-                                                        },
-                                                        servicesCheck: { 
-                                                            field: field === 'services' ? 'UPDATING' : 'existing',
-                                                            value: hasServices,
-                                                            rawValue: servicesValue
-                                                        }
-                                                    });
-                                                    
+                                                    );
+
                                                     // Only trigger auto-save if all fields are complete
-                                                    if (hasEnterprise && hasProduct && hasServices) {
-                                                        console.log('🔄 Triggering auto-save timer for complete existing record:', rowId);
-                                                        
+                                                    if (
+                                                        hasEnterprise &&
+                                                        hasProduct &&
+                                                        hasServices
+                                                    ) {
+                                                        console.log(
+                                                            '🔄 Triggering auto-save timer for complete existing record:',
+                                                            rowId,
+                                                        );
+
                                                         // Clear validation errors for this row since it's now complete
-                                                        if (showValidationErrors) {
-                                                            const currentIncompleteRows = getIncompleteRows();
-                                                            if (!currentIncompleteRows.includes(rowId)) {
+                                                        if (
+                                                            showValidationErrors
+                                                        ) {
+                                                            const currentIncompleteRows =
+                                                                getIncompleteRows();
+                                                            if (
+                                                                !currentIncompleteRows.includes(
+                                                                    rowId,
+                                                                )
+                                                            ) {
                                                                 // This row is no longer incomplete, check if all rows are complete
-                                                                const remainingIncompleteRows = currentIncompleteRows.filter(id => id !== rowId);
-                                                                if (remainingIncompleteRows.length === 0) {
+                                                                const remainingIncompleteRows =
+                                                                    currentIncompleteRows.filter(
+                                                                        (id) =>
+                                                                            id !==
+                                                                            rowId,
+                                                                    );
+                                                                if (
+                                                                    remainingIncompleteRows.length ===
+                                                                    0
+                                                                ) {
                                                                     // All rows are now complete, clear validation errors
-                                                                    setShowValidationErrors(false);
+                                                                    setShowValidationErrors(
+                                                                        false,
+                                                                    );
                                                                 }
                                                             }
                                                         }
-                                                        
+
                                                         // Add to modified records set
-                                                        setModifiedExistingRecords(prev => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.add(rowId);
-                                                            return newSet;
-                                                        });
+                                                        setModifiedExistingRecords(
+                                                            (prev) => {
+                                                                const newSet =
+                                                                    new Set(
+                                                                        prev,
+                                                                    );
+                                                                newSet.add(
+                                                                    rowId,
+                                                                );
+                                                                return newSet;
+                                                            },
+                                                        );
                                                         // Trigger auto-save timer for visual feedback
                                                         debouncedAutoSave();
                                                     } else {
-                                                        console.log('❌ Not triggering auto-save for incomplete existing record:', rowId, {
-                                                            hasEnterprise: !!hasEnterprise,
-                                                            hasProduct: !!hasProduct,
-                                                            hasServices: !!hasServices
-                                                        });
+                                                        console.log(
+                                                            '❌ Not triggering auto-save for incomplete existing record:',
+                                                            rowId,
+                                                            {
+                                                                hasEnterprise:
+                                                                    !!hasEnterprise,
+                                                                hasProduct:
+                                                                    !!hasProduct,
+                                                                hasServices:
+                                                                    !!hasServices,
+                                                            },
+                                                        );
                                                         // Remove from modified records set if it was there
-                                                        setModifiedExistingRecords(prev => {
-                                                            const newSet = new Set(prev);
-                                                            const wasRemoved = newSet.delete(rowId);
-                                                            console.log(`🧹 Removing incomplete record ${rowId} from modified set: ${wasRemoved ? 'removed' : 'not found'}`);
-                                                            console.log(`🧹 Modified set after removal:`, Array.from(newSet));
-                                                            return newSet;
-                                                        });
-                                                        
+                                                        setModifiedExistingRecords(
+                                                            (prev) => {
+                                                                const newSet =
+                                                                    new Set(
+                                                                        prev,
+                                                                    );
+                                                                const wasRemoved =
+                                                                    newSet.delete(
+                                                                        rowId,
+                                                                    );
+                                                                console.log(
+                                                                    `🧹 Removing incomplete record ${rowId} from modified set: ${
+                                                                        wasRemoved
+                                                                            ? 'removed'
+                                                                            : 'not found'
+                                                                    }`,
+                                                                );
+                                                                console.log(
+                                                                    `🧹 Modified set after removal:`,
+                                                                    Array.from(
+                                                                        newSet,
+                                                                    ),
+                                                                );
+                                                                return newSet;
+                                                            },
+                                                        );
+
                                                         // Exit early - do not proceed with API call for incomplete record
-                                                        console.log(`🛑 Skipping API call for incomplete record: ${rowId}`);
+                                                        console.log(
+                                                            `🛑 Skipping API call for incomplete record: ${rowId}`,
+                                                        );
                                                         return;
                                                     }
                                                 }
@@ -3071,9 +3633,10 @@ export default function EnterpriseConfiguration() {
 
                                             // Update the enterprise linkage via API
                                             try {
-                                                const config = enterpriseConfigs.find(
-                                                    (a) => a.id === rowId,
-                                                );
+                                                const config =
+                                                    enterpriseConfigs.find(
+                                                        (a) => a.id === rowId,
+                                                    );
                                                 if (config) {
                                                     // Create updated config with the new value
                                                     const updatedConfig = {
@@ -3089,11 +3652,16 @@ export default function EnterpriseConfiguration() {
                                                         updatedConfig.product ||
                                                         updatedConfig.productName;
                                                     // Use field-specific value to avoid stale data from alternate field names
-                                                    const rawServiceValue = 
-                                                        field === 'services' ? updatedConfig.services :
-                                                        field === 'serviceName' ? updatedConfig.serviceName :
-                                                        updatedConfig.services || updatedConfig.serviceName || '';
-                                                    
+                                                    const rawServiceValue =
+                                                        field === 'services'
+                                                            ? updatedConfig.services
+                                                            : field ===
+                                                              'serviceName'
+                                                            ? updatedConfig.serviceName
+                                                            : updatedConfig.services ||
+                                                              updatedConfig.serviceName ||
+                                                              '';
+
                                                     const serviceNames =
                                                         rawServiceValue
                                                             .split(', ')
@@ -3124,7 +3692,8 @@ export default function EnterpriseConfiguration() {
                                                         config.productName;
 
                                                     if (
-                                                        (field === 'enterprise' &&
+                                                        (field ===
+                                                            'enterprise' &&
                                                             enterpriseName !==
                                                                 oldEnterpriseName) ||
                                                         (field === 'product' &&
@@ -3175,12 +3744,20 @@ export default function EnterpriseConfiguration() {
                                                             // Merge services into the existing duplicate record
                                                             const existingServices =
                                                                 duplicateRecord.services
-                                                                    ?.split(', ')
-                                                                    .filter(Boolean) || [];
+                                                                    ?.split(
+                                                                        ', ',
+                                                                    )
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    ) || [];
                                                             const currentServices =
                                                                 config.services
-                                                                    ?.split(', ')
-                                                                    .filter(Boolean) || [];
+                                                                    ?.split(
+                                                                        ', ',
+                                                                    )
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    ) || [];
                                                             const allServices =
                                                                 Array.from(
                                                                     new Set([
@@ -3257,36 +3834,39 @@ export default function EnterpriseConfiguration() {
                                                                 // Update local state: merge into duplicate and remove current
                                                                 setEnterpriseConfigs(
                                                                     (prev) => {
-                                                                        const updated = prev
-                                                                            .map(
-                                                                                (
-                                                                                    cfg,
-                                                                                ) => {
-                                                                                    if (
-                                                                                        cfg.id ===
-                                                                                        duplicateRecord.id
-                                                                                    ) {
-                                                                                        return {
-                                                                                            ...cfg,
-                                                                                            services:
-                                                                                                allServices.join(
-                                                                                                    ', ',
-                                                                                                ),
-                                                                                        };
-                                                                                    }
-                                                                                    return cfg;
-                                                                                },
-                                                                            )
-                                                                            .filter(
-                                                                                (
-                                                                                    cfg,
-                                                                                ) =>
-                                                                                    cfg.id !==
-                                                                                    rowId,
-                                                                            );
+                                                                        const updated =
+                                                                            prev
+                                                                                .map(
+                                                                                    (
+                                                                                        cfg,
+                                                                                    ) => {
+                                                                                        if (
+                                                                                            cfg.id ===
+                                                                                            duplicateRecord.id
+                                                                                        ) {
+                                                                                            return {
+                                                                                                ...cfg,
+                                                                                                services:
+                                                                                                    allServices.join(
+                                                                                                        ', ',
+                                                                                                    ),
+                                                                                            };
+                                                                                        }
+                                                                                        return cfg;
+                                                                                    },
+                                                                                )
+                                                                                .filter(
+                                                                                    (
+                                                                                        cfg,
+                                                                                    ) =>
+                                                                                        cfg.id !==
+                                                                                        rowId,
+                                                                                );
                                                                         // Apply stable sorting to maintain display order
-                                                                        return sortConfigsByDisplayOrder(updated);
-                                                                    }
+                                                                        return sortConfigsByDisplayOrder(
+                                                                            updated,
+                                                                        );
+                                                                    },
                                                                 );
 
                                                                 console.log(
@@ -3391,48 +3971,103 @@ export default function EnterpriseConfiguration() {
                                                                             newLinkage as any
                                                                         ).id
                                                                     ) {
-                                                                        const newId = (newLinkage as any).id;
-                                                                        console.log('🔄 Updating record ID from', rowId, 'to', newId);
-                                                                        
+                                                                        const newId =
+                                                                            (
+                                                                                newLinkage as any
+                                                                            )
+                                                                                .id;
+                                                                        console.log(
+                                                                            '🔄 Updating record ID from',
+                                                                            rowId,
+                                                                            'to',
+                                                                            newId,
+                                                                        );
+
                                                                         // Transfer modified record tracking from old ID to new ID
-                                                                        if (modifiedExistingRecordsRef.current.has(rowId)) {
-                                                                            console.log('🔄 Transferring modified record tracking from old ID to new ID');
-                                                                            modifiedExistingRecordsRef.current.delete(rowId);
-                                                                            modifiedExistingRecordsRef.current.add(newId);
-                                                                            console.log('✅ Modified records tracking updated:', Array.from(modifiedExistingRecordsRef.current));
+                                                                        if (
+                                                                            modifiedExistingRecordsRef.current.has(
+                                                                                rowId,
+                                                                            )
+                                                                        ) {
+                                                                            console.log(
+                                                                                '🔄 Transferring modified record tracking from old ID to new ID',
+                                                                            );
+                                                                            modifiedExistingRecordsRef.current.delete(
+                                                                                rowId,
+                                                                            );
+                                                                            modifiedExistingRecordsRef.current.add(
+                                                                                newId,
+                                                                            );
+                                                                            console.log(
+                                                                                '✅ Modified records tracking updated:',
+                                                                                Array.from(
+                                                                                    modifiedExistingRecordsRef.current,
+                                                                                ),
+                                                                            );
                                                                         }
 
                                                                         // Transfer client-side display order from old ID to new ID
-                                                                        const oldDisplayOrder = displayOrderRef.current.get(rowId);
-                                                                        if (oldDisplayOrder !== undefined) {
-                                                                            displayOrderRef.current.delete(rowId);
-                                                                            displayOrderRef.current.set(newId, oldDisplayOrder);
-                                                                            console.log('🔄 Transferred display order', oldDisplayOrder, 'from', rowId, 'to', newId);
+                                                                        const oldDisplayOrder =
+                                                                            displayOrderRef.current.get(
+                                                                                rowId,
+                                                                            );
+                                                                        if (
+                                                                            oldDisplayOrder !==
+                                                                            undefined
+                                                                        ) {
+                                                                            displayOrderRef.current.delete(
+                                                                                rowId,
+                                                                            );
+                                                                            displayOrderRef.current.set(
+                                                                                newId,
+                                                                                oldDisplayOrder,
+                                                                            );
+                                                                            console.log(
+                                                                                '🔄 Transferred display order',
+                                                                                oldDisplayOrder,
+                                                                                'from',
+                                                                                rowId,
+                                                                                'to',
+                                                                                newId,
+                                                                            );
                                                                         }
-                                                                        
+
                                                                         setEnterpriseConfigs(
                                                                             (
                                                                                 prev,
                                                                             ) => {
-                                                                                const updated = prev.map(
-                                                                                    (
-                                                                                        cfg,
-                                                                                    ) =>
-                                                                                        cfg.id ===
-                                                                                        rowId
-                                                                                            ? {
-                                                                                                  ...cfg,
-                                                                                                  id: newId,
-                                                                                                  // Preserve display order and timestamps
-                                                                                                  displayOrder: cfg.displayOrder || oldDisplayOrder || 0,
-                                                                                                  createdAt: cfg.createdAt || new Date().toISOString(),
-                                                                                                  updatedAt: (newLinkage as any).updatedAt || new Date().toISOString(),
-                                                                                              }
-                                                                                            : cfg,
-                                                                                );
+                                                                                const updated =
+                                                                                    prev.map(
+                                                                                        (
+                                                                                            cfg,
+                                                                                        ) =>
+                                                                                            cfg.id ===
+                                                                                            rowId
+                                                                                                ? {
+                                                                                                      ...cfg,
+                                                                                                      id: newId,
+                                                                                                      // Preserve display order and timestamps
+                                                                                                      displayOrder:
+                                                                                                          cfg.displayOrder ||
+                                                                                                          oldDisplayOrder ||
+                                                                                                          0,
+                                                                                                      createdAt:
+                                                                                                          cfg.createdAt ||
+                                                                                                          new Date().toISOString(),
+                                                                                                      updatedAt:
+                                                                                                          (
+                                                                                                              newLinkage as any
+                                                                                                          )
+                                                                                                              .updatedAt ||
+                                                                                                          new Date().toISOString(),
+                                                                                                  }
+                                                                                                : cfg,
+                                                                                    );
                                                                                 // Apply stable sorting to maintain display order
-                                                                                return sortConfigsByDisplayOrder(updated);
-                                                                            }
+                                                                                return sortConfigsByDisplayOrder(
+                                                                                    updated,
+                                                                                );
+                                                                            },
                                                                         );
                                                                     }
                                                                 } catch (createError) {
@@ -3610,7 +4245,7 @@ export default function EnterpriseConfiguration() {
                                 setShowValidationModal(false);
                                 setShowValidationErrors(true);
                                 // Force re-render by updating table version
-                                setTableVersion(prev => prev + 1);
+                                setTableVersion((prev) => prev + 1);
                             }}
                         ></div>
 
@@ -3649,7 +4284,7 @@ export default function EnterpriseConfiguration() {
                                         setShowValidationModal(false);
                                         setShowValidationErrors(true);
                                         // Force re-render by updating table version
-                                        setTableVersion(prev => prev + 1);
+                                        setTableVersion((prev) => prev + 1);
                                     }}
                                     className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto'
                                 >
@@ -3696,7 +4331,8 @@ export default function EnterpriseConfiguration() {
                                 <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
                                     <div className='mt-2'>
                                         <p className='text-sm text-gray-900'>
-                                            Are you sure you want to delete this enterprise configuration?
+                                            Are you sure you want to delete this
+                                            enterprise configuration?
                                         </p>
                                     </div>
                                 </div>
@@ -3756,11 +4392,13 @@ export default function EnterpriseConfiguration() {
                     animate={{opacity: 1, y: 0, scale: 1}}
                     exit={{opacity: 0, y: -50, scale: 0.9}}
                     transition={{duration: 0.3, ease: 'easeOut'}}
-                    className={`fixed z-50 max-w-sm notification-above-save ${isAIPanelCollapsed ? 'ai-panel-collapsed' : ''}`}
+                    className={`fixed z-50 max-w-sm notification-above-save ${
+                        isAIPanelCollapsed ? 'ai-panel-collapsed' : ''
+                    }`}
                     style={{
                         // Position well above the toolbar with significant spacing
                         // Header height (~80px) + more gap above toolbar (40px)
-                        top: '40px'
+                        top: '40px',
                     }}
                 >
                     <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>

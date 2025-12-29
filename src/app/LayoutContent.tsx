@@ -90,7 +90,13 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
     }, [isMobile]);
 
     // Check if we're on a standalone page (like login) that shouldn't have the layout
-    const isStandalonePage = pathname === '/login';
+    // Handle null pathname during SSR and check for login path with or without basePath
+    const isStandalonePage =
+        pathname === '/login' ||
+        pathname === '/prod/login' ||
+        pathname?.endsWith('/login') ||
+        (typeof window !== 'undefined' &&
+            window.location.pathname.endsWith('/login'));
 
     // If it's a standalone page, just render the children without any layout
     if (isStandalonePage) {

@@ -446,9 +446,30 @@ export default function Breadcrumbs({
                     return;
                 }
 
-                const list = await api.get<any[]>('/api/accounts');
+                const rawList = await api.get<any>('/api/accounts');
                 if (!mounted) return;
-                const mapped = (list || []).map((a) => ({
+
+                // Handle various response formats
+                let list: any[] = [];
+                if (Array.isArray(rawList)) {
+                    list = rawList;
+                } else if (
+                    rawList?.data?.accounts &&
+                    Array.isArray(rawList.data.accounts)
+                ) {
+                    list = rawList.data.accounts;
+                } else if (
+                    rawList?.accounts &&
+                    Array.isArray(rawList.accounts)
+                ) {
+                    list = rawList.accounts;
+                } else if (rawList?.data && Array.isArray(rawList.data)) {
+                    list = rawList.data;
+                }
+
+                console.log('📦 [Breadcrumbs] Accounts loaded:', list.length);
+
+                const mapped = (list || []).map((a: any) => ({
                     id: String(
                         a.id ??
                             a.accountId ??
@@ -518,14 +539,41 @@ export default function Breadcrumbs({
         })();
         (async () => {
             try {
-                const list = await api.get<Array<{id: string; name: string}>>(
-                    '/api/enterprises',
-                );
+                const rawEnterprises = await api.get<any>('/api/enterprises');
                 if (!mounted) return;
-                const mapped = (list || []).map((e) => ({
-                    id: String(e.id),
-                    name: e.name,
-                }));
+
+                // Handle various response formats
+                let list: Array<{id: string; name: string}> = [];
+                if (Array.isArray(rawEnterprises)) {
+                    list = rawEnterprises;
+                } else if (
+                    rawEnterprises?.data?.enterprises &&
+                    Array.isArray(rawEnterprises.data.enterprises)
+                ) {
+                    list = rawEnterprises.data.enterprises;
+                } else if (
+                    rawEnterprises?.enterprises &&
+                    Array.isArray(rawEnterprises.enterprises)
+                ) {
+                    list = rawEnterprises.enterprises;
+                } else if (
+                    rawEnterprises?.data &&
+                    Array.isArray(rawEnterprises.data)
+                ) {
+                    list = rawEnterprises.data;
+                }
+
+                console.log(
+                    '📦 [Breadcrumbs] Enterprises loaded:',
+                    list.length,
+                );
+
+                const mapped = (list || []).map(
+                    (e: {id: string; name: string}) => ({
+                        id: String(e.id),
+                        name: e.name,
+                    }),
+                );
                 setAllEnterprises(mapped); // Store all enterprises
                 setEnterprises(mapped); // Initially show all
                 const savedId =
