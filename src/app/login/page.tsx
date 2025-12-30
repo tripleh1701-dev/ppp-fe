@@ -11,6 +11,19 @@ import {
     clearPasswordChallenge,
 } from '@/utils/auth';
 
+// Helper to extract basePath from current URL
+// /prod/ui/login -> /prod/ui
+// /prod/login -> /prod
+// /login -> ''
+const getBasePathFromUrl = (): string => {
+    if (typeof window === 'undefined') return '';
+    const currentPath = window.location.pathname;
+    const pathParts = currentPath
+        .split('/')
+        .filter((part) => part !== '' && part !== 'login');
+    return pathParts.length > 0 ? '/' + pathParts.join('/') : '';
+};
+
 export default function LoginPage() {
     const router = useRouter();
     const [email, setEmail] = useState('');
@@ -25,12 +38,7 @@ export default function LoginPage() {
     useEffect(() => {
         // If already authenticated, redirect to dashboard
         if (isAuthenticated()) {
-            // Compute basePath from current URL to handle /prod prefix correctly
-            const currentPath = window.location.pathname;
-            const basePath = currentPath.startsWith('/prod') ? '/prod' :
-                             currentPath.startsWith('/ui') ? '/ui' :
-                             (process.env.NEXT_PUBLIC_BASE_PATH || '');
-            window.location.href = `${basePath}/dashboard`;
+            window.location.href = `${getBasePathFromUrl()}/dashboard`;
             return;
         }
         // Check if there's a pending password change
@@ -53,12 +61,7 @@ export default function LoginPage() {
             if (user) {
                 // Success - redirect to dashboard using hard navigation
                 // This ensures LayoutContent remounts with fresh auth state and shows sidebar
-                // Compute basePath from current URL to handle /prod prefix correctly
-                const currentPath = window.location.pathname;
-                const basePath = currentPath.startsWith('/prod') ? '/prod' :
-                                 currentPath.startsWith('/ui') ? '/ui' :
-                                 (process.env.NEXT_PUBLIC_BASE_PATH || '');
-                window.location.href = `${basePath}/dashboard`;
+                window.location.href = `${getBasePathFromUrl()}/dashboard`;
             } else {
                 // Check if password change is required
                 const challengeData = getPasswordChallengeData();
@@ -100,12 +103,7 @@ export default function LoginPage() {
             const user = await completePasswordChallenge(newPassword);
             if (user) {
                 // Use hard navigation to ensure proper state refresh and sidebar display
-                // Compute basePath from current URL to handle /prod prefix correctly
-                const currentPath = window.location.pathname;
-                const basePath = currentPath.startsWith('/prod') ? '/prod' :
-                                 currentPath.startsWith('/ui') ? '/ui' :
-                                 (process.env.NEXT_PUBLIC_BASE_PATH || '');
-                window.location.href = `${basePath}/dashboard`;
+                window.location.href = `${getBasePathFromUrl()}/dashboard`;
             } else {
                 setError('Failed to update password. Please try again.');
                 setIsLoading(false);
