@@ -2,6 +2,7 @@
 
 import {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {usePathname, useRouter} from 'next/navigation';
 import AccountSettingsPanel from './AccountSettingsPanel';
 import AccessControlPanel from './AccessControlPanel';
@@ -381,9 +382,11 @@ export default function NavigationSidebar({
                             href='/'
                             className='flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200'
                         >
-                            <img
+                            <Image
                                 src='/images/logos/logo.svg'
                                 alt='Systiva Logo'
+                                width={44}
+                                height={44}
                                 className='w-11 h-11 object-contain'
                             />
                             <div className='min-w-0'>
@@ -401,9 +404,11 @@ export default function NavigationSidebar({
                             href='/'
                             className='flex justify-center w-full hover:opacity-80 transition-opacity duration-200'
                         >
-                            <img
+                            <Image
                                 src='/images/logos/logo.svg'
                                 alt='Systiva Logo'
+                                width={44}
+                                height={44}
                                 className='w-11 h-11 object-contain'
                             />
                         </Link>

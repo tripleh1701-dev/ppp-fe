@@ -10,6 +10,9 @@ const inter = Inter({
     variable: '--font-inter',
 });
 
+// Get base path for production (handles API Gateway stage prefix)
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export const metadata: Metadata = {
     title: 'Systiva - Enterprise CI/CD Platform',
     description: 'Build and manage your CI/CD pipelines with ease',
@@ -17,6 +20,10 @@ export const metadata: Metadata = {
     authors: [{name: 'Systiva Team'}],
     viewport:
         'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
+    icons: {
+        icon: `${basePath}/images/logos/logo.svg`,
+        apple: `${basePath}/images/logos/logo.svg`,
+    },
 };
 
 export const viewport: Viewport = {
@@ -43,23 +50,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
                 />
                 <meta name='apple-mobile-web-app-title' content='Systiva' />
 
-                {/* App icons */}
-                <link
-                    rel='icon'
-                    type='image/svg+xml'
-                    href='/images/logos/logo.svg'
-                />
-                <link rel='alternate icon' href='/images/logos/logo.svg' />
-                <link rel='apple-touch-icon' href='/images/logos/logo.svg' />
-
-                {/* Preload critical fonts */}
-                <link
-                    rel='preload'
-                    href='/fonts/inter-var.woff2'
-                    as='font'
-                    type='font/woff2'
-                    crossOrigin='anonymous'
-                />
+                {/* Note: Fonts are handled by next/font, no manual preload needed */}
 
                 {/* CSS for older browsers */}
                 <style
