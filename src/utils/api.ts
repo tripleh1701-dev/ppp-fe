@@ -100,10 +100,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (!res.ok) {
         const text = await res.text().catch(() => '');
 
-        // Log auth errors for debugging
+        // Handle 401 Unauthorized - token expired or missing
         if (res.status === 401) {
             console.error('❌ API 401 Unauthorized:', url);
             console.error('🔐 Token present:', !!token);
+
+            // Clear stored auth data and redirect to login
+            if (typeof window !== 'undefined') {
+                // Only redirect if not already on login page
+                if (!window.location.pathname.includes('/login')) {
+                    console.log('🔒 Token expired, redirecting to login...');
+                    localStorage.removeItem('systiva_auth_token');
+                    localStorage.removeItem('systiva_refresh_token');
+                    localStorage.removeItem('systiva_user');
+                    window.location.href = '/login';
+                    return undefined as unknown as T;
+                }
+            }
         }
 
         throw new Error(`API ${res.status}: ${text}`);

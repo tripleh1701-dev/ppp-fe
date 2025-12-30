@@ -5,12 +5,18 @@ import {usePathname} from 'next/navigation';
 import NavigationSidebar from '@/components/NavigationSidebar';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import AISuggestionsPanel from '@/components/AISuggestionsPanel';
+import {isAuthenticated} from '@/utils/auth';
 
-// Helper to check if path is login page
+// Helper to check if path is login page - check multiple patterns
 const isLoginPath = (path: string | null): boolean => {
     if (!path) return false;
+    // Check for various login path patterns
     return (
-        path === '/login' || path === '/prod/login' || path.endsWith('/login')
+        path === '/login' ||
+        path === '/prod/login' ||
+        path === '/ui/login' ||
+        path.endsWith('/login') ||
+        path.includes('/login')
     );
 };
 
@@ -20,12 +26,41 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
     const [isMobile, setIsMobile] = useState(false);
     const [isTablet, setIsTablet] = useState(false);
     const [isCanvasPage, setIsCanvasPage] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
     // Check for login page - compute directly from pathname for instant check
     const isLoginPage =
         isLoginPath(pathname) ||
         (typeof window !== 'undefined' &&
             isLoginPath(window.location.pathname));
+
+    // Global authentication check - redirect to login if token is expired/missing
+    useEffect(() => {
+        const checkAuth = () => {
+            // Only run on client-side
+            if (typeof window === 'undefined') {
+                return;
+            }
+
+            // Skip auth check on login page
+            if (isLoginPage) {
+                setIsCheckingAuth(false);
+                return;
+            }
+
+            // Check if user is authenticated
+            if (!isAuthenticated()) {
+                console.log('🔒 User not authenticated, redirecting to login');
+                // Use window.location for hard redirect to ensure clean state
+                window.location.href = '/login';
+                return;
+            }
+
+            setIsCheckingAuth(false);
+        };
+
+        checkAuth();
+    }, [pathname, isLoginPage]);
 
     // Responsive breakpoint detection for native 80% zoom simulation
     useEffect(() => {
@@ -106,6 +141,11 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
     // If it's login page, just render the children without any layout
     if (isLoginPage) {
         return <>{children}</>;
+    }
+
+    // Show nothing while checking authentication to prevent flash of content
+    if (isCheckingAuth) {
+        return null;
     }
 
     return (
