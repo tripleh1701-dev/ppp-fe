@@ -821,3 +821,84 @@ export async function onboardAccount(
         throw error;
     }
 }
+
+/**
+ * Offboard (delete) account response interface
+ */
+export interface OffboardAccountResponse {
+    result: 'success' | 'failed';
+    msg: string;
+    data?: {
+        accountId: string;
+        deletedAt: string;
+        infraDeprovisioning?: {
+            executionArn?: string;
+            note?: string;
+        };
+    };
+}
+
+/**
+ * Offboard (delete) an account via ppp-be backend
+ * This triggers infrastructure deprovisioning and removes the account from database
+ *
+ * @param accountId - The ID of the account to offboard
+ * @returns API response with deletion details
+ */
+export async function offboardAccount(
+    accountId: string,
+): Promise<OffboardAccountResponse> {
+    // Use ppp-be-main (workflow 10) backend - independent from admin-portal
+    // Endpoint: /api/v1/app/api/accounts/offboard?accountId=xxx
+    const url = `${API_BASE}/api/v1/app/api/accounts/offboard?accountId=${accountId}`;
+
+    // Get authentication token
+    const token = getAuthToken();
+
+    // Build headers
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    } else {
+        console.warn('⚠️ No auth token found. API call may fail with 401.');
+    }
+
+    try {
+        console.log('🗑️ Offboarding account:', accountId);
+        console.log('📤 DELETE to:', url);
+
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers,
+        });
+
+        const responseData = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            console.error('❌ Offboard API error:', res.status, responseData);
+
+            if (res.status === 401) {
+                console.error(
+                    '🔐 Authentication failed. Token may be expired or missing.',
+                );
+            }
+
+            throw new Error(
+                `Offboard API ${res.status}: ${
+                    responseData.message ||
+                    responseData.msg ||
+                    JSON.stringify(responseData)
+                }`,
+            );
+        }
+
+        console.log('✅ Account offboarded successfully:', responseData);
+        return responseData;
+    } catch (error) {
+        console.error('❌ Error offboarding account:', error);
+        throw error;
+    }
+}

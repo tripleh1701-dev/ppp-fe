@@ -655,14 +655,14 @@ export default function ManageAccounts() {
             // Filter out temporary rows before saving to localStorage
             const persistentAccountsData = accountsData.filter(
                 (account: any) => {
-                    const isTemporary = String(account.id).startsWith('tmp-');
-                    if (isTemporary) {
+                const isTemporary = String(account.id).startsWith('tmp-');
+                if (isTemporary) {
                         console.log(
                             '🧹 Not saving temporary row to localStorage:',
                             account.id,
                         );
-                    }
-                    return !isTemporary;
+                }
+                return !isTemporary;
                 },
             );
 
@@ -1872,8 +1872,8 @@ export default function ManageAccounts() {
         console.log(
             '📋 License state breakdown:',
             Object.keys(currentLicenseState).map((rowId) => ({
-                rowId,
-                licenseCount: currentLicenseState[rowId]?.length || 0,
+            rowId,
+            licenseCount: currentLicenseState[rowId]?.length || 0,
                 licenses: currentLicenseState[rowId],
             })),
         );
@@ -2608,8 +2608,8 @@ export default function ManageAccounts() {
                 e.preventDefault();
                 const message =
                     incomplete.length > 0
-                        ? 'You have incomplete account configurations. Your changes will be lost if you leave.'
-                        : 'You have unsaved changes. Your changes will be lost if you leave.';
+                    ? 'You have incomplete account configurations. Your changes will be lost if you leave.'
+                    : 'You have unsaved changes. Your changes will be lost if you leave.';
                 e.returnValue = message;
                 return e.returnValue;
             }
@@ -2939,7 +2939,7 @@ export default function ManageAccounts() {
                     // First, try to fetch from external Admin Portal API
                     console.log(
                         '🌐 Calling external Admin Portal API for accounts...',
-                    );
+                        );
                     const externalAccounts = await fetchExternalAccounts();
 
                     console.log(
@@ -3022,33 +3022,33 @@ export default function ManageAccounts() {
                                     }`;
 
                                     return {
-                                        id: license.id, // Keep original ID for API operations
-                                        stableId: stableLicenseKey, // Add stable identifier for localStorage
-                                        enterprise: license.enterprise || '',
-                                        product: license.product || '',
-                                        service: license.service || '',
-                                        licenseStartDate:
-                                            license.licenseStart ||
-                                            license.licenseStartDate ||
-                                            '',
-                                        licenseEndDate:
-                                            license.licenseEnd ||
-                                            license.licenseEndDate ||
-                                            '',
-                                        numberOfUsers:
-                                            license.users ||
-                                            license.numberOfUsers ||
-                                            '',
-                                        contactDetails: (() => {
-                                            // Handle different contact data structures from API
-                                            let contactDetails;
+                                    id: license.id, // Keep original ID for API operations
+                                    stableId: stableLicenseKey, // Add stable identifier for localStorage
+                                    enterprise: license.enterprise || '',
+                                    product: license.product || '',
+                                    service: license.service || '',
+                                    licenseStartDate:
+                                        license.licenseStart ||
+                                        license.licenseStartDate ||
+                                        '',
+                                    licenseEndDate:
+                                        license.licenseEnd ||
+                                        license.licenseEndDate ||
+                                        '',
+                                    numberOfUsers:
+                                        license.users ||
+                                        license.numberOfUsers ||
+                                        '',
+                                    contactDetails: (() => {
+                                        // Handle different contact data structures from API
+                                        let contactDetails;
 
-                                            if (license.contactDetails) {
-                                                // Direct contactDetails object
+                                        if (license.contactDetails) {
+                                            // Direct contactDetails object
                                                 contactDetails =
                                                     license.contactDetails;
-                                            } else if (license.contacts) {
-                                                // contacts might be an array, take first item
+                                        } else if (license.contacts) {
+                                            // contacts might be an array, take first item
                                                 if (
                                                     Array.isArray(
                                                         license.contacts,
@@ -3061,21 +3061,10 @@ export default function ManageAccounts() {
                                                     typeof license.contacts ===
                                                     'object'
                                                 ) {
-                                                    // contacts is an object
+                                                // contacts is an object
                                                     contactDetails =
                                                         license.contacts;
-                                                } else {
-                                                    contactDetails = {
-                                                        id: '',
-                                                        name: '',
-                                                        email: '',
-                                                        phone: '',
-                                                        department: '',
-                                                        designation: '',
-                                                    };
-                                                }
                                             } else {
-                                                // No contact data, create empty structure
                                                 contactDetails = {
                                                     id: '',
                                                     name: '',
@@ -3085,15 +3074,26 @@ export default function ManageAccounts() {
                                                     designation: '',
                                                 };
                                             }
+                                        } else {
+                                            // No contact data, create empty structure
+                                            contactDetails = {
+                                                id: '',
+                                                name: '',
+                                                email: '',
+                                                phone: '',
+                                                department: '',
+                                                designation: '',
+                                            };
+                                        }
 
-                                            // Check localStorage for contact data using stable ID
-                                            const contactKey = `contact-${stableLicenseKey}`;
-                                            try {
+                                        // Check localStorage for contact data using stable ID
+                                        const contactKey = `contact-${stableLicenseKey}`;
+                                        try {
                                                 const savedContact =
                                                     localStorage.getItem(
                                                         contactKey,
                                                     );
-                                                if (savedContact) {
+                                            if (savedContact) {
                                                     const parsedContact =
                                                         JSON.parse(
                                                             savedContact,
@@ -3106,15 +3106,15 @@ export default function ManageAccounts() {
                                                         ...contactDetails,
                                                         ...parsedContact,
                                                     };
-                                                }
-                                            } catch (error) {
+                                            }
+                                        } catch (error) {
                                                 console.warn(
                                                     `⚠️ Error loading saved contact for ${contactKey}:`,
                                                     error,
                                                 );
-                                            }
+                                        }
 
-                                            // Debug log for contact details
+                                        // Debug log for contact details
                                             console.log(
                                                 `📞 Contact details processing for license ${license.id}:`,
                                                 {
@@ -3133,14 +3133,14 @@ export default function ManageAccounts() {
                                                 },
                                             );
 
-                                            return contactDetails;
-                                        })(),
-                                        renewalNotice:
-                                            license.renewalNotice || false,
-                                        noticePeriodDays:
-                                            license.noticePeriod?.toString() ||
-                                            license.noticePeriodDays ||
-                                            '',
+                                        return contactDetails;
+                                    })(),
+                                    renewalNotice:
+                                        license.renewalNotice || false,
+                                    noticePeriodDays:
+                                        license.noticePeriod?.toString() ||
+                                        license.noticePeriodDays ||
+                                        '',
                                     };
                                 },
                             ),
@@ -3178,13 +3178,13 @@ export default function ManageAccounts() {
                                     const isTemporary = String(
                                         account.id,
                                     ).startsWith('tmp-');
-                                    if (isTemporary) {
+                                if (isTemporary) {
                                         console.log(
                                             '🧹 Filtering out temporary row from localStorage:',
                                             account.id,
                                         );
-                                    }
-                                    return !isTemporary;
+                                }
+                                return !isTemporary;
                                 },
                             );
 
@@ -3226,7 +3226,7 @@ export default function ManageAccounts() {
                                     localLicenseIds: localLicenses.map(
                                         (l: any) => l.id,
                                     ),
-                                    apiLicensesCount: apiLicenses.length,
+                                apiLicensesCount: apiLicenses.length,
                                     localLicensesCount: localLicenses.length,
                                 },
                             );
@@ -3235,11 +3235,11 @@ export default function ManageAccounts() {
                             // Only merge in localStorage changes for licenses that still exist in the API
                             const mergedLicenses = apiLicenses.map(
                                 (apiLicense: any) => {
-                                    // Find matching local license using stable identifier first, then fallback to other methods
+                                // Find matching local license using stable identifier first, then fallback to other methods
                                     const matchingLocalLicense =
                                         localLicenses.find(
                                             (localLicense: any) => {
-                                                // Try stable ID first (if both have it)
+                                    // Try stable ID first (if both have it)
                                                 if (
                                                     apiLicense.stableId &&
                                                     localLicense.stableId
@@ -3248,15 +3248,15 @@ export default function ManageAccounts() {
                                                         apiLicense.stableId ===
                                                         localLicense.stableId
                                                     );
-                                                }
-                                                // Try to match by API ID
+                                    }
+                                    // Try to match by API ID
                                                 if (
                                                     apiLicense.id ===
                                                     localLicense.id
                                                 ) {
-                                                    return true;
-                                                }
-                                                // Fallback to content similarity
+                                        return true;
+                                    }
+                                    // Fallback to content similarity
                                                 return (
                                                     apiLicense.enterprise ===
                                                         localLicense.enterprise &&
@@ -3268,11 +3268,11 @@ export default function ManageAccounts() {
                                             },
                                         );
 
-                                    if (matchingLocalLicense) {
-                                        // Merge localStorage edits into API data (but preserve API structure)
-                                        return {
-                                            ...apiLicense, // API data as base
-                                            // Only merge specific fields that might have been edited locally
+                                if (matchingLocalLicense) {
+                                    // Merge localStorage edits into API data (but preserve API structure)
+                                    return {
+                                        ...apiLicense, // API data as base
+                                        // Only merge specific fields that might have been edited locally
                                             enterprise:
                                                 matchingLocalLicense.enterprise ||
                                                 apiLicense.enterprise,
@@ -3303,8 +3303,8 @@ export default function ManageAccounts() {
                                                 matchingLocalLicense.noticePeriodDays ||
                                                 apiLicense.noticePeriodDays ||
                                                 apiLicense.noticePeriod,
-                                            // Handle contact details with preference for API data (database) as source of truth
-                                            contactDetails: (() => {
+                                        // Handle contact details with preference for API data (database) as source of truth
+                                        contactDetails: (() => {
                                                 const apiContactDetails =
                                                     apiLicense.contactDetails ||
                                                     (Array.isArray(
@@ -3315,7 +3315,7 @@ export default function ManageAccounts() {
                                                         ? apiLicense.contacts[0]
                                                         : apiLicense.contacts);
 
-                                                // Always prefer API data if it has meaningful contact information
+                                            // Always prefer API data if it has meaningful contact information
                                                 if (
                                                     apiContactDetails &&
                                                     (apiContactDetails.name ||
@@ -3325,19 +3325,19 @@ export default function ManageAccounts() {
                                                         `📞 Using API contact data for license ${apiLicense.id} (database source of truth):`,
                                                         apiContactDetails,
                                                     );
-                                                    return apiContactDetails;
-                                                }
+                                                return apiContactDetails;
+                                            }
 
-                                                // Only use stable localStorage as fallback when API has no meaningful contact data
-                                                if (apiLicense.stableId) {
-                                                    const stableKey = `contact-${apiLicense.stableId}`;
+                                            // Only use stable localStorage as fallback when API has no meaningful contact data
+                                            if (apiLicense.stableId) {
+                                                const stableKey = `contact-${apiLicense.stableId}`;
                                                     const savedContactData =
                                                         localStorage.getItem(
                                                             stableKey,
                                                         );
 
-                                                    if (savedContactData) {
-                                                        try {
+                                                if (savedContactData) {
+                                                    try {
                                                             const parsedContactData =
                                                                 JSON.parse(
                                                                     savedContactData,
@@ -3346,17 +3346,17 @@ export default function ManageAccounts() {
                                                                 `📞 Using stable localStorage contact data as fallback for license ${apiLicense.id} (key: ${stableKey}):`,
                                                                 parsedContactData,
                                                             );
-                                                            return parsedContactData;
-                                                        } catch (error) {
+                                                        return parsedContactData;
+                                                    } catch (error) {
                                                             console.error(
                                                                 `❌ Error parsing stable contact data for ${stableKey}:`,
                                                                 error,
                                                             );
-                                                        }
                                                     }
                                                 }
+                                            }
 
-                                                // Legacy localStorage fallback
+                                            // Legacy localStorage fallback
                                                 const localContactDetails =
                                                     matchingLocalLicense?.contactDetails;
                                                 if (
@@ -3368,10 +3368,10 @@ export default function ManageAccounts() {
                                                         `📞 Using legacy localStorage contact data as fallback for license ${apiLicense.id}:`,
                                                         localContactDetails,
                                                     );
-                                                    return localContactDetails;
-                                                }
+                                                return localContactDetails;
+                                            }
 
-                                                // Return empty contact structure if no data available
+                                            // Return empty contact structure if no data available
                                                 if (
                                                     apiContactDetails &&
                                                     (apiContactDetails.name ||
@@ -3381,24 +3381,24 @@ export default function ManageAccounts() {
                                                         `📞 Using API contact data for license ${apiLicense.id}:`,
                                                         apiContactDetails,
                                                     );
-                                                    return apiContactDetails;
-                                                }
+                                                return apiContactDetails;
+                                            }
 
-                                                // Default empty structure
-                                                return {
-                                                    id: '',
-                                                    name: '',
-                                                    email: '',
-                                                    phone: '',
-                                                    department: '',
-                                                    designation: '',
-                                                };
+                                            // Default empty structure
+                                            return {
+                                                id: '',
+                                                name: '',
+                                                email: '',
+                                                phone: '',
+                                                department: '',
+                                                designation: '',
+                                            };
                                             })(),
-                                        };
-                                    }
+                                    };
+                                }
 
-                                    // No localStorage counterpart - use API data as-is
-                                    return apiLicense;
+                                // No localStorage counterpart - use API data as-is
+                                return apiLicense;
                                 },
                             );
 
@@ -3424,8 +3424,8 @@ export default function ManageAccounts() {
                                 console.error(
                                     `❌ Duplicate license IDs after merge for ${localAccount.accountName}:`,
                                     {
-                                        total: mergedLicenseIds.length,
-                                        unique: uniqueMergedIds.length,
+                                    total: mergedLicenseIds.length,
+                                    unique: uniqueMergedIds.length,
                                         duplicates: mergedLicenseIds.filter(
                                             (id: any, index: number) =>
                                                 mergedLicenseIds.indexOf(id) !==
@@ -3468,7 +3468,7 @@ export default function ManageAccounts() {
                                         (acc) => acc.id === localAccount.id,
                                     ),
                             )
-                            .map((localAccount: any) => localAccount.id);
+                        .map((localAccount: any) => localAccount.id);
 
                     if (accountsToRemoveFromLocalStorage.length > 0) {
                         console.log(
@@ -3480,7 +3480,7 @@ export default function ManageAccounts() {
                                     !accountsToRemoveFromLocalStorage.includes(
                                         localAccount.id,
                                     ),
-                            );
+                        );
 
                         // Update localStorage with cleaned data
                         try {
@@ -3887,7 +3887,7 @@ export default function ManageAccounts() {
                         const isTemporary = String(account.id).startsWith(
                             'tmp-',
                         );
-                        return !isTemporary;
+                    return !isTemporary;
                     },
                 );
 
@@ -3976,7 +3976,7 @@ export default function ManageAccounts() {
                 );
                 console.log('📄 Account data to delete:', accountToDelete);
 
-                // Delete via API - use correct ppp-be-main backend URL
+                // Delete via API - use offboard endpoint for infrastructure deprovisioning
                 let apiBase =
                     process.env.NEXT_PUBLIC_API_BASE_URL ||
                     process.env.NEXT_PUBLIC_API_BASE ||
@@ -3987,14 +3987,15 @@ export default function ManageAccounts() {
                 } else if (apiBase.endsWith('/api')) {
                     apiBase = apiBase.slice(0, -4);
                 }
-                // Construct the correct URL: /api/v1/app/api/accounts/{id}
-                const deleteUrl = `${apiBase}/api/v1/app/api/accounts/${pendingDeleteRowId}`;
-                console.log('🗑️ Delete URL:', deleteUrl);
+                // Use offboard endpoint to trigger infrastructure deprovisioning
+                // Construct the correct URL: /api/v1/app/api/accounts/offboard?accountId={id}
+                const offboardUrl = `${apiBase}/api/v1/app/api/accounts/offboard?accountId=${pendingDeleteRowId}`;
+                console.log('🗑️ Offboard URL:', offboardUrl);
 
                 try {
                     const token = localStorage.getItem('systiva_auth_token');
-                    const response = await fetch(deleteUrl, {
-                        method: 'DELETE',
+                    const response = await fetch(offboardUrl, {
+                            method: 'DELETE',
                         headers: {
                             'Content-Type': 'application/json',
                             ...(token
@@ -4006,19 +4007,20 @@ export default function ManageAccounts() {
                     if (!response.ok) {
                         const errorText = await response.text();
                         console.error(
-                            '❌ Delete failed:',
+                            '❌ Offboard failed:',
                             response.status,
                             errorText,
                         );
                         throw new Error(
-                            `Failed to delete account: ${response.status}`,
+                            `Failed to offboard account: ${response.status}`,
                         );
                     }
 
-                    console.log('✅ Account deleted via API');
+                    const offboardResult = await response.json().catch(() => ({}));
+                    console.log('✅ Account offboarded via API:', offboardResult);
                 } catch (error) {
-                    console.error('Error deleting account via API:', error);
-                    throw new Error('Failed to delete account from DynamoDB');
+                    console.error('Error offboarding account via API:', error);
+                    throw new Error('Failed to offboard account');
                 }
 
                 // Remove from local state
@@ -4276,7 +4278,7 @@ export default function ManageAccounts() {
                       .replace(/,\s*,/g, ',')
                       .replace(/,\s*$/, '')
                       .replace(/^\s*,\s*/, '')
-                : '';
+            : '';
 
         // Update local state
         setAccounts((prev) => {
@@ -4425,9 +4427,9 @@ export default function ManageAccounts() {
             console.log(
                 '📍 Individual save - Updated selectedAccountForAddress:',
                 {
-                    id: updatedSelected.id,
-                    addresses: updatedSelected.addresses,
-                    addressData: updatedSelected.addressData,
+                id: updatedSelected.id,
+                addresses: updatedSelected.addresses,
+                addressData: updatedSelected.addressData,
                     address: updatedSelected.address,
                 },
             );
@@ -4691,7 +4693,7 @@ export default function ManageAccounts() {
                 console.log(
                     '✅ Individual technical user saved to API successfully',
                     {
-                        response: responseData,
+                    response: responseData,
                         technicalUsersInResponse:
                             responseData?.technicalUsers || 'Not present',
                         willRefetchFromUsersAPI:
@@ -4920,7 +4922,7 @@ export default function ManageAccounts() {
                                                             console.log(
                                                                 '🔍 Account filter onChange:',
                                                                 {
-                                                                    value,
+                                                                value,
                                                                     dropdownOptionsLength:
                                                                         dropdownOptions
                                                                             .accountNames
@@ -4950,7 +4952,7 @@ export default function ManageAccounts() {
                                                                             .includes(
                                                                                 value.toLowerCase(),
                                                                             ),
-                                                                );
+                                                            );
                                                             console.log(
                                                                 '🔍 Filtered accounts:',
                                                                 filtered.map(
@@ -4975,7 +4977,7 @@ export default function ManageAccounts() {
                                                                                 a.name ===
                                                                                 account.name,
                                                                         ),
-                                                                );
+                                                            );
                                                             setFilteredAccountNames(
                                                                 uniqueFiltered,
                                                             );
@@ -5093,23 +5095,23 @@ export default function ManageAccounts() {
                                                                     account,
                                                                     index,
                                                                 ) => (
-                                                                    <div
+                                                                <div
                                                                         key={
                                                                             account.id
                                                                         }
-                                                                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                                                                             index ===
                                                                             selectedAccountIndex
                                                                                 ? 'bg-blue-100'
                                                                                 : ''
-                                                                        }`}
+                                                                    }`}
                                                                         onMouseDown={(
                                                                             e,
                                                                         ) => {
-                                                                            e.preventDefault(); // Prevent input blur
+                                                                        e.preventDefault(); // Prevent input blur
                                                                             setFilterForm(
                                                                                 {
-                                                                                    ...filterForm,
+                                                                            ...filterForm,
                                                                                     accountName:
                                                                                         account.name,
                                                                                 },
@@ -5120,12 +5122,12 @@ export default function ManageAccounts() {
                                                                             setSelectedAccountIndex(
                                                                                 -1,
                                                                             );
-                                                                        }}
-                                                                    >
+                                                                    }}
+                                                                >
                                                                         {
                                                                             account.name
                                                                         }
-                                                                    </div>
+                                                                </div>
                                                                 ),
                                                             )}
                                                         </div>
@@ -5150,7 +5152,7 @@ export default function ManageAccounts() {
                                                             console.log(
                                                                 '🔍 Master Account filter onChange:',
                                                                 {
-                                                                    value,
+                                                                value,
                                                                     dropdownOptionsLength:
                                                                         dropdownOptions
                                                                             .masterAccounts
@@ -5180,7 +5182,7 @@ export default function ManageAccounts() {
                                                                             .includes(
                                                                                 value.toLowerCase(),
                                                                             ),
-                                                                );
+                                                            );
                                                             console.log(
                                                                 '🔍 Filtered master accounts:',
                                                                 filtered.map(
@@ -5205,7 +5207,7 @@ export default function ManageAccounts() {
                                                                                 m.name ===
                                                                                 master.name,
                                                                         ),
-                                                                );
+                                                            );
                                                             setFilteredMasterAccounts(
                                                                 uniqueFiltered,
                                                             );
@@ -5323,23 +5325,23 @@ export default function ManageAccounts() {
                                                                     master,
                                                                     index,
                                                                 ) => (
-                                                                    <div
+                                                                <div
                                                                         key={
                                                                             master.id
                                                                         }
-                                                                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
                                                                             index ===
                                                                             selectedMasterAccountIndex
                                                                                 ? 'bg-blue-100'
                                                                                 : ''
-                                                                        }`}
+                                                                    }`}
                                                                         onMouseDown={(
                                                                             e,
                                                                         ) => {
-                                                                            e.preventDefault(); // Prevent input blur
+                                                                        e.preventDefault(); // Prevent input blur
                                                                             setFilterForm(
                                                                                 {
-                                                                                    ...filterForm,
+                                                                            ...filterForm,
                                                                                     masterAccount:
                                                                                         master.name,
                                                                                 },
@@ -5350,12 +5352,12 @@ export default function ManageAccounts() {
                                                                             setSelectedMasterAccountIndex(
                                                                                 -1,
                                                                             );
-                                                                        }}
-                                                                    >
+                                                                    }}
+                                                                >
                                                                         {
                                                                             master.name
                                                                         }
-                                                                    </div>
+                                                                </div>
                                                                 ),
                                                             )}
                                                         </div>
@@ -5464,7 +5466,7 @@ export default function ManageAccounts() {
                                                     >
                                                         <option value=''>
                                                             Select column...
-                                                        </option>
+                                                            </option>
                                                         {toolbarCols.map(
                                                             (col) => (
                                                                 <option
@@ -6215,8 +6217,8 @@ export default function ManageAccounts() {
                                                 console.log(
                                                     '📊 License completeness check:',
                                                     {
-                                                        rowId,
-                                                        hasCompleteLicenseData,
+                                                    rowId,
+                                                    hasCompleteLicenseData,
                                                         licensesCount:
                                                             Array.isArray(value)
                                                                 ? value.length
@@ -6251,8 +6253,8 @@ export default function ManageAccounts() {
                                                     console.log(
                                                         '🔍 License change check:',
                                                         {
-                                                            rowId,
-                                                            hasLicenseChanged,
+                                                        rowId,
+                                                        hasLicenseChanged,
                                                             oldCount:
                                                                 currentAccount
                                                                     ?.licenses
@@ -6597,10 +6599,10 @@ export default function ManageAccounts() {
                                                     console.log(
                                                         '🔍 Value change check:',
                                                         {
-                                                            rowId,
-                                                            field,
-                                                            oldValue,
-                                                            newValue: value,
+                                                        rowId,
+                                                        field,
+                                                        oldValue,
+                                                        newValue: value,
                                                             hasValueChanged,
                                                         },
                                                     );
