@@ -3,7 +3,13 @@
 import React, {useState, useEffect} from 'react';
 import {useRouter} from 'next/navigation';
 import Image from 'next/image';
-import {login, isAuthenticated, getPasswordChallengeData, completePasswordChallenge, clearPasswordChallenge} from '@/utils/auth';
+import {
+    login,
+    isAuthenticated,
+    getPasswordChallengeData,
+    completePasswordChallenge,
+    clearPasswordChallenge,
+} from '@/utils/auth';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -39,8 +45,9 @@ export default function LoginPage() {
             const user = await login(email, password);
 
             if (user) {
-                // Success - redirect to dashboard
-                router.push('/dashboard');
+                // Success - redirect to dashboard using hard navigation
+                // This ensures the LayoutContent remounts with fresh auth state
+                window.location.href = '/dashboard';
             } else {
                 // Check if password change is required
                 const challengeData = getPasswordChallengeData();
@@ -81,7 +88,8 @@ export default function LoginPage() {
         try {
             const user = await completePasswordChallenge(newPassword);
             if (user) {
-                router.push('/dashboard');
+                // Use hard navigation to ensure proper state refresh
+                window.location.href = '/dashboard';
             } else {
                 setError('Failed to update password. Please try again.');
                 setIsLoading(false);
@@ -308,13 +316,17 @@ export default function LoginPage() {
 
                     {/* Password Change Form (for first-time login) */}
                     {showPasswordChange ? (
-                        <form onSubmit={handlePasswordChange} className='space-y-4'>
+                        <form
+                            onSubmit={handlePasswordChange}
+                            className='space-y-4'
+                        >
                             <div className='p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4'>
                                 <p className='text-sm text-blue-800 font-medium'>
                                     🔐 Password Change Required
                                 </p>
                                 <p className='text-sm text-blue-600 mt-1'>
-                                    This is your first login. Please create a new password.
+                                    This is your first login. Please create a
+                                    new password.
                                 </p>
                             </div>
 
@@ -345,7 +357,9 @@ export default function LoginPage() {
                                     id='newPassword'
                                     type='password'
                                     value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    onChange={(e) =>
+                                        setNewPassword(e.target.value)
+                                    }
                                     className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
                                     placeholder='Enter new password (min 8 characters)'
                                     required
@@ -364,7 +378,9 @@ export default function LoginPage() {
                                     id='confirmPassword'
                                     type='password'
                                     value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    onChange={(e) =>
+                                        setConfirmPassword(e.target.value)
+                                    }
                                     className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
                                     placeholder='Confirm new password'
                                     required
@@ -376,8 +392,16 @@ export default function LoginPage() {
                             {error && (
                                 <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
                                     <p className='text-sm text-red-600 flex items-center gap-2'>
-                                        <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 20 20'>
-                                            <path fillRule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' clipRule='evenodd' />
+                                        <svg
+                                            className='w-5 h-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
+                                                clipRule='evenodd'
+                                            />
                                         </svg>
                                         {error}
                                     </p>
@@ -389,7 +413,9 @@ export default function LoginPage() {
                                 disabled={isLoading}
                                 className='w-full px-4 py-3 bg-[#0171EC] hover:bg-[#005fca] disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md'
                             >
-                                {isLoading ? 'Updating Password...' : 'Update Password & Sign In'}
+                                {isLoading
+                                    ? 'Updating Password...'
+                                    : 'Update Password & Sign In'}
                             </button>
 
                             <button
@@ -401,113 +427,115 @@ export default function LoginPage() {
                             </button>
                         </form>
                     ) : (
-                    /* Email Login Form */
-                    <form onSubmit={handleEmailLogin} className='space-y-4'>
-                        {isSignUp && (
+                        /* Email Login Form */
+                        <form onSubmit={handleEmailLogin} className='space-y-4'>
+                            {isSignUp && (
+                                <div>
+                                    <label
+                                        htmlFor='name'
+                                        className='block text-sm font-medium text-slate-700 mb-1'
+                                    >
+                                        Full Name
+                                    </label>
+                                    <input
+                                        id='name'
+                                        type='text'
+                                        className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
+                                        placeholder='Enter your full name'
+                                    />
+                                </div>
+                            )}
+
                             <div>
                                 <label
-                                    htmlFor='name'
+                                    htmlFor='email'
                                     className='block text-sm font-medium text-slate-700 mb-1'
                                 >
-                                    Full Name
+                                    Email
                                 </label>
                                 <input
-                                    id='name'
-                                    type='text'
+                                    id='email'
+                                    type='email'
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
-                                    placeholder='Enter your full name'
+                                    placeholder='Enter your email'
+                                    required
                                 />
                             </div>
-                        )}
 
-                        <div>
-                            <label
-                                htmlFor='email'
-                                className='block text-sm font-medium text-slate-700 mb-1'
-                            >
-                                Email
-                            </label>
-                            <input
-                                id='email'
-                                type='email'
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
-                                placeholder='Enter your email'
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor='password'
-                                className='block text-sm font-medium text-slate-700 mb-1'
-                            >
-                                Password
-                            </label>
-                            <input
-                                id='password'
-                                type='password'
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
-                                placeholder='Enter your password'
-                                required
-                            />
-                        </div>
-
-                        {!isSignUp && (
-                            <div className='flex items-center justify-between'>
-                                <label className='flex items-center'>
-                                    <input
-                                        type='checkbox'
-                                        className='w-4 h-4 text-[#0171EC] border-slate-300 rounded focus:ring-[#0171EC]'
-                                    />
-                                    <span className='ml-2 text-sm text-slate-600'>
-                                        Remember me
-                                    </span>
-                                </label>
-                                <a
-                                    href='#'
-                                    className='text-sm text-[#0171EC] hover:text-[#005fca] font-medium'
+                            <div>
+                                <label
+                                    htmlFor='password'
+                                    className='block text-sm font-medium text-slate-700 mb-1'
                                 >
-                                    Forgot password?
-                                </a>
+                                    Password
+                                </label>
+                                <input
+                                    id='password'
+                                    type='password'
+                                    value={password}
+                                    onChange={(e) =>
+                                        setPassword(e.target.value)
+                                    }
+                                    className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0171EC] focus:border-[#0171EC] transition-colors'
+                                    placeholder='Enter your password'
+                                    required
+                                />
                             </div>
-                        )}
 
-                        {/* Error Message */}
-                        {error && (
-                            <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
-                                <p className='text-sm text-red-600 flex items-center gap-2'>
-                                    <svg
-                                        className='w-5 h-5'
-                                        fill='currentColor'
-                                        viewBox='0 0 20 20'
-                                    >
-                                        <path
-                                            fillRule='evenodd'
-                                            d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
-                                            clipRule='evenodd'
+                            {!isSignUp && (
+                                <div className='flex items-center justify-between'>
+                                    <label className='flex items-center'>
+                                        <input
+                                            type='checkbox'
+                                            className='w-4 h-4 text-[#0171EC] border-slate-300 rounded focus:ring-[#0171EC]'
                                         />
-                                    </svg>
-                                    {error}
-                                </p>
-                            </div>
-                        )}
+                                        <span className='ml-2 text-sm text-slate-600'>
+                                            Remember me
+                                        </span>
+                                    </label>
+                                    <a
+                                        href='#'
+                                        className='text-sm text-[#0171EC] hover:text-[#005fca] font-medium'
+                                    >
+                                        Forgot password?
+                                    </a>
+                                </div>
+                            )}
 
-                        <button
-                            type='submit'
-                            disabled={isLoading}
-                            className='w-full px-4 py-3 bg-[#0171EC] hover:bg-[#005fca] disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md'
-                        >
-                            {isLoading
-                                ? 'Signing in...'
-                                : isSignUp
-                                ? 'Sign up with Email'
-                                : 'Sign in'}
-                        </button>
-                    </form>
+                            {/* Error Message */}
+                            {error && (
+                                <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
+                                    <p className='text-sm text-red-600 flex items-center gap-2'>
+                                        <svg
+                                            className='w-5 h-5'
+                                            fill='currentColor'
+                                            viewBox='0 0 20 20'
+                                        >
+                                            <path
+                                                fillRule='evenodd'
+                                                d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
+                                                clipRule='evenodd'
+                                            />
+                                        </svg>
+                                        {error}
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                type='submit'
+                                disabled={isLoading}
+                                className='w-full px-4 py-3 bg-[#0171EC] hover:bg-[#005fca] disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-md'
+                            >
+                                {isLoading
+                                    ? 'Signing in...'
+                                    : isSignUp
+                                    ? 'Sign up with Email'
+                                    : 'Sign in'}
+                            </button>
+                        </form>
                     )}
 
                     {/* Toggle Sign Up/Sign In */}

@@ -143,9 +143,13 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
         return <>{children}</>;
     }
 
-    // Show nothing while checking authentication to prevent flash of content
+    // Show loading indicator while checking authentication (brief flash)
     if (isCheckingAuth) {
-        return null;
+        return (
+            <div className='h-screen flex items-center justify-center bg-secondary'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600'></div>
+            </div>
+        );
     }
 
     return (
