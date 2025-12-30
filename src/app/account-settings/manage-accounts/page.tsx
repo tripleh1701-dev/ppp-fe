@@ -28,6 +28,19 @@ import TechnicalUserModal, {
 } from '@/components/TechnicalUserModal';
 import {api, fetchExternalAccounts, onboardAccount} from '@/utils/api';
 
+// Helper function to safely trim strings - handles null, undefined, numbers, objects
+const safeTrim = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'number') return String(value);
+    return String(value).trim();
+};
+
+// Helper to check if a value is non-empty after trimming
+const hasValue = (value: any): boolean => {
+    return safeTrim(value).length > 0;
+};
+
 export default function ManageAccounts() {
     // Component mounting debug (temporarily disabled)
     // console.log('🏗️ ManageAccounts component mounting...');
@@ -1126,26 +1139,30 @@ export default function ManageAccounts() {
 
         const incompleteRows = effectiveConfigs
             .filter((config: any) => {
-                const hasAccountName = config.accountName?.trim();
-                const hasMasterAccount = config.masterAccount?.trim();
-                const hasCloudType = config.cloudType?.trim();
+                const hasAccountName = hasValue(config.accountName);
+                const hasMasterAccount = hasValue(config.masterAccount);
+                const hasCloudType = hasValue(config.cloudType);
 
                 // Check if this account has incomplete licenses
                 const hasIncompleteLicenses =
                     config.licenses &&
                     config.licenses.length > 0 &&
                     config.licenses.some((license: any) => {
-                        const hasEnterprise = license.enterprise?.trim();
-                        const hasProduct = license.product?.trim();
-                        const hasService = license.service?.trim();
-                        const hasLicenseStartDate =
-                            license.licenseStartDate?.trim();
-                        const hasLicenseEndDate =
-                            license.licenseEndDate?.trim();
-                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                        const hasEnterprise = hasValue(license.enterprise);
+                        const hasProduct = hasValue(license.product);
+                        const hasService = hasValue(license.service);
+                        const hasLicenseStartDate = hasValue(
+                            license.licenseStartDate,
+                        );
+                        const hasLicenseEndDate = hasValue(
+                            license.licenseEndDate,
+                        );
+                        const hasNumberOfUsers = hasValue(
+                            license.numberOfUsers,
+                        );
                         const hasValidNoticePeriod =
                             !license.renewalNotice ||
-                            license.noticePeriodDays?.trim();
+                            hasValue(license.noticePeriodDays);
 
                         return (
                             !hasEnterprise ||
@@ -1983,18 +2000,21 @@ export default function ManageAccounts() {
                 if (config.licenses && config.licenses.length > 0) {
                     const hasIncompleteInThisRow = config.licenses.some(
                         (license: any) => {
-                            const hasEnterprise = license.enterprise?.trim();
-                            const hasProduct = license.product?.trim();
-                            const hasService = license.service?.trim();
-                            const hasLicenseStartDate =
-                                license.licenseStartDate?.trim();
-                            const hasLicenseEndDate =
-                                license.licenseEndDate?.trim();
-                            const hasNumberOfUsers =
-                                license.numberOfUsers?.trim();
+                            const hasEnterprise = hasValue(license.enterprise);
+                            const hasProduct = hasValue(license.product);
+                            const hasService = hasValue(license.service);
+                            const hasLicenseStartDate = hasValue(
+                                license.licenseStartDate,
+                            );
+                            const hasLicenseEndDate = hasValue(
+                                license.licenseEndDate,
+                            );
+                            const hasNumberOfUsers = hasValue(
+                                license.numberOfUsers,
+                            );
                             const hasValidNoticePeriod =
                                 !license.renewalNotice ||
-                                license.noticePeriodDays?.trim();
+                                hasValue(license.noticePeriodDays);
 
                             return (
                                 !hasEnterprise ||
@@ -2029,18 +2049,21 @@ export default function ManageAccounts() {
                 if (config.licenses && config.licenses.length > 0) {
                     const incompleteLicenses = config.licenses.filter(
                         (license: any) => {
-                            const hasEnterprise = license.enterprise?.trim();
-                            const hasProduct = license.product?.trim();
-                            const hasService = license.service?.trim();
-                            const hasLicenseStartDate =
-                                license.licenseStartDate?.trim();
-                            const hasLicenseEndDate =
-                                license.licenseEndDate?.trim();
-                            const hasNumberOfUsers =
-                                license.numberOfUsers?.trim();
+                            const hasEnterprise = hasValue(license.enterprise);
+                            const hasProduct = hasValue(license.product);
+                            const hasService = hasValue(license.service);
+                            const hasLicenseStartDate = hasValue(
+                                license.licenseStartDate,
+                            );
+                            const hasLicenseEndDate = hasValue(
+                                license.licenseEndDate,
+                            );
+                            const hasNumberOfUsers = hasValue(
+                                license.numberOfUsers,
+                            );
                             const hasValidNoticePeriod =
                                 !license.renewalNotice ||
-                                license.noticePeriodDays?.trim();
+                                hasValue(license.noticePeriodDays);
 
                             return (
                                 !hasEnterprise ||
@@ -2063,18 +2086,21 @@ export default function ManageAccounts() {
                         });
 
                         incompleteLicenses.forEach((license: any) => {
-                            const hasEnterprise = license.enterprise?.trim();
-                            const hasProduct = license.product?.trim();
-                            const hasService = license.service?.trim();
-                            const hasLicenseStartDate =
-                                license.licenseStartDate?.trim();
-                            const hasLicenseEndDate =
-                                license.licenseEndDate?.trim();
-                            const hasNumberOfUsers =
-                                license.numberOfUsers?.trim();
+                            const hasEnterprise = hasValue(license.enterprise);
+                            const hasProduct = hasValue(license.product);
+                            const hasService = hasValue(license.service);
+                            const hasLicenseStartDate = hasValue(
+                                license.licenseStartDate,
+                            );
+                            const hasLicenseEndDate = hasValue(
+                                license.licenseEndDate,
+                            );
+                            const hasNumberOfUsers = hasValue(
+                                license.numberOfUsers,
+                            );
                             const hasValidNoticePeriod =
                                 !license.renewalNotice ||
-                                license.noticePeriodDays?.trim();
+                                hasValue(license.noticePeriodDays);
 
                             if (!hasEnterprise)
                                 allLicenseMissingFields.add('Enterprise');
@@ -2521,17 +2547,21 @@ export default function ManageAccounts() {
                 licensesCount: acc.licenses?.length || 0,
                 licensesComplete:
                     acc.licenses?.every((license: any) => {
-                        const hasEnterprise = license.enterprise?.trim();
-                        const hasProduct = license.product?.trim();
-                        const hasService = license.service?.trim();
-                        const hasLicenseStartDate =
-                            license.licenseStartDate?.trim();
-                        const hasLicenseEndDate =
-                            license.licenseEndDate?.trim();
-                        const hasNumberOfUsers = license.numberOfUsers?.trim();
+                        const hasEnterprise = hasValue(license.enterprise);
+                        const hasProduct = hasValue(license.product);
+                        const hasService = hasValue(license.service);
+                        const hasLicenseStartDate = hasValue(
+                            license.licenseStartDate,
+                        );
+                        const hasLicenseEndDate = hasValue(
+                            license.licenseEndDate,
+                        );
+                        const hasNumberOfUsers = hasValue(
+                            license.numberOfUsers,
+                        );
                         const hasValidNoticePeriod =
                             !license.renewalNotice ||
-                            license.noticePeriodDays?.trim();
+                            hasValue(license.noticePeriodDays);
 
                         return (
                             hasEnterprise &&
@@ -6141,20 +6171,34 @@ export default function ManageAccounts() {
                                                     value.every(
                                                         (license: any) => {
                                                             const hasEnterprise =
-                                                                license.enterprise?.trim();
+                                                                hasValue(
+                                                                    license.enterprise,
+                                                                );
                                                             const hasProduct =
-                                                                license.product?.trim();
+                                                                hasValue(
+                                                                    license.product,
+                                                                );
                                                             const hasService =
-                                                                license.service?.trim();
+                                                                hasValue(
+                                                                    license.service,
+                                                                );
                                                             const hasLicenseStartDate =
-                                                                license.licenseStartDate?.trim();
+                                                                hasValue(
+                                                                    license.licenseStartDate,
+                                                                );
                                                             const hasLicenseEndDate =
-                                                                license.licenseEndDate?.trim();
+                                                                hasValue(
+                                                                    license.licenseEndDate,
+                                                                );
                                                             const hasNumberOfUsers =
-                                                                license.numberOfUsers?.trim();
+                                                                hasValue(
+                                                                    license.numberOfUsers,
+                                                                );
                                                             const hasValidNoticePeriod =
                                                                 !license.renewalNotice ||
-                                                                license.noticePeriodDays?.trim();
+                                                                hasValue(
+                                                                    license.noticePeriodDays,
+                                                                );
 
                                                             return (
                                                                 hasEnterprise &&

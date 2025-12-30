@@ -25,7 +25,9 @@ export default function LoginPage() {
     useEffect(() => {
         // If already authenticated, redirect to dashboard
         if (isAuthenticated()) {
-            router.push('/dashboard');
+            const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+            window.location.href = `${basePath}/dashboard`;
+            return;
         }
         // Check if there's a pending password change
         const challengeData = getPasswordChallengeData();
@@ -33,7 +35,7 @@ export default function LoginPage() {
             setEmail(challengeData.username);
             setShowPasswordChange(true);
         }
-    }, [router]);
+    }, []);
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,9 +47,10 @@ export default function LoginPage() {
             const user = await login(email, password);
 
             if (user) {
-                // Success - redirect to dashboard
-                // Use router.push which respects Next.js basePath configuration
-                router.push('/dashboard');
+                // Success - redirect to dashboard using hard navigation
+                // This ensures LayoutContent remounts with fresh auth state and shows sidebar
+                const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                window.location.href = `${basePath}/dashboard`;
             } else {
                 // Check if password change is required
                 const challengeData = getPasswordChallengeData();
@@ -88,8 +91,9 @@ export default function LoginPage() {
         try {
             const user = await completePasswordChallenge(newPassword);
             if (user) {
-                // Use router.push which respects Next.js basePath
-                router.push('/dashboard');
+                // Use hard navigation to ensure proper state refresh and sidebar display
+                const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                window.location.href = `${basePath}/dashboard`;
             } else {
                 setError('Failed to update password. Please try again.');
                 setIsLoading(false);
