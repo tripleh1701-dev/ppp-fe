@@ -56,7 +56,7 @@ const getAccountColor = (accountName: string) => {
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
-    
+
     // Blueish account color palette - consistent across all components
     const accountColors = [
         {
@@ -90,7 +90,7 @@ const getAccountColor = (accountName: string) => {
             tone: 'slate' as const,
         },
     ];
-    
+
     return accountColors[hash % accountColors.length];
 };
 
@@ -198,7 +198,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                             setIsOpen(true);
                             setHighlightedIndex(0);
                         } else {
-                            setHighlightedIndex(prev => 
+                            setHighlightedIndex(prev =>
                                 prev < options.length - 1 ? prev + 1 : prev
                             );
                         }
@@ -229,16 +229,16 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                         <span className="text-slate-400">{placeholder}</span>
                     )}
                 </span>
-                <ChevronDown 
-                    size={12} 
-                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+                <ChevronDown
+                    size={12}
+                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
             {isOpen && dropdownPosition && createPortal(
-                <div 
+                <div
                     className="fixed z-[99999] bg-white border border-gray-200 rounded-md shadow-xl"
-                    style={{ 
+                    style={{
                         top: `${dropdownPosition.top}px`,
                         left: `${dropdownPosition.left}px`,
                         width: `${dropdownPosition.width}px`,
@@ -268,7 +268,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                                 setHighlightedIndex(-1);
                             }}
                             className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
-                                value === option.value ? 'bg-blue-100 text-blue-700' : 
+                                value === option.value ? 'bg-blue-100 text-blue-700' :
                                 highlightedIndex === index ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                             }`}
                         >
@@ -335,8 +335,11 @@ const ChipDropdown = ({
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const filteredOptions = options.filter((option) =>
-        option.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    // Ensure options is always an array
+    const safeOptions = Array.isArray(options) ? options : [];
+
+    const filteredOptions = safeOptions.filter((option) =>
+        option?.name?.toLowerCase?.()?.includes?.(searchTerm.toLowerCase()) ?? false,
     );
 
     useEffect(() => {
@@ -355,7 +358,7 @@ const ChipDropdown = ({
             document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const selectedOptions = options.filter((opt) => selected.includes(opt.id));
+    const selectedOptions = safeOptions.filter((opt) => selected.includes(opt?.id));
 
     return (
         <div className='relative w-full' ref={dropdownRef}>
@@ -540,7 +543,7 @@ function InlineEditableText({
         );
     }
     const isEmpty = !value || value.length === 0;
-    
+
     // Show input immediately for empty fields (like Enterprise Configuration)
     if (editing || isEmpty) {
         return (
@@ -570,7 +573,7 @@ function InlineEditableText({
             />
         );
     }
-    
+
     // Show display mode for non-empty fields
     return (
         <span
@@ -1000,18 +1003,18 @@ function PhoneMultiSelect({
         const rect = containerRef.current?.getBoundingClientRect();
         if (rect && typeof window !== 'undefined') {
             // Find table container for better positioning
-            const tableContainer = containerRef.current?.closest('[role="table"]') || 
+            const tableContainer = containerRef.current?.closest('[role="table"]') ||
                                   containerRef.current?.closest('.overflow-auto') ||
                                   document.body;
             const tableRect = tableContainer.getBoundingClientRect();
-            
+
             const width = 256;
             // Constrain within table bounds
             const tableRightBound = tableRect.right - width - 16;
             const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
             const minLeft = Math.max(tableRect.left + 16, 16);
             const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
-            
+
             const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
             const top = Math.min(tableBottomBound, rect.bottom + 8);
             setDropdownPos({top, left, width});
@@ -1022,24 +1025,24 @@ function PhoneMultiSelect({
     React.useEffect(() => {
         if (showMoreServices && moreServicesRef.current) {
             const rect = moreServicesRef.current.getBoundingClientRect();
-            
+
             // Find the table container to ensure dropdown stays within table bounds
-            const tableContainer = moreServicesRef.current.closest('[role="table"]') || 
+            const tableContainer = moreServicesRef.current.closest('[role="table"]') ||
                                   moreServicesRef.current.closest('.overflow-auto') ||
                                   document.body;
             const tableRect = tableContainer.getBoundingClientRect();
-            
+
             // Calculate width with stricter table container constraints
             const maxWidth = Math.min(280, tableRect.width * 0.4, window.innerWidth * 0.3);
             const width = Math.max(180, Math.min(maxWidth, rect.width));
-            
+
             // Ensure dropdown stays strictly within table container horizontally
             const idealLeft = rect.left;
             const tableRightBound = tableRect.right - width - 16; // More margin from table edge
             const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
             const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
             const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
-            
+
             // Ensure dropdown stays within both table and viewport vertically
             const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
             const top = Math.min(tableBottomBound, rect.bottom + 8);
@@ -1078,23 +1081,23 @@ function PhoneMultiSelect({
             setShowAdder(false);
             setAdding('');
             setQuery('');
-            
+
             // Focus next row's first field (Enterprise) after selecting existing service
             const currentElement = inputRef?.current;
             if (currentElement) {
                 // Find the closest div with data-row-id attribute
                 const currentRowDiv = currentElement.closest('[data-row-id]');
                 const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                
+
                 if (currentRowId) {
                     // Find the next row (increment the row number)
                     const currentRowNum = parseInt(currentRowId);
                     const nextRowId = (currentRowNum + 1).toString();
-                    
+
                     // Find the enterprise column in the next row
                     const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                     const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                    
+
                     if (nextInput) {
                         // Use requestAnimationFrame to ensure DOM is updated
                         requestAnimationFrame(() => {
@@ -1129,16 +1132,16 @@ function PhoneMultiSelect({
                     // Find the closest div with data-row-id attribute
                     const currentRowDiv = currentElement.closest('[data-row-id]');
                     const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                    
+
                     if (currentRowId) {
                         // Find the next row (increment the row number)
                         const currentRowNum = parseInt(currentRowId);
                         const nextRowId = (currentRowNum + 1).toString();
-                        
+
                         // Find the enterprise column in the next row
                         const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                         const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                        
+
                         if (nextInput) {
                             // Use requestAnimationFrame to ensure DOM is updated
                             requestAnimationFrame(() => {
@@ -1166,23 +1169,23 @@ function PhoneMultiSelect({
                 );
                 if (existingItem) {
                     togglePhone(existingItem.name);
-                    
+
                     // Focus next row's first field (Enterprise) after selecting existing service
                     const currentElement = inputRef?.current;
                     if (currentElement) {
                         // Find the closest div with data-row-id attribute
                         const currentRowDiv = currentElement.closest('[data-row-id]');
                         const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                        
+
                         if (currentRowId) {
                             // Find the next row (increment the row number)
                             const currentRowNum = parseInt(currentRowId);
                             const nextRowId = (currentRowNum + 1).toString();
-                            
+
                             // Find the enterprise column in the next row
                             const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                             const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                            
+
                             if (nextInput) {
                                 // Use requestAnimationFrame to ensure DOM is updated
                                 requestAnimationFrame(() => {
@@ -1227,7 +1230,7 @@ function PhoneMultiSelect({
                     .map((service: string, index: number) => {
                         // Use consistent color function
                         const colorTheme = getAccountColor(service);
-                        
+
                         return (
                             <motion.span
                                 key={service}
@@ -1269,9 +1272,9 @@ function PhoneMultiSelect({
                         >
                             +{selectedPhones.length - visibleCount}
                         </button>
-                        
+
                         {/* Dropdown for additional services */}
-                        {showMoreServices && moreServicesPos && 
+                        {showMoreServices && moreServicesPos &&
                             createPortal(
                                 <div
                                     className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
@@ -1293,7 +1296,7 @@ function PhoneMultiSelect({
                                             {selectedPhones.slice(visibleCount).map((phone, idx) => {
                                                 const colorTheme = getAccountColor(phone);
                                                 return (
-                                                    <div 
+                                                    <div
                                                         key={`additional-${idx}`}
                                                         className='flex items-center justify-between group/additional'
                                                     >
@@ -1324,7 +1327,7 @@ function PhoneMultiSelect({
                         }
                     </div>
                 )}
-                
+
                 {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
                 {selectedPhones.length === 0 || open || isError ? (
                     <input
@@ -1344,22 +1347,22 @@ function PhoneMultiSelect({
                                 // Find the closest div with data-col attribute (current column)
                                 const currentColDiv = currentElement.closest('[data-col]');
                                 const currentRowId = currentColDiv?.getAttribute('data-row-id');
-                                
+
                                 if (currentRowId) {
                                     // For services column, move to next row's first column (enterprise)
                                     // Find next row by looking for the next row ID
                                     const allRows = document.querySelectorAll('[data-row-id]');
-                                    const currentRowIndex = Array.from(allRows).findIndex(row => 
+                                    const currentRowIndex = Array.from(allRows).findIndex(row =>
                                         row.getAttribute('data-row-id') === currentRowId
                                     );
-                                    
+
                                     // Find next row's enterprise column
                                     const nextRowElements = Array.from(allRows).slice(currentRowIndex + 1);
-                                    const nextEnterpriseCol = nextRowElements.find(row => 
+                                    const nextEnterpriseCol = nextRowElements.find(row =>
                                         row.getAttribute('data-col') === 'enterprise'
                                     );
                                     const nextInput = nextEnterpriseCol?.querySelector('input') as HTMLInputElement;
-                                    
+
                                     if (nextInput) {
                                         // Use requestAnimationFrame to ensure DOM is updated
                                         requestAnimationFrame(() => {
@@ -1373,12 +1376,12 @@ function PhoneMultiSelect({
                             if (e.key === 'Enter' && query.trim()) {
                                 e.preventDefault(); // Prevent form submission
                                 e.stopPropagation(); // Stop event bubbling
-                                
+
                                 // Check for exact match first
-                                const exactMatch = options.find(opt => 
+                                const exactMatch = options.find(opt =>
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
-                                
+
                                 if (exactMatch) {
                                     // Add existing service and navigate
                                     toggleService(exactMatch.name);
@@ -1399,7 +1402,7 @@ function PhoneMultiSelect({
                                             togglePhone(created.name);
                                             setQuery('');
                                             setOpen(false);
-                                            
+
                                             // Navigate to next row
                                             navigateToNextRow(e.target as HTMLInputElement);
 
@@ -1428,18 +1431,18 @@ function PhoneMultiSelect({
                                 }
                             } else if (e.key === 'Tab' && query.trim()) {
                                 // Check for exact match in all options when Tab is pressed
-                                const exactMatch = options.find(opt => 
+                                const exactMatch = options.find(opt =>
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
                                 if (exactMatch) {
                                     e.preventDefault(); // Prevent default Tab behavior
                                     e.stopPropagation(); // Stop event bubbling
-                                    
+
                                     // Add the service first
                                     toggleService(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
-                                    
+
                                     // Navigate to next row
                                     navigateToNextRow(e.target as HTMLInputElement);
                                 } else {
@@ -1938,12 +1941,12 @@ function SimpleChipInput({
                 onBlur={commit}
                 placeholder={placeholder}
                 className={`min-w-0 w-full rounded-sm border ${
-                    isError 
-                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                    isError
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
                         : 'border-blue-300 bg-white'
                 } px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${
-                    isError 
-                        ? 'focus:ring-red-200 focus:border-red-500' 
+                    isError
+                        ? 'focus:ring-red-200 focus:border-red-500'
                         : 'focus:ring-blue-200 focus:border-blue-500'
                 }`}
             />
@@ -2041,7 +2044,7 @@ function AsyncChipSelect({
     onTabPrev?: () => void;
 }) {
     const [open, setOpen] = React.useState(false);
-    
+
     // Debug wrapper for setOpen to track all state changes
     const [current, setCurrent] = React.useState<string | undefined>(value);
     const [query, setQuery] = React.useState('');
@@ -2126,18 +2129,18 @@ function AsyncChipSelect({
     // Simple positioning function - just set basic position below field
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
-        
+
         const containerRect = containerRef.current.getBoundingClientRect();
-        
+
         // Always position below field - let browser handle viewport constraints
         setDropdownPosition('below');
-        
+
         // Simple positioning - just below the field
         const top = containerRect.bottom + 2;
         const left = containerRect.left;
         const width = Math.max(200, containerRect.width);
         const arrowOffset = 20;
-        
+
         setDropdownPortalPos({ top, left, width, arrowOffset });
     }, [type]);
 
@@ -2145,7 +2148,7 @@ function AsyncChipSelect({
     React.useEffect(() => {
         if (open) {
             calculateDropdownPosition();
-            
+
             // Debounced reposition handler to prevent flickering
             let repositionTimeout: NodeJS.Timeout;
             const debouncedReposition = () => {
@@ -2154,7 +2157,7 @@ function AsyncChipSelect({
                     calculateDropdownPosition();
                 }, 50); // 50ms debounce
             };
-            
+
             window.addEventListener('scroll', debouncedReposition, true);
             window.addEventListener('resize', debouncedReposition);
             return () => {
@@ -2170,9 +2173,9 @@ function AsyncChipSelect({
         setLoading(true);
         try {
             let allData: Array<{id: string; name: string}> = [];
-            
+
             console.log(`Loading options for type: ${type}`);
-            
+
             // Use dropdownOptions if available for accountName
             if (type === 'accountName' && dropdownOptions?.accountNames) {
                 allData = dropdownOptions.accountNames;
@@ -2211,7 +2214,7 @@ function AsyncChipSelect({
                 // Filter products based on selected enterprise
                 if (currentRowEnterprise) {
                     console.log(`🔍 Filtering products for enterprise: ${currentRowEnterprise}`);
-                    
+
                     // Get enterprise configuration data to find products for this enterprise
                     try {
                         const enterpriseConfigs = await api.get<Array<{
@@ -2219,7 +2222,7 @@ function AsyncChipSelect({
                             product: { name: string };
                             services: Array<{ name: string }>;
                         }>>('/api/enterprise-products-services') || [];
-                        
+
                         // Extract unique product names for the selected enterprise
                         const uniqueProducts = Array.from(new Set(
                             enterpriseConfigs
@@ -2227,13 +2230,13 @@ function AsyncChipSelect({
                                 .map(config => config.product.name)
                                 .filter(product => product && product.trim() !== '')
                         ));
-                        
+
                         // Convert to the expected format
                         allData = uniqueProducts.map((product, index) => ({
                             id: `product-${index}`,
                             name: product
                         }));
-                        
+
                         console.log(`📊 Found ${allData.length} products for enterprise "${currentRowEnterprise}":`, allData.map(p => p.name));
                     } catch (error) {
                         console.error('Failed to load enterprise configs:', error);
@@ -2252,7 +2255,7 @@ function AsyncChipSelect({
                 // Filter services based on selected enterprise and product
                 if (currentRowEnterprise && currentRowProduct) {
                     console.log(`🔍 Filtering services for enterprise: ${currentRowEnterprise}, product: ${currentRowProduct}`);
-                    
+
                     // Get enterprise configuration data to find services for this enterprise+product combination
                     try {
                         const enterpriseConfigs = await api.get<Array<{
@@ -2260,24 +2263,24 @@ function AsyncChipSelect({
                             product: { name: string };
                             services: Array<{ name: string }>;
                         }>>('/api/enterprise-products-services') || [];
-                        
+
                         // Extract unique service names for the selected enterprise+product combination
                         const uniqueServices = Array.from(new Set(
                             enterpriseConfigs
-                                .filter(config => 
-                                    config.enterprise.name === currentRowEnterprise && 
+                                .filter(config =>
+                                    config.enterprise.name === currentRowEnterprise &&
                                     config.product.name === currentRowProduct
                                 )
                                 .flatMap(config => config.services.map(service => service.name))
                                 .filter(service => service && service.trim() !== '')
                         ));
-                        
+
                         // Convert to the expected format
                         allData = uniqueServices.map((service, index) => ({
                             id: `service-${index}`,
                             name: service
                         }));
-                        
+
                         console.log(`📊 Found ${allData.length} services for enterprise "${currentRowEnterprise}" + product "${currentRowProduct}":`, allData.map(s => s.name));
                     } catch (error) {
                         console.error('Failed to load enterprise configs:', error);
@@ -2297,9 +2300,11 @@ function AsyncChipSelect({
                     '/api/accountNames',
                 ) || [];
             }
-            
-            setAllOptions(allData);
+
+            // Ensure allData is always an array before setting
+            setAllOptions(Array.isArray(allData) ? allData : []);
         } catch (error) {
+            console.error(`Error loading options for ${type}:`, error);
             setAllOptions([]);
         } finally {
             setLoading(false);
@@ -2308,26 +2313,28 @@ function AsyncChipSelect({
 
     // Function to filter options based on current query and other criteria
     const filterOptions = React.useCallback(() => {
-        if (allOptions.length === 0) return;
+        // Ensure allOptions is an array before filtering
+        const safeOptions = Array.isArray(allOptions) ? allOptions : [];
+        if (safeOptions.length === 0) return;
 
-        let filtered = allOptions;
+        let filtered = safeOptions;
 
         // Apply search filter
         if (query) {
             const queryLower = query.toLowerCase();
-            filtered = filtered.filter(opt => 
-                opt.name.toLowerCase().startsWith(queryLower)
+            filtered = filtered.filter(opt =>
+                opt?.name?.toLowerCase?.()?.startsWith?.(queryLower) ?? false
             );
-            
+
             // Sort filtered results: exact matches first, then alphabetical
             filtered = filtered.sort((a, b) => {
-                const aLower = a.name.toLowerCase();
-                const bLower = b.name.toLowerCase();
-                
+                const aLower = a?.name?.toLowerCase?.() || '';
+                const bLower = b?.name?.toLowerCase?.() || '';
+
                 // Exact match comes first
                 if (aLower === queryLower && bLower !== queryLower) return -1;
                 if (bLower === queryLower && aLower !== queryLower) return 1;
-                
+
                 // Otherwise alphabetical order
                 return aLower.localeCompare(bLower);
             });
@@ -2386,12 +2393,12 @@ function AsyncChipSelect({
             // Prevent rapid successive calls
             if (documentClickHandlerRef.current) return;
             documentClickHandlerRef.current = true;
-            
+
             // Reset the guard after a brief delay
             setTimeout(() => {
                 documentClickHandlerRef.current = false;
             }, 10);
-            
+
             const target = e.target as Node;
             const withinAnchor = !!containerRef.current?.contains(target);
             const withinDropdown = !!dropdownRef.current?.contains(target);
@@ -2473,7 +2480,7 @@ function AsyncChipSelect({
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
                     let dropdownType: string;
-                    
+
                     switch (type) {
                         case 'accountName':
                             dropdownType = 'accountNames';
@@ -2488,7 +2495,7 @@ function AsyncChipSelect({
                             dropdownType = 'emails'; // fallback
                             break;
                     }
-                    
+
                     // Only call if this is a supported type for the callback
                     if (type === 'accountName' || type === 'masterAccount' || type === 'address') {
                         onNewItemCreated(dropdownType as any, created);
@@ -2530,15 +2537,15 @@ function AsyncChipSelect({
     }, [type, allOptions]);
 
     const sizeClass = compact ? 'text-[11px] py-0.5' : 'text-[12px] py-1';
-    
+
     // Debug display logic
     const shouldShowChip = current?.trim() || value?.trim();
     const shouldShowInput = !shouldShowChip || open;
-    
+
     if (type === 'enterprise' || type === 'product' || type === 'service') {
         console.log(`🎨 DISPLAY for ${type}: current="${current}", value="${value}", open=${open}, shouldShowChip=${shouldShowChip}, shouldShowInput=${shouldShowInput}`);
     }
-    
+
     return (
         <div
             ref={containerRef}
@@ -2562,8 +2569,8 @@ function AsyncChipSelect({
                             damping: 30,
                         }}
                         className={`w-full inline-flex items-center gap-1 px-2 py-1 text-[11px] leading-[14px] rounded-sm relative focus:outline-none ${
-                            disabled 
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            disabled
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                 : 'bg-white text-black focus:ring-2 focus:ring-blue-200 focus:border-blue-500'
                         }`}
                         style={{width: '100%', minWidth: '100%'}}
@@ -2584,22 +2591,22 @@ function AsyncChipSelect({
                                 if (e.stopImmediatePropagation) {
                                     e.stopImmediatePropagation();
                                 }
-                                
+
                                 // Navigate to next field directly (like EnterpriseConfigTable)
                                 const currentElement = e.target as HTMLElement;
                                 const currentColDiv = currentElement.closest('[data-license-col]');
                                 const currentLicenseId = currentColDiv?.getAttribute('data-license-id');
-                                
+
                                 console.log('🎯 Tab from license chip:', {
                                     currentLicenseId,
                                     currentCol: currentColDiv?.getAttribute('data-license-col'),
                                     type
                                 });
-                                
+
                                 if (currentLicenseId && currentColDiv) {
                                     const currentCol = currentColDiv.getAttribute('data-license-col');
                                     let targetCol = '';
-                                    
+
                                     if (e.shiftKey) {
                                         // Shift+Tab: go to previous column
                                         if (currentCol === 'product') {
@@ -2631,16 +2638,16 @@ function AsyncChipSelect({
                                             targetCol = 'noticePeriodDays';
                                         }
                                     }
-                                    
+
                                     console.log('🎯 Navigating from license chip to:', targetCol);
-                                    
+
                                     if (targetCol) {
                                         // Find the target column in the same license row
                                         const targetColDiv = document.querySelector(`[data-license-id="${currentLicenseId}"][data-license-col="${targetCol}"]`);
                                         const targetInput = targetColDiv?.querySelector('input') as HTMLInputElement;
-                                        
+
                                         console.log('🎯 Target input found:', !!targetInput);
-                                        
+
                                         if (targetInput) {
                                             targetInput.focus();
                                             targetInput.select();
@@ -2687,22 +2694,22 @@ function AsyncChipSelect({
                         onClick={(e: any) => {
                             console.log(`🖱️ [${type}] CHIP CLICK - disabled: ${disabled}, open: ${open}, allOptions.length: ${allOptions.length}`);
                             if (disabled) return; // Don't handle clicks when disabled
-                            
+
                             // Set reopening state to prevent blur from closing dropdown
                             setReopening(true);
                             console.log(`🔄 [${type}] Setting reopening state to TRUE`);
-                            
+
                             // Prevent any pending or immediate blur events
                             preventBlurRef.current = true;
                             console.log(`🔄 [${type}] Setting preventBlurRef to TRUE`);
-                            
+
                             // Cancel any pending blur timeout
                             if (blurTimeoutRef.current) {
                                 clearTimeout(blurTimeoutRef.current);
                                 blurTimeoutRef.current = null;
                                 console.log(`🚫 [${type}] Cancelled pending blur timeout`);
                             }
-                            
+
                             console.log(`🖱️ [${type}] Processing chip click...`);
                             // For clickable fields (cloudType, enterprise, product, service), allow single click to open dropdown
                             if ((type === 'cloudType' || type === 'enterprise' || type === 'product' || type === 'service') && (allOptions.length > 0 || ['enterprise', 'product', 'service'].includes(type))) {
@@ -2712,13 +2719,13 @@ function AsyncChipSelect({
                                     setQuery('');
                                     setOpen(true);
                                     console.log(`🎯 [${type}] setOpen(true) called from chip click`);
-                                    
+
                                     // Clear reopening state after dropdown is opened
                                     setTimeout(() => {
                                         setReopening(false);
                                         console.log(`✅ [${type}] Cleared reopening state (set to FALSE)`);
                                     }, 200);
-                                    
+
                                     setTimeout(() => {
                                         if (inputRef.current) {
                                             inputRef.current.focus();
@@ -2732,9 +2739,9 @@ function AsyncChipSelect({
                         <span className='flex-1 truncate pointer-events-none'>{current || value}</span>
                         {/* Dropdown arrow for cloudType */}
                         {type === 'cloudType' && (
-                            <ChevronDown 
-                                size={12} 
-                                className="text-slate-400 flex-shrink-0 ml-1" 
+                            <ChevronDown
+                                size={12}
+                                className="text-slate-400 flex-shrink-0 ml-1"
                             />
                         )}
                         {!disabled && (
@@ -2755,7 +2762,7 @@ function AsyncChipSelect({
                         )}
                     </motion.span>
                 )}
-                
+
                 {/* Show input when no value selected or actively typing */}
                 {shouldShowInput ? (
                     <div className="relative w-full">
@@ -2765,16 +2772,16 @@ function AsyncChipSelect({
                             disabled={disabled}
                             onChange={(e: any) => {
                                 if (disabled) return; // Don't handle changes when disabled
-                                
+
                                 const newValue = e.target.value;
                                 setQuery(newValue);
-                                
+
                 // Only open dropdown when typing if there are options to show
                 if (allOptions.length > 0) {
                     setOpen(true);
                     console.log(`📝 [${type}] Opening dropdown from onChange - allOptions: ${allOptions.length}`);
                 }                                // Don't load options if dropdown is disabled (empty options array)
-                                
+
                                 // Clear current selection if user clears the input completely
                                 if (newValue === '') {
                                     setCurrent('');
@@ -2783,19 +2790,19 @@ function AsyncChipSelect({
                             }}
                             onBlur={(e: any) => {
                                 console.log(`🔴 [${type}] BLUR EVENT - disabled: ${disabled}, preventBlur: ${preventBlurRef.current}, reopening: ${reopening}`);
-                                
+
                                 if (disabled) {
                                     console.log(`🔴 [${type}] Blur ignored - field disabled`);
                                     return; // Don't handle blur when disabled
                                 }
-                                
+
                                 // Check if we're preventing blur (when intentionally opening dropdown)
                                 if (preventBlurRef.current || reopening) {
                                     console.log(`🚫 [${type}] Preventing blur - dropdown being opened intentionally (reopening: ${reopening})`);
                                     preventBlurRef.current = false;
                                     return;
                                 }
-                                
+
                                 console.log(`🔵 [${type}] Blur proceeding - setting 150ms timeout`);
                                 // Add small delay to prevent dropdown from closing immediately when clicking options
                                 blurTimeoutRef.current = setTimeout(() => {
@@ -2804,9 +2811,9 @@ function AsyncChipSelect({
                                         console.log(`🚫 [${type}] Cancelling blur timeout - reopening in progress`);
                                         return;
                                     }
-                                    
+
                                     console.log(`🔵 [${type}] Blur timeout executing - query: "${query.trim()}"`);
-                                    
+
                                     // Create chip from entered text when focus is lost
                                     const newValue = query.trim();
                                     if (newValue) {
@@ -2821,23 +2828,23 @@ function AsyncChipSelect({
                             }}
                             onFocus={() => {
                                 console.log(`🟢 [${type}] FOCUS EVENT - disabled: ${disabled}, reopening: ${reopening}, open: ${open}, allOptions.length: ${allOptions.length}`);
-                                
+
                                 // Cancel any pending blur timeout
                                 if (blurTimeoutRef.current) {
                                     clearTimeout(blurTimeoutRef.current);
                                     blurTimeoutRef.current = null;
                                     console.log(`🚫 [${type}] Cancelled pending blur timeout`);
                                 }
-                                
+
                                 // Reset prevent blur flag for clean state
                                 preventBlurRef.current = false;
                                 console.log(`🟢 [${type}] Reset preventBlurRef to false`);
-                                
+
                                 if (disabled) {
                                     console.log(`🚫 [${type}] Skipping focus - field is disabled`);
                                     return; // Don't open dropdown when disabled
                                 }
-                                
+
                                 // For license fields (enterprise, product, service), open dropdown to trigger API loading
                                 // For other fields, only open if there are already options to show
                                 if (allOptions.length > 0 || (['enterprise', 'product', 'service'].includes(type))) {
@@ -2855,7 +2862,7 @@ function AsyncChipSelect({
                                     if (e.stopImmediatePropagation) {
                                         e.stopImmediatePropagation();
                                     }
-                                    
+
                                     // Save current value immediately
                                     const newValue = query.trim();
                                     if (newValue) {
@@ -2864,18 +2871,18 @@ function AsyncChipSelect({
                                         setQuery('');
                                         setOpen(false);
                                     }
-                                    
+
                                     // Direct navigation like EnterpriseConfigTable
                                     if (e.key === 'Tab') {
                                         const currentElement = e.target as HTMLElement;
                                         const currentColDiv = currentElement.closest('[data-license-col]');
                                         const currentLicenseId = currentColDiv?.getAttribute('data-license-id');
-                                        
+
                                         if (currentLicenseId && currentColDiv) {
                                             // License field navigation
                                             const currentCol = currentColDiv.getAttribute('data-license-col');
                                             let targetCol = '';
-                                            
+
                                             if (e.shiftKey) {
                                                 // Shift+Tab: go to previous column
                                                 if (currentCol === 'product') {
@@ -2907,12 +2914,12 @@ function AsyncChipSelect({
                                                     targetCol = 'noticePeriodDays';
                                                 }
                                             }
-                                            
+
                                             if (targetCol) {
                                                 // Find the target column in the same license row
                                                 const targetColDiv = document.querySelector(`[data-license-id="${currentLicenseId}"][data-license-col="${targetCol}"]`);
                                                 const targetInput = targetColDiv?.querySelector('input') as HTMLInputElement;
-                                                
+
                                                 if (targetInput) {
                                                     targetInput.focus();
                                                     targetInput.select();
@@ -2942,16 +2949,16 @@ function AsyncChipSelect({
                                 }
                             }}
                             className={`w-full text-left px-2 pr-8 ${sizeClass} rounded border ${
-                                disabled 
-                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                    : isError 
-                                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
-                                        : open 
-                                            ? 'border-blue-500 bg-white ring-2 ring-blue-200' 
+                                disabled
+                                    ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : isError
+                                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
+                                        : open
+                                            ? 'border-blue-500 bg-white ring-2 ring-blue-200'
                                             : 'border-blue-300 bg-white hover:bg-slate-50'
                             } text-slate-700 placeholder:text-slate-300 focus:outline-none ${
-                                disabled 
-                                    ? '' 
+                                disabled
+                                    ? ''
                                     : 'focus:ring-2 ' + (isError ? 'focus:ring-red-200 focus:border-red-500' : 'focus:ring-blue-200 focus:border-blue-500')
                             }`}
                             placeholder=''
@@ -2981,16 +2988,16 @@ function AsyncChipSelect({
                     </div>
                 ) : null}
             </div>
-            
+
             {/* Full Autocomplete Dropdown - Portal Based */}
             {open && dropdownPortalPos && (allOptions.length > 0 || loading || ['enterprise', 'product', 'service'].includes(type)) && (() => {
                 console.log(`🔍 DROPDOWN RENDER: ${type} - options:${allOptions.length}, loading:${loading}, portalPos:`, dropdownPortalPos);
-                
+
                 // Use fixed height for simplicity
                 const maxHeight = 240;
-                
+
                 return createPortal(
-                <div 
+                <div
                     ref={dropdownRef}
                     className='rounded-xl border border-slate-200 bg-white shadow-2xl'
                     style={{
@@ -3007,14 +3014,14 @@ function AsyncChipSelect({
                         // Prevent blur when clicking in dropdown area
                         preventBlurRef.current = true;
                         console.log(`🖱️ Dropdown mousedown - preventing blur for ${type}`);
-                        
+
                         // Allow button clicks but prevent closing the dropdown
                         const target = e.target as HTMLElement;
                         if (!target.closest('button')) {
                             e.preventDefault();
                             e.stopPropagation();
                         }
-                        
+
                         // Reset prevent blur after a short delay
                         setTimeout(() => {
                             preventBlurRef.current = false;
@@ -3022,12 +3029,12 @@ function AsyncChipSelect({
                     }}
                 >
                     {/* Simple pointer - always points up into field */}
-                    <div 
+                    <div
                         className="absolute -top-2 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200"
                         style={{ left: `${dropdownPortalPos.arrowOffset || 20}px` }}
                     ></div>
                         <div className='relative z-10'>
-                            <div 
+                            <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{ maxHeight: `${maxHeight - 40}px` }} // Subtract padding/borders
                             >
@@ -3038,31 +3045,31 @@ function AsyncChipSelect({
                             ) : (
                                 (() => {
                                     // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim() 
-                                        ? options.filter(opt => 
+                                    const filteredOptions = query.trim()
+                                        ? options.filter(opt =>
                                             opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
                                             opt.name.toLowerCase().includes(query.toLowerCase())
                                         ).sort((a, b) => {
                                             const aLower = a.name.toLowerCase();
                                             const bLower = b.name.toLowerCase();
                                             const queryLower = query.toLowerCase();
-                                            
+
                                             // Prioritize starts with matches
                                             const aStartsWith = aLower.startsWith(queryLower);
                                             const bStartsWith = bLower.startsWith(queryLower);
-                                            
+
                                             if (aStartsWith && !bStartsWith) return -1;
                                             if (bStartsWith && !aStartsWith) return 1;
-                                            
+
                                             return aLower.localeCompare(bLower);
                                         })
                                         : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-                                    
+
                                     // Check if query exactly matches an existing option
-                                    const exactMatch = query.trim() ? options.find(opt => 
+                                    const exactMatch = query.trim() ? options.find(opt =>
                                         opt.name.toLowerCase() === query.toLowerCase().trim()
                                     ) : null;
-                                    
+
                                     const showCreateNew = query.trim() && !exactMatch && (type !== 'enterprise' && type !== 'product' && type !== 'service');
 
                                     return (
@@ -3078,7 +3085,7 @@ function AsyncChipSelect({
                                                             { bg: 'bg-indigo-100', hover: 'hover:bg-indigo-200', text: 'text-indigo-700' },
                                                         ];
                                                         const tone = palette[idx % palette.length];
-                                                        
+
                                                         return (
                                                             <motion.div
                                                                 key={opt.id}
@@ -3095,20 +3102,20 @@ function AsyncChipSelect({
                                                                         e.stopPropagation();
                                                                     }}
                                                                     onClick={(e) => {
-                                                                        console.log(`🎯 SELECTION CLICK: ${type} - Selecting "${opt.name}" for license`); 
+                                                                        console.log(`🎯 SELECTION CLICK: ${type} - Selecting "${opt.name}" for license`);
                                                                         e.preventDefault();
                                                                         e.stopPropagation();
-                                                                        
+
                                                                         // Update local state immediately for instant UI feedback
                                                                         setCurrent(opt.name);
                                                                         setQuery('');
                                                                         setOpen(false);
-                                                                        
+
                                                                         // Call parent onChange
                                                                         try {
                                                                             const success = onChange(opt.name);
                                                                             console.log(`✅ SELECTION SUCCESS: onChange called for ${type}, result:`, success);
-                                                                            
+
                                                                             // After selection, focus the chip so Tab navigation works
                                                                             setTimeout(() => {
                                                                                 try {
@@ -3117,7 +3124,7 @@ function AsyncChipSelect({
                                                                                     if (currentRowId) {
                                                                                         licenseId = currentRowId;
                                                                                     }
-                                                                                    
+
                                                                                     const chipSelector = `[data-license-id="${licenseId}"][data-license-col="${type}"] span[tabindex="0"]`;
                                                                                     const chipElement = document.querySelector(chipSelector) as HTMLElement;
                                                                                     if (chipElement) {
@@ -3154,16 +3161,16 @@ function AsyncChipSelect({
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
                                                                                 e.preventDefault();
-                                                                                
+
                                                                                 if (confirm(`Are you sure you want to delete "${opt.name}"? This action cannot be undone.`)) {
                                                                                     try {
                                                                                         const endpoint = type === 'accountName' ? '/api/accountNames' : type === 'masterAccount' ? '/api/masterAccounts' : type === 'address' ? '/api/addresses' : '/api/templates';
                                                                                         await api.del(`${endpoint}/${opt.id}`);
-                                                                                        
+
                                                                                         // Remove from local options
                                                                                         setOptions((prev) => prev.filter(o => o.id !== opt.id));
                                                                                         setAllOptions((prev) => prev.filter(o => o.id !== opt.id));
-                                                                                        
+
                                                                                         console.log(`🗑️ Deleted ${type}: ${opt.name}`);
                                                                                     } catch (error) {
                                                                                         console.error(`Failed to delete ${type}:`, error);
@@ -3184,7 +3191,7 @@ function AsyncChipSelect({
                                                     })}
                                                 </div>
                                             )}
-                                            
+
                                             {/* Show "Create New" option */}
                                             {showCreateNew && (
                                                 <motion.div
@@ -3196,7 +3203,7 @@ function AsyncChipSelect({
                                                         onClick={async () => {
                                                             try {
                                                                 let created: { id: string; name: string; } | null = null;
-                                                                
+
                                                                 if (type === 'accountName') {
                                                                     created = await api.post<{ id: string; name: string; }>('/api/accountNames', {
                                                                         name: query.trim(),
@@ -3219,22 +3226,22 @@ function AsyncChipSelect({
                                                                     });
                                                                 }
                                                                 // Note: Enterprise, Product, and Service creation removed - only selection from existing values allowed
-                                                                
+
                                                                 if (created) {
                                                                     // Update options list
                                                                     setOptions((prev) => [...prev, created!]);
                                                                     setAllOptions((prev) => [...prev, created!]);
-                                                                    
+
                                                                     // Set the new value
                                                                     setCurrent(created.name);
                                                                     onChange(created.name);
                                                                     setQuery('');
                                                                     setOpen(false);
-                                                                    
+
                                                                     // Notify parent component
                                                                     if (onNewItemCreated) {
                                                                         let dropdownType: string;
-                                                                        
+
                                                                         switch (type) {
                                                                             case 'accountName':
                                                                                 dropdownType = 'accountNames';
@@ -3252,7 +3259,7 @@ function AsyncChipSelect({
                                                                                 dropdownType = 'emails'; // fallback
                                                                                 break;
                                                                         }
-                                                                        
+
                                                                         // Only call if this is a supported type for the callback (excluding enterprise, product, service)
                                                                         if (['accountName', 'masterAccount', 'address', 'template'].includes(type)) {
                                                                             onNewItemCreated(dropdownType as any, created);
@@ -3261,21 +3268,21 @@ function AsyncChipSelect({
                                                                 }
                                                             } catch (error) {
                                                                 console.log(`API creation failed for ${type}, creating local entry`);
-                                                                
+
                                                                 // Fallback: create a local entry when API fails
                                                                 const newId = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                                                                 const created = { id: newId, name: query.trim() };
-                                                                
+
                                                                 // Update options list
                                                                 setOptions((prev) => [...prev, created]);
                                                                 setAllOptions((prev) => [...prev, created]);
-                                                                
+
                                                                 // Set the new value
                                                                 setCurrent(created.name);
                                                                 onChange(created.name);
                                                                 setQuery('');
                                                                 setOpen(false);
-                                                                
+
                                                                 // Notify parent component
                                                                 if (onNewItemCreated) {
                                                                     const dropdownType = type === 'accountName' ? 'accountNames' : type === 'masterAccount' ? 'masterAccounts' : type === 'cloudType' ? 'cloudTypes' : type === 'address' ? 'addresses' : 'emails';
@@ -3289,7 +3296,7 @@ function AsyncChipSelect({
                                                     </button>
                                                 </motion.div>
                                             )}
-                                            
+
                                             {/* Show "No results" message */}
                                             {filteredOptions.length === 0 && !showCreateNew && (
                                                 <div className='px-3 py-2 text-center text-sm text-slate-500'>
@@ -3493,7 +3500,7 @@ function LicenseSubRow({
     };
 
     return (
-        <div 
+        <div
             className={`relative transition-all duration-200 ${
                 isTableRow ? '' : 'ml-6 my-1'
             } ${
@@ -3517,11 +3524,11 @@ function LicenseSubRow({
                     <div className="absolute top-1/2 left-3 w-3 h-px bg-blue-300"></div>
                 </div>
             )}
-            
+
             {/* License row content with grid structure */}
-            <div 
+            <div
                 className={`grid gap-3 p-3 transition-all duration-200 ${
-                    isTableRow 
+                    isTableRow
                         ? `border-l border-r border-blue-200 hover:bg-blue-50/50 ${
                             isLastRow ? 'rounded-b-lg border-b' : 'border-b'
                         }`
@@ -3564,10 +3571,10 @@ function LicenseSubRow({
                             </svg>
                         </motion.button>
                     )}
-                    
+
                     {/* Duplicate License Warning */}
                     {showValidationErrors && isLicenseDuplicate(license, rowId) && (
-                        <div 
+                        <div
                             className="flex items-center justify-center w-4 h-4 bg-red-100 border border-red-300 rounded-full ml-1"
                             title="Duplicate license entry detected. Please modify at least one field to make this entry unique."
                         >
@@ -3603,7 +3610,7 @@ function LicenseSubRow({
                         {...createLicenseTabNavigation('enterprise')}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="product">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Product</label>}
                     <AsyncChipSelect
@@ -3623,7 +3630,7 @@ function LicenseSubRow({
                         {...createLicenseTabNavigation('product')}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="service">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Service</label>}
                     <AsyncChipSelect
@@ -3643,7 +3650,7 @@ function LicenseSubRow({
                         {...createLicenseTabNavigation('service')}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseStartDate">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">License Start Date</label>}
                     <DateChipSelect
@@ -3671,7 +3678,7 @@ function LicenseSubRow({
                         })()}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="licenseEndDate">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">License End Date</label>}
                     <DateChipSelect
@@ -3684,7 +3691,7 @@ function LicenseSubRow({
                         minDate={license.licenseStartDate || undefined}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="numberOfUsers">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">No. of Users</label>}
                     <AsyncChipSelect
@@ -3703,7 +3710,7 @@ function LicenseSubRow({
                         {...createLicenseTabNavigation('numberOfUsers')}
                     />
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="contactDetails">
                     {!isTableRow && <label className="text-xs font-medium text-black mb-1">Contact</label>}
                     <div className={`flex items-start justify-center pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
@@ -3735,7 +3742,7 @@ function LicenseSubRow({
                         </button>
                     </div>
                 </div>
-                
+
                 <div className="flex flex-col" data-license-id={license.id} data-license-col="renewalNotice">
                     {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1">Renewal Notice</label>}
                     <div className={`flex items-start space-x-1 pt-0.5 ${isTableRow ? 'h-full' : 'h-8'}`}>
@@ -3748,8 +3755,8 @@ function LicenseSubRow({
                         <span className="text-xs text-gray-600">Notify</span>
                     </div>
                 </div>
-                
-                
+
+
                 <div className="flex flex-col min-w-0" data-license-id={license.id} data-license-col="noticePeriodDays">
                     {!isTableRow && <label className="text-xs font-medium text-blue-700 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Notice (days)</label>}
                     <AsyncChipSelect
@@ -3889,7 +3896,7 @@ function SortableAccountRow({
                         const nextButton = document.querySelector(
                             `[data-row-id="${row.id}"][data-col="${nextCol}"] button`,
                         ) as HTMLButtonElement;
-                        
+
                         if (nextButton) {
                             nextButton.focus();
                         } else {
@@ -3934,7 +3941,7 @@ function SortableAccountRow({
                         const prevButton = document.querySelector(
                             `[data-row-id="${row.id}"][data-col="${prevCol}"] button`,
                         ) as HTMLButtonElement;
-                        
+
                         if (prevButton) {
                             prevButton.focus();
                         } else {
@@ -4066,7 +4073,7 @@ function SortableAccountRow({
 
     // Check if this row has validation errors (incomplete licenses or other fields)
     const hasRowValidationError = showValidationErrors && (
-        incompleteRowIds.includes(row.id) || 
+        incompleteRowIds.includes(row.id) ||
         isCellMissing(row.id, 'accountName') ||
         isCellMissing(row.id, 'masterAccount') ||
         isCellMissing(row.id, 'cloudType')
@@ -4081,8 +4088,8 @@ function SortableAccountRow({
             className={`w-full grid items-center gap-0 border rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
                 hasRowValidationError
                     ? 'border-red-500 bg-red-50 shadow-md ring-2 ring-red-200'
-                    : isSelected 
-                        ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200' 
+                    : isSelected
+                        ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200'
                         : 'border-slate-200 hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected || hasRowValidationError ? '' : 'bg-white') : (isSelected || hasRowValidationError ? '' : 'bg-slate-50/70')} ${
                 inFillRange ? 'bg-primary-50/40' : ''
@@ -4157,7 +4164,7 @@ function SortableAccountRow({
                             : ''
                     }`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -4165,8 +4172,8 @@ function SortableAccountRow({
                     {!hideRowExpansion && (
                         <button
                             className={`h-5 w-5 rounded transition-all duration-200 ${
-                                isExpanded 
-                                    ? 'text-white bg-primary-600 ring-2 ring-primary-500 shadow-md font-bold hover:bg-primary-700' 
+                                isExpanded
+                                    ? 'text-white bg-primary-600 ring-2 ring-primary-500 shadow-md font-bold hover:bg-primary-700'
                                     : 'text-primary-600 hover:bg-primary-100 hover:text-primary-700'
                             }`}
                             onClick={() => onToggle(row.id)}
@@ -4244,8 +4251,8 @@ function SortableAccountRow({
             {cols.includes('masterAccount') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
+                        isSelected
+                            ? 'bg-blue-50'
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
@@ -4291,8 +4298,8 @@ function SortableAccountRow({
             {cols.includes('cloudType') && (
                 <div
                     className={`text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
+                        isSelected
+                            ? 'bg-blue-50'
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
@@ -4335,8 +4342,8 @@ function SortableAccountRow({
             {cols.includes('address') && (
                 <div
                     className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
+                        isSelected
+                            ? 'bg-blue-50'
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
@@ -4359,8 +4366,8 @@ function SortableAccountRow({
             {cols.includes('technicalUser') && (
                 <div
                     className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
+                        isSelected
+                            ? 'bg-blue-50'
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
@@ -4441,18 +4448,18 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 }, ref) => {
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
-    
+
     // State for license deletion
     const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<string | null>(null);
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
-    
+
     // State for expanded rows and licenses
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [rowLicenses, setRowLicenses] = useState<Record<string, License[]>>({});
     const rowLicensesRef = useRef<Record<string, License[]>>({});
     const [pendingLicenseRows, setPendingLicenseRows] = useState<Set<string>>(new Set());
     const [licenseValidationTriggered, setLicenseValidationTriggered] = useState<Set<string>>(new Set());
-    
+
     // State for selected enterprise (from top-right breadcrumb)
     const [selectedEnterpriseName, setSelectedEnterpriseName] = useState<string>('');
 
@@ -4482,34 +4489,34 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
     const orderRef = useRef<string[]>([]);
-    
+
     // Keep local state for editing, but initialize it safely
     const [localEdits, setLocalEdits] = useState<Record<string, Partial<AccountRow>>>({});
-    
+
     // Use useMemo for base derived state with stable comparison
     const { baseLocalRows, order } = useMemo(() => {
         // Check if rows array length or IDs have changed (shallow comparison)
         const currentIds = rows.map(r => r.id).join(',');
         const prevIds = prevRowsRef.current.map(r => r.id).join(',');
-        
+
         if (currentIds === prevIds && rows.length === prevRowsRef.current.length) {
             return {
                 baseLocalRows: prevRowsRef.current,
                 order: orderRef.current
             };
         }
-        
+
         // Update refs and create new state
         prevRowsRef.current = rows.map(r => ({ ...r }));
         const newOrder = rows.map(r => r.id);
         orderRef.current = newOrder;
-        
+
         return {
             baseLocalRows: prevRowsRef.current,
             order: newOrder
         };
     }, [rows]);
-    
+
     // Apply local edits to create final localRows with stable reference
     const localRows = useMemo(() => {
         return baseLocalRows.map(row => {
@@ -4523,7 +4530,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             };
         });
     }, [baseLocalRows, localEdits]);
-    
+
     // Initialize rowLicenses from rows prop only once
     const [hasInitializedLicenses, setHasInitializedLicenses] = useState(false);
 
@@ -4547,7 +4554,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         expandAllRows: () => {
             const allRowIds = rows.map(row => row.id);
             setExpandedRows(new Set(allRowIds));
-            
+
             // Initialize licenses for all rows that don't have them
             setRowLicenses(prevLicenses => {
                 const newLicenses = { ...prevLicenses };
@@ -4593,7 +4600,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
         // Check if this row has validation errors (either from parent or local validation)
         const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
-        
+
         if (!hasValidationError) return false;
 
         // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
@@ -4604,20 +4611,20 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     // Function to validate all rows and highlight missing fields
     const validateAndHighlightErrors = () => {
         const errorRowIds = new Set<string>();
-        
+
         localRows.forEach(row => {
             // Check if any required field is missing
-            if (isFieldMissing(row, 'accountName') || 
-                isFieldMissing(row, 'email') || 
+            if (isFieldMissing(row, 'accountName') ||
+                isFieldMissing(row, 'email') ||
                 isFieldMissing(row, 'phone')) {
                 errorRowIds.add(row.id);
             }
         });
-        
+
         setValidationErrors(errorRowIds);
         return errorRowIds;
     };
-    
+
     useEffect(() => {
         if (!hasInitializedLicenses) {
             const initialLicenses: Record<string, License[]> = {};
@@ -4630,7 +4637,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         licenseIds: row.licenses.map(l => l.id),
                         actualLicenseIdsWithDetails: row.licenses.map(l => ({ id: l.id, enterprise: l.enterprise, product: l.product, service: l.service }))
                     });
-                    
+
                     // Check for duplicate license IDs within the same account
                     const licenseIds = row.licenses.map(l => l.id);
                     const uniqueLicenseIds = Array.from(new Set(licenseIds));
@@ -4641,11 +4648,11 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             duplicates: licenseIds.filter((id: string, index: number) => licenseIds.indexOf(id) !== index)
                         });
                     }
-                    
+
                     initialLicenses[row.id] = row.licenses;
                 }
             });
-            
+
             if (Object.keys(initialLicenses).length > 0) {
                 console.log('🔍 Setting initial rowLicenses:', initialLicenses);
                 setRowLicenses(initialLicenses);
@@ -4653,7 +4660,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             setHasInitializedLicenses(true);
         }
     }, [rows, hasInitializedLicenses]);
-    
+
     // Load selected enterprise from localStorage and listen for changes
     useEffect(() => {
         const loadSelectedEnterprise = () => {
@@ -4684,27 +4691,27 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             window.removeEventListener('storage', handleEnterpriseChange);
         };
     }, []);
-    
+
     // No useEffect needed - using useMemo for derived state above
 
     // Effect to trigger validation when requested
     useEffect(() => {
         if (triggerValidation) {
             const errorRowIds = new Set<string>();
-            
+
             // Use baseLocalRows with localEdits applied inline to avoid dependency issues
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
                 // Check if any required field is missing
-                if (isFieldMissing(row, 'accountName') || 
-                    isFieldMissing(row, 'email') || 
+                if (isFieldMissing(row, 'accountName') ||
+                    isFieldMissing(row, 'email') ||
                     isFieldMissing(row, 'phone')) {
                     errorRowIds.add(row.id);
                 }
             });
-            
+
             setValidationErrors(errorRowIds);
-            
+
             if (onValidationComplete) {
                 onValidationComplete(Array.from(errorRowIds));
             }
@@ -4764,7 +4771,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             const rowsWithIncompleteLicenses = new Set<string>();
             Object.keys(rowLicenses).forEach(rowId => {
                 const licenses = rowLicenses[rowId] || [];
-                const hasIncompleteLicense = licenses.some(license => 
+                const hasIncompleteLicense = licenses.some(license =>
                     !license.enterprise?.trim() || !license.product?.trim() || !license.service?.trim() ||
                     !license.licenseStartDate?.trim() || !license.licenseEndDate?.trim() || !license.numberOfUsers?.trim() ||
                     (license.renewalNotice && !license.noticePeriodDays?.trim())
@@ -4837,7 +4844,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     function updateRowField(rowId: string, key: keyof AccountRow, value: any) {
         let changed: AccountRow | null = null;
-        
+
         // Update local edits instead of directly modifying localRows
         setLocalEdits(prev => {
             // Use baseLocalRows with current edits to avoid circular dependency
@@ -4847,7 +4854,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 const currentRow = { ...baseRow, ...currentEdits };
                 const next = {...currentRow, [key]: value} as AccountRow;
                 changed = next;
-                
+
                 return {
                     ...prev,
                     [rowId]: {
@@ -4858,7 +4865,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             }
             return prev;
         });
-        
+
         if (changed) schedulePersist(changed);
 
         // Also call the parent's onUpdateField function if provided
@@ -4896,7 +4903,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const expandAllRows = () => {
         const allRowIds = orderedItems.map(row => row.id);
         setExpandedRows(new Set(allRowIds));
-        
+
         // Initialize licenses for all rows that don't have them
         setRowLicenses(prevLicenses => {
             const newLicenses = { ...prevLicenses };
@@ -4916,8 +4923,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     // Helper function to check if main row fields are complete
     const isMainRowComplete = (row: AccountRow): boolean => {
-        return !!(row.accountName && row.accountName.trim() && 
-                 row.masterAccount && row.masterAccount.trim() && 
+        return !!(row.accountName && row.accountName.trim() &&
+                 row.masterAccount && row.masterAccount.trim() &&
                  row.cloudType && row.cloudType.trim());
     };
 
@@ -4976,10 +4983,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             const updatedLicenses = [...currentLicenses, newLicense];
             onUpdateField(rowId, 'licenses', updatedLicenses);
         }
-        
+
         // Don't clear validation errors when adding new license - let existing validation state persist
         // This allows multiple accounts to maintain their validation highlighting
-        
+
         console.log('➕ Added new empty license, updated parent state but preserved validation state:', {
             rowId,
             licenseId: newLicenseId
@@ -4993,7 +5000,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 [rowId]: (prev[rowId] || []).map(license => {
                     if (license.id === licenseId) {
                         const updatedLicense = {...license, [field]: value};
-                        
+
                         // Clear dependent fields when parent fields change
                         if (field === 'enterprise') {
                             // When Enterprise changes, clear Product and Service
@@ -5003,7 +5010,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             // When Product changes, clear Service
                             updatedLicense.service = '';
                         }
-                        
+
                         return updatedLicense;
                     }
                     return license;
@@ -5012,12 +5019,12 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
             // Check if the license is now complete using the updated state
             const updatedLicense = updatedLicenses[rowId]?.find(l => l.id === licenseId);
-            if (updatedLicense && updatedLicense.enterprise && updatedLicense.product && updatedLicense.service && 
+            if (updatedLicense && updatedLicense.enterprise && updatedLicense.product && updatedLicense.service &&
                 updatedLicense.licenseStartDate && updatedLicense.licenseEndDate && updatedLicense.numberOfUsers &&
                 (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays)) {
                 // License is complete, check if all licenses in row are complete
                 const allLicenses = updatedLicenses[rowId] || [];
-                const allComplete = allLicenses.every(l => 
+                const allComplete = allLicenses.every(l =>
                     l.enterprise && l.product && l.service && l.licenseStartDate && l.licenseEndDate && l.numberOfUsers &&
                     (!l.renewalNotice || l.noticePeriodDays)
                 );
@@ -5050,30 +5057,30 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         // Only trigger auto-save for license updates if ALL mandatory fields are complete
         // This prevents auto-save from triggering on partial license completion
         const isValueEmpty = typeof value === 'boolean' ? false : (!value || value.trim() === '');
-        
+
         if (!isValueEmpty && onUpdateField) {
             // Get the updated licenses for this row
-            const updatedRowLicenses = rowLicenses[rowId]?.map(license => 
-                license.id === licenseId 
+            const updatedRowLicenses = rowLicenses[rowId]?.map(license =>
+                license.id === licenseId
                     ? {...license, [field]: value}
                     : license
             ) || [];
-            
+
             // Check if this specific license now has all mandatory fields completed
             const updatedLicense = updatedRowLicenses.find(license => license.id === licenseId);
-            const hasAllFields = updatedLicense && 
-                updatedLicense.enterprise?.trim() && 
-                updatedLicense.product?.trim() && 
+            const hasAllFields = updatedLicense &&
+                updatedLicense.enterprise?.trim() &&
+                updatedLicense.product?.trim() &&
                 updatedLicense.service?.trim() &&
                 updatedLicense.licenseStartDate?.trim() &&
                 updatedLicense.licenseEndDate?.trim() &&
                 updatedLicense.numberOfUsers?.trim() &&
                 (!updatedLicense.renewalNotice || updatedLicense.noticePeriodDays?.trim());
-            
+
             // Check if this license is a duplicate (using the temporarily updated license data)
             const isDuplicate = hasAllFields && updatedRowLicenses.filter(otherLicense => {
                 if (otherLicense.id === updatedLicense.id) return false; // Don't compare with self
-                
+
                 return (
                     otherLicense.enterprise === updatedLicense.enterprise &&
                     otherLicense.product === updatedLicense.product &&
@@ -5085,7 +5092,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     otherLicense.noticePeriodDays === updatedLicense.noticePeriodDays
                 );
             }).length > 0;
-            
+
             if (hasAllFields && !isDuplicate) {
                 console.log('🔄 Triggering auto-save for complete license:', {
                     rowId,
@@ -5132,7 +5139,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         // Store the deletion context for completion after confirmation
         setPendingDeleteLicenseId(licenseId);
         setPendingDeleteRowId(rowId);
-        
+
         if (onLicenseDelete) {
             // Use the parent's animation callback
             await onLicenseDelete(licenseId);
@@ -5142,7 +5149,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 ...prev,
                 [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
             }));
-            
+
             // Trigger auto-save for license deletion
             if (onUpdateField) {
                 const updatedLicenses = (rowLicenses[rowId] || []).filter(license => license.id !== licenseId);
@@ -5156,21 +5163,21 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         if (pendingDeleteLicenseId && pendingDeleteRowId) {
             const rowId = pendingDeleteRowId;
             const licenseId = pendingDeleteLicenseId;
-            
+
             setRowLicenses(prev => {
                 const updatedLicenses = {
                     ...prev,
                     [rowId]: (prev[rowId] || []).filter(license => license.id !== licenseId)
                 };
-                
+
                 // Trigger auto-save for license deletion after animation
                 if (onUpdateField) {
                     onUpdateField(rowId, 'licenses', updatedLicenses[rowId] || []);
                 }
-                
+
                 return updatedLicenses;
             });
-            
+
             setPendingDeleteLicenseId(null);
             setPendingDeleteRowId(null);
         }
@@ -5218,21 +5225,21 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             default:
                 isMissing = false;
         }
-        
+
         // Debug logging for missing fields
         if (isMissing && showValidationErrors) {
             console.log(`🔴 License field missing - License ID: ${license.id}, Field: ${field}, Value: "${license[field] || ''}", showValidationErrors: ${showValidationErrors}`);
         }
-        
+
         return isMissing;
     };
 
     // Check if a license entry is a duplicate within the same account row
     const isLicenseDuplicate = React.useCallback((license: License, rowId: string): boolean => {
         const rowLicenseArray = rowLicenses[rowId] || [];
-        
+
         // Only check for duplicates if all required fields are filled
-        if (!license.enterprise || !license.product || !license.service || 
+        if (!license.enterprise || !license.product || !license.service ||
             !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers) {
             return false;
         }
@@ -5240,7 +5247,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         // Count how many licenses have the exact same values
         const duplicateCount = rowLicenseArray.filter(otherLicense => {
             if (otherLicense.id === license.id) return false; // Don't compare with self
-            
+
             return (
                 otherLicense.enterprise === license.enterprise &&
                 otherLicense.product === license.product &&
@@ -5254,7 +5261,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         }).length;
 
         const isDuplicate = duplicateCount > 0;
-        
+
         // Debug logging for duplicate detection
         if (isDuplicate && showValidationErrors) {
             console.log(`🔴 Duplicate license detected - License ID: ${license.id}, Row ID: ${rowId}`);
@@ -5283,13 +5290,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 const hasIncomplete = licenses.some(license => {
                     // Only check for missing required fields (not duplicates)
                     // Duplicates should be visually indicated but shouldn't prevent adding new rows
-                    const hasMissingFields = !license.enterprise || !license.product || !license.service || 
+                    const hasMissingFields = !license.enterprise || !license.product || !license.service ||
                         !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                         (license.renewalNotice && !license.noticePeriodDays);
-                    
+
                     return hasMissingFields;
                 });
-                
+
                 if (hasIncomplete) {
                     incompleteLicenseRows.push(rowId);
                     hasIncompleteLicenses = true;
@@ -5315,16 +5322,16 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
 
     // Function to check if there are any incomplete licenses
     const hasIncompleteLicenses = () => {
-        return Object.entries(rowLicenses).some(([rowId, licenses]) => 
+        return Object.entries(rowLicenses).some(([rowId, licenses]) =>
             licenses.some(license => {
                 // Check for missing required fields
-                const hasMissingFields = !license.enterprise || !license.product || !license.service || 
+                const hasMissingFields = !license.enterprise || !license.product || !license.service ||
                     !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                     (license.renewalNotice && !license.noticePeriodDays);
-                
+
                 // Check for duplicates
                 const isDuplicate = isLicenseDuplicate(license, rowId);
-                
+
                 return hasMissingFields || isDuplicate;
             })
         );
@@ -5377,11 +5384,11 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const gridTemplate = useMemo(() => {
         // Always include delete button column first with fixed width
         const deleteCol = '32px'; // Fixed width for delete button
-        
+
         const base = cols.map((c, index) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
-            
+
             // Define minimum and maximum widths per column
             const constraints = {
                 accountName: { min: 180, max: 300 }, // Increased min width to prevent arrow overlap
@@ -5390,9 +5397,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 address: { min: 120, max: 200 }, // Address column constraints - increased for icon + text
                 technicalUser: { min: 140, max: 220 }, // Technical User column constraints - increased for icon + text
             };
-            
+
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 150, max: 300 };
-            
+
             if (dynamicWidth && dynamicWidth > 0) {
                 // For Services column, use minmax to fill remaining space
                 if (c === 'services') {
@@ -5400,12 +5407,12 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 }
                 // Clamp the dynamic width within constraints for other columns
                 const clampedWidth = Math.max(
-                    columnConstraints.min, 
+                    columnConstraints.min,
                     Math.min(columnConstraints.max, dynamicWidth)
                 );
                 return `${clampedWidth}px`;
             }
-            
+
             // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
@@ -5423,14 +5430,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 }
                 return defaultSize;
             }
-            
+
             // Final fallback - Services gets remaining space
             if (c === 'services') {
                 return `minmax(${columnConstraints.min}px, 1fr)`;
             }
             return `${columnConstraints.min}px`;
         });
-        
+
         const custom = customColumns.map(() => '110px');
         const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
@@ -5448,7 +5455,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     const handleOpenContactModal = useCallback((rowId: string, licenseId: string, initialData?: Contact) => {
         console.log('📞 Opening ContactModal:', { rowId, licenseId, initialData });
         console.log('📞 Contact data in initialData:', initialData);
-        
+
         // Use a function to get the current state at the time of execution
         // This ensures we get the most up-to-date state each time the function is called
         const getCurrentLicenseData = () => {
@@ -5460,21 +5467,21 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 mostCurrentContactData: currentLicense?.contactDetails
             };
         };
-        
+
         const { currentRowLicenses, currentLicense, mostCurrentContactData } = getCurrentLicenseData();
-        
+
         console.log('🔍 Current rowLicenses state snapshot (from ref):', JSON.stringify(rowLicensesRef.current, null, 2));
         console.log('🔍 Current license from rowLicenses state (immediate):', currentLicense);
         console.log('🔍 Most current contact data (immediate):', mostCurrentContactData);
         console.log('🔍 Passed initialData (immediate):', initialData);
-        
+
         // CRITICAL FIX: Always prioritize ref data first, then fall back to initialData
         // This ensures we use the most up-to-date saved state, not stale render data
         let contactDataToUse: Contact;
-        
+
         if (mostCurrentContactData && (
-            mostCurrentContactData.name || 
-            mostCurrentContactData.email || 
+            mostCurrentContactData.name ||
+            mostCurrentContactData.email ||
             mostCurrentContactData.phone ||
             mostCurrentContactData.department ||
             mostCurrentContactData.designation
@@ -5482,8 +5489,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             contactDataToUse = mostCurrentContactData;
             console.log('🔍 Using most current contact data from ref state (priority #1)');
         } else if (initialData && (
-            initialData.name || 
-            initialData.email || 
+            initialData.name ||
+            initialData.email ||
             initialData.phone ||
             initialData.department ||
             initialData.designation
@@ -5501,22 +5508,22 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             };
             console.log('🔍 Using empty defaults (fallback #3)');
         }
-        
+
         console.log('🔍 Final contact data being used (immediate):', contactDataToUse);
-        
+
         const row = localRows.find(r => r.id === rowId);
-        
+
         // Set all modal state including data before opening the modal
         // Use React 18's batching to ensure all updates happen together
         setContactModalRowId(rowId);
         setContactModalLicenseId(licenseId);
         setContactModalAccountName(row?.accountName || '');
         setContactModalMasterAccount(row?.masterAccount || '');
-        
+
         // CRITICAL FIX: Ensure modal data is set with the most current contact data
         // before opening the modal to prevent stale data from being displayed
         setContactModalData([contactDataToUse]);
-        
+
         // Small delay to ensure state updates are processed before opening modal
         setTimeout(() => {
             console.log('🔍 Opening modal with contactDataToUse:', contactDataToUse);
@@ -5557,7 +5564,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 }
                 return license;
             });
-            
+
             return {
                 ...prev,
                 [contactModalRowId]: updatedLicenses
@@ -5572,7 +5579,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         console.log('🔍 AccountsTable: contacts received:', contacts);
         console.log('🔍 AccountsTable: contactModalRowId:', contactModalRowId);
         console.log('🔍 AccountsTable: contactModalLicenseId:', contactModalLicenseId);
-        
+
         if (!contactModalRowId || !contactModalLicenseId || contacts.length === 0) {
             console.error('❌ AccountsTable: Missing required data for individual save');
             return;
@@ -5612,7 +5619,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         ...currentRefLicenses[licenseIndex],
                         contactDetails: contact
                     };
-                    
+
                     console.log('🔄 Pre-emptively updating ref with contact data for immediate access:', contact);
                     rowLicensesRef.current = {
                         ...rowLicensesRef.current,
@@ -5699,19 +5706,19 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     }
                     return license;
                 });
-                
+
                 const newState = {
                     ...prev,
                     [contactModalRowId]: updatedLicenses
                 };
-                
+
                 // IMMEDIATELY update the ref with the new state - don't wait for useEffect
                 rowLicensesRef.current = newState;
-                
+
                 console.log('🔄 setRowLicenses called, returning new state:', newState);
                 console.log('🔄 Updated license with contact:', updatedLicenses.find(l => l.id === contactModalLicenseId));
                 console.log('🔄 Ref immediately updated with new state');
-                
+
                 // Save to localStorage only as backup for temporary rows or if API save might have failed
                 try {
                     const licenseToUpdate = updatedLicenses.find(l => l.id === contactModalLicenseId);
@@ -5725,14 +5732,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 } catch (error) {
                     console.error('❌ Error saving contact to localStorage:', error);
                 }
-                
+
                 // Resolve the promise with the updated contact data
                 resolve(contact);
-                
+
                 return newState;
             });
         });
-        
+
         // Wait for the state update to complete, then update the ref with the exact contact data
         updatePromise.then((updatedContact) => {
             console.log('🔄 Promise resolved with updated contact:', updatedContact);
@@ -5744,7 +5751,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     console.log('🔄 Force-updated ref with contact data:', updatedContact);
                 }
             }
-            
+
             // Force a re-render by updating state again to ensure UI reflects the changes
             setTimeout(() => {
                 setRowLicenses(prev => ({...prev}));
@@ -5758,10 +5765,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             const currentLicenses = rowLicenses[contactModalRowId] || [];
             const updatedLicense = currentLicenses.find(l => l.id === contactModalLicenseId);
             console.log('🔄 License after state update:', updatedLicense);
-            
+
             // Force a state update to ensure React knows about the change
             setRowLicenses(prev => ({ ...prev }));
-            
+
             // Additional force update to ensure all components re-render with latest data
             setTimeout(() => {
                 console.log('🔄 Second state verification after forced update...');
@@ -5783,66 +5790,66 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     ) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const tableContainer = e.currentTarget.closest('.grid');
         if (!tableContainer) return;
-        
+
         const startX = e.clientX;
         const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
-        
+
         // Define column-specific constraints
         const constraints = {
             enterprise: { min: 140, max: 250 }, // Increased min to prevent arrow overlap
             product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
             services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
         };
-        
+
         const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
-        
+
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        
+
         const onMove = (ev: MouseEvent) => {
             ev.preventDefault();
             const delta = ev.clientX - startX;
             const newWidth = Math.max(
-                columnConstraints.min, 
+                columnConstraints.min,
                 Math.min(columnConstraints.max, startWidth + delta)
             );
-            
+
             setColWidths((prev) => ({
                 ...prev,
                 [colKey]: newWidth
             }));
-            
+
             // Trigger scroll check during resize to detect Services column visibility
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
                     const containerWidth = tableContainerRef.current.clientWidth;
-                    
+
                     // Check if Services content is getting hidden
                     const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-                    
+
                     servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
                         const serviceRect = serviceElement.getBoundingClientRect();
                         const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                        
+
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-                        
+
                         if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-                    
+
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -5850,50 +5857,50 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-                    
-                    const needsScrollbar = 
-                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+
+                    const needsScrollbar =
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) ||
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
                         (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
-                    
+
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 10);
         };
-        
+
         const onUp = () => {
             // Remove visual feedback
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            
+
             // Final check for scrollbar need after resize is complete
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
                     const containerWidth = tableContainerRef.current.clientWidth;
-                    
+
                     // Check if Services content is hidden
                     const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-                    
+
                     servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
                         const serviceRect = serviceElement.getBoundingClientRect();
                         const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                        
+
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-                        
+
                         if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-                    
+
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -5901,21 +5908,21 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-                    
-                    const needsScrollbar = 
-                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+
+                    const needsScrollbar =
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) ||
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
                         (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
-                    
+
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 50);
-            
+
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-        
+
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };
@@ -5958,9 +5965,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             return <>{text}</>;
         }
     };
-    
+
     // Handle delete click - directly call parent's onDelete function
-    
+
     // Use external sort state if provided, otherwise fall back to internal state
     const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
@@ -5978,9 +5985,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             setInternalSortCol(null);
             setInternalSortDir(null);
         };
-        
+
         window.addEventListener('clearTableSorting', handleClearSorting);
-        
+
         return () => {
             window.removeEventListener('clearTableSorting', handleClearSorting);
         };
@@ -6000,15 +6007,15 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         direction?: 'asc' | 'desc'
     ) => {
         let nextDir: 'asc' | 'desc';
-        
+
         // Check if external sorting is actively being used (both props provided and not empty)
         const isExternalSorting = externalSortColumn && externalSortDirection;
-        
+
         if (isExternalSorting) {
             // When external sort is actively controlled, use external state for calculation
-            nextDir = direction || 
+            nextDir = direction ||
                 (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
-            
+
             // Notify parent to update external sort state
             if (onSortChange) {
                 onSortChange(col, nextDir);
@@ -6017,17 +6024,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             // When using internal sort (including first time with no sorting)
             nextDir = direction ||
                 (internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc');
-            
+
             // Update internal state first (this actually sorts the table)
             setInternalSortCol(col);
             setInternalSortDir(nextDir);
-            
+
             // Then notify parent to update Sort panel (for toolbar sync)
             if (onSortChange) {
                 onSortChange(col, nextDir);
             }
         }
-        
+
         // Always dispatch custom event for parent component to listen to
         notifyParentSortChange(col, nextDir);
     };
@@ -6042,7 +6049,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             },
             bubbles: true
         });
-        
+
         // Dispatch the event from the document to ensure it reaches the parent
         document.dispatchEvent(event);
     };
@@ -6069,10 +6076,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
         }
 
         const groups: Record<string, AccountRow[]> = {};
-        
+
         displayItems.forEach((item) => {
             let groupKey = '';
-            
+
             switch (groupBy) {
                 case 'accountName':
                     groupKey = item.accountName || '(No Account Name)';
@@ -6089,7 +6096,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 default:
                     groupKey = 'All Records';
             }
-            
+
             if (!groups[groupKey]) {
                 groups[groupKey] = [];
             }
@@ -6116,45 +6123,45 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
     // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
     const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
-    
+
     useEffect(() => {
         const checkScrollNeed = () => {
             if (!tableContainerRef.current) return;
-            
+
             // Get current zoom level
             const currentZoom = window.devicePixelRatio || 1;
             const baseZoom = 1;
             const zoomFactor = currentZoom / baseZoom;
-            
+
             // Get viewport dimensions accounting for AI insights panel
             const viewportWidth = window.innerWidth;
             const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
             const availableWidth = viewportWidth - aiPanelWidth;
-            
+
             // Check if content width exceeds container width with a larger buffer for hover effects
             const contentWidth = tableContainerRef.current.scrollWidth;
             const containerWidth = tableContainerRef.current.clientWidth;
-            
+
             // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
             const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
-            
+
             // Only show scrollbar when content genuinely exceeds container accounting for hover effects
             const isContentOverflowing = contentWidth > containerWidth + hoverBuffer;
-            
+
             // Check if Services column content is actually being cut off
             const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
             let servicesContentHidden = false;
-            
+
             if (servicesColumns.length > 0) {
                 servicesColumns.forEach(serviceCol => {
                     const serviceElement = serviceCol as HTMLElement;
                     const serviceRect = serviceElement.getBoundingClientRect();
                     const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                    
+
                     // More reasonable threshold - minimum 300px for services content
                     const minServicesWidth = 300;
                     const bufferZone = 15; // Additional buffer for hover effects
-                    
+
                     // Only trigger if Services column is actually cut off or too narrow to display content properly
                     if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
                         // Additional check: see if there's actually content being cut off
@@ -6171,10 +6178,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     }
                 });
             }
-            
+
             // Show scrollbar only when there's genuine overflow or content is being cut off
             const needsScrollbar = isContentOverflowing || servicesContentHidden;
-            
+
             // Debug logging (remove in production)
             console.log('Scroll Check:', {
                 contentWidth,
@@ -6184,24 +6191,24 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 servicesContentHidden,
                 needsScrollbar
             });
-            
+
             setShouldShowHorizontalScroll(needsScrollbar);
         };
-        
+
         // Check on mount and when table structure changes
         let scrollCheckTimeout: NodeJS.Timeout;
         const debouncedScrollCheck = () => {
             clearTimeout(scrollCheckTimeout);
             scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
         };
-        
+
         checkScrollNeed();
-        
+
         // Use ResizeObserver for better performance
         const resizeObserver = new ResizeObserver(() => {
             debouncedScrollCheck(); // Use debounced version
         });
-        
+
         // Use MutationObserver to detect when Services content changes
         const mutationObserver = new MutationObserver((mutations) => {
             let shouldCheck = false;
@@ -6218,7 +6225,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 debouncedScrollCheck(); // Use debounced version
             }
         });
-        
+
         if (tableContainerRef.current) {
             resizeObserver.observe(tableContainerRef.current);
             mutationObserver.observe(tableContainerRef.current, {
@@ -6227,7 +6234,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 attributes: true,
                 attributeFilter: ['style', 'class']
             });
-            
+
             // Also observe all column cells for resize changes
             const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
             columnCells.forEach(cell => {
@@ -6236,26 +6243,26 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                 }
             });
         }
-        
+
         // Also listen for window resize (zoom changes)
         window.addEventListener('resize', debouncedScrollCheck);
-        
+
         // Listen for zoom via keyboard shortcuts and mouse wheel
         const handleKeyZoom = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
                 debouncedScrollCheck();
             }
         };
-        
+
         const handleWheelZoom = (e: WheelEvent) => {
             if (e.ctrlKey || e.metaKey) {
                 debouncedScrollCheck();
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyZoom);
         window.addEventListener('wheel', handleWheelZoom, { passive: true });
-        
+
         return () => {
             resizeObserver.disconnect();
             mutationObserver.disconnect();
@@ -6265,7 +6272,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
             clearTimeout(scrollCheckTimeout);
         };
     }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
-    
+
     return (
         <div className='w-full compact-table safari-tight'>
             {/* Using browser default scrollbars only */}
@@ -6277,37 +6284,37 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         overflow-y: visible;
                         overflow-x: ${shouldShowHorizontalScroll ? 'auto' : 'hidden'};
                     }
-                    
+
                     /* Prevent horizontal scrollbars on table cells and headers (except services) */
                     [data-col]:not([data-col="services"]) {
                         overflow-x: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
                     }
-                    
+
                     /* Specifically prevent scrollbars in column headers */
                     .bg-slate-50[data-col] {
                         overflow: hidden;
                         text-overflow: ellipsis;
                     }
-                    
+
                     /* Header row should not have scrollbars */
                     .bg-slate-50 > div {
                         overflow: hidden !important;
                         text-overflow: ellipsis;
                     }
-                    
+
                     /* Ensure header content fits properly */
                     .bg-slate-50 .relative {
                         overflow: hidden;
                         min-width: 0;
                     }
-                    
+
                     /* Ensure proper grid layout */
                     .grid {
                         display: grid;
                     }
-                    
+
                     /* Services column should allow content display within bounds */
                     [data-col="services"] {
                         overflow: visible;
@@ -6316,7 +6323,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         position: relative;
                         max-width: 600px;
                     }
-                    
+
                     /* Services column chips should display full text */
                     [data-col="services"] .inline-flex {
                         white-space: nowrap;
@@ -6325,14 +6332,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         min-width: max-content;
                         flex-shrink: 0;
                     }
-                    
+
                     /* Services column chip text should not be truncated */
                     [data-col="services"] .inline-flex span {
                         white-space: nowrap;
                         overflow: visible;
                         text-overflow: unset;
                     }
-                    
+
                     /* Services column container should wrap content */
                     [data-col="services"] > div {
                         white-space: normal;
@@ -6343,7 +6350,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         position: relative;
                         max-width: 100%;
                     }
-                    
+
                     /* Ensure dropdowns within Services column stay within bounds */
                     [data-col="services"] .absolute {
                         max-width: 100%;
@@ -6356,20 +6363,20 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                         max-width: 100%;
                         box-sizing: border-box;
                     }
-                    
+
                     /* Ensure dropdowns don't extend beyond table container */
                     .z-\\[9999\\] {
                         max-width: calc(100vw - 32px) !important;
                         max-height: calc(100vh - 100px) !important;
                         overflow: auto !important;
                     }
-                    
+
                     /* Table container should contain overflow */
                     [role="table"] {
                         position: relative;
                         contain: layout style;
                     }
-                    
+
                     /* Hide any scrollbars that might appear in header elements */
                     .bg-slate-50 {
                         overflow: hidden;
@@ -6431,20 +6438,20 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     </div>
                 </div>
             ) : (
-                <div 
+                <div
                     ref={tableContainerRef}
-                    role='table' 
+                    role='table'
                     className='p-0 w-full'
                     style={{
-                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible', 
+                        overflowX: shouldShowHorizontalScroll ? 'auto' : 'visible',
                         overflowY: 'visible',
                         maxWidth: '100%',
                         boxSizing: 'border-box'
                     }}
                 >
-                <div className='w-full relative' style={{ 
+                <div className='w-full relative' style={{
                     minWidth: 'max(100%, 800px)', // Reduced minimum width for more compact table
-                    width: '100%' 
+                    width: '100%'
                 }}>
                     {(() => {
                         const defaultLabels: Record<string, string> = {
@@ -6479,8 +6486,8 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
-                                minWidth: 'fit-content', 
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{
+                                minWidth: 'fit-content',
                                 width: '100%',
                                 maxWidth: '100%',
                                 overflow: 'hidden' // Ensure content doesn't escape the container
@@ -6488,7 +6495,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                 <div
                                     className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
                                     style={{
-                                        gridTemplateColumns: gridTemplate, 
+                                        gridTemplateColumns: gridTemplate,
                                         minWidth: 'max-content',
                                         width: '100%',
                                         display: 'grid'
@@ -6498,13 +6505,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                     <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
                                         {/* Empty header for delete column */}
                                     </div>
-                                    
+
                                     {cols.map((c, idx) => (
                                         <div
                                             key={c}
                                             className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
-                                                idx === 0 
-                                                    ? 'border-l-0' 
+                                                idx === 0
+                                                    ? 'border-l-0'
                                                     : ''
                                             } ${
                                                 idx === 0 && pinFirst && !shouldShowHorizontalScroll
@@ -6624,18 +6631,18 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         <div className='relative bg-gradient-to-r from-blue-50/80 to-transparent border-l-4 border-blue-400 ml-20 mt-1 mb-2'>
                                             {/* Vertical connection line from chevron */}
                                             <div className="absolute -left-2 top-0 bottom-0 w-px bg-blue-400"></div>
-                                            
+
                                             {/* License section header */}
                                             <div className="p-3 pb-2">
                                                 <h4 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
                                                     <FileText className="w-4 h-4" />
                                                     Licenses for {r.accountName || 'Account'}
                                                 </h4>
-                                                
+
                                                 {/* License Table Container */}
                                                 <div className="ml-6 relative">
                                                     {/* Table Header */}
-                                                    <div 
+                                                    <div
                                                         className="grid gap-3 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black"
                                                         style={{
                                                             gridTemplateColumns: "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px"
@@ -6652,23 +6659,23 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         <div>Renewal</div>
                                                         <div>Notice (days)</div>
                                                     </div>
-                                                    
 
-                                                    
+
+
                                                     {/* Existing License Rows */}
                                                     {(() => {
                                                         // Deduplicate licenses to prevent duplicate rendering
                                                         const allLicenses = rowLicenses[r.id] || [];
-                                                        const uniqueLicenses = allLicenses.filter((license, index, array) => 
+                                                        const uniqueLicenses = allLicenses.filter((license, index, array) =>
                                                             array.findIndex(l => l.id === license.id) === index
                                                         );
-                                                        
+
                                                         console.log(`🔍 License rendering for ${r.accountName}:`, {
                                                             originalCount: allLicenses.length,
                                                             uniqueCount: uniqueLicenses.length,
                                                             licenseIds: uniqueLicenses.map(l => l.id)
                                                         });
-                                                        
+
                                                         return uniqueLicenses.map((license, index) => {
                                                             console.log(`🔍 Rendering license ${index} for account ${r.accountName}:`, {
                                                                 licenseId: license.id,
@@ -6704,9 +6711,9 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                             );
                                                         });
                                                     })()}
-                                                    
+
                                                     {/* Add New License Button */}
-                                                    <div 
+                                                    <div
                                                         className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                                         style={{
                                                             gridTemplateColumns: "30px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px",
@@ -6715,7 +6722,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         }}
                                                         onClick={() => {
                                                             // Check if main row is complete and all existing licenses are complete
-                                                            if (isMainRowComplete(r) && !(rowLicenses[r.id] || []).some(license => 
+                                                            if (isMainRowComplete(r) && !(rowLicenses[r.id] || []).some(license =>
                                                                 !license.enterprise || !license.product || !license.service ||
                                                                 !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                                                                 (license.renewalNotice && !license.noticePeriodDays)
@@ -6726,7 +6733,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         title={
                                                             !isMainRowComplete(r)
                                                                 ? 'Complete main row fields first'
-                                                                : (rowLicenses[r.id] || []).some(license => 
+                                                                : (rowLicenses[r.id] || []).some(license =>
                                                                     !license.enterprise || !license.product || !license.service ||
                                                                     !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                                                                     (license.renewalNotice && !license.noticePeriodDays)
@@ -6739,18 +6746,18 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                                         <div className='flex items-center justify-center px-2 py-1'>
                                                             {/* No delete icon for add license row */}
                                                         </div>
-                                                        
+
                                                         {/* Add new license content spanning all columns */}
-                                                        <div 
+                                                        <div
                                                             className={`flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 ${
-                                                                (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license => 
+                                                                (!isMainRowComplete(r) || (rowLicenses[r.id] || []).some(license =>
                                                                     !license.enterprise || !license.product || !license.service ||
                                                                     !license.licenseStartDate || !license.licenseEndDate || !license.numberOfUsers ||
                                                                     (license.renewalNotice && !license.noticePeriodDays)
                                                                 ))
                                                                 ? 'text-slate-400 cursor-not-allowed'
                                                                 : 'text-slate-500 group-hover:text-blue-600'
-                                                            }`} 
+                                                            }`}
                                                             style={{gridColumn: `span ${(rowLicenses[r.id] || []).some(license => license.renewalNotice) ? '9' : '8'}`}}
                                                         >
                                                             <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
@@ -6765,13 +6772,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                     )}
                                 </div>
                             ))}
-                            
+
                             {/* Add New Row Button */}
                             {onAddNewRow && (
-                                <div 
+                                <div
                                     className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                     style={{
-                                        gridTemplateColumns: gridTemplate, 
+                                        gridTemplateColumns: gridTemplate,
                                         minWidth: 'max-content',
                                         width: '100%'
                                     }}
@@ -6782,7 +6789,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                     <div className='flex items-center justify-center px-2 py-1'>
                                         {/* No delete icon for add row */}
                                     </div>
-                                    
+
                                     {/* Add new row content spanning all columns */}
                                     <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                         <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
@@ -6806,7 +6813,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                             </span>
                                         </h4>
                                     </div>
-                                    
+
                                     {/* Group Rows */}
                                     <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
@@ -6854,14 +6861,14 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                     </div>
                                 </div>
                             ))}
-                            
+
                             {/* Add New Row Button for grouped view */}
                             {onAddNewRow && (
                                 <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
-                                    <div 
+                                    <div
                                         className="grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                         style={{
-                                            gridTemplateColumns: gridTemplate, 
+                                            gridTemplateColumns: gridTemplate,
                                             minWidth: 'max-content',
                                             width: '100%'
                                         }}
@@ -6872,7 +6879,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                                         <div className='flex items-center justify-center px-2 py-1'>
                                             {/* No delete icon for add row */}
                                         </div>
-                                        
+
                                         {/* Add new row content spanning all columns */}
                                         <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                             <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
@@ -6888,7 +6895,7 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(({
                     </div>
                 </div>
             )}
-            
+
             {/* ContactModal for license contact details */}
             <ContactModal
                 isOpen={showContactModal}

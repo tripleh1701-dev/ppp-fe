@@ -25,7 +25,11 @@ export default function LoginPage() {
     useEffect(() => {
         // If already authenticated, redirect to dashboard
         if (isAuthenticated()) {
-            const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+            // Compute basePath from current URL to handle /prod prefix correctly
+            const currentPath = window.location.pathname;
+            const basePath = currentPath.startsWith('/prod') ? '/prod' :
+                             currentPath.startsWith('/ui') ? '/ui' :
+                             (process.env.NEXT_PUBLIC_BASE_PATH || '');
             window.location.href = `${basePath}/dashboard`;
             return;
         }
@@ -49,7 +53,11 @@ export default function LoginPage() {
             if (user) {
                 // Success - redirect to dashboard using hard navigation
                 // This ensures LayoutContent remounts with fresh auth state and shows sidebar
-                const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                // Compute basePath from current URL to handle /prod prefix correctly
+                const currentPath = window.location.pathname;
+                const basePath = currentPath.startsWith('/prod') ? '/prod' :
+                                 currentPath.startsWith('/ui') ? '/ui' :
+                                 (process.env.NEXT_PUBLIC_BASE_PATH || '');
                 window.location.href = `${basePath}/dashboard`;
             } else {
                 // Check if password change is required
@@ -92,7 +100,11 @@ export default function LoginPage() {
             const user = await completePasswordChallenge(newPassword);
             if (user) {
                 // Use hard navigation to ensure proper state refresh and sidebar display
-                const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                // Compute basePath from current URL to handle /prod prefix correctly
+                const currentPath = window.location.pathname;
+                const basePath = currentPath.startsWith('/prod') ? '/prod' :
+                                 currentPath.startsWith('/ui') ? '/ui' :
+                                 (process.env.NEXT_PUBLIC_BASE_PATH || '');
                 window.location.href = `${basePath}/dashboard`;
             } else {
                 setError('Failed to update password. Please try again.');
