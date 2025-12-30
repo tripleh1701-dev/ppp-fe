@@ -6,12 +6,26 @@ import NavigationSidebar from '@/components/NavigationSidebar';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import AISuggestionsPanel from '@/components/AISuggestionsPanel';
 
+// Helper to check if path is login page
+const isLoginPath = (path: string | null): boolean => {
+    if (!path) return false;
+    return (
+        path === '/login' || path === '/prod/login' || path.endsWith('/login')
+    );
+};
+
 export default function LayoutContent({children}: {children: React.ReactNode}) {
     const pathname = usePathname();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [isTablet, setIsTablet] = useState(false);
     const [isCanvasPage, setIsCanvasPage] = useState(false);
+
+    // Check for login page - compute directly from pathname for instant check
+    const isLoginPage =
+        isLoginPath(pathname) ||
+        (typeof window !== 'undefined' &&
+            isLoginPath(window.location.pathname));
 
     // Responsive breakpoint detection for native 80% zoom simulation
     useEffect(() => {
@@ -89,17 +103,8 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
         };
     }, [isMobile]);
 
-    // Check if we're on a standalone page (like login) that shouldn't have the layout
-    // Handle null pathname during SSR and check for login path with or without basePath
-    const isStandalonePage =
-        pathname === '/login' ||
-        pathname === '/prod/login' ||
-        pathname?.endsWith('/login') ||
-        (typeof window !== 'undefined' &&
-            window.location.pathname.endsWith('/login'));
-
-    // If it's a standalone page, just render the children without any layout
-    if (isStandalonePage) {
+    // If it's login page, just render the children without any layout
+    if (isLoginPage) {
         return <>{children}</>;
     }
 

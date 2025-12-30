@@ -53,6 +53,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         '/api/enterprises',
         '/api/products',
         '/api/services',
+        '/api/enterprise-products-services',
+        '/api/users',
+        '/api/user-groups',
+        '/api/roles',
+        '/api/groups',
+        '/api/pipeline-canvas',
     ];
 
     const isSysAppEndpoint = sysAppEndpoints.some(
@@ -79,7 +85,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Build headers with auth token
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(options?.headers as Record<string, string> || {}),
+        ...((options?.headers as Record<string, string>) || {}),
     };
 
     // Add Authorization header if token exists
