@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, useEffect} from 'react';
-import {usePathname} from 'next/navigation';
+import {usePathname, useRouter} from 'next/navigation';
 import NavigationSidebar from '@/components/NavigationSidebar';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import AISuggestionsPanel from '@/components/AISuggestionsPanel';
@@ -22,6 +22,7 @@ const isLoginPath = (path: string | null): boolean => {
 
 export default function LayoutContent({children}: {children: React.ReactNode}) {
     const pathname = usePathname();
+    const router = useRouter();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [isTablet, setIsTablet] = useState(false);
@@ -51,8 +52,8 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
             // Check if user is authenticated
             if (!isAuthenticated()) {
                 console.log('🔒 User not authenticated, redirecting to login');
-                // Use window.location for hard redirect to ensure clean state
-                window.location.href = '/login';
+                // Use router.push which respects Next.js basePath
+                router.push('/login');
                 return;
             }
 
@@ -60,7 +61,7 @@ export default function LayoutContent({children}: {children: React.ReactNode}) {
         };
 
         checkAuth();
-    }, [pathname, isLoginPage]);
+    }, [pathname, isLoginPage, router]);
 
     // Responsive breakpoint detection for native 80% zoom simulation
     useEffect(() => {

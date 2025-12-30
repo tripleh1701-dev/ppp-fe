@@ -45,9 +45,9 @@ export default function LoginPage() {
             const user = await login(email, password);
 
             if (user) {
-                // Success - redirect to dashboard using hard navigation
-                // This ensures the LayoutContent remounts with fresh auth state
-                window.location.href = '/dashboard';
+                // Success - redirect to dashboard
+                // Use router.push which respects Next.js basePath configuration
+                router.push('/dashboard');
             } else {
                 // Check if password change is required
                 const challengeData = getPasswordChallengeData();
@@ -88,8 +88,8 @@ export default function LoginPage() {
         try {
             const user = await completePasswordChallenge(newPassword);
             if (user) {
-                // Use hard navigation to ensure proper state refresh
-                window.location.href = '/dashboard';
+                // Use router.push which respects Next.js basePath
+                router.push('/dashboard');
             } else {
                 setError('Failed to update password. Please try again.');
                 setIsLoading(false);
