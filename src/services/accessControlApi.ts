@@ -74,6 +74,14 @@ export interface ListRolesOptions {
     enterpriseName?: string | null;
 }
 
+// Context interface for CRUD operations with account/enterprise
+export interface AccountEnterpriseContext {
+    accountId: string;
+    accountName: string;
+    enterpriseId: string;
+    enterpriseName: string;
+}
+
 export interface ListUsersResponse {
     users: UserRecord[];
     total: number;
@@ -124,27 +132,58 @@ export class AccessControlApiService {
 
     /**
      * Create a new user
+     * @param userData User data to create
+     * @param context Optional account/enterprise context for scoped storage
      */
     async createUser(
         userData: Omit<UserRecord, 'id' | 'createdAt' | 'updatedAt'>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<UserRecord> {
-        return api.post<UserRecord>('/api/users', userData);
+        const payload = context ? {...userData, ...context} : userData;
+        return api.post<UserRecord>('/api/users', payload);
     }
 
     /**
      * Update an existing user
+     * @param userId User ID to update
+     * @param updates Partial user data to update
+     * @param context Optional account/enterprise context for scoped storage
      */
     async updateUser(
         userId: string,
         updates: Partial<UserRecord>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<UserRecord> {
-        return api.put<UserRecord>(`/api/users/${userId}`, updates);
+        const payload = context ? {...updates, ...context} : updates;
+        return api.put<UserRecord>(`/api/users/${userId}`, payload);
     }
 
     /**
      * Delete a user
+     * @param userId User ID to delete
+     * @param context Optional account/enterprise context for scoped storage
      */
-    async deleteUser(userId: string): Promise<void> {
+    async deleteUser(
+        userId: string,
+        context?: Partial<AccountEnterpriseContext>,
+    ): Promise<void> {
+        if (context) {
+            const params = new URLSearchParams();
+            if (context.accountId)
+                params.append('accountId', context.accountId);
+            if (context.accountName)
+                params.append('accountName', context.accountName);
+            if (context.enterpriseId)
+                params.append('enterpriseId', context.enterpriseId);
+            if (context.enterpriseName)
+                params.append('enterpriseName', context.enterpriseName);
+            const queryString = params.toString();
+            return api.del(
+                queryString
+                    ? `/api/users/${userId}?${queryString}`
+                    : `/api/users/${userId}`,
+            );
+        }
         return api.del(`/api/users/${userId}`);
     }
 
@@ -214,27 +253,58 @@ export class AccessControlApiService {
 
     /**
      * Create a new group
+     * @param groupData Group data to create
+     * @param context Optional account/enterprise context for scoped storage
      */
     async createGroup(
         groupData: Omit<GroupRecord, 'id' | 'createdAt' | 'updatedAt'>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<GroupRecord> {
-        return api.post<GroupRecord>('/api/groups', groupData);
+        const payload = context ? {...groupData, ...context} : groupData;
+        return api.post<GroupRecord>('/api/groups', payload);
     }
 
     /**
      * Update an existing group
+     * @param groupId Group ID to update
+     * @param updates Partial group data to update
+     * @param context Optional account/enterprise context for scoped storage
      */
     async updateGroup(
         groupId: string,
         updates: Partial<GroupRecord>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<GroupRecord> {
-        return api.put<GroupRecord>(`/api/groups/${groupId}`, updates);
+        const payload = context ? {...updates, ...context} : updates;
+        return api.put<GroupRecord>(`/api/groups/${groupId}`, payload);
     }
 
     /**
      * Delete a group
+     * @param groupId Group ID to delete
+     * @param context Optional account/enterprise context for scoped storage
      */
-    async deleteGroup(groupId: string): Promise<void> {
+    async deleteGroup(
+        groupId: string,
+        context?: Partial<AccountEnterpriseContext>,
+    ): Promise<void> {
+        if (context) {
+            const params = new URLSearchParams();
+            if (context.accountId)
+                params.append('accountId', context.accountId);
+            if (context.accountName)
+                params.append('accountName', context.accountName);
+            if (context.enterpriseId)
+                params.append('enterpriseId', context.enterpriseId);
+            if (context.enterpriseName)
+                params.append('enterpriseName', context.enterpriseName);
+            const queryString = params.toString();
+            return api.del(
+                queryString
+                    ? `/api/groups/${groupId}?${queryString}`
+                    : `/api/groups/${groupId}`,
+            );
+        }
         return api.del(`/api/groups/${groupId}`);
     }
 
@@ -322,27 +392,58 @@ export class AccessControlApiService {
 
     /**
      * Create a new role
+     * @param roleData Role data to create
+     * @param context Optional account/enterprise context for scoped storage
      */
     async createRole(
         roleData: Omit<RoleRecord, 'id' | 'createdAt' | 'updatedAt'>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<RoleRecord> {
-        return api.post<RoleRecord>('/api/roles', roleData);
+        const payload = context ? {...roleData, ...context} : roleData;
+        return api.post<RoleRecord>('/api/roles', payload);
     }
 
     /**
      * Update an existing role
+     * @param roleId Role ID to update
+     * @param updates Partial role data to update
+     * @param context Optional account/enterprise context for scoped storage
      */
     async updateRole(
         roleId: string,
         updates: Partial<RoleRecord>,
+        context?: Partial<AccountEnterpriseContext>,
     ): Promise<RoleRecord> {
-        return api.put<RoleRecord>(`/api/roles/${roleId}`, updates);
+        const payload = context ? {...updates, ...context} : updates;
+        return api.put<RoleRecord>(`/api/roles/${roleId}`, payload);
     }
 
     /**
      * Delete a role
+     * @param roleId Role ID to delete
+     * @param context Optional account/enterprise context for scoped storage
      */
-    async deleteRole(roleId: string): Promise<void> {
+    async deleteRole(
+        roleId: string,
+        context?: Partial<AccountEnterpriseContext>,
+    ): Promise<void> {
+        if (context) {
+            const params = new URLSearchParams();
+            if (context.accountId)
+                params.append('accountId', context.accountId);
+            if (context.accountName)
+                params.append('accountName', context.accountName);
+            if (context.enterpriseId)
+                params.append('enterpriseId', context.enterpriseId);
+            if (context.enterpriseName)
+                params.append('enterpriseName', context.enterpriseName);
+            const queryString = params.toString();
+            return api.del(
+                queryString
+                    ? `/api/roles/${roleId}?${queryString}`
+                    : `/api/roles/${roleId}`,
+            );
+        }
         return api.del(`/api/roles/${roleId}`);
     }
 
