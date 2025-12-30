@@ -3946,19 +3946,43 @@ export default function ManageAccounts() {
                 );
                 console.log('📄 Account data to delete:', accountToDelete);
 
-                // Delete via API
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                // Delete via API - use correct ppp-be-main backend URL
+                let apiBase =
+                    process.env.NEXT_PUBLIC_API_BASE_URL ||
+                    process.env.NEXT_PUBLIC_API_BASE ||
+                    'http://localhost:4000';
+                // Clean up base URL to construct proper endpoint
+                if (apiBase.endsWith('/api/v1')) {
+                    apiBase = apiBase.slice(0, -7);
+                } else if (apiBase.endsWith('/api')) {
+                    apiBase = apiBase.slice(0, -4);
+                }
+                // Construct the correct URL: /api/v1/app/api/accounts/{id}
+                const deleteUrl = `${apiBase}/api/v1/app/api/accounts/${pendingDeleteRowId}`;
+                console.log('🗑️ Delete URL:', deleteUrl);
+
                 try {
-                    const response = await fetch(
-                        `${apiBase}/api/accounts/${pendingDeleteRowId}`,
-                        {
-                            method: 'DELETE',
+                    const token = localStorage.getItem('systiva_auth_token');
+                    const response = await fetch(deleteUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token
+                                ? {Authorization: `Bearer ${token}`}
+                                : {}),
                         },
-                    );
+                    });
 
                     if (!response.ok) {
-                        throw new Error('Failed to delete account');
+                        const errorText = await response.text();
+                        console.error(
+                            '❌ Delete failed:',
+                            response.status,
+                            errorText,
+                        );
+                        throw new Error(
+                            `Failed to delete account: ${response.status}`,
+                        );
                     }
 
                     console.log('✅ Account deleted via API');
