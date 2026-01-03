@@ -114,8 +114,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
                     localStorage.removeItem('systiva_refresh_token');
                     localStorage.removeItem('systiva_user');
                     // Use basePath for proper redirect in production
-                    const basePath =
-                        process.env.NEXT_PUBLIC_BASE_PATH || '';
+                    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
                     window.location.href = `${basePath}/login`;
                     return undefined as unknown as T;
                 }
@@ -725,12 +724,24 @@ export interface TechnicalUser {
     createdBy?: string;
 }
 
+export interface License {
+    id?: string;
+    enterprise?: string;
+    product?: string;
+    service?: string;
+    licenseStart?: string;
+    licenseEnd?: string;
+    users?: number;
+    noticePeriod?: number;
+    renewalNotice?: boolean;
+}
+
 export interface OnboardAccountPayload {
     // Required fields (3)
     accountName: string;
     masterAccount: string;
     subscriptionTier: 'public' | 'private' | 'platform' | string;
-    // Optional fields
+    // Optional fields - single values (for backward compatibility)
     email?: string;
     firstName?: string;
     lastName?: string;
@@ -740,6 +751,10 @@ export interface OnboardAccountPayload {
     addressDetails?: AddressDetails;
     technicalUser?: TechnicalUser;
     createdBy?: string;
+    // Optional fields - arrays (for full data persistence)
+    addresses?: AddressDetails[];
+    technicalUsers?: TechnicalUser[];
+    licenses?: License[];
 }
 
 export interface OnboardAccountResponse {

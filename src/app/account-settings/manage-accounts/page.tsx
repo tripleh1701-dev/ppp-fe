@@ -912,6 +912,7 @@ export default function ManageAccounts() {
                 : undefined;
 
             // Build onboard payload for external Admin Portal API
+            // Include all account details: addresses, technical users, licenses
             const onboardPayload = {
                 accountName: account.accountName || '',
                 masterAccount:
@@ -919,8 +920,13 @@ export default function ManageAccounts() {
                 subscriptionTier: mapCloudTypeToSubscriptionTier(
                     account.cloudType || '',
                 ),
+                // Single values for backward compatibility
                 ...(addressDetails && {addressDetails}),
                 ...(technicalUser && {technicalUser}),
+                // Full arrays for complete data persistence
+                addresses: account.addresses || [],
+                technicalUsers: account.technicalUsers || [],
+                licenses: account.licenses || [],
             };
 
             console.log(
