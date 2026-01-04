@@ -6892,43 +6892,208 @@ export default function ManageAccounts() {
                         ></div>
 
                         <motion.div
-                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
-                            initial={{opacity: 0, scale: 0.9}}
-                            animate={{opacity: 1, scale: 1}}
-                            exit={{opacity: 0, scale: 0.9}}
-                            transition={{duration: 0.2}}
+                            className='relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md'
+                            initial={{opacity: 0, scale: 0.9, y: 20}}
+                            animate={{opacity: 1, scale: 1, y: 0}}
+                            exit={{opacity: 0, scale: 0.9, y: 20}}
+                            transition={{duration: 0.25, ease: 'easeOut'}}
                         >
-                            <div className='sm:flex sm:items-start'>
-                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
-                                    <svg
-                                        className='h-6 w-6 text-red-600'
-                                        fill='none'
-                                        viewBox='0 0 24 24'
-                                        strokeWidth='1.5'
-                                        stroke='currentColor'
-                                    >
-                                        <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
-                                        />
-                                    </svg>
-                                </div>
-                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
-                                    <div className='mt-2'>
-                                        <p className='text-sm text-gray-900'>
+                            {/* Header with gradient */}
+                            <div className='bg-gradient-to-r from-red-500 to-red-600 px-6 py-4'>
+                                <div className='flex items-center gap-3'>
+                                    <div className='flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm'>
+                                        <svg
+                                            className='h-5 w-5 text-white'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                            strokeWidth='2'
+                                            stroke='currentColor'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                            />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className='text-lg font-semibold text-white'>
                                             {deleteType === 'account'
-                                                ? 'Are you sure you want to delete this account?'
-                                                : 'Are you sure you want to delete this license details?'}
+                                                ? 'Delete Account'
+                                                : 'Delete License'}
+                                        </h3>
+                                        <p className='text-sm text-red-100'>
+                                            This action cannot be undone
                                         </p>
                                     </div>
                                 </div>
                             </div>
-                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+
+                            {/* Body */}
+                            <div className='px-6 py-5'>
+                                {deleteType === 'account' ? (
+                                    <>
+                                        {/* Account details */}
+                                        {(() => {
+                                            const accountToDelete =
+                                                accounts.find(
+                                                    (acc) =>
+                                                        acc.id ===
+                                                        pendingDeleteRowId,
+                                                );
+                                            return accountToDelete ? (
+                                                <div className='mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200'>
+                                                    <div className='flex items-center gap-2 mb-2'>
+                                                        <svg
+                                                            className='w-4 h-4 text-slate-500'
+                                                            fill='none'
+                                                            viewBox='0 0 24 24'
+                                                            stroke='currentColor'
+                                                        >
+                                                            <path
+                                                                strokeLinecap='round'
+                                                                strokeLinejoin='round'
+                                                                strokeWidth={2}
+                                                                d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+                                                            />
+                                                        </svg>
+                                                        <span className='text-sm font-medium text-slate-700'>
+                                                            {accountToDelete.accountName ||
+                                                                'Unnamed Account'}
+                                                        </span>
+                                                    </div>
+                                                    {accountToDelete.masterAccount && (
+                                                        <p className='text-xs text-slate-500 ml-6'>
+                                                            Master:{' '}
+                                                            {
+                                                                accountToDelete.masterAccount
+                                                            }
+                                                        </p>
+                                                    )}
+                                                    <p className='text-xs text-slate-400 ml-6 mt-1 font-mono'>
+                                                        ID: {accountToDelete.id}
+                                                    </p>
+                                                </div>
+                                            ) : null;
+                                        })()}
+
+                                        <p className='text-sm text-gray-600 mb-4'>
+                                            Are you sure you want to delete this
+                                            account? This will:
+                                        </p>
+
+                                        {/* What will happen list */}
+                                        <ul className='space-y-2 mb-4'>
+                                            <li className='flex items-start gap-2 text-sm'>
+                                                <svg
+                                                    className='w-4 h-4 text-red-500 mt-0.5 flex-shrink-0'
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M6 18L18 6M6 6l12 12'
+                                                    />
+                                                </svg>
+                                                <span className='text-gray-700'>
+                                                    Remove the account record
+                                                    permanently
+                                                </span>
+                                            </li>
+                                            <li className='flex items-start gap-2 text-sm'>
+                                                <svg
+                                                    className='w-4 h-4 text-red-500 mt-0.5 flex-shrink-0'
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M6 18L18 6M6 6l12 12'
+                                                    />
+                                                </svg>
+                                                <span className='text-gray-700'>
+                                                    Delete all associated
+                                                    licenses
+                                                </span>
+                                            </li>
+                                            <li className='flex items-start gap-2 text-sm'>
+                                                <svg
+                                                    className='w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0'
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+                                                    />
+                                                </svg>
+                                                <span className='text-gray-700'>
+                                                    <strong className='text-amber-600'>
+                                                        Offload infrastructure
+                                                    </strong>{' '}
+                                                    if provisioned
+                                                </span>
+                                            </li>
+                                        </ul>
+
+                                        {/* Infrastructure warning */}
+                                        <div className='p-3 bg-amber-50 border border-amber-200 rounded-lg'>
+                                            <div className='flex items-start gap-2'>
+                                                <svg
+                                                    className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5'
+                                                    fill='none'
+                                                    viewBox='0 0 24 24'
+                                                    stroke='currentColor'
+                                                >
+                                                    <path
+                                                        strokeLinecap='round'
+                                                        strokeLinejoin='round'
+                                                        strokeWidth={2}
+                                                        d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                                    />
+                                                </svg>
+                                                <div className='text-xs text-amber-800'>
+                                                    <p className='font-semibold mb-1'>
+                                                        Infrastructure
+                                                        Deprovisioning
+                                                    </p>
+                                                    <p>
+                                                        If this account has
+                                                        cloud infrastructure
+                                                        provisioned, it will be
+                                                        automatically
+                                                        decommissioned. This
+                                                        process may take a few
+                                                        minutes.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className='text-sm text-gray-600'>
+                                        Are you sure you want to delete this
+                                        license? This will permanently remove
+                                        the license details from the account.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Footer with buttons */}
+                            <div className='bg-gray-50 px-6 py-4 flex flex-row-reverse gap-3'>
                                 <button
                                     type='button'
                                     disabled={deletingRow}
-                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed sm:ml-3 sm:w-auto'
+                                    className='inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
                                     onClick={handleDeleteConfirm}
                                 >
                                     {deletingRow ? (
@@ -6954,19 +7119,36 @@ export default function ManageAccounts() {
                                             </svg>
                                             {deleteType === 'license'
                                                 ? 'Deleting License...'
-                                                : 'Deleting...'}
+                                                : 'Offloading & Deleting...'}
                                         </>
                                     ) : (
-                                        'Yes'
+                                        <>
+                                            <svg
+                                                className='w-4 h-4 mr-1.5'
+                                                fill='none'
+                                                viewBox='0 0 24 24'
+                                                stroke='currentColor'
+                                            >
+                                                <path
+                                                    strokeLinecap='round'
+                                                    strokeLinejoin='round'
+                                                    strokeWidth={2}
+                                                    d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                                />
+                                            </svg>
+                                            {deleteType === 'account'
+                                                ? 'Delete & Offload'
+                                                : 'Delete License'}
+                                        </>
                                     )}
                                 </button>
                                 <button
                                     type='button'
                                     disabled={deletingRow}
-                                    className='mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed sm:mt-0 sm:w-auto'
+                                    className='inline-flex items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
                                     onClick={handleDeleteCancel}
                                 >
-                                    No
+                                    Cancel
                                 </button>
                             </div>
                         </motion.div>
