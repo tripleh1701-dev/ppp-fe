@@ -114,7 +114,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
                     localStorage.removeItem('systiva_refresh_token');
                     localStorage.removeItem('systiva_user');
                     // Use basePath for proper redirect in production
-                    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+                    // Must include /prod stage for API Gateway deployments
+                    const isProd = process.env.NODE_ENV === 'production';
+                    const basePath = isProd
+                        ? process.env.NEXT_PUBLIC_BASE_PATH || '/prod'
+                        : '';
                     window.location.href = `${basePath}/login`;
                     return undefined as unknown as T;
                 }
