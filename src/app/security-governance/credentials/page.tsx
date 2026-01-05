@@ -3744,6 +3744,8 @@ export default function ManageCredentials() {
                         selectedAccountId={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') || '' : ''}
                         selectedAccountName={typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') || '' : ''}
                         workstream={latestRow.entity || ''}
+                        product={latestRow.product || ''}
+                        service={latestRow.service || ''}
                     />
                 );
             })()}

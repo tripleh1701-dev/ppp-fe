@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Plug, Save, Edit2, XCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, Plug, Save, Edit2, XCircle, ChevronDown, Check, CheckCircle, AlertTriangle } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
@@ -15,6 +15,13 @@ export interface Connector {
     category: string;
     connector: string;
     connectorIconName?: string; // Icon name for the selected connector tool
+    environmentType?: 'Pre-Production' | 'Production'; // Cloud Foundry target environment
+    // Cloud Foundry connectivity fields (Manage Environments)
+    apiUrl?: string;
+    apiCredentialName?: string;
+    iflowUrl?: string;
+    iflowCredentialName?: string;
+    hostUrl?: string;
     authenticationType: string;
     url?: string; // URL field for connectivity
     credentialName?: string; // Credential name from Manage Credentials
@@ -37,7 +44,7 @@ interface EnvironmentModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave?: (connectors: Connector[]) => void; // Bulk save functionality
-    onSaveIndividual?: (connectors: Connector[]) => void; // Individual save functionality
+    onSaveIndividual?: (connectors: Connector[], environmentNameFromModal?: string, descriptionFromModal?: string) => void; // Individual save functionality
     connectorName: string;
     initialConnectors?: Connector[];
     selectedEnterprise?: string;
@@ -47,6 +54,10 @@ interface EnvironmentModalProps {
     workstream?: string; // Entity/workstream name
     product?: string; // Product name
     service?: string; // Service name
+    rowId?: string; // EnvironmentRow ID for storing connectivity test results in Manage Environments table
+    alwaysShowEditForm?: boolean; // If true, always show edit form instead of summary view
+    fromBuilds?: boolean; // If true, opened from BuildsTable - fields should be blank and mandatory
+    environmentDescription?: string; // Description from the row (for Manage Environments screen)
 }
 
 // OAuth Button Component - Uses native event listener to bypass popup blockers
@@ -526,6 +537,9 @@ function CredentialNameDropdown({
     workstream = '',
     product = '',
     service = '',
+    connector = '',
+    category = '',
+    serviceKeyDetails = '',
 }: {
     value: string;
     onChange: (value: string) => void;
@@ -539,6 +553,9 @@ function CredentialNameDropdown({
     workstream?: string;
     product?: string;
     service?: string;
+    connector?: string;
+    category?: string;
+    serviceKeyDetails?: string;
 }) {
     const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
@@ -599,7 +616,7 @@ function CredentialNameDropdown({
             console.log('📦 [CredentialDropdown] Loaded', allCredentials.length, 'credentials from localStorage');
             console.log('📦 [CredentialDropdown] Sample credential structure:', allCredentials.length > 0 ? allCredentials[0] : 'No credentials');
 
-            // Filter credentials by account, enterprise, entity (workstream), product, and service
+            // Filter credentials by account, enterprise, entity (workstream), product, service, and connector/category/serviceKeyDetails
             const filteredCredentials = allCredentials.filter((credential) => {
                 // Match entity (workstream) - case-insensitive
                 const entityMatch = !workstream || !credential.entity || 
@@ -612,14 +629,35 @@ function CredentialNameDropdown({
                 // Match service - case-insensitive
                 const serviceMatch = !service || !credential.service || 
                     credential.service.toLowerCase() === service.toLowerCase();
+
+                // Match connector/category/serviceKeyDetails - only show credentials that have a matching connector entry
+                let connectorMatch = true;
+                if (connector && connector.trim()) {
+                    if (credential.connectors && credential.connectors.length > 0) {
+                        connectorMatch = credential.connectors.some((c: any) => {
+                            const matchesConnector = c.connector && c.connector.toLowerCase() === connector.toLowerCase();
+                            const matchesCategory = !category || !c.category || c.category.toLowerCase() === category.toLowerCase();
+                            const matchesServiceKey =
+                                !serviceKeyDetails ||
+                                !c.serviceKeyDetails ||
+                                String(c.serviceKeyDetails).toLowerCase() === String(serviceKeyDetails).toLowerCase();
+                            return matchesConnector && matchesCategory && matchesServiceKey;
+                        });
+                    } else {
+                        connectorMatch = false;
+                    }
+                }
                 
-                return entityMatch && productMatch && serviceMatch;
+                return entityMatch && productMatch && serviceMatch && connectorMatch;
             });
 
             console.log('🔍 [CredentialDropdown] Filtered to', filteredCredentials.length, 'credentials matching filters:', {
                 workstream,
                 product,
-                service
+                service,
+                connector
+                ,category
+                ,serviceKeyDetails
             });
             console.log('🔍 [CredentialDropdown] Filtered credentials:', filteredCredentials);
 
@@ -666,7 +704,7 @@ function CredentialNameDropdown({
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service]);
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service, connector, category, serviceKeyDetails]);
 
     useEffect(() => {
         if (open) {
@@ -679,11 +717,14 @@ function CredentialNameDropdown({
         if (open && selectedAccountId && selectedEnterpriseId) {
             loadCredentials();
         }
-    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
+    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, connector, category, serviceKeyDetails, loadCredentials]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            const clickedInsideTrigger = !!containerRef.current && containerRef.current.contains(target);
+            const clickedInsideDropdown = !!dropdownRef.current && dropdownRef.current.contains(target);
+            if (!clickedInsideTrigger && !clickedInsideDropdown) {
                 setOpen(false);
             }
         };
@@ -695,6 +736,10 @@ function CredentialNameDropdown({
     }, [open]);
 
     const selectedOption = options.find(opt => opt.name === value);
+    // If value is set but not in options (due to filtering/refresh), still display the value
+    const displayValue = value && value.trim()
+        ? (selectedOption ? selectedOption.name : value)
+        : '';
 
     return (
         <div ref={containerRef} className="relative w-full">
@@ -708,8 +753,8 @@ function CredentialNameDropdown({
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-                <span className={value ? 'text-gray-900' : 'text-gray-500'}>
-                    {selectedOption ? selectedOption.name : placeholder}
+                <span className={displayValue ? 'text-gray-900' : 'text-gray-500'}>
+                    {displayValue || placeholder}
                 </span>
                 <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'transform rotate-180' : ''}`} />
             </button>
@@ -717,7 +762,7 @@ function CredentialNameDropdown({
             {open && createPortal(
                 <div
                     ref={dropdownRef}
-                    className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                    className="fixed z-[10050] mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
                     style={dropdownPos ? {
                         top: `${dropdownPos.top}px`,
                         left: `${dropdownPos.left}px`,
@@ -1017,12 +1062,35 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
     selectedAccountName = '',
     workstream = '',
     product = '',
-    service = ''
+    service = '',
+    rowId,
+    alwaysShowEditForm = false,
+    fromBuilds = false,
+    environmentDescription: propEnvironmentDescription = ''
 }) => {
+    // Manage Environments currently only supports a fixed connector
+    const FIXED_CATEGORY_VALUE = 'deploy';
+    const FIXED_CATEGORY_LABEL = 'Deploy';
+    const FIXED_CONNECTOR_VALUE = 'Cloud Foundry';
+    
+    // State for Environment Name and Description (header fields)
+    const [environmentNameState, setEnvironmentNameState] = useState<string>('');
+    const [environmentDescription, setEnvironmentDescription] = useState<string>('');
+
+    const [credentialModalTarget, setCredentialModalTarget] = useState<'api' | 'iflow'>('api');
+    const [credentialModalConnectorId, setCredentialModalConnectorId] = useState<string | null>(null);
+
     const [connectors, setConnectors] = useState<Connector[]>([{
         id: generateId(),
-        category: '',
-        connector: '',
+        category: FIXED_CATEGORY_VALUE,
+        connector: FIXED_CONNECTOR_VALUE,
+        connectorIconName: getToolConfig(FIXED_CONNECTOR_VALUE)?.iconName,
+        environmentType: undefined,
+        apiUrl: '',
+        apiCredentialName: '',
+        iflowUrl: '',
+        iflowCredentialName: '',
+        hostUrl: '',
         authenticationType: '',
         url: '',
         credentialName: '',
@@ -1054,6 +1122,11 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
     const [githubOAuthClientId, setGithubOAuthClientId] = useState<string | null>(null);
     const [loadingOAuthClientId, setLoadingOAuthClientId] = useState(false);
     const [showCredentialModal, setShowCredentialModal] = useState(false);
+    // Connectivity test state (EnvironmentModal)
+    const [isTestingConnectivity, setIsTestingConnectivity] = useState(false);
+    const [connectivityTestStatus, setConnectivityTestStatus] = useState<'idle' | 'success' | 'failed'>('idle');
+    const [connectivityTestMessage, setConnectivityTestMessage] = useState<string>('');
+    const [connectivityTestTime, setConnectivityTestTime] = useState<Date | null>(null);
     // Store OAuth window references so we can close them from the parent
     const oauthWindowsRef = useRef<Map<string, Window | null>>(new Map());
     // Ref to track OAuth status for preserving during modal reopen
@@ -1084,17 +1157,46 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
             errors.push('connector');
             messages.connector = 'Connector is required';
         }
-        
-        // Validate URL - required
-        if (!connector.url || !connector.url.trim()) {
-            errors.push('url');
-            messages.url = 'URL is required';
+
+        // Cloud Foundry: Environment Type is required
+        if (connector.connector === FIXED_CONNECTOR_VALUE) {
+            if (!connector.environmentType) {
+                errors.push('environmentType');
+                messages.environmentType = 'Please select Pre-Production or Production';
+            }
+
+            if (!connector.apiUrl || !connector.apiUrl.trim()) {
+                errors.push('apiUrl');
+                messages.apiUrl = 'API URL is required';
+            }
+            if (!connector.apiCredentialName || !connector.apiCredentialName.trim()) {
+                errors.push('apiCredentialName');
+                messages.apiCredentialName = 'API Credential Name is required';
+            }
+            if (!connector.iflowUrl || !connector.iflowUrl.trim()) {
+                errors.push('iflowUrl');
+                messages.iflowUrl = 'IFlow URL is required';
+            }
+            if (!connector.iflowCredentialName || !connector.iflowCredentialName.trim()) {
+                errors.push('iflowCredentialName');
+                messages.iflowCredentialName = 'IFlow Credential Name is required';
+            }
+            if (!connector.hostUrl || !connector.hostUrl.trim()) {
+                errors.push('hostUrl');
+                messages.hostUrl = 'Host URL is required';
+            }
         }
         
-        // Validate Credential Name - required
-        if (!connector.credentialName || !connector.credentialName.trim()) {
-            errors.push('credentialName');
-            messages.credentialName = 'Credential Name is required';
+        // Legacy URL/Credential (used by other connectors; not Cloud Foundry)
+        if (connector.connector !== FIXED_CONNECTOR_VALUE) {
+            if (!connector.url || !connector.url.trim()) {
+                errors.push('url');
+                messages.url = 'URL is required';
+            }
+            if (!connector.credentialName || !connector.credentialName.trim()) {
+                errors.push('credentialName');
+                messages.credentialName = 'Credential Name is required';
+            }
         }
         
         // Validate Authentication Type - optional now (kept for backward compatibility)
@@ -1155,6 +1257,282 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
         
         return { errors, messages };
     };
+
+    const testEnvironmentConnectivity = async (connectorId: string) => {
+        const connector = connectors.find(c => c.id === connectorId);
+        if (!connector) return;
+
+        const loadCredentialAuthDetails = () => {
+            try {
+                const accountId =
+                    selectedAccountId ||
+                    (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') ||
+                    '';
+                const enterpriseId =
+                    selectedEnterpriseId ||
+                    (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') ||
+                    '';
+
+                if (!accountId || !enterpriseId) {
+                    return { error: 'Missing account or enterprise context.' as const };
+                }
+
+                const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${accountId}_${enterpriseId}`;
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                if (!stored) {
+                    return { error: 'No credentials found for selected account and enterprise.' as const };
+                }
+
+                const allCredentials: CredentialRow[] = JSON.parse(stored);
+                const credentialName = connector.iflowCredentialName?.trim() || '';
+                if (!credentialName) {
+                    return { error: 'Missing IFlow credential name.' as const };
+                }
+
+                const row = allCredentials.find((c) => {
+                    const nameMatch = (c.credentialName || '').trim() === credentialName;
+                    const entityMatch =
+                        !workstream ||
+                        !c.entity ||
+                        c.entity.toLowerCase() === String(workstream).toLowerCase();
+                    const productMatch =
+                        !product || !c.product || c.product.toLowerCase() === String(product).toLowerCase();
+                    const serviceMatch =
+                        !service || !c.service || c.service.toLowerCase() === String(service).toLowerCase();
+                    return nameMatch && entityMatch && productMatch && serviceMatch;
+                });
+
+                if (!row) {
+                    return {
+                        error:
+                            'Selected credential name was not found for the current workstream/product/service context.' as const,
+                    };
+                }
+
+                const connectorConfig = row.connectors?.find((cfg) => {
+                    const matchesCategory = (cfg.category || '').toLowerCase() === 'deploy';
+                    const matchesConnector = (cfg.connector || '').toLowerCase() === 'cloud foundry';
+                    const matchesServiceKey = (cfg.serviceKeyDetails || '').toLowerCase() === 'iflow';
+                    return matchesCategory && matchesConnector && matchesServiceKey;
+                });
+
+                if (!connectorConfig) {
+                    return {
+                        error: 'Credential does not include Cloud Foundry (IFlow) connector configuration.' as const,
+                    };
+                }
+
+                const authenticationType = connectorConfig.authenticationType || '';
+                if (!authenticationType) {
+                    return { error: 'Credential is missing authentication type for Cloud Foundry.' as const };
+                }
+
+                if (authenticationType === 'OAuth2') {
+                    const oauth2ClientId = connectorConfig.oauth2ClientId || '';
+                    const oauth2ClientSecret = connectorConfig.oauth2ClientSecret || '';
+                    const oauth2TokenUrl = connectorConfig.oauth2TokenUrl || '';
+                    if (!oauth2ClientId || !oauth2ClientSecret || !oauth2TokenUrl) {
+                        return { error: 'OAuth2 credential is missing Client ID, Client Secret, or Token URL.' as const };
+                    }
+                    return {
+                        authenticationType,
+                        oauth2ClientId,
+                        oauth2ClientSecret,
+                        oauth2TokenUrl,
+                    };
+                }
+
+                // Default: treat as Basic Auth style credential using username + apiKey (as stored in localStorage schema)
+                const username = connectorConfig.username || '';
+                const apiKey = connectorConfig.apiKey || '';
+                if (!username || !apiKey) {
+                    return { error: 'Basic Auth credential is missing username or secret.' as const };
+                }
+                return {
+                    authenticationType,
+                    username,
+                    apiKey,
+                };
+            } catch (e) {
+                console.error('❌ [EnvironmentModal] Failed to load credential auth details:', e);
+                return { error: 'Failed to load credential details from local storage.' as const };
+            }
+        };
+
+        // Ensure all required fields are present (for Cloud Foundry)
+        const allFilled = !!(
+            connector.environmentType &&
+            connector.iflowCredentialName?.trim() &&
+            connector.hostUrl?.trim()
+        );
+        if (!allFilled) {
+            setConnectivityTestStatus('failed');
+            setConnectivityTestMessage('Please fill IFlow Credential Name and Host URL before testing.');
+            setConnectivityTestTime(new Date());
+            return;
+        }
+
+        // Validate context is present
+        const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') || '';
+        const accountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : '') || '';
+        const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') || '';
+        const enterpriseName = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : '') || '';
+
+        if (!accountId || !enterpriseId) {
+            setConnectivityTestStatus('failed');
+            setConnectivityTestMessage('Missing account or enterprise context.');
+            setConnectivityTestTime(new Date());
+            return;
+        }
+
+        const credentialAuthDetails = loadCredentialAuthDetails();
+        if ('error' in credentialAuthDetails) {
+            setConnectivityTestStatus('failed');
+            setConnectivityTestMessage(String(credentialAuthDetails.error || 'Failed to load credential details.'));
+            setConnectivityTestTime(new Date());
+            return;
+        }
+
+        const testPayload: any = {
+            accountId,
+            accountName,
+            enterpriseId,
+            enterpriseName,
+            workstream: workstream || '',
+            product: product || '',
+            service: service || '',
+            credentialName: connector.iflowCredentialName,
+            hostUrl: connector.hostUrl,
+            ...credentialAuthDetails,
+        };
+
+        console.log('🧪 [EnvironmentModal] Sending environment connectivity test:', testPayload);
+
+        setIsTestingConnectivity(true);
+        setConnectivityTestStatus('idle');
+        setConnectivityTestMessage('Test in Progress');
+        setConnectivityTestTime(null);
+
+        const minDurationMs = 2500;
+        const startedAt = Date.now();
+
+        try {
+            const response = await api.post<{success?: boolean; status?: string; connected?: boolean; message?: string}>(
+                '/api/environments/cloudfoundry/test-connection',
+                testPayload,
+            );
+
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < minDurationMs) {
+                await new Promise(resolve => setTimeout(resolve, minDurationMs - elapsed));
+            }
+
+            const success = !!(response && (response.success || response.status === 'success' || response.connected));
+            setConnectivityTestStatus(success ? 'success' : 'failed');
+            setConnectivityTestMessage(response?.message || (success ? 'Success' : 'Failed'));
+            setConnectivityTestTime(new Date());
+
+            // Persist test result for Manage Environments Status column
+            if (accountId && enterpriseId) {
+                try {
+                    const STORAGE_KEY = `environment_test_results_${accountId}_${enterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                    const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
+                    
+                    // If rowId is available, use it; otherwise use environmentName as key (will be migrated when environment is saved)
+                    const resultKey = rowId || (environmentNameState ? `temp_${environmentNameState}_${workstream}_${product}_${service}` : null);
+                    
+                    if (resultKey) {
+                        results[resultKey] = { status: success ? 'success' : 'failed', timestamp: Date.now() };
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                            console.log('💾 [EnvironmentModal] Saved test result to localStorage for key:', resultKey, 'status:', success ? 'success' : 'failed', 'rowId:', rowId || 'none (using temp key)');
+                            window.dispatchEvent(new Event('environmentTestResultUpdated'));
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ [EnvironmentModal] Error saving test result to localStorage:', error);
+                }
+            }
+        } catch (err: any) {
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < minDurationMs) {
+                await new Promise(resolve => setTimeout(resolve, minDurationMs - elapsed));
+            }
+            const msg = err?.message || 'Connectivity test failed';
+            setConnectivityTestStatus('failed');
+            setConnectivityTestMessage(msg);
+            setConnectivityTestTime(new Date());
+
+            // Persist failed test result for Manage Environments Status column
+            if (accountId && enterpriseId) {
+                try {
+                    const STORAGE_KEY = `environment_test_results_${accountId}_${enterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                    const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
+                    
+                    // If rowId is available, use it; otherwise use environmentName as key (will be migrated when environment is saved)
+                    const resultKey = rowId || (environmentNameState ? `temp_${environmentNameState}_${workstream}_${product}_${service}` : null);
+                    
+                    if (resultKey) {
+                        results[resultKey] = { status: 'failed', timestamp: Date.now() };
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                            console.log('💾 [EnvironmentModal] Saved failed test result to localStorage for key:', resultKey, 'rowId:', rowId || 'none (using temp key)');
+                            window.dispatchEvent(new Event('environmentTestResultUpdated'));
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ [EnvironmentModal] Error saving failed test result to localStorage:', error);
+                }
+            }
+        } finally {
+            setIsTestingConnectivity(false);
+        }
+    };
+
+    // When modal opens (or initialConnectors changes), ensure fixed Category/Connector are always enforced
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const toolConfig = getToolConfig(FIXED_CONNECTOR_VALUE);
+
+        setConnectors((prev) => {
+            const source = (initialConnectors && initialConnectors.length > 0) ? initialConnectors : prev;
+            const normalized = (source.length > 0 ? source : prev).map((c) => ({
+                ...c,
+                category: FIXED_CATEGORY_VALUE,
+                connector: FIXED_CONNECTOR_VALUE,
+                connectorIconName: toolConfig?.iconName || c.connectorIconName,
+            }));
+
+            // Ensure at least one connector exists
+            if (normalized.length === 0) {
+                return [{
+                    id: generateId(),
+                    category: FIXED_CATEGORY_VALUE,
+                    connector: FIXED_CONNECTOR_VALUE,
+                    connectorIconName: toolConfig?.iconName,
+                    environmentType: undefined,
+                    authenticationType: '',
+                    url: '',
+                    credentialName: '',
+                    username: '',
+                    usernameEncryption: 'Plaintext',
+                    apiKey: '',
+                    apiKeyEncryption: 'Encrypted',
+                    personalAccessToken: '',
+                    tokenEncryption: 'Plaintext',
+                    status: true,
+                    description: '',
+                }];
+            }
+
+            return normalized;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, initialConnectors]);
 
     const validateAllConnectors = (): boolean => {
         const errors: {[key: string]: string[]} = {};
@@ -1301,17 +1679,35 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
             const wasClosed = !wasOpenRef.current;
             wasOpenRef.current = true;
             
-            // Only reset if modal was just opened (transition from closed to open)
-            // Don't reset if modal is staying open (already had connectors)
+            // Only reset header fields if modal was just opened (transition from closed to open)
+            // Don't reset if modal is staying open (user is editing)
             if (wasClosed) {
+                // Always start with blank fields when modal opens (no initial values or placeholder text)
+                if (fromBuilds) {
+                    // When opened from BuildsTable, always start with blank fields
+                    setEnvironmentNameState('');
+                    setEnvironmentDescription('');
+                } else {
+                    // When opened from Manage Environments, auto-fill from props
+                    setEnvironmentNameState(connectorName || '');
+                    setEnvironmentDescription(propEnvironmentDescription || '');
+                }
+                
                 console.log('🔍 ConnectorModal opened with initialConnectors:', initialConnectors);
                 if (initialConnectors.length > 0) {
                     console.log('🔌 Loading initial connectors:', initialConnectors);
                     setConnectors(initialConnectors);
                     setOriginalConnectors(JSON.parse(JSON.stringify(initialConnectors))); // Deep copy
-                    setActivelyEditingNewConnector(new Set());
-                    setEditingConnectorId(null); // Clear any editing state to show summary view
-                    console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    if (alwaysShowEditForm) {
+                        // Mark all connectors as actively editing to show edit form
+                        const connectorIds = new Set(initialConnectors.map(c => c.id));
+                        setActivelyEditingNewConnector(connectorIds);
+                        console.log('🔌 Loaded', initialConnectors.length, 'connector(s) with alwaysShowEditForm - showing edit form');
+                    } else {
+                        setActivelyEditingNewConnector(new Set());
+                        setEditingConnectorId(null); // Clear any editing state to show summary view
+                        console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    }
                 } else if (connectors.length === 0) {
                     // Only create new connector if we don't have any connectors yet
                     const newId = generateId();
@@ -1690,8 +2086,15 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
             ...prev,
             {
                 id: newId,
-                category: '',
-                connector: '',
+                category: FIXED_CATEGORY_VALUE,
+                connector: FIXED_CONNECTOR_VALUE,
+                connectorIconName: getToolConfig(FIXED_CONNECTOR_VALUE)?.iconName,
+                environmentType: undefined,
+                apiUrl: '',
+                apiCredentialName: '',
+                iflowUrl: '',
+                iflowCredentialName: '',
+                hostUrl: '',
                 authenticationType: '',
                 username: '',
                 usernameEncryption: 'Plaintext',
@@ -1765,6 +2168,80 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
         });
     }, []);
 
+    // Clear API/IFlow credential name if it no longer exists in Manage Credentials for the current context
+    const validateAndCleanEnvironmentCredentialNames = useCallback(() => {
+        if (!isOpen) return;
+
+        // Need account/enterprise to read credentials storage
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+
+        try {
+            const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+            const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+            const allCredentials: CredentialRow[] = stored ? JSON.parse(stored) : [];
+
+            const credentialExistsFor = (credentialNameRaw: string, serviceKeyDetails: 'API' | 'IFlow'): boolean => {
+                const credentialName = (credentialNameRaw || '').trim();
+                if (!credentialName) return true;
+
+                const row = allCredentials.find((c) => {
+                    const nameMatch = (c.credentialName || '').trim() === credentialName;
+                    const entityMatch =
+                        !workstream || !c.entity || c.entity.toLowerCase() === String(workstream).toLowerCase();
+                    const productMatch =
+                        !product || !c.product || c.product.toLowerCase() === String(product).toLowerCase();
+                    const serviceMatch =
+                        !service || !c.service || c.service.toLowerCase() === String(service).toLowerCase();
+                    return nameMatch && entityMatch && productMatch && serviceMatch;
+                });
+
+                if (!row) return false;
+
+                const cfConfig = row.connectors?.some((cfg) => {
+                    const matchesCategory = (cfg.category || '').toLowerCase() === 'deploy';
+                    const matchesConnector = (cfg.connector || '').toLowerCase() === 'cloud foundry';
+                    const matchesServiceKey =
+                        !cfg.serviceKeyDetails ||
+                        String(cfg.serviceKeyDetails).toLowerCase() === String(serviceKeyDetails).toLowerCase();
+                    return matchesCategory && matchesConnector && matchesServiceKey;
+                });
+
+                return !!cfConfig;
+            };
+
+            setConnectors((prev) =>
+                prev.map((c) => {
+                    let next = c;
+                    if (c.apiCredentialName?.trim() && !credentialExistsFor(c.apiCredentialName, 'API')) {
+                        next = { ...next, apiCredentialName: '' };
+                    }
+                    if (c.iflowCredentialName?.trim() && !credentialExistsFor(c.iflowCredentialName, 'IFlow')) {
+                        next = { ...next, iflowCredentialName: '' };
+                    }
+                    return next;
+                }),
+            );
+        } catch (e) {
+            console.error('❌ [EnvironmentModal] Error validating credential names:', e);
+        }
+    }, [isOpen, selectedAccountId, selectedEnterpriseId, workstream, product, service]);
+
+    // Re-validate selected credential names when Manage Credentials changes (e.g., delete/edit)
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleCredentialsChanged = () => validateAndCleanEnvironmentCredentialNames();
+        window.addEventListener('credentialsStorageChanged', handleCredentialsChanged as EventListener);
+        return () => {
+            window.removeEventListener('credentialsStorageChanged', handleCredentialsChanged as EventListener);
+        };
+    }, [isOpen, validateAndCleanEnvironmentCredentialNames]);
+
+    // Also validate when modal opens or context changes
+    useEffect(() => {
+        validateAndCleanEnvironmentCredentialNames();
+    }, [validateAndCleanEnvironmentCredentialNames]);
+
     const removeConnector = (id: string) => {
         if (connectors.length > 1) {
             setConnectors(prev => prev.filter(connector => connector.id !== id));
@@ -1790,9 +2267,24 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
     };
 
     const handleSaveIndividualConnector = (connector: Connector) => {
+        console.log('💾 [EnvironmentModal] Save button clicked - handleSaveIndividualConnector called');
+        console.log('💾 [EnvironmentModal] Environment Name from header:', environmentNameState);
+        console.log('💾 [EnvironmentModal] Description from header:', environmentDescription);
+        
+        // Validate Environment Name (mandatory)
+        if (!environmentNameState || !environmentNameState.trim()) {
+            console.error('❌ [EnvironmentModal] Validation failed: Environment Name is required');
+            alert('Environment Name is required');
+            return;
+        }
+        
         // Get the latest connector from state to ensure we have the most up-to-date values
         const currentConnector = connectors.find(c => c.id === connector.id) || connector;
         const connectorToSave = { ...currentConnector };
+        
+        // Update description from header field
+        connectorToSave.description = environmentDescription;
+        console.log('💾 [EnvironmentModal] Updated connector description:', environmentDescription);
         
         const connectorValidation = validateConnector(connectorToSave);
         if (connectorValidation.errors.length > 0) {
@@ -1866,8 +2358,10 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                 c.category.trim() || c.connector.trim()
             );
             // Defer the call to avoid updating parent during render
+            // Pass environmentNameState and environmentDescription along with connectors
             setTimeout(() => {
-                onSaveIndividual(validConnectors);
+                console.log('💾 [EnvironmentModal] Calling onSaveIndividual with environment name:', environmentNameState.trim());
+                onSaveIndividual(validConnectors, environmentNameState.trim(), environmentDescription.trim());
             }, 0);
         }
     };
@@ -1947,7 +2441,7 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
                         <div className="flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide">
                             <Plug className="h-4 w-4" />
-                            <span>Manage Connector</span>
+                            <span>Manage Environments</span>
                         </div>
                     </div>
                 </div>
@@ -1958,7 +2452,7 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                     <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-blue-100 text-base">Configure Connector</p>
+                                <p className="text-blue-100 text-base">Configure Environment</p>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button
@@ -1970,11 +2464,25 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                             </div>
                         </div>
                         
-                        {/* Connector Info */}
-                        <div className="mt-4">
-                            <div className="text-blue-100 text-sm font-medium mb-1">Connector Name</div>
-                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
-                                <div className="text-white font-medium truncate text-xs">{connectorName || '\u00A0'}</div>
+                        {/* Environment Info */}
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-blue-100 text-sm font-medium mb-1">Environment Name{fromBuilds ? ' *' : ''}</div>
+                                <input
+                                    type="text"
+                                    value={environmentNameState}
+                                    onChange={(e) => setEnvironmentNameState(e.target.value)}
+                                    className="w-full px-2 py-1 border border-white/20 rounded-lg text-sm bg-white/10 backdrop-blur-sm text-white min-h-[28px] focus:outline-none focus:ring-2 focus:ring-white/30"
+                                />
+                            </div>
+                            <div>
+                                <div className="text-blue-100 text-sm font-medium mb-1">Description</div>
+                                <input
+                                    type="text"
+                                    value={environmentDescription}
+                                    onChange={(e) => setEnvironmentDescription(e.target.value)}
+                                    className="w-full px-2 py-1 border border-white/20 rounded-lg text-sm bg-white/10 backdrop-blur-sm text-white min-h-[28px] focus:outline-none focus:ring-2 focus:ring-white/30"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1983,7 +2491,7 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                 <div className="flex-1 bg-gray-50 overflow-hidden">
                     <div className="h-full overflow-y-auto px-6 py-6">
                         <div className="space-y-6">
-                            {/* Connector Cards */}
+                            {/* Environment Cards */}
                             {connectors.map((connector, index) => (
                                 <div 
                                     key={connector.id} 
@@ -1995,7 +2503,7 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                 <Plug className="h-4 w-4 text-blue-600" />
                                             </div>
                                             <h3 className="text-base font-semibold text-gray-900">
-                                                Connector
+                                                Environment
                                             </h3>
                                         </div>
                                         <div className="flex items-center space-x-2">
@@ -2067,19 +2575,11 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Category *
                                                     </label>
-                                                    <CategoryDropdown
-                                                        value={connector.category || ''}
-                                                        onChange={(newCategory) => {
-                                                            updateConnector(connector.id, 'category', newCategory);
-                                                            // Clear connector when category changes
-                                                            if (newCategory !== connector.category) {
-                                                                updateConnector(connector.id, 'connector', '');
-                                                            }
-                                                        }}
-                                                        options={availableCategories}
-                                                        disabled={loadingGlobalSettings || availableCategories.length === 0}
-                                                        isError={validationErrors[connector.id]?.includes('category') || false}
-                                                        placeholder="Select category..."
+                                                    <input
+                                                        type="text"
+                                                        value={FIXED_CATEGORY_LABEL}
+                                                        disabled
+                                                        className="w-full px-2 py-1 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-700 min-h-[28px]"
                                                     />
                                                     {validationErrors[connector.id]?.includes('category') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -2089,37 +2589,29 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                     {loadingGlobalSettings && (
                                                         <p className="text-gray-500 text-xs mt-1">Loading categories...</p>
                                                     )}
-                                                    {!loadingGlobalSettings && availableCategories.length === 0 && (
-                                                        <p className="text-gray-500 text-xs mt-1">No categories available for this workstream</p>
-                                                    )}
                                                 </div>
                                                 
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Connector *
                                                     </label>
-                                                    <ConnectorDropdown
-                                                        value={connector.connector || ''}
-                                                        onChange={(newConnector) => {
-                                                            updateConnector(connector.id, 'connector', newConnector);
-                                                            // Clear authentication type when connector changes
-                                                            if (newConnector !== connector.connector) {
-                                                                updateConnector(connector.id, 'authenticationType', '');
-                                                            }
-                                                        }}
-                                                        options={connector.category ? getOrderedToolsForCategory(connector.category) : []}
-                                                        disabled={loadingGlobalSettings || !connector.category || getOrderedToolsForCategory(connector.category).length === 0}
-                                                        isError={validationErrors[connector.id]?.includes('connector') || false}
-                                                        placeholder="Select connector..."
-                                                        iconName={connector.connectorIconName}
-                                                    />
+                                                    <div className="flex items-center gap-2 px-2 py-1 border border-slate-200 rounded-lg bg-slate-50 min-h-[28px]">
+                                                        {connector.connectorIconName ? (
+                                                            <Icon name={connector.connectorIconName} size={16} className="text-slate-600" />
+                                                        ) : (
+                                                            <Plug className="w-4 h-4 text-slate-600" />
+                                                        )}
+                                                        <input
+                                                            type="text"
+                                                            value={FIXED_CONNECTOR_VALUE}
+                                                            disabled
+                                                            className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                                                        />
+                                                    </div>
                                                     {validationErrors[connector.id]?.includes('connector') && (
                                                         <p className="text-red-500 text-xs mt-1">
                                                             {validationMessages[connector.id]?.connector || 'Connector is required'}
                                                         </p>
-                                                    )}
-                                                    {connector.category && getOrderedToolsForCategory(connector.category).length === 0 && (
-                                                        <p className="text-gray-500 text-xs mt-1">No connectors available for this category</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -2130,63 +2622,250 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                     Connectivity Details
                                                 </h3>
                                                 <div className="space-y-4">
-                                                    {/* URL Field */}
+                                                    {/* Environment Type tiles (Pre-Production / Production) */}
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                            URL *
+                                                            Environment Type *
                                                         </label>
-                                                        <input
-                                                            type="text"
-                                                            value={connector.url || ''}
-                                                            onChange={(e) => updateConnector(connector.id, 'url', e.target.value)}
-                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                validationErrors[connector.id]?.includes('url')
-                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                            }`}
-                                                        />
-                                                        {validationErrors[connector.id]?.includes('url') && (
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {(['Pre-Production', 'Production'] as const).map((opt) => {
+                                                                const selected = connector.environmentType === opt;
+                                                                return (
+                                                                    <button
+                                                                        key={opt}
+                                                                        type="button"
+                                                                        onClick={() => updateConnector(connector.id, 'environmentType', opt)}
+                                                                        className={`relative text-left rounded-lg border p-3 transition-colors ${
+                                                                            selected
+                                                                                ? 'border-blue-500 bg-blue-50'
+                                                                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                                                                        }`}
+                                                                    >
+                                                                        {selected && (
+                                                                            <div className="absolute top-2 right-2 w-5 h-5 rounded-md bg-blue-600 flex items-center justify-center">
+                                                                                <Check className="w-3.5 h-3.5 text-white" />
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="text-sm font-semibold text-slate-800">{opt}</div>
+                                                                        <div className="text-xs text-slate-500 mt-0.5">
+                                                                            {opt === 'Pre-Production' ? 'Non-prod / staging target' : 'Production target'}
+                                                                        </div>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {validationErrors[connector.id]?.includes('environmentType') && (
                                                             <p className="text-red-500 text-xs mt-1">
-                                                                {validationMessages[connector.id]?.url || 'URL is required'}
+                                                                {validationMessages[connector.id]?.environmentType || 'Environment Type is required'}
                                                             </p>
                                                         )}
                                                     </div>
 
-                                                    {/* Credential Name Dropdown */}
-                                                    <div>
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <label className="block text-sm font-medium text-gray-700">
-                                                                Credential Name *
+                                                    {/* Cloud Foundry Connectivity Fields */}
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                API URL *
                                                             </label>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowCredentialModal(true)}
-                                                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                                                            >
-                                                                <Plus className="h-3.5 w-3.5" />
-                                                                <span>Create Credential</span>
-                                                            </button>
+                                                            <input
+                                                                type="text"
+                                                                value={connector.apiUrl || ''}
+                                                                onChange={(e) => updateConnector(connector.id, 'apiUrl', e.target.value)}
+                                                                className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                    validationErrors[connector.id]?.includes('apiUrl')
+                                                                        ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                        : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                }`}
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('apiUrl') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.apiUrl || 'API URL is required'}
+                                                                </p>
+                                                            )}
                                                         </div>
-                                                        <CredentialNameDropdown
-                                                            value={connector.credentialName || ''}
-                                                            onChange={(newValue) => {
-                                                                updateConnector(connector.id, 'credentialName', newValue);
-                                                            }}
-                                                            selectedAccountId={selectedAccountId}
-                                                            selectedAccountName={selectedAccountName}
-                                                            selectedEnterpriseId={selectedEnterpriseId}
-                                                            selectedEnterprise={selectedEnterprise}
-                                                            workstream={workstream}
-                                                            product={product}
-                                                            service={service}
-                                                            isError={validationErrors[connector.id]?.includes('credentialName') || false}
-                                                            placeholder="Select credential name..."
-                                                        />
-                                                        {validationErrors[connector.id]?.includes('credentialName') && (
-                                                            <p className="text-red-500 text-xs mt-1">
-                                                                {validationMessages[connector.id]?.credentialName || 'Credential Name is required'}
-                                                            </p>
-                                                        )}
+
+                                                        <div>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <label className="block text-sm font-medium text-gray-700">
+                                                                    API Credential Name *
+                                                                </label>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setCredentialModalTarget('api');
+                                                                        setCredentialModalConnectorId(connector.id);
+                                                                        setShowCredentialModal(true);
+                                                                    }}
+                                                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                                                                >
+                                                                    <Plus className="h-3.5 w-3.5" />
+                                                                    <span>Create Credential</span>
+                                                                </button>
+                                                            </div>
+                                                            <CredentialNameDropdown
+                                                                value={connector.apiCredentialName || ''}
+                                                                onChange={(newValue) => updateConnector(connector.id, 'apiCredentialName', newValue)}
+                                                                selectedAccountId={selectedAccountId}
+                                                                selectedAccountName={selectedAccountName}
+                                                                selectedEnterpriseId={selectedEnterpriseId}
+                                                                selectedEnterprise={selectedEnterprise}
+                                                                workstream={workstream}
+                                                                product={product}
+                                                                service={service}
+                                                                connector={FIXED_CONNECTOR_VALUE}
+                                                                category={FIXED_CATEGORY_VALUE}
+                                                                serviceKeyDetails="API"
+                                                                isError={validationErrors[connector.id]?.includes('apiCredentialName') || false}
+                                                                placeholder="Select API credential name..."
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('apiCredentialName') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.apiCredentialName || 'API Credential Name is required'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                IFlow URL *
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={connector.iflowUrl || ''}
+                                                                onChange={(e) => updateConnector(connector.id, 'iflowUrl', e.target.value)}
+                                                                className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                    validationErrors[connector.id]?.includes('iflowUrl')
+                                                                        ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                        : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                }`}
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('iflowUrl') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.iflowUrl || 'IFlow URL is required'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <label className="block text-sm font-medium text-gray-700">
+                                                                    IFlow Credential Name *
+                                                                </label>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setCredentialModalTarget('iflow');
+                                                                        setCredentialModalConnectorId(connector.id);
+                                                                        setShowCredentialModal(true);
+                                                                    }}
+                                                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                                                                >
+                                                                    <Plus className="h-3.5 w-3.5" />
+                                                                    <span>Create Credential</span>
+                                                                </button>
+                                                            </div>
+                                                            <CredentialNameDropdown
+                                                                value={connector.iflowCredentialName || ''}
+                                                                onChange={(newValue) => updateConnector(connector.id, 'iflowCredentialName', newValue)}
+                                                                selectedAccountId={selectedAccountId}
+                                                                selectedAccountName={selectedAccountName}
+                                                                selectedEnterpriseId={selectedEnterpriseId}
+                                                                selectedEnterprise={selectedEnterprise}
+                                                                workstream={workstream}
+                                                                product={product}
+                                                                service={service}
+                                                                connector={FIXED_CONNECTOR_VALUE}
+                                                                category={FIXED_CATEGORY_VALUE}
+                                                                serviceKeyDetails="IFlow"
+                                                                isError={validationErrors[connector.id]?.includes('iflowCredentialName') || false}
+                                                                placeholder="Select IFlow credential name..."
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('iflowCredentialName') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.iflowCredentialName || 'IFlow Credential Name is required'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                Host URL *
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={connector.hostUrl || ''}
+                                                                onChange={(e) => updateConnector(connector.id, 'hostUrl', e.target.value)}
+                                                                className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                    validationErrors[connector.id]?.includes('hostUrl')
+                                                                        ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                        : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                }`}
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('hostUrl') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.hostUrl || 'Host URL is required'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        {(() => {
+                                                            const allFilled = !!(
+                                                                connector.environmentType &&
+                                                                connector.apiUrl?.trim() &&
+                                                                connector.apiCredentialName?.trim() &&
+                                                                connector.iflowUrl?.trim() &&
+                                                                connector.iflowCredentialName?.trim() &&
+                                                                connector.hostUrl?.trim()
+                                                            );
+                                                            return (
+                                                                <div className="pt-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={!allFilled || isTestingConnectivity}
+                                                                        className={`w-full px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                                                                            allFilled && !isTestingConnectivity
+                                                                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                                : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                                                                        }`}
+                                                                        onClick={() => {
+                                                                            testEnvironmentConnectivity(connector.id);
+                                                                        }}
+                                                                    >
+                                                                        Test
+                                                                    </button>
+                                                                    {/* Status / spinner */}
+                                                                    <div className="mt-2 min-h-[18px]">
+                                                                        {isTestingConnectivity && (
+                                                                            <div className="flex items-center gap-2 text-xs text-slate-700">
+                                                                                <motion.div
+                                                                                    className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full"
+                                                                                    animate={{ rotate: 360 }}
+                                                                                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                                                                />
+                                                                                <span className="font-medium">{connectivityTestMessage || 'Test in Progress'}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {!isTestingConnectivity && connectivityTestStatus !== 'idle' && (
+                                                                            <div className="flex items-center gap-2 text-xs">
+                                                                                {connectivityTestStatus === 'success' ? (
+                                                                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                                                                ) : (
+                                                                                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                                                                                )}
+                                                                                <span className={connectivityTestStatus === 'success' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                                                                                    {connectivityTestStatus === 'success' ? 'Success' : 'Failed'}
+                                                                                </span>
+                                                                                {connectivityTestTime && (
+                                                                                    <span className="text-[10px] text-slate-500">
+                                                                                        {connectivityTestTime.toLocaleTimeString()}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     
                                                     {/* Conditional fields for Username and API Key (Jira) */}
@@ -2520,11 +3199,11 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                             </div>
                                         </div>
                                     ) : (
-                                        /* Show connector summary when not editing */
+                                        /* Show environment summary when not editing */
                                         <div className="bg-white border border-slate-300 rounded-lg p-5 shadow-sm">
                                             <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-200">
                                                 <Plug className="h-4 w-4 text-slate-600" />
-                                                <span className="text-sm font-semibold text-slate-800">Connector Information</span>
+                                                <span className="text-sm font-semibold text-slate-800">Environment Information</span>
                                             </div>
                                             
                                             <div className="space-y-4">
@@ -2532,7 +3211,9 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Category</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.category || 'N/A'}</div>
+                                                        <div className="text-sm font-medium text-slate-600">
+                                                            {connector.category === FIXED_CATEGORY_VALUE ? FIXED_CATEGORY_LABEL : (connector.category || 'N/A')}
+                                                        </div>
                                                     </div>
                                                     <div>
                                                         <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Connector</div>
@@ -2540,11 +3221,31 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* Authentication Details */}
-                                                <div className="border-t border-slate-200 pt-4 mt-4">
+                                                {/* Connectivity Details */}
+                                                <div className="border-t border-slate-200 pt-4 mt-4 space-y-4">
                                                     <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Authentication Type</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.authenticationType || 'N/A'}</div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Environment Type</div>
+                                                        <div className="text-sm font-medium text-slate-600">{connector.environmentType || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">API URL</div>
+                                                        <div className="text-sm font-medium text-slate-600 break-words">{connector.apiUrl || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">API Credential Name</div>
+                                                        <div className="text-sm font-medium text-slate-600">{connector.apiCredentialName || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">IFlow URL</div>
+                                                        <div className="text-sm font-medium text-slate-600 break-words">{connector.iflowUrl || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">IFlow Credential Name</div>
+                                                        <div className="text-sm font-medium text-slate-600">{connector.iflowCredentialName || 'N/A'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Host URL</div>
+                                                        <div className="text-sm font-medium text-slate-600 break-words">{connector.hostUrl || 'N/A'}</div>
                                                     </div>
                                                 </div>
 
@@ -2612,25 +3313,53 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                 onClose={() => setShowCredentialModal(false)}
                 onSave={async (credentials) => {
                     try {
+                        // Get account and enterprise IDs for local storage key
+                        const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') || '';
+                        const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') || '';
+
+                        if (!accountId || !enterpriseId) {
+                            console.error('❌ [Credential Save] Missing accountId or enterpriseId');
+                            alert('Failed to save credential. Missing account or enterprise information.');
+                            return;
+                        }
+
                         // Get the current connector to get category and connector name
                         const currentConnector = connectors.length > 0 ? connectors[0] : null;
                         const connectorCategory = currentConnector?.category || '';
                         const connectorConnector = currentConnector?.connector || connectorName || '';
-                        
-                        // Save each credential to the API
+
+                        // Load existing credentials from local storage
+                        const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                        const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${accountId}_${enterpriseId}`;
+                        const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                        const existingCredentials: CredentialRow[] = stored ? JSON.parse(stored) : [];
+
+                        console.log('💾 [Credential Save] Loaded', existingCredentials.length, 'existing credentials from localStorage');
+
+                        // Process each credential to save
                         for (const credential of credentials) {
-                            // Build the credential payload with all required context
-                            const credentialPayload = {
-                                credentialName: credential.credentialName,
-                                description: credential.description || '',
-                                entity: credential.entity || workstream || '',
-                                product: credential.product || product || '',
-                                service: credential.service || service || '',
-                                scope: credential.scope || credential.connector || connectorConnector || '',
-                                category: credential.category || connectorCategory || '',
-                                connector: credential.connector || connectorConnector || '',
-                                // Authentication fields
+                            const finalConnector = (credential as any).connector || connectorConnector || '';
+                            const finalCategory = (credential as any).category || connectorCategory || '';
+
+                            const toolConfig = getToolConfig(finalConnector);
+                            const connectorIconName = toolConfig?.iconName || '';
+
+                            // NOTE: Manage Credentials is localStorage-based right now, so we do NOT call any API here.
+                            // We only upsert into localStorage and dispatch refresh events.
+
+                            // Build connector object for the credential row (localStorage)
+                            const connectorData: any = {
+                                id: generateId(),
+                                category: finalCategory,
+                                connector: finalConnector,
+                                connectorIconName: connectorIconName,
                                 authenticationType: credential.authenticationType || '',
+                                // Cloud Foundry
+                                serviceKeyDetails: (credential as any).serviceKeyDetails,
+                                oauth2ClientId: (credential as any).oauth2ClientId,
+                                oauth2ClientSecret: (credential as any).oauth2ClientSecret,
+                                oauth2TokenUrl: (credential as any).oauth2TokenUrl,
+                                // Standard fields
                                 username: credential.username || '',
                                 usernameEncryption: credential.usernameEncryption || 'Plaintext',
                                 apiKey: credential.apiKey || '',
@@ -2642,30 +3371,86 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                                 githubApplicationId: credential.githubApplicationId || '',
                                 githubApplicationIdEncryption: credential.githubApplicationIdEncryption || 'Plaintext',
                                 githubPrivateKey: credential.githubPrivateKey || '',
-                                // Context fields for filtering
-                                accountId: selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : '') || '',
-                                accountName: selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : '') || '',
-                                enterpriseId: selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : '') || '',
-                                enterpriseName: selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : '') || '',
+                                status: true,
+                                description: credential.description || '',
                             };
-                            
-                            console.log('💾 Saving credential to API:', credentialPayload);
-                            
-                            // Save credential via API
-                            const savedCredential = await api.post('/api/credentials', credentialPayload);
-                            console.log('✅ Credential saved successfully:', savedCredential);
+
+                            // Upsert by credentialName
+                            const existingIndex = existingCredentials.findIndex(
+                                (cred) => cred.credentialName === credential.credentialName,
+                            );
+
+                            if (existingIndex >= 0) {
+                                const existingRow = existingCredentials[existingIndex];
+                                const connectorIndex =
+                                    existingRow.connectors?.findIndex((c) => c.connector === connectorData.connector) ?? -1;
+
+                                if (connectorIndex >= 0 && existingRow.connectors) {
+                                    existingRow.connectors[connectorIndex] = connectorData;
+                                } else {
+                                    existingRow.connectors = existingRow.connectors || [];
+                                    existingRow.connectors.push(connectorData);
+                                }
+
+                                existingRow.description = credential.description ?? existingRow.description;
+                                if (credential.entity) existingRow.entity = credential.entity;
+                                if (credential.product) existingRow.product = credential.product;
+                                if (credential.service) existingRow.service = credential.service;
+                                if (connectorIconName) existingRow.connectorIconName = connectorIconName;
+                            } else {
+                                const newCredentialRow: CredentialRow = {
+                                    id: generateId(),
+                                    credentialName: credential.credentialName,
+                                    description: credential.description || '',
+                                    entity: credential.entity || workstream || '',
+                                    product: credential.product || product || '',
+                                    service: credential.service || service || '',
+                                    scope: credential.scope || (credential as any).connector || finalConnector || '',
+                                    connectorIconName: connectorIconName,
+                                    connectors: [connectorData],
+                                };
+                                existingCredentials.push(newCredentialRow);
+                            }
                         }
-                        
+
+                        // Save updated credentials back to localStorage + dispatch refresh events
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(storageKey, JSON.stringify(existingCredentials));
+                            window.dispatchEvent(new CustomEvent('credentialsStorageChanged', { detail: { accountId, enterpriseId, key: storageKey } }));
+                            window.dispatchEvent(new CustomEvent('credentialSaved', {
+                                detail: {
+                                    accountId,
+                                    enterpriseId,
+                                    workstream,
+                                    product,
+                                    service,
+                                    connector: connectorConnector,
+                                },
+                            }));
+                        }
+
                         // Close the modal after successful save
                         setShowCredentialModal(false);
+
+                        // Populate the correct credential field in the Environment form
+                        const savedName = credentials?.[0]?.credentialName;
+                        if (savedName && credentialModalConnectorId) {
+                            if (credentialModalTarget === 'api') {
+                                updateConnector(credentialModalConnectorId, 'apiCredentialName', savedName);
+                            } else if (credentialModalTarget === 'iflow') {
+                                updateConnector(credentialModalConnectorId, 'iflowCredentialName', savedName);
+                            }
+                        }
                     } catch (error) {
                         console.error('❌ Error saving credential:', error);
                         alert('Failed to save credential. Please try again.');
                     }
                 }}
-                connectorName={connectorName}
+                connectorName={FIXED_CONNECTOR_VALUE}
                 category={connectors.length > 0 ? connectors[0]?.category : ''}
                 connector={connectors.length > 0 ? connectors[0]?.connector : connectorName}
+                serviceKeyDetails={credentialModalTarget === 'api' ? 'API' : 'IFlow'}
+                lockServiceKeyDetails={true}
                 initialCredentials={[]}
                 selectedEnterprise={selectedEnterprise}
                 selectedEnterpriseId={selectedEnterpriseId}
@@ -2674,6 +3459,7 @@ const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
                 workstream={workstream}
                 product={product}
                 service={service}
+                // Open as a stacked side panel so the Environment modal left panel stays visible
                 stackLevel={1}
             />
         </div>

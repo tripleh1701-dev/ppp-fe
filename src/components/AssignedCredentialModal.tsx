@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Key, Save, XCircle, ChevronDown } from 'lucide-react';
+import { X, Key, Save, XCircle, ChevronDown, CheckCircle } from 'lucide-react';
 import { BookmarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { generateId } from '@/utils/id-generator';
 import { api } from '@/utils/api';
+import { Icon } from '@/components/Icons';
 
 export interface Credential {
     id: string;
@@ -18,6 +19,12 @@ export interface Credential {
     category?: string; // Category from connector
     connector?: string; // Connector name
     isFromDatabase?: boolean;
+    // Cloud Foundry (Deploy) service key type
+    serviceKeyDetails?: 'API' | 'IFlow';
+    // Cloud Foundry OAuth2 fields
+    oauth2ClientId?: string;
+    oauth2ClientSecret?: string;
+    oauth2TokenUrl?: string;
     // Authentication fields
     authenticationType?: string;
     username?: string;
@@ -48,6 +55,8 @@ interface AssignedCredentialModalProps {
     workstream?: string;
     product?: string;
     service?: string;
+    serviceKeyDetails?: 'API' | 'IFlow'; // Optional default for Cloud Foundry
+    lockServiceKeyDetails?: boolean; // If true, user cannot change Service Key Details (used from EnvironmentModal)
     stackLevel?: number;
 }
 
@@ -288,6 +297,245 @@ function AuthenticationTypeDropdown({
     );
 }
 
+// OAuth Button Component - Uses native event listener to bypass popup blockers
+function OAuthButton({
+    credentialId,
+    githubOAuthClientId,
+    loadingOAuthClientId,
+    credentialName,
+    setOauthStatus,
+    setOauthMessage,
+    disabled,
+    oauthWindowsRef,
+    selectedAccountId,
+    selectedAccountName,
+    selectedEnterpriseId,
+    selectedEnterprise,
+    workstream,
+    product,
+    service
+}: {
+    credentialId: string;
+    githubOAuthClientId: string | null;
+    loadingOAuthClientId: boolean;
+    credentialName: string;
+    setOauthStatus: React.Dispatch<React.SetStateAction<'idle' | 'pending' | 'success' | 'error'>>;
+    setOauthMessage: React.Dispatch<React.SetStateAction<string>>;
+    disabled: boolean;
+    oauthWindowsRef: React.MutableRefObject<Window | null>;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
+    selectedEnterpriseId?: string;
+    selectedEnterprise?: string;
+    workstream?: string;
+    product?: string;
+    service?: string;
+}) {
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const button = buttonRef.current;
+        if (!button || disabled) return;
+
+        const handleNativeClick = (e: MouseEvent) => {
+            // Validate first - if invalid, prevent default and show error
+            if (!githubOAuthClientId || loadingOAuthClientId) {
+                e.preventDefault();
+                e.stopPropagation();
+                setOauthStatus('error');
+                setOauthMessage(loadingOAuthClientId 
+                    ? 'Loading OAuth configuration...' 
+                    : 'GitHub OAuth Client ID is not configured. Please configure it in GitHub OAuth Apps settings.');
+                return;
+            }
+
+            // Prevent default button behavior
+            e.preventDefault();
+            e.stopPropagation();
+
+            // CRITICAL: Set status to pending IMMEDIATELY when button is clicked
+            setOauthStatus('pending');
+            setOauthMessage('OAuth in Progress');
+
+            // Prepare URL data with all context parameters
+            const state = crypto.randomUUID().replace(/-/g, '');
+            const baseRedirectUri = `${window.location.origin}/security-governance/credentials/github/oauth2/callback`;
+            
+            // CRITICAL: Build redirect_uri with ALL context parameters as query params
+            const redirectParams = new URLSearchParams();
+            if (selectedAccountId) redirectParams.set('accountId', selectedAccountId);
+            if (selectedAccountName) redirectParams.set('accountName', selectedAccountName);
+            if (selectedEnterpriseId) redirectParams.set('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise) redirectParams.set('enterpriseName', selectedEnterprise);
+            if (workstream) redirectParams.set('workstream', workstream);
+            if (product) redirectParams.set('product', product);
+            if (service) redirectParams.set('service', service);
+            
+            const redirectUri = redirectParams.toString() 
+                ? `${baseRedirectUri}?${redirectParams.toString()}`
+                : baseRedirectUri;
+            
+            // Build OAuth authorization URL
+            const queryParams = new URLSearchParams({
+                client_id: githubOAuthClientId,
+                response_type: 'code',
+                scope: 'repo',
+                redirect_uri: redirectUri,
+                state: state,
+            });
+            
+            const oauthUrl = `https://github.com/login/oauth/authorize?${queryParams.toString()}`;
+            
+            // CRITICAL: Store OAuth data BEFORE opening window
+            localStorage.removeItem('githubOAuthSuccess');
+            localStorage.removeItem('githubOAuthError');
+            sessionStorage.setItem('latestCSRFToken', state);
+            sessionStorage.setItem('githubOAuthCredentialId', credentialId);
+            sessionStorage.setItem('githubOAuthCredentialName', credentialName);
+            localStorage.setItem('latestCSRFToken', state);
+            localStorage.setItem('githubOAuthCredentialId', credentialId);
+            localStorage.setItem('githubOAuthCredentialName', credentialName);
+            
+            const cookieExpiry = new Date(Date.now() + 10 * 60 * 1000).toUTCString();
+            document.cookie = `githubOAuthCSRFToken=${state}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
+            document.cookie = `githubOAuthCredentialId=${credentialId}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
+            document.cookie = `githubOAuthCredentialName=${encodeURIComponent(credentialName)}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
+            
+            console.log('🔑 [OAuth] Stored credential ID:', credentialId);
+            console.log('🔑 [OAuth] Stored credential name:', credentialName);
+            console.log('🔑 [OAuth] Context parameters (in redirect_uri):', {
+                accountId: selectedAccountId || '(empty)',
+                accountName: selectedAccountName || '(empty)',
+                enterpriseId: selectedEnterpriseId || '(empty)',
+                enterpriseName: selectedEnterprise || '(empty)',
+                workstream: workstream || '(empty)',
+                product: product || '(empty)',
+                service: service || '(empty)',
+            });
+            console.log('🔑 [OAuth] Redirect URI (with context params):', redirectUri);
+            console.log('🔑 [OAuth] Full OAuth Authorization URL:', oauthUrl);
+            
+            // Open OAuth window
+            const oauthWindow = window.open(oauthUrl, '_blank', 'width=600,height=700,noreferrer');
+            
+            if (oauthWindow) {
+                console.log('✅ [OAuth] Window opened successfully');
+                oauthWindowsRef.current = oauthWindow;
+            } else {
+                console.warn('⚠️ [OAuth] window.open() returned null - popup may have been blocked');
+            }
+            
+            // Monitor OAuth completion
+            const checkOAuthStatus = () => {
+                const storedCredentialId = localStorage.getItem('githubOAuthCredentialId');
+                const oauthSuccess = localStorage.getItem('githubOAuthSuccess');
+                const oauthError = localStorage.getItem('githubOAuthError');
+                
+                if (storedCredentialId !== credentialId) {
+                    return false;
+                }
+                
+                if (oauthSuccess === 'true') {
+                    console.log('✅ [OAuth] Success detected for credential:', credentialId);
+                    setOauthStatus('success');
+                    setOauthMessage('OAuth configured successfully');
+                    
+                    localStorage.removeItem('githubOAuthSuccess');
+                    if (oauthWindowsRef.current && !oauthWindowsRef.current.closed) {
+                        try {
+                            oauthWindowsRef.current.close();
+                            oauthWindowsRef.current = null;
+                        } catch (e) {
+                            console.error('❌ [OAuth] Error closing window:', e);
+                        }
+                    }
+                    return true;
+                } else if (oauthSuccess === 'false' || oauthError) {
+                    console.log('❌ [OAuth] Error detected for credential:', credentialId);
+                    setOauthStatus('error');
+                    setOauthMessage(oauthError || 'OAuth authorization failed');
+                    
+                    localStorage.removeItem('githubOAuthError');
+                    localStorage.removeItem('githubOAuthSuccess');
+                    if (oauthWindowsRef.current && !oauthWindowsRef.current.closed) {
+                        try {
+                            oauthWindowsRef.current.close();
+                            oauthWindowsRef.current = null;
+                        } catch (e) {
+                            console.error('❌ [OAuth] Error closing window:', e);
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            };
+            
+            if (checkOAuthStatus()) {
+                return;
+            }
+            
+            const handleStorageChange = (e: StorageEvent) => {
+                if (e.key === 'githubOAuthSuccess' || e.key === 'githubOAuthError') {
+                    if (checkOAuthStatus()) {
+                        window.removeEventListener('storage', handleStorageChange);
+                    }
+                }
+            };
+            window.addEventListener('storage', handleStorageChange);
+            
+            const checkInterval = setInterval(() => {
+                if (checkOAuthStatus()) {
+                    clearInterval(checkInterval);
+                    window.removeEventListener('storage', handleStorageChange);
+                    return;
+                }
+                
+                if (oauthWindow) {
+                    try {
+                        if (oauthWindow.closed) {
+                            oauthWindowsRef.current = null;
+                            console.log('🔄 [OAuth] OAuth window closed, but continuing to monitor...');
+                        }
+                    } catch (e) {
+                        // Cross-origin error - continue monitoring
+                    }
+                }
+            }, 300);
+            
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                window.removeEventListener('storage', handleStorageChange);
+            }, 600000);
+        };
+
+        button.addEventListener('mousedown', handleNativeClick, true);
+        
+        return () => {
+            button.removeEventListener('mousedown', handleNativeClick, true);
+        };
+    }, [credentialId, githubOAuthClientId, loadingOAuthClientId, credentialName, setOauthStatus, setOauthMessage, disabled, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service]);
+
+    return (
+        <button
+            ref={buttonRef}
+            type="button"
+            disabled={disabled}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm hover:shadow-md ${
+                disabled
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+        >
+            <Icon name="github" size={16} className="text-white" />
+            <span>
+                {loadingOAuthClientId 
+                    ? 'Loading...' 
+                    : 'Link to GitHub'}
+            </span>
+        </button>
+    );
+}
+
 const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
     isOpen,
     onClose,
@@ -303,6 +551,8 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
     workstream = '',
     product = '',
     service = '',
+    serviceKeyDetails,
+    lockServiceKeyDetails = false,
     stackLevel = 0
 }) => {
     // Calculate modal width based on stack level to keep parent modal's left panel visible
@@ -324,7 +574,11 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
         category: category || '',
         connector: connector || connectorName || '',
         scope: connector || connectorName || '', // Scope is the connector name
+        serviceKeyDetails: serviceKeyDetails,
         authenticationType: '',
+        oauth2ClientId: '',
+        oauth2ClientSecret: '',
+        oauth2TokenUrl: '',
         username: '',
         usernameEncryption: 'Plaintext',
         apiKey: '',
@@ -338,11 +592,19 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
     const [validationErrors, setValidationErrors] = useState<{[key: string]: boolean}>({});
     const [validationMessages, setValidationMessages] = useState<{[key: string]: string}>({});
     const prevIsOpenRef = useRef(false);
+    
+    // OAuth state tracking
+    const [oauthStatus, setOauthStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+    const [oauthMessage, setOauthMessage] = useState<string>('');
+    const [githubOAuthClientId, setGithubOAuthClientId] = useState<string | null>(null);
+    const [loadingOAuthClientId, setLoadingOAuthClientId] = useState(false);
+    const oauthWindowsRef = useRef<Window | null>(null);
 
     // Define authentication types available for each connector
     const AUTH_TYPES_BY_CONNECTOR: Record<string, string[]> = {
         'Jira': ['Username and API Key', 'Personal Access Token'],
         'GitHub': ['Username and Token', 'GitHub App', 'OAuth'],
+        'Cloud Foundry': ['OAuth2'],
         // Add more connectors as needed
     };
 
@@ -405,10 +667,19 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                 setValidationErrors({});
                 setValidationMessages({});
             }
+
+            // If caller provided a default service key detail (e.g., EnvironmentModal API/IFlow),
+            // ensure it is applied every time the modal is open.
+            if (serviceKeyDetails) {
+                setCredential(prev => ({
+                    ...prev,
+                    serviceKeyDetails: serviceKeyDetails,
+                }));
+            }
         }
         
         prevIsOpenRef.current = isOpen;
-    }, [isOpen, initialCredentials, workstream, product, service]);
+    }, [isOpen, initialCredentials, workstream, product, service, serviceKeyDetails]);
 
     // Track changes to detect unsaved changes
     useEffect(() => {
@@ -424,6 +695,146 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
             setHasUnsavedChanges(hasAnyData);
         }
     }, [credential, originalCredential, isOpen]);
+
+    // Load GitHub OAuth Client ID from API
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        // Only load if connector is GitHub and OAuth is selected or available
+        const isGitHub = (connector || connectorName || '').toLowerCase() === 'github';
+        if (!isGitHub) return;
+        
+        const loadGitHubOAuthClientId = async () => {
+            setLoadingOAuthClientId(true);
+            try {
+                const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
+                const accountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
+                const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
+                const enterpriseName = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
+                
+                let apiUrl = '/api/oauth/github/client-id';
+                const params = new URLSearchParams();
+                if (accountId) params.append('accountId', accountId);
+                if (accountName) params.append('accountName', accountName);
+                if (enterpriseId) params.append('enterpriseId', enterpriseId);
+                if (enterpriseName) params.append('enterpriseName', enterpriseName);
+                if (workstream) params.append('workstream', workstream);
+                if (product) params.append('product', product);
+                if (service) params.append('service', service);
+                if (params.toString()) apiUrl += `?${params.toString()}`;
+                
+                console.log('🔑 [OAuth] Fetching GitHub OAuth Client ID from:', apiUrl);
+                
+                try {
+                    const response = await api.get<{ clientId: string } | { error: string } | any>(apiUrl);
+                    
+                    if (response && typeof response === 'object') {
+                        if ('clientId' in response && response.clientId) {
+                            setGithubOAuthClientId(response.clientId);
+                            return;
+                        }
+                        if ('client_id' in response && response.client_id) {
+                            setGithubOAuthClientId(response.client_id);
+                            return;
+                        }
+                        if (typeof response === 'string' && response.trim() !== '') {
+                            setGithubOAuthClientId(response);
+                            return;
+                        }
+                    }
+                    
+                    setGithubOAuthClientId(null);
+                } catch (apiError: any) {
+                    console.error('❌ [OAuth] Failed to load GitHub OAuth Client ID:', apiError);
+                    setGithubOAuthClientId(null);
+                }
+            } catch (error: any) {
+                console.error('❌ [OAuth] Unexpected error loading GitHub OAuth Client ID:', error);
+                setGithubOAuthClientId(null);
+            } finally {
+                setLoadingOAuthClientId(false);
+            }
+        };
+        
+        loadGitHubOAuthClientId();
+    }, [isOpen, connector, connectorName, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service]);
+
+    // Listen for OAuth completion
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleOAuthMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            if (event.data.type === 'GITHUB_OAUTH_SUCCESS') {
+                const credentialId = event.data.credentialId;
+                if (credentialId === credential.id) {
+                    console.log('✅ [OAuth] GitHub OAuth successful for credential:', credentialId);
+                    setOauthStatus('success');
+                    setOauthMessage('OAuth configured successfully');
+                    
+                    if (oauthWindowsRef.current && !oauthWindowsRef.current.closed) {
+                        try {
+                            oauthWindowsRef.current.close();
+                            oauthWindowsRef.current = null;
+                        } catch (e) {
+                            console.error('❌ [OAuth] Error closing window:', e);
+                        }
+                    }
+                }
+            } else if (event.data.type === 'GITHUB_OAUTH_ERROR') {
+                const credentialId = event.data.credentialId;
+                const errorMessage = event.data.error || 'OAuth authorization failed';
+                if (credentialId === credential.id) {
+                    console.error('❌ [OAuth] GitHub OAuth failed for credential:', credentialId, errorMessage);
+                    setOauthStatus('error');
+                    setOauthMessage(errorMessage);
+                    
+                    if (oauthWindowsRef.current && !oauthWindowsRef.current.closed) {
+                        try {
+                            oauthWindowsRef.current.close();
+                            oauthWindowsRef.current = null;
+                        } catch (e) {
+                            console.error('❌ [OAuth] Error closing window:', e);
+                        }
+                    }
+                }
+            }
+        };
+
+        // Check localStorage for OAuth completion status
+        if (typeof window !== 'undefined') {
+            const storedCredentialId = localStorage.getItem('githubOAuthCredentialId');
+            const oauthSuccess = localStorage.getItem('githubOAuthSuccess');
+            
+            if (storedCredentialId === credential.id) {
+                if (oauthSuccess === 'true') {
+                    setOauthStatus('success');
+                    setOauthMessage('OAuth configured successfully');
+                    localStorage.removeItem('githubOAuthSuccess');
+                    localStorage.removeItem('githubOAuthCredentialId');
+                } else if (oauthSuccess === 'false') {
+                    const errorMessage = localStorage.getItem('githubOAuthError') || 'OAuth authentication failed';
+                    setOauthStatus('error');
+                    setOauthMessage(errorMessage);
+                    localStorage.removeItem('githubOAuthError');
+                    localStorage.removeItem('githubOAuthSuccess');
+                    localStorage.removeItem('githubOAuthCredentialId');
+                } else {
+                    // Still pending
+                    setOauthStatus('pending');
+                    setOauthMessage('OAuth in Progress');
+                }
+            }
+        }
+
+        window.addEventListener('message', handleOAuthMessage);
+        return () => {
+            window.removeEventListener('message', handleOAuthMessage);
+        };
+    }, [isOpen, credential.id]);
 
     const updateCredential = (field: keyof Credential, value: string) => {
         setCredential(prev => ({ ...prev, [field]: value }));
@@ -495,6 +906,26 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                 errors.githubPrivateKey = true;
                 messages.githubPrivateKey = 'GitHub Private Key is required';
             }
+        } else if (credential.authenticationType === 'OAuth2') {
+            // Cloud Foundry (Deploy) - OAuth2 required fields
+            if ((credential.category || category || '').toLowerCase() === 'deploy' && (credential.connector || connector || connectorName || '').toLowerCase() === 'cloud foundry') {
+                if (!credential.serviceKeyDetails) {
+                    errors.serviceKeyDetails = true;
+                    messages.serviceKeyDetails = 'Service Key Details is required';
+                }
+                if (!credential.oauth2ClientId || !credential.oauth2ClientId.trim()) {
+                    errors.oauth2ClientId = true;
+                    messages.oauth2ClientId = 'Client ID is required';
+                }
+                if (!credential.oauth2ClientSecret || !credential.oauth2ClientSecret.trim()) {
+                    errors.oauth2ClientSecret = true;
+                    messages.oauth2ClientSecret = 'Client Secret is required';
+                }
+                if (!credential.oauth2TokenUrl || !credential.oauth2TokenUrl.trim()) {
+                    errors.oauth2TokenUrl = true;
+                    messages.oauth2TokenUrl = 'Token URL is required';
+                }
+            }
         }
 
         setValidationErrors(errors);
@@ -507,9 +938,20 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
             return;
         }
 
-        onSave([credential]);
+        // Ensure credential has the correct context values from props
+        const credentialToSave: Credential = {
+            ...credential,
+            entity: credential.entity || workstream || '',
+            product: credential.product || product || '',
+            service: credential.service || service || '',
+            category: credential.category || category || '',
+            connector: credential.connector || connector || connectorName || '',
+            scope: credential.scope || credential.connector || connector || connectorName || '',
+        };
+
+        onSave([credentialToSave]);
         setHasUnsavedChanges(false);
-        setOriginalCredential(JSON.parse(JSON.stringify(credential)));
+        setOriginalCredential(JSON.parse(JSON.stringify(credentialToSave)));
     };
 
     const handleClose = () => {
@@ -532,6 +974,14 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
 
     const handleAuthenticationTypeChange = (newValue: string) => {
         updateCredential('authenticationType', newValue);
+        
+        // Clear Cloud Foundry OAuth2 fields when auth type changes away from OAuth2
+        if (newValue !== 'OAuth2') {
+            updateCredential('serviceKeyDetails', '');
+            updateCredential('oauth2ClientId', '');
+            updateCredential('oauth2ClientSecret', '');
+            updateCredential('oauth2TokenUrl', '');
+        }
         
         // Set default encryption values when authentication type changes
         if (newValue === 'Username and API Key') {
@@ -704,6 +1154,38 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                                         <h3 className="text-base font-semibold text-gray-900 mb-4">
                                             Authentication Details
                                         </h3>
+                                        {/* Cloud Foundry (Deploy): Service Key Details */}
+                                        {(credential.category || category || '').toLowerCase() === 'deploy' &&
+                                            (credential.connector || connector || connectorName || '').toLowerCase() === 'cloud foundry' && (
+                                            <div className="mb-4">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Service Key Details *
+                                                </label>
+                                                <div className="flex items-center gap-6">
+                                                    {(['API', 'IFlow'] as const).map((opt) => (
+                                                        <label key={opt} className="flex items-center gap-2 text-sm text-slate-700">
+                                                            <input
+                                                                type="radio"
+                                                                name={`serviceKeyDetails-${credential.id}`}
+                                                                value={opt}
+                                                                checked={credential.serviceKeyDetails === opt}
+                                                                disabled={lockServiceKeyDetails && !!serviceKeyDetails && serviceKeyDetails !== opt}
+                                                                onChange={() => {
+                                                                    if (lockServiceKeyDetails && serviceKeyDetails && serviceKeyDetails !== opt) return;
+                                                                    updateCredential('serviceKeyDetails', opt);
+                                                                }}
+                                                            />
+                                                            <span>{opt}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                {validationErrors.serviceKeyDetails && (
+                                                    <p className="text-red-500 text-xs mt-1">
+                                                        {validationMessages.serviceKeyDetails || 'Service Key Details is required'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Authentication Type
@@ -720,6 +1202,76 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                                                 <p className="text-red-500 text-xs mt-1">
                                                     {validationMessages.authenticationType || 'Authentication Type is required'}
                                                 </p>
+                                            )}
+
+                                            {/* Conditional fields for OAuth2 (Cloud Foundry) */}
+                                            {credential.authenticationType === 'OAuth2' &&
+                                                (credential.category || category || '').toLowerCase() === 'deploy' &&
+                                                (credential.connector || connector || connectorName || '').toLowerCase() === 'cloud foundry' && (
+                                                <div className="mt-4 space-y-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Client ID *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={credential.oauth2ClientId || ''}
+                                                            onChange={(e) => updateCredential('oauth2ClientId', e.target.value)}
+                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                validationErrors.oauth2ClientId
+                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                            }`}
+                                                        />
+                                                        {validationErrors.oauth2ClientId && (
+                                                            <p className="text-red-500 text-xs mt-1">
+                                                                {validationMessages.oauth2ClientId || 'Client ID is required'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Client Secret *
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            value={credential.oauth2ClientSecret || ''}
+                                                            onChange={(e) => updateCredential('oauth2ClientSecret', e.target.value)}
+                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                validationErrors.oauth2ClientSecret
+                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                            }`}
+                                                        />
+                                                        {validationErrors.oauth2ClientSecret && (
+                                                            <p className="text-red-500 text-xs mt-1">
+                                                                {validationMessages.oauth2ClientSecret || 'Client Secret is required'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Token URL *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={credential.oauth2TokenUrl || ''}
+                                                            onChange={(e) => updateCredential('oauth2TokenUrl', e.target.value)}
+                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                validationErrors.oauth2TokenUrl
+                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                            }`}
+                                                        />
+                                                        {validationErrors.oauth2TokenUrl && (
+                                                            <p className="text-red-500 text-xs mt-1">
+                                                                {validationMessages.oauth2TokenUrl || 'Token URL is required'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             )}
                                             
                                             {/* Conditional fields for Username and API Key (Jira) */}
@@ -951,6 +1503,71 @@ const AssignedCredentialModal: React.FC<AssignedCredentialModalProps> = ({
                                                             </p>
                                                         )}
                                                     </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Conditional fields for OAuth */}
+                                            {credential.authenticationType === 'OAuth' && (connector || connectorName || '').toLowerCase() === 'github' && (
+                                                <div className="mt-4">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700 mb-1">GitHub OAuth Authentication</p>
+                                                            <p className="text-xs text-gray-500">Connect your GitHub account using OAuth</p>
+                                                        </div>
+                                                        <OAuthButton
+                                                            credentialId={credential.id}
+                                                            githubOAuthClientId={githubOAuthClientId}
+                                                            loadingOAuthClientId={loadingOAuthClientId}
+                                                            credentialName={credential.credentialName || ''}
+                                                            setOauthStatus={setOauthStatus}
+                                                            setOauthMessage={setOauthMessage}
+                                                            disabled={loadingOAuthClientId || !githubOAuthClientId || oauthStatus === 'pending'}
+                                                            oauthWindowsRef={oauthWindowsRef}
+                                                            selectedAccountId={selectedAccountId}
+                                                            selectedAccountName={selectedAccountName}
+                                                            selectedEnterpriseId={selectedEnterpriseId}
+                                                            selectedEnterprise={selectedEnterprise}
+                                                            workstream={workstream}
+                                                            product={product}
+                                                            service={service}
+                                                        />
+                                                    </div>
+                                                    
+                                                    {/* OAuth Status Display */}
+                                                    {oauthStatus !== 'idle' && (
+                                                        <div className={`mt-3 p-3 rounded-lg ${
+                                                            oauthStatus === 'success' 
+                                                                ? 'bg-green-50 border border-green-200' 
+                                                                : oauthStatus === 'error'
+                                                                ? 'bg-red-50 border border-red-200'
+                                                                : 'bg-blue-50 border border-blue-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-2">
+                                                                {oauthStatus === 'pending' && (
+                                                                    <motion.div
+                                                                        className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
+                                                                        animate={{ rotate: 360 }}
+                                                                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                                                    />
+                                                                )}
+                                                                {oauthStatus === 'success' && (
+                                                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                                                )}
+                                                                {oauthStatus === 'error' && (
+                                                                    <XCircle className="w-4 h-4 text-red-600" />
+                                                                )}
+                                                                <span className={`text-sm font-medium ${
+                                                                    oauthStatus === 'success' 
+                                                                        ? 'text-green-800' 
+                                                                        : oauthStatus === 'error'
+                                                                        ? 'text-red-800'
+                                                                        : 'text-blue-800'
+                                                                }`}>
+                                                                    {oauthMessage || (oauthStatus === 'pending' ? 'OAuth in Progress' : oauthStatus === 'success' ? 'OAuth configured successfully' : 'OAuth authorization failed')}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

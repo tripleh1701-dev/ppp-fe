@@ -6016,13 +6016,64 @@ function AsyncChipSelectService({
 interface ConnectivityStatusCellProps {
     connectorName: string;
     rowId: string;
+    selectedAccountId?: string;
+    selectedAccountName?: string;
+    selectedEnterpriseId?: string;
+    selectedEnterprise?: string;
+    workstream?: string;
+    product?: string;
+    service?: string;
 }
 
-function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCellProps) {
+function ConnectivityStatusCell({ connectorName, rowId, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service }: ConnectivityStatusCellProps) {
     const [isTesting, setIsTesting] = useState(false);
     const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'failed'>('idle');
     const [testTime, setTestTime] = useState<Date | null>(null);
     const [timeAgo, setTimeAgo] = useState<string>('');
+
+    interface TestResult {
+        status: 'success' | 'failed';
+        timestamp: number;
+    }
+
+    // Load stored test result from localStorage (persisted by EnvironmentModal)
+    const loadTestResult = useCallback(() => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+        try {
+            const STORAGE_KEY = `environment_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+            const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+            if (stored) {
+                const results: Record<string, TestResult> = JSON.parse(stored);
+                const result = results[rowId];
+                if (result) {
+                    setTestStatus(result.status);
+                    setTestTime(new Date(result.timestamp));
+                } else {
+                    setTestStatus('idle');
+                    setTestTime(null);
+                }
+            } else {
+                setTestStatus('idle');
+                setTestTime(null);
+            }
+        } catch (error) {
+            console.error('❌ [Environment ConnectivityStatusCell] Error loading test result:', error);
+        }
+    }, [rowId, selectedAccountId, selectedEnterpriseId]);
+
+    useEffect(() => {
+        loadTestResult();
+    }, [loadTestResult]);
+
+    useEffect(() => {
+        const handleTestResultUpdate = () => {
+            loadTestResult();
+        };
+        window.addEventListener('environmentTestResultUpdated', handleTestResultUpdate);
+        return () => {
+            window.removeEventListener('environmentTestResultUpdated', handleTestResultUpdate);
+        };
+    }, [loadTestResult]);
 
     // Calculate time ago string
     const getTimeAgo = (date: Date): string => {
@@ -6062,6 +6113,11 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
     }, [testTime]);
 
     const testConnectivity = async () => {
+        if (!selectedAccountId || !selectedEnterpriseId) {
+            console.error('❌ [Environment ConnectivityStatusCell] Missing accountId or enterpriseId');
+            return;
+        }
+
         setIsTesting(true);
         setTestStatus('idle');
         setTestTime(null);
@@ -6071,12 +6127,106 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
         const testStartTime = Date.now();
 
         try {
+            // Load latest saved Environment row from localStorage (to use the same details entered in EnvironmentModal)
+            const LOCAL_STORAGE_ENVIRONMENTS_KEY = 'environments_environments_data';
+            const envStorageKey = `${LOCAL_STORAGE_ENVIRONMENTS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+            const storedRows = typeof window !== 'undefined' ? window.localStorage.getItem(envStorageKey) : null;
+            const allRows: any[] = storedRows ? JSON.parse(storedRows) : [];
+            const currentRow = allRows.find((r) => r.id === rowId);
 
-            // Call connectivity test API endpoint
-            // TODO: Update endpoint path when backend API is ready
-            const response = await api.post<{success?: boolean; status?: string; connected?: boolean}>(`/api/connectors/${rowId}/test-connection`, {
-                connectorName: connectorName,
+            const cfConnector =
+                currentRow?.connectors?.find((c: any) => (c.connector || '').toLowerCase() === 'cloud foundry') ||
+                currentRow?.connectors?.[0];
+
+            const iflowCredentialName = (cfConnector?.iflowCredentialName || '').trim();
+            const hostUrl = (cfConnector?.hostUrl || '').trim();
+
+            if (!iflowCredentialName || !hostUrl) {
+                throw new Error('Please configure IFlow Credential Name and Host URL in EnvironmentModal before testing.');
+            }
+
+            // Load credential auth details from Manage Credentials localStorage (same logic as EnvironmentModal)
+            const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+            const credStorageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+            const storedCreds = typeof window !== 'undefined' ? window.localStorage.getItem(credStorageKey) : null;
+            const allCreds: any[] = storedCreds ? JSON.parse(storedCreds) : [];
+
+            const matchingCredential = allCreds.find((c) => {
+                const nameMatch = (c.credentialName || '').trim() === iflowCredentialName;
+                const entityMatch = !workstream || !c.entity || String(c.entity).toLowerCase() === String(workstream).toLowerCase();
+                const productMatch = !product || !c.product || String(c.product).toLowerCase() === String(product).toLowerCase();
+                const serviceMatch = !service || !c.service || String(c.service).toLowerCase() === String(service).toLowerCase();
+                return nameMatch && entityMatch && productMatch && serviceMatch;
             });
+
+            if (!matchingCredential) {
+                throw new Error('Selected credential name was not found for the current workstream/product/service context.');
+            }
+
+            const cfCredConfig = matchingCredential?.connectors?.find((cfg: any) => {
+                const matchesCategory = (cfg.category || '').toLowerCase() === 'deploy';
+                const matchesConnector = (cfg.connector || '').toLowerCase() === 'cloud foundry';
+                const matchesServiceKey = (cfg.serviceKeyDetails || '').toLowerCase() === 'iflow';
+                return matchesCategory && matchesConnector && matchesServiceKey;
+            });
+
+            if (!cfCredConfig) {
+                throw new Error('Credential does not include Cloud Foundry (IFlow) connector configuration.');
+            }
+
+            const authenticationType = cfCredConfig.authenticationType || '';
+            if (!authenticationType) {
+                throw new Error('Credential is missing authentication type for Cloud Foundry.');
+            }
+
+            const authDetails: any =
+                authenticationType === 'OAuth2'
+                    ? {
+                          authenticationType,
+                          oauth2ClientId: cfCredConfig.oauth2ClientId,
+                          oauth2ClientSecret: cfCredConfig.oauth2ClientSecret,
+                          oauth2TokenUrl: cfCredConfig.oauth2TokenUrl,
+                      }
+                    : {
+                          authenticationType,
+                          username: cfCredConfig.username,
+                          apiKey: cfCredConfig.apiKey,
+                      };
+
+            if (authenticationType === 'OAuth2') {
+                if (!authDetails.oauth2ClientId || !authDetails.oauth2ClientSecret || !authDetails.oauth2TokenUrl) {
+                    throw new Error('OAuth2 credential is missing Client ID, Client Secret, or Token URL.');
+                }
+            } else {
+                if (!authDetails.username || !authDetails.apiKey) {
+                    throw new Error('Basic Auth credential is missing username or secret.');
+                }
+            }
+
+            const testPayload: any = {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : '') || '',
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : '') || '',
+                workstream: workstream || '',
+                product: product || '',
+                service: service || '',
+                credentialName: iflowCredentialName,
+                hostUrl,
+                ...authDetails,
+            };
+
+            console.log('🧪 [Environment ConnectivityStatusCell] Sending environment connectivity test:', {
+                ...testPayload,
+                oauth2ClientSecret: testPayload.oauth2ClientSecret ? `[MASKED - Length: ${String(testPayload.oauth2ClientSecret).length}]` : undefined,
+                apiKey: testPayload.apiKey ? `[MASKED - Length: ${String(testPayload.apiKey).length}]` : undefined,
+            });
+
+            // Call Cloud Foundry test endpoint (same as EnvironmentModal)
+            const response = await api.post<{success?: boolean; status?: string; connected?: boolean; message?: string}>(
+                '/api/environments/cloudfoundry/test-connection',
+                testPayload,
+            );
 
             // Ensure minimum test duration has passed
             const elapsedTime = Date.now() - testStartTime;
@@ -6087,9 +6237,24 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
             }
 
             // Check if response indicates success
-            const success = response && (response.success || response.status === 'success' || response.connected);
+            const success = !!(response && (response.success || response.status === 'success' || response.connected));
+            const timestamp = Date.now();
             setTestStatus(success ? 'success' : 'failed');
-            setTestTime(new Date());
+            setTestTime(new Date(timestamp));
+
+            // Store test result in localStorage so Status column persists after refresh
+            try {
+                const STORAGE_KEY = `environment_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                const results: Record<string, TestResult> = stored ? JSON.parse(stored) : {};
+                results[rowId] = { status: success ? 'success' : 'failed', timestamp };
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                    window.dispatchEvent(new Event('environmentTestResultUpdated'));
+                }
+            } catch (error) {
+                console.error('❌ [Environment ConnectivityStatusCell] Error saving test result:', error);
+            }
         } catch (error) {
             // Ensure minimum test duration even on error
             const elapsedTime = Date.now() - testStartTime;
@@ -6099,9 +6264,24 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
                 await new Promise(resolve => setTimeout(resolve, remainingTime));
             }
 
+            const timestamp = Date.now();
             setTestStatus('failed');
-            setTestTime(new Date());
+            setTestTime(new Date(timestamp));
             console.error('Connectivity test failed:', error);
+
+            // Store failed test result
+            try {
+                const STORAGE_KEY = `environment_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
+                const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+                const results: Record<string, TestResult> = stored ? JSON.parse(stored) : {};
+                results[rowId] = { status: 'failed', timestamp };
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                    window.dispatchEvent(new Event('environmentTestResultUpdated'));
+                }
+            } catch (e) {
+                console.error('❌ [Environment ConnectivityStatusCell] Error saving failed test result:', e);
+            }
         } finally {
             setIsTesting(false);
         }
@@ -6109,9 +6289,12 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
 
     return (
         <div className="flex items-center gap-3 w-full px-2">
-            {/* Status (appears in front of Test button after clicking) */}
+            {/* Only show the status container AFTER a test has started or results exist */}
             {(isTesting || testStatus !== 'idle') && (
-                <div className="flex flex-col items-start gap-0.5">
+                <div
+                    className="flex flex-col items-start gap-0.5"
+                    style={{ minWidth: '100px', width: '100px', flexShrink: 0 }}
+                >
                     {isTesting ? (
                         // Test in Progress
                         <div className="flex items-center gap-1.5 text-xs text-slate-700">
@@ -6122,7 +6305,7 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
                             />
                             <span className="font-medium">Test in Progress</span>
                         </div>
-                    ) : testStatus !== 'idle' ? (
+                    ) : (
                         // Status with icon, text, and timestamp
                         <>
                             <div className="flex items-center gap-1.5">
@@ -6141,7 +6324,7 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
                                 </span>
                             )}
                         </>
-                    ) : null}
+                    )}
                 </div>
             )}
 
@@ -6159,9 +6342,15 @@ function ConnectivityStatusCell({ connectorName, rowId }: ConnectivityStatusCell
                     position: 'relative',
                     overflow: 'hidden',
                     minHeight: '28px',
+                    // Before first test, button should fill the entire column width.
+                    // After test starts or results exist, keep a fixed width to avoid layout shifts.
+                    minWidth: (isTesting || testStatus !== 'idle') ? '60px' : undefined,
+                    width: (isTesting || testStatus !== 'idle') ? '60px' : '100%',
                     padding: '4px 12px',
                     fontSize: '11px',
                     fontWeight: 600,
+                    flexShrink: 0,
+                    flexGrow: (isTesting || testStatus !== 'idle') ? 0 : 1,
                 }}
             >
                 Test
@@ -6942,6 +7131,13 @@ function SortableEnvironmentRow({
                         <ConnectivityStatusCell 
                             connectorName={row.connectorName || 'Connector'} 
                             rowId={row.id}
+                            selectedAccountId={selectedAccountId}
+                            selectedAccountName={selectedAccountName}
+                            selectedEnterpriseId={selectedEnterpriseId}
+                            selectedEnterprise={selectedEnterprise}
+                            workstream={row.entity || ''}
+                            product={row.product || ''}
+                            service={row.service || ''}
                         />
                     </div>
                 </div>

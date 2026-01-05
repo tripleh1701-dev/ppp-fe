@@ -3687,6 +3687,8 @@ export default function ManageConnectors() {
                         workstream={latestRow.entity || ''}
                         product={latestRow.product || ''}
                         service={latestRow.service || ''}
+                        fromBuilds={false}
+                        connectorDescription={latestRow.description || ''}
                     />
                 );
             })()}

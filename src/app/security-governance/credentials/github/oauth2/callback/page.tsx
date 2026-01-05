@@ -28,6 +28,15 @@ export default function GitHubOAuthCallback() {
                 const state = stateRaw ? decodeURIComponent(stateRaw) : null;
                 const error = searchParams.get('error');
                 const errorDescription = searchParams.get('error_description');
+                
+                // Extract context parameters from URL (GitHub redirects back with these)
+                const urlAccountId = searchParams.get('accountId') || '';
+                const urlAccountName = searchParams.get('accountName') || '';
+                const urlEnterpriseId = searchParams.get('enterpriseId') || '';
+                const urlEnterpriseName = searchParams.get('enterpriseName') || '';
+                const urlWorkstream = searchParams.get('workstream') || '';
+                const urlProduct = searchParams.get('product') || '';
+                const urlService = searchParams.get('service') || '';
 
                 // Handle OAuth error from GitHub
                 if (error) {
@@ -78,6 +87,7 @@ export default function GitHubOAuthCallback() {
 
                 // Validate the state parameter (CSRF token)
                 // Try multiple storage mechanisms: sessionStorage -> localStorage -> cookie
+                // Helper function to get cookie value
                 const getCookie = (name: string): string | null => {
                     if (typeof document === 'undefined') return null;
                     const value = `; ${document.cookie}`;
@@ -173,11 +183,108 @@ export default function GitHubOAuthCallback() {
                     document.cookie = 'githubOAuthConnectorId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                 }
 
+                // Retrieve credential name, accountId, and enterpriseId from storage
+                const credentialNameRaw = 
+                    sessionStorage.getItem('githubOAuthCredentialName') || 
+                    localStorage.getItem('githubOAuthCredentialName') ||
+                    getCookie('githubOAuthCredentialName') ||
+                    '';
+                const credentialName = credentialNameRaw ? decodeURIComponent(credentialNameRaw) : '';
+
+                // Fallback: Get accountId and enterpriseId from localStorage (set by the app)
+                const accountId = urlAccountId || (typeof window !== 'undefined' 
+                    ? (window.localStorage.getItem('selectedAccountId') || '')
+                    : '');
+                const accountName = urlAccountName || (typeof window !== 'undefined'
+                    ? (window.localStorage.getItem('selectedAccountName') || '')
+                    : '');
+                const enterpriseId = urlEnterpriseId || (typeof window !== 'undefined'
+                    ? (window.localStorage.getItem('selectedEnterpriseId') || '')
+                    : '');
+                const enterpriseName = urlEnterpriseName || (typeof window !== 'undefined'
+                    ? (window.localStorage.getItem('selectedEnterpriseName') || '')
+                    : '');
+                const workstream = urlWorkstream || '';
+                const product = urlProduct || '';
+                const service = urlService || '';
+
+                console.log('🔑 [OAuth] Token exchange context:', {
+                    credentialName,
+                    credentialNameRaw,
+                    accountId,
+                    accountName,
+                    enterpriseId,
+                    enterpriseName,
+                    workstream,
+                    product,
+                    service,
+                    hasCode: !!code,
+                    fromSessionStorage: !!sessionStorage.getItem('githubOAuthCredentialName'),
+                    fromLocalStorage: !!localStorage.getItem('githubOAuthCredentialName'),
+                    fromCookie: !!getCookie('githubOAuthCredentialName')
+                });
+                // Log values explicitly so they're visible even if object is collapsed
+                console.log('🔑 [OAuth] Credential Name:', credentialName || 'MISSING');
+                console.log('🔑 [OAuth] Account ID:', accountId || 'MISSING');
+                console.log('🔑 [OAuth] Account Name:', accountName || 'MISSING');
+                console.log('🔑 [OAuth] Enterprise ID:', enterpriseId || 'MISSING');
+                console.log('🔑 [OAuth] Enterprise Name:', enterpriseName || 'MISSING');
+                console.log('🔑 [OAuth] Workstream:', workstream || 'MISSING');
+                console.log('🔑 [OAuth] Product:', product || 'MISSING');
+                console.log('🔑 [OAuth] Service:', service || 'MISSING');
+                console.log('🔑 [OAuth] Code present:', !!code);
+
+                // Validate that we have the required values
+                if (!credentialName) {
+                    console.warn('⚠️ [OAuth] WARNING: credentialName is missing! This may cause the token to not be stored correctly.');
+                    console.warn('⚠️ [OAuth] Available storage:', {
+                        sessionStorage: sessionStorage.getItem('githubOAuthCredentialName'),
+                        localStorage: localStorage.getItem('githubOAuthCredentialName'),
+                        cookie: getCookie('githubOAuthCredentialName')
+                    });
+                }
+                if (!accountId) {
+                    console.warn('⚠️ [OAuth] WARNING: accountId is missing!');
+                }
+                if (!enterpriseId) {
+                    console.warn('⚠️ [OAuth] WARNING: enterpriseId is missing!');
+                }
+
+                // Prepare the payload with all context parameters (only include if they have values)
+                const tokenExchangePayload: any = { 
+                    code,
+                };
+                
+                // Add context parameters only if they exist (no hardcoded values)
+                if (credentialName) tokenExchangePayload.credentialName = credentialName;
+                if (accountId) tokenExchangePayload.accountId = accountId;
+                if (accountName) tokenExchangePayload.accountName = accountName;
+                if (enterpriseId) tokenExchangePayload.enterpriseId = enterpriseId;
+                if (enterpriseName) tokenExchangePayload.enterpriseName = enterpriseName;
+                if (workstream) tokenExchangePayload.workstream = workstream;
+                if (product) tokenExchangePayload.product = product;
+                if (service) tokenExchangePayload.service = service;
+
+                console.log('📤 [OAuth] Sending token exchange request with payload:', {
+                    ...tokenExchangePayload,
+                    code: tokenExchangePayload.code ? '[REDACTED]' : undefined
+                });
+                // Log payload values explicitly
+                console.log('📤 [OAuth] Payload - Credential Name:', tokenExchangePayload.credentialName || 'MISSING');
+                console.log('📤 [OAuth] Payload - Account ID:', tokenExchangePayload.accountId || 'MISSING');
+                console.log('📤 [OAuth] Payload - Account Name:', tokenExchangePayload.accountName || 'MISSING');
+                console.log('📤 [OAuth] Payload - Enterprise ID:', tokenExchangePayload.enterpriseId || 'MISSING');
+                console.log('📤 [OAuth] Payload - Enterprise Name:', tokenExchangePayload.enterpriseName || 'MISSING');
+                console.log('📤 [OAuth] Payload - Workstream:', tokenExchangePayload.workstream || 'MISSING');
+                console.log('📤 [OAuth] Payload - Product:', tokenExchangePayload.product || 'MISSING');
+                console.log('📤 [OAuth] Payload - Service:', tokenExchangePayload.service || 'MISSING');
+                console.log('📤 [OAuth] Payload - Code:', tokenExchangePayload.code ? `[REDACTED - length: ${tokenExchangePayload.code.length}]` : 'MISSING');
+
                 // Send the code to backend for token exchange
                 try {
                     const response = await api.post<{ success: boolean; message?: string; accessToken?: string }>(
                         '/api/oauth-token',
-                        { code }
+                        tokenExchangePayload
                     );
 
                     if (response && response.success) {
@@ -187,32 +294,42 @@ export default function GitHubOAuthCallback() {
                         
                         // Store success flag for modal to pick up
                         if (typeof window !== 'undefined') {
-                            const getCookie = (name: string): string | null => {
-                                const value = `; ${document.cookie}`;
-                                const parts = value.split(`; ${name}=`);
-                                if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-                                return null;
-                            };
+                            // Check for both connectorId (from ConnectorModal) and credentialId (from AssignedCredentialModal)
                             const connectorId = 
                                 sessionStorage.getItem('githubOAuthConnectorId') || 
                                 localStorage.getItem('githubOAuthConnectorId') ||
                                 getCookie('githubOAuthConnectorId');
-                            if (connectorId) {
+                            const credentialId = 
+                                sessionStorage.getItem('githubOAuthCredentialId') || 
+                                localStorage.getItem('githubOAuthCredentialId') ||
+                                getCookie('githubOAuthCredentialId');
+                            
+                            const id = connectorId || credentialId;
+                            if (id) {
                                 localStorage.setItem('githubOAuthSuccess', 'true');
                                 localStorage.setItem('githubOAuthShouldReopenModal', 'true');
+                                // Store the ID that was used (for compatibility)
+                                if (connectorId) {
+                                    localStorage.setItem('githubOAuthConnectorId', connectorId);
+                                }
+                                if (credentialId) {
+                                    localStorage.setItem('githubOAuthCredentialId', credentialId);
+                                }
                             }
                             
                             // Notify parent window about OAuth success
                             if (window.opener) {
                                 window.opener.postMessage({
                                     type: 'GITHUB_OAUTH_SUCCESS',
-                                    connectorId: connectorId
+                                    connectorId: connectorId || undefined,
+                                    credentialId: credentialId || undefined
                                 }, window.location.origin);
                                 
                                 // Also request parent to close this window
                                 window.opener.postMessage({
                                     type: 'CLOSE_OAUTH_WINDOW',
-                                    connectorId: connectorId
+                                    connectorId: connectorId || undefined,
+                                    credentialId: credentialId || undefined
                                 }, window.location.origin);
                             }
                         }
@@ -289,27 +406,36 @@ export default function GitHubOAuthCallback() {
                     
                     // Store error flag for modal to pick up
                     if (typeof window !== 'undefined') {
-                        const getCookie = (name: string): string | null => {
-                            const value = `; ${document.cookie}`;
-                            const parts = value.split(`; ${name}=`);
-                            if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-                            return null;
-                        };
+                        // Check for both connectorId (from ConnectorModal) and credentialId (from AssignedCredentialModal)
                         const connectorId = 
                             sessionStorage.getItem('githubOAuthConnectorId') || 
                             localStorage.getItem('githubOAuthConnectorId') ||
                             getCookie('githubOAuthConnectorId');
-                        if (connectorId) {
+                        const credentialId = 
+                            sessionStorage.getItem('githubOAuthCredentialId') || 
+                            localStorage.getItem('githubOAuthCredentialId') ||
+                            getCookie('githubOAuthCredentialId');
+                        
+                        const id = connectorId || credentialId;
+                        if (id) {
                             localStorage.setItem('githubOAuthSuccess', 'false');
                             localStorage.setItem('githubOAuthError', errorMessage);
                             localStorage.setItem('githubOAuthShouldReopenModal', 'true');
+                            // Store the ID that was used (for compatibility)
+                            if (connectorId) {
+                                localStorage.setItem('githubOAuthConnectorId', connectorId);
+                            }
+                            if (credentialId) {
+                                localStorage.setItem('githubOAuthCredentialId', credentialId);
+                            }
                         }
                         
                         // Notify parent window about OAuth error
                         if (window.opener) {
                             window.opener.postMessage({
                                 type: 'GITHUB_OAUTH_ERROR',
-                                connectorId: connectorId,
+                                connectorId: connectorId || undefined,
+                                credentialId: credentialId || undefined,
                                 error: errorMessage
                             }, window.location.origin);
                         }
