@@ -461,6 +461,10 @@ export interface ConnectorRow {
         connectorIconName?: string;
         authenticationType: string;
         url?: string; // URL field for connectivity
+        // GitHub (Code) specific fields
+        urlType?: string; // 'Account' | 'Repository'
+        connectionType?: string; // 'HTTP' | 'SSH'
+        githubAccountUrl?: string; // GitHub URL used for connectivity when connector is GitHub under Code
         credentialName?: string; // Credential name from Manage Credentials
         username?: string;
         usernameEncryption?: string;
@@ -6020,7 +6024,12 @@ interface ConnectivityStatusCellProps {
     rowId: string;
     row: ConnectorRow;
     selectedAccountId?: string;
+    selectedAccountName?: string;
     selectedEnterpriseId?: string;
+    selectedEnterprise?: string;
+    workstream?: string;
+    product?: string;
+    service?: string;
 }
 
 interface TestResult {
@@ -6028,7 +6037,7 @@ interface TestResult {
     timestamp: number;
 }
 
-function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, selectedEnterpriseId }: ConnectivityStatusCellProps) {
+function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream, product, service }: ConnectivityStatusCellProps) {
     const [isTesting, setIsTesting] = useState(false);
     const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'failed'>('idle');
     const [testTime, setTestTime] = useState<Date | null>(null);
@@ -6214,10 +6223,17 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
             return;
         }
 
+        // Determine URL value for logging
+        const urlValueForLog = connector.category === 'code' && connector.connector === 'GitHub'
+            ? connector.githubAccountUrl
+            : connector.url;
+
         console.log('🔍 [ConnectivityStatusCell] Using connector (from localStorage):', {
             rowId,
             connectorName: connector.connector,
-            url: connector.url,
+            category: connector.category,
+            url: urlValueForLog,
+            githubAccountUrl: connector.githubAccountUrl,
             credentialName: connector.credentialName,
             authenticationType: connector.authenticationType,
             connectorId: connector.id,
@@ -6226,16 +6242,32 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
         });
 
         // Check if required fields are filled
-        if (!connector.connector || !connector.credentialName || !connector.url) {
+        // For GitHub Code connector, check githubAccountUrl; for others, check url
+        const hasUrl = connector.category === 'code' && connector.connector === 'GitHub'
+            ? connector.githubAccountUrl
+            : connector.url;
+
+        if (!connector.connector || !connector.credentialName || !hasUrl) {
             console.warn('⚠️ [ConnectivityStatusCell] Cannot test connectivity - missing required fields:', {
                 hasConnector: !!connector.connector,
                 hasCredentialName: !!connector.credentialName,
-                hasUrl: !!connector.url,
+                hasUrl: !!hasUrl,
                 connector: connector.connector || '(empty)',
                 credentialName: connector.credentialName || '(empty)',
-                url: connector.url || '(empty)'
+                url: hasUrl || '(empty)',
+                category: connector.category || '(empty)',
+                isGitHub: connector.category === 'code' && connector.connector === 'GitHub',
+                githubAccountUrl: connector.githubAccountUrl || '(empty)'
             });
             alert('Cannot test connectivity. Please ensure URL and Credential Name are filled in the connector details.');
+            return;
+        }
+
+        // Ensure accountId and enterpriseId are present
+        if (!selectedAccountId || !selectedEnterpriseId) {
+            console.error('❌ [ConnectivityStatusCell] Cannot test connectivity - missing accountId or enterpriseId');
+            setTestStatus('failed');
+            setTestTime(new Date());
             return;
         }
 
@@ -6254,9 +6286,16 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
             let foundCredentialConnector: any = null;
             let authType = connector.authenticationType || '';
             
+            // Determine URL value for logging
+            const urlValueForLog = connector.category === 'code' && connector.connector === 'GitHub'
+                ? connector.githubAccountUrl
+                : connector.url;
+            
             console.log('🔑 [ConnectivityStatusCell] Starting connectivity test:', {
                 connectorName: connector.connector,
-                url: connector.url,
+                category: connector.category,
+                url: urlValueForLog,
+                githubAccountUrl: connector.githubAccountUrl,
                 credentialName: connector.credentialName,
                 authenticationType: connector.authenticationType,
                 hasAccountId: !!selectedAccountId,
@@ -6276,6 +6315,40 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                         const credential = allCredentials.find(
                             cred => cred.credentialName === connector.credentialName
                         );
+                        
+                        // Validate that credential exists
+                        if (!credential) {
+                            console.error('❌ [ConnectivityStatusCell] Credential not found:', connector.credentialName);
+                            throw new Error(`Credential "${connector.credentialName}" not found. It may have been deleted. Please update the connector with a valid credential name.`);
+                        }
+                        
+                        // Validate that credential matches current workstream/product/service
+                        const currentWorkstream = workstream || row.entity || '';
+                        const currentProduct = product || row.product || '';
+                        const currentService = service || row.service || '';
+                        
+                        const entityMatch = !currentWorkstream || !credential.entity || 
+                            credential.entity.toLowerCase() === currentWorkstream.toLowerCase();
+                        const productMatch = !currentProduct || !credential.product || 
+                            credential.product.toLowerCase() === currentProduct.toLowerCase();
+                        const serviceMatch = !currentService || !credential.service || 
+                            credential.service.toLowerCase() === currentService.toLowerCase();
+                        
+                        if (!entityMatch || !productMatch || !serviceMatch) {
+                            console.error('❌ [ConnectivityStatusCell] Credential does not match current workstream/product/service:', {
+                                credentialName: connector.credentialName,
+                                credentialWorkstream: credential.entity,
+                                credentialProduct: credential.product,
+                                credentialService: credential.service,
+                                currentWorkstream: currentWorkstream,
+                                currentProduct: currentProduct,
+                                currentService: currentService,
+                                entityMatch,
+                                productMatch,
+                                serviceMatch
+                            });
+                            throw new Error(`Credential "${connector.credentialName}" does not match the current workstream/product/service combination. The credential's workstream/product/service may have been changed in Manage Credentials. Please update the connector with a valid credential name.`);
+                        }
                         
                         if (credential && credential.connectors && credential.connectors.length > 0) {
                             console.log('🔑 [ConnectivityStatusCell] Found credential:', credential.credentialName, 'with', credential.connectors.length, 'connectors');
@@ -6301,8 +6374,16 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                                 if (authType === 'Username and API Key' || (!authType && foundCredentialConnector.username && foundCredentialConnector.apiKey)) {
                                     username = foundCredentialConnector.username || connector.username || '';
                                     apiToken = foundCredentialConnector.apiKey || connector.apiKey || '';
+                                } else if (authType === 'Username and Token' || (!authType && foundCredentialConnector.username && foundCredentialConnector.personalAccessToken)) {
+                                    // For GitHub: Username and Token (Personal Access Token)
+                                    username = foundCredentialConnector.username || connector.username || '';
+                                    apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
                                 } else if (authType === 'Personal Access Token' || (!authType && foundCredentialConnector.personalAccessToken)) {
                                     apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
+                                } else if (authType === 'OAuth') {
+                                    // For OAuth, OAuth is already configured in Manage Credentials
+                                    // The backend will use the OAuth token associated with this credential name
+                                    console.log('🔑 [ConnectivityStatusCell] Using OAuth authentication for credential:', connector.credentialName);
                                 }
                                 
                                 console.log('🔑 [ConnectivityStatusCell] Extracted credential details:', {
@@ -6327,24 +6408,36 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                                     credentialConnectorFound: true
                                 });
                             } else {
-                                console.warn('⚠️ [ConnectivityStatusCell] No matching connector found in credential:', {
+                                console.error('❌ [ConnectivityStatusCell] No matching connector found in credential:', {
                                     credentialName: connector.credentialName,
                                     connectorName: connector.connector,
                                     availableConnectors: credential.connectors.map((c: any) => c.connector)
                                 });
+                                throw new Error(`Credential "${connector.credentialName}" does not have connector "${connector.connector}". Please update the connector with a valid credential.`);
                             }
                         } else {
-                            console.warn('⚠️ [ConnectivityStatusCell] Credential found but no connectors array:', {
+                            console.error('❌ [ConnectivityStatusCell] Credential found but no connectors array:', {
                                 credentialName: connector.credentialName,
                                 hasConnectors: !!(credential && credential.connectors),
                                 connectorsLength: credential?.connectors?.length || 0
                             });
+                            throw new Error(`Credential "${connector.credentialName}" has no connectors configured. Please update the connector with a valid credential.`);
                         }
                     } else {
-                        console.warn('⚠️ [ConnectivityStatusCell] No credentials found in localStorage for storage key:', storageKey);
+                        console.error('❌ [ConnectivityStatusCell] No credentials found in localStorage for storage key:', storageKey);
+                        throw new Error(`Credential "${connector.credentialName}" not found. It may have been deleted. Please update the connector with a valid credential name.`);
                     }
-                } catch (error) {
+                } catch (error: any) {
                     console.error('❌ [ConnectivityStatusCell] Error loading credential from localStorage:', error);
+                    // Re-throw credential validation errors so they fail the test
+                    if (error?.message && (
+                        error.message.includes('not found') || 
+                        error.message.includes('deleted') ||
+                        error.message.includes('no connectors') ||
+                        error.message.includes('does not match')
+                    )) {
+                        throw error; // Re-throw to fail the test
+                    }
                 }
             } else {
                 console.warn('⚠️ [ConnectivityStatusCell] Cannot load credentials - missing credentialName, accountId, or enterpriseId:', {
@@ -6354,29 +6447,111 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                 });
             }
 
+            // Validate that credential was found and has the required connector
+            // For OAuth, we still need the credential to exist (even if no username/token)
+            if (authType !== 'OAuth' && !foundCredentialConnector && connector.credentialName) {
+                throw new Error(`Credential "${connector.credentialName}" not found or does not have connector "${connector.connector}". It may have been deleted. Please update the connector with a valid credential name.`);
+            }
+            
+            // For OAuth, validate that credential exists and matches filters (even if connector details aren't needed)
+            if (authType === 'OAuth' && connector.credentialName && !foundCredentialConnector) {
+                // Check if credential exists and matches workstream/product/service
+                try {
+                    const LOCAL_STORAGE_CREDENTIALS_KEY = 'credentials_credentials_data';
+                    const storageKey = `${LOCAL_STORAGE_CREDENTIALS_KEY}_${selectedAccountId}_${selectedEnterpriseId}`;
+                    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null;
+                    if (stored) {
+                        const allCredentials: any[] = JSON.parse(stored);
+                        const credential = allCredentials.find(
+                            cred => cred.credentialName === connector.credentialName
+                        );
+                        if (!credential) {
+                            throw new Error(`Credential "${connector.credentialName}" not found. It may have been deleted. Please update the connector with a valid credential name.`);
+                        }
+                        
+                        // Validate that credential matches current workstream/product/service
+                        const currentWorkstream = workstream || row.entity || '';
+                        const currentProduct = product || row.product || '';
+                        const currentService = service || row.service || '';
+                        
+                        const entityMatch = !currentWorkstream || !credential.entity || 
+                            credential.entity.toLowerCase() === currentWorkstream.toLowerCase();
+                        const productMatch = !currentProduct || !credential.product || 
+                            credential.product.toLowerCase() === currentProduct.toLowerCase();
+                        const serviceMatch = !currentService || !credential.service || 
+                            credential.service.toLowerCase() === currentService.toLowerCase();
+                        
+                        if (!entityMatch || !productMatch || !serviceMatch) {
+                            throw new Error(`Credential "${connector.credentialName}" does not match the current workstream/product/service combination. The credential's workstream/product/service may have been changed in Manage Credentials. Please update the connector with a valid credential name.`);
+                        }
+                    } else {
+                        throw new Error(`Credential "${connector.credentialName}" not found. It may have been deleted. Please update the connector with a valid credential name.`);
+                    }
+                } catch (error: any) {
+                    // Re-throw credential validation errors
+                    if (error?.message && (
+                        error.message.includes('not found') || 
+                        error.message.includes('does not match')
+                    )) {
+                        throw error;
+                    }
+                }
+            }
+
             // Build test connection payload
+            // For GitHub Code connector, use githubAccountUrl; for others, use url
+            const urlValue = connector.category === 'code' && connector.connector === 'GitHub'
+                ? connector.githubAccountUrl || ''
+                : connector.url || '';
+            
+            // Build test payload with only provided values (no hardcoded defaults)
             const testPayload: any = {
                 connectorName: connector.connector,
-                url: connector.url || '',
+                url: urlValue,
                 credentialName: connector.credentialName,
             };
+            
+            // Add context parameters only if they exist (no hardcoded values)
+            if (selectedAccountId) testPayload.accountId = selectedAccountId;
+            if (selectedAccountName) testPayload.accountName = selectedAccountName;
+            if (selectedEnterpriseId) testPayload.enterpriseId = selectedEnterpriseId;
+            if (selectedEnterprise) testPayload.enterpriseName = selectedEnterprise;
+            if (workstream || row.entity) testPayload.workstream = workstream || row.entity || '';
+            if (product || row.product) testPayload.product = product || row.product || '';
+            if (service || row.service) testPayload.service = service || row.service || '';
 
             // Add authentication details based on authentication type
             // For JIRA: Username and API Key (API Token)
             if (authType === 'Username and API Key' || (!authType && username && apiToken)) {
                 testPayload.username = username || connector.username || '';
                 testPayload.apiToken = apiToken || connector.apiKey || ''; // JIRA uses API Token, not API Key
+            } else if (authType === 'Username and Token' || (!authType && username && apiToken)) {
+                // For GitHub: Username and Token (Personal Access Token)
+                testPayload.username = username || connector.username || '';
+                testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
             } else if (authType === 'Personal Access Token' || (!authType && apiToken && !username)) {
                 testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
+            } else if (authType === 'OAuth') {
+                // For OAuth authentication, include OAuth status
+                testPayload.authenticationType = 'OAuth';
+                console.log('🔑 [ConnectivityStatusCell] Using OAuth authentication for credential:', connector.credentialName);
             }
             
             console.log('🧪 [ConnectivityStatusCell] Sending test request:', {
                 connector: connector.connector,
-                url: connector.url,
+                url: urlValue,
                 credentialName: connector.credentialName,
                 authenticationType: authType,
+                accountId: testPayload.accountId,
+                accountName: testPayload.accountName,
+                enterpriseId: testPayload.enterpriseId,
+                enterpriseName: testPayload.enterpriseName,
+                workstream: testPayload.workstream,
+                product: testPayload.product,
+                service: testPayload.service,
                 hasUsername: !!testPayload.username,
                 hasApiToken: !!testPayload.apiToken,
+                hasPersonalAccessToken: !!testPayload.personalAccessToken,
                 username: testPayload.username ? `${testPayload.username.substring(0, 5)}...` : 'none',
                 apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
                 apiTokenPreview: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 10)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 5)}` : 'none',
@@ -6388,10 +6563,17 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                 connectorName: testPayload.connectorName,
                 url: testPayload.url,
                 credentialName: testPayload.credentialName,
+                accountId: testPayload.accountId,
+                accountName: testPayload.accountName,
+                enterpriseId: testPayload.enterpriseId,
+                enterpriseName: testPayload.enterpriseName,
+                workstream: testPayload.workstream,
+                product: testPayload.product,
+                service: testPayload.service,
                 username: testPayload.username || '(empty)',
-                apiToken: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 20)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 10)}` : '(empty)',
+                apiToken: testPayload.apiToken ? `[MASKED - Length: ${testPayload.apiToken.length}]` : '(empty)',
                 apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
-                personalAccessToken: testPayload.personalAccessToken ? `${testPayload.personalAccessToken.substring(0, 20)}...${testPayload.personalAccessToken.substring(testPayload.personalAccessToken.length - 10)}` : '(empty)',
+                personalAccessToken: testPayload.personalAccessToken ? `[MASKED - Length: ${testPayload.personalAccessToken.length}]` : '(empty)',
                 authenticationType: authType || '(empty)',
                 fullPayload: {
                     ...testPayload,
@@ -6401,8 +6583,8 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                 }
             });
             
-            // Validate that we have the required fields
-            if (!testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
+            // Validate that we have the required fields (skip validation for OAuth as it's handled above)
+            if (authType !== 'OAuth' && !testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
                 throw new Error('Missing authentication credentials. Please ensure the credential contains username and API token.');
             }
 
@@ -6488,9 +6670,12 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
 
     return (
         <div className="flex items-center gap-3 w-full px-2">
-            {/* Status (appears in front of Test button after clicking) */}
+            {/* Only show the status container AFTER a test has started or results exist */}
             {(isTesting || testStatus !== 'idle') && (
-                <div className="flex flex-col items-start gap-0.5">
+                <div
+                    className="flex flex-col items-start gap-0.5"
+                    style={{ minWidth: '100px', width: '100px', flexShrink: 0 }}
+                >
                     {isTesting ? (
                         // Test in Progress
                         <div className="flex items-center gap-1.5 text-xs text-slate-700">
@@ -6501,7 +6686,7 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                             />
                             <span className="font-medium">Test in Progress</span>
                         </div>
-                    ) : testStatus !== 'idle' ? (
+                    ) : (
                         // Status with icon, text, and timestamp
                         <>
                             <div className="flex items-center gap-1.5">
@@ -6520,7 +6705,7 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                                 </span>
                             )}
                         </>
-                    ) : null}
+                    )}
                 </div>
             )}
 
@@ -6538,9 +6723,15 @@ function ConnectivityStatusCell({ connectorName, rowId, row, selectedAccountId, 
                     position: 'relative',
                     overflow: 'hidden',
                     minHeight: '28px',
+                    // Before first test, button should fill the entire column width.
+                    // After test starts or results exist, keep a fixed width to avoid layout shifts.
+                    minWidth: (isTesting || testStatus !== 'idle') ? '60px' : undefined,
+                    width: (isTesting || testStatus !== 'idle') ? '60px' : '100%',
                     padding: '4px 12px',
                     fontSize: '11px',
                     fontWeight: 600,
+                    flexShrink: 0,
+                    flexGrow: (isTesting || testStatus !== 'idle') ? 0 : 1,
                 }}
             >
                 Test
@@ -7324,7 +7515,12 @@ function SortableConnectorRow({
                             rowId={row.id}
                             row={row}
                             selectedAccountId={selectedAccountId}
+                            selectedAccountName={selectedAccountName}
                             selectedEnterpriseId={selectedEnterpriseId}
+                            selectedEnterprise={selectedEnterprise}
+                            workstream={row.entity}
+                            product={row.product}
+                            service={row.service}
                         />
                     </div>
                 </div>

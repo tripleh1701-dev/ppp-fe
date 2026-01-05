@@ -459,6 +459,11 @@ export interface CredentialRow {
         connector: string;
         connectorIconName?: string;
         authenticationType: string;
+        serviceKeyDetails?: 'API' | 'IFlow';
+        // Cloud Foundry OAuth2 fields (Deploy)
+        oauth2ClientId?: string;
+        oauth2ClientSecret?: string;
+        oauth2TokenUrl?: string;
         username?: string;
         usernameEncryption?: string;
         apiKey?: string;

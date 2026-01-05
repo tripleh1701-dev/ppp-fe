@@ -156,6 +156,7 @@ const pathMapping: {
         ),
     },
     builds: {label: 'Builds', icon: 'flask'},
+    integrations: {label: 'Integrations', icon: 'flask'},
     'access-control': {label: 'Access Control', icon: 'lock'},
     'account-settings': {label: 'Account Settings', icon: 'gear'},
     'enterprise-configuration': {

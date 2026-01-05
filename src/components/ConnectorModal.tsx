@@ -14,6 +14,12 @@ export interface Connector {
     connector: string;
     connectorIconName?: string; // Icon name for the selected connector tool
     authenticationType: string;
+    // Cloud Foundry (Deploy) service key type
+    serviceKeyDetails?: 'API' | 'IFlow';
+    // Cloud Foundry OAuth2 fields (Manage Credentials -> Deploy -> Cloud Foundry)
+    oauth2ClientId?: string;
+    oauth2ClientSecret?: string;
+    oauth2TokenUrl?: string;
     username?: string;
     usernameEncryption?: string; // 'Plaintext' or 'Encrypted'
     apiKey?: string;
@@ -41,6 +47,8 @@ interface ConnectorModalProps {
     selectedAccountId?: string;
     selectedAccountName?: string;
     workstream?: string; // Entity/workstream name
+    product?: string; // Product name (e.g., 'DevOps')
+    service?: string; // Service name (e.g., 'Extension')
 }
 
 // OAuth Button Component - Uses native event listener to bypass popup blockers
@@ -53,7 +61,14 @@ function OAuthButton({
     setOauthStatus,
     setOauthMessages,
     disabled,
-    oauthWindowsRef
+    oauthWindowsRef,
+    selectedAccountId,
+    selectedAccountName,
+    selectedEnterpriseId,
+    selectedEnterprise,
+    workstream,
+    product,
+    service
 }: {
     connectorId: string;
     githubOAuthClientId: string | null;
@@ -64,6 +79,13 @@ function OAuthButton({
     setOauthMessages: React.Dispatch<React.SetStateAction<{[connectorId: string]: string}>>;
     disabled: boolean;
     oauthWindowsRef: React.MutableRefObject<Map<string, Window | null>>;
+    selectedAccountId: string;
+    selectedAccountName: string;
+    selectedEnterpriseId: string;
+    selectedEnterprise: string;
+    workstream: string;
+    product: string;
+    service: string;
 }) {
     const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -95,10 +117,35 @@ function OAuthButton({
             setOauthStatus(prev => ({ ...prev, [connectorId]: 'pending' }));
             setOauthMessages(prev => ({ ...prev, [connectorId]: 'OAuth in Progress' }));
 
-            // Prepare URL data - keep it minimal
+            // Prepare URL data with all context parameters
             const state = crypto.randomUUID().replace(/-/g, '');
-            const redirectUri = `${window.location.origin}/security-governance/credentials/github/oauth2/callback`;
-            const oauthUrl = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(githubOAuthClientId)}&response_type=code&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+            const baseRedirectUri = `${window.location.origin}/security-governance/credentials/github/oauth2/callback`;
+            
+            // CRITICAL: Build redirect_uri with ALL context parameters as query params
+            // GitHub will redirect back to this exact URL, preserving the query parameters
+            const redirectParams = new URLSearchParams();
+            if (selectedAccountId) redirectParams.set('accountId', selectedAccountId);
+            if (selectedAccountName) redirectParams.set('accountName', selectedAccountName);
+            if (selectedEnterpriseId) redirectParams.set('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise) redirectParams.set('enterpriseName', selectedEnterprise);
+            if (workstream) redirectParams.set('workstream', workstream);
+            if (product) redirectParams.set('product', product);
+            if (service) redirectParams.set('service', service);
+            
+            const redirectUri = redirectParams.toString() 
+                ? `${baseRedirectUri}?${redirectParams.toString()}`
+                : baseRedirectUri;
+            
+            // Build OAuth authorization URL with redirect_uri that includes context parameters
+            const queryParams = new URLSearchParams({
+                client_id: githubOAuthClientId,
+                response_type: 'code',
+                scope: 'repo',
+                redirect_uri: redirectUri, // This URL includes all context parameters
+                state: state,
+            });
+            
+            const oauthUrl = `https://github.com/login/oauth/authorize?${queryParams.toString()}`;
             
             // CRITICAL: Store OAuth data BEFORE opening window
             // Use multiple storage mechanisms for maximum reliability across tabs
@@ -122,11 +169,24 @@ function OAuthButton({
             const cookieExpiry = new Date(Date.now() + 10 * 60 * 1000).toUTCString();
             document.cookie = `githubOAuthCSRFToken=${state}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
             document.cookie = `githubOAuthConnectorId=${connectorId}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
+            document.cookie = `githubOAuthCredentialName=${encodeURIComponent(credentialName)}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
             
             console.log('🔑 [OAuth] Stored CSRF token in sessionStorage:', state);
             console.log('🔑 [OAuth] Stored CSRF token in localStorage:', state);
             console.log('🔑 [OAuth] Stored CSRF token in cookie:', state);
             console.log('🔑 [OAuth] Stored connector ID:', connectorId);
+            console.log('🔑 [OAuth] Stored credential name:', credentialName);
+            console.log('🔑 [OAuth] Context parameters (in redirect_uri):', {
+                accountId: selectedAccountId || '(empty)',
+                accountName: selectedAccountName || '(empty)',
+                enterpriseId: selectedEnterpriseId || '(empty)',
+                enterpriseName: selectedEnterprise || '(empty)',
+                workstream: workstream || '(empty)',
+                product: product || '(empty)',
+                service: service || '(empty)',
+            });
+            console.log('🔑 [OAuth] Redirect URI (with context params):', redirectUri);
+            console.log('🔑 [OAuth] Full OAuth Authorization URL:', oauthUrl);
             
             // CRITICAL: Open window IMMEDIATELY using native event
             // This bypasses React's synthetic event system
@@ -769,13 +829,19 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     selectedEnterpriseId = '',
     selectedAccountId = '',
     selectedAccountName = '',
-    workstream = ''
+    workstream = '',
+    product = '',
+    service = ''
 }) => {
     const [connectors, setConnectors] = useState<Connector[]>([{
         id: generateId(),
         category: '',
         connector: '',
         authenticationType: '',
+        serviceKeyDetails: undefined,
+        oauth2ClientId: '',
+        oauth2ClientSecret: '',
+        oauth2TokenUrl: '',
         username: '',
         usernameEncryption: 'Plaintext',
         apiKey: '',
@@ -835,6 +901,26 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         }
         
         // Validate Authentication Type - optional now
+
+        // Cloud Foundry (Deploy) - OAuth2 required fields
+        if (connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && connector.authenticationType === 'OAuth2') {
+            if (!connector.serviceKeyDetails) {
+                errors.push('serviceKeyDetails');
+                messages.serviceKeyDetails = 'Service Key Details is required';
+            }
+            if (!connector.oauth2ClientId || !connector.oauth2ClientId.trim()) {
+                errors.push('oauth2ClientId');
+                messages.oauth2ClientId = 'Client ID is required';
+            }
+            if (!connector.oauth2ClientSecret || !connector.oauth2ClientSecret.trim()) {
+                errors.push('oauth2ClientSecret');
+                messages.oauth2ClientSecret = 'Client Secret is required';
+            }
+            if (!connector.oauth2TokenUrl || !connector.oauth2TokenUrl.trim()) {
+                errors.push('oauth2TokenUrl');
+                messages.oauth2TokenUrl = 'Token URL is required';
+            }
+        }
         
         // Validate Username and API Key - required if authentication type is Username and API Key (Jira)
         if (connector.authenticationType === 'Username and API Key') {
@@ -1395,6 +1481,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     const AUTH_TYPES_BY_CONNECTOR: Record<string, string[]> = {
         'Jira': ['Username and API Key', 'Personal Access Token'],
         'GitHub': ['Username and Token', 'GitHub App', 'OAuth'],
+        'Cloud Foundry': ['OAuth2'],
         // Add more connectors as needed
     };
 
@@ -1866,6 +1953,33 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                                 <h3 className="text-base font-semibold text-gray-900 mb-4">
                                                     Authentication Details
                                                 </h3>
+                                                {/* Cloud Foundry (Deploy): Service Key Details */}
+                                                {connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
+                                                    <div className="mb-4">
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Service Key Details *
+                                                        </label>
+                                                        <div className="flex items-center gap-6">
+                                                            {(['API', 'IFlow'] as const).map((opt) => (
+                                                                <label key={opt} className="flex items-center gap-2 text-sm text-slate-700">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`serviceKeyDetails-${connector.id}`}
+                                                                        value={opt}
+                                                                        checked={connector.serviceKeyDetails === opt}
+                                                                        onChange={() => updateConnector(connector.id, 'serviceKeyDetails', opt)}
+                                                                    />
+                                                                    <span>{opt}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                        {validationErrors[connector.id]?.includes('serviceKeyDetails') && (
+                                                            <p className="text-red-500 text-xs mt-1">
+                                                                {validationMessages[connector.id]?.serviceKeyDetails || 'Service Key Details is required'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Authentication Type
@@ -1876,6 +1990,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                                             updateConnector(connector.id, 'authenticationType', newValue);
                                                         }}
                                                         onValueChange={(newValue) => {
+                                                            // Clear OAuth2 fields when auth type changes away from OAuth2
+                                                            if (newValue !== 'OAuth2') {
+                                                                updateConnector(connector.id, 'serviceKeyDetails', '');
+                                                                updateConnector(connector.id, 'oauth2ClientId', '');
+                                                                updateConnector(connector.id, 'oauth2ClientSecret', '');
+                                                                updateConnector(connector.id, 'oauth2TokenUrl', '');
+                                                            }
                                                             // Set default encryption values when authentication type changes
                                                             if (newValue === 'Username and API Key') {
                                                                 if (!connector.usernameEncryption) {
@@ -2167,6 +2288,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                                                     setOauthMessages={setOauthMessages}
                                                                     disabled={loadingOAuthClientId || !githubOAuthClientId || oauthStatus[connector.id] === 'pending'}
                                                                     oauthWindowsRef={oauthWindowsRef}
+                                                                    selectedAccountId={selectedAccountId}
+                                                                    selectedAccountName={selectedAccountName}
+                                                                    selectedEnterpriseId={selectedEnterpriseId}
+                                                                    selectedEnterprise={selectedEnterprise}
+                                                                    workstream={workstream}
+                                                                    product={product}
+                                                                    service={service}
                                                                 />
                                                             </div>
                                                             
@@ -2244,6 +2372,74 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                                             )}
                                                         </div>
                                                     )}
+
+                                                    {/* Conditional fields for OAuth2 (Cloud Foundry) */}
+                                                    {connector.authenticationType === 'OAuth2' && connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
+                                                        <div className="mt-4 space-y-4">
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    Client ID *
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={connector.oauth2ClientId || ''}
+                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2ClientId', e.target.value)}
+                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                        validationErrors[connector.id]?.includes('oauth2ClientId')
+                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                    }`}
+                                                                />
+                                                                {validationErrors[connector.id]?.includes('oauth2ClientId') && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.oauth2ClientId || 'Client ID is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    Client Secret *
+                                                                </label>
+                                                                <input
+                                                                    type="password"
+                                                                    value={connector.oauth2ClientSecret || ''}
+                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2ClientSecret', e.target.value)}
+                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                        validationErrors[connector.id]?.includes('oauth2ClientSecret')
+                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                    }`}
+                                                                />
+                                                                {validationErrors[connector.id]?.includes('oauth2ClientSecret') && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.oauth2ClientSecret || 'Client Secret is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    Token URL *
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={connector.oauth2TokenUrl || ''}
+                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2TokenUrl', e.target.value)}
+                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                        validationErrors[connector.id]?.includes('oauth2TokenUrl')
+                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                    }`}
+                                                                />
+                                                                {validationErrors[connector.id]?.includes('oauth2TokenUrl') && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.oauth2TokenUrl || 'Token URL is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -2269,7 +2465,13 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                                                 </div>
 
                                                 {/* Authentication Details */}
-                                                <div className="border-t border-slate-200 pt-4 mt-4">
+                                                <div className="border-t border-slate-200 pt-4 mt-4 space-y-4">
+                                                    {connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
+                                                        <div>
+                                                            <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Service Key Details</div>
+                                                            <div className="text-sm font-medium text-slate-600">{connector.serviceKeyDetails || 'N/A'}</div>
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Authentication Type</div>
                                                         <div className="text-sm font-medium text-slate-600">{connector.authenticationType || 'N/A'}</div>

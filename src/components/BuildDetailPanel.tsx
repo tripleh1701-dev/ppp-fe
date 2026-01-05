@@ -1,7 +1,8 @@
 'use client';
 
-import React, {useState} from 'react';
-import {motion, AnimatePresence} from 'framer-motion';
+import React, {useState, useEffect} from 'react';
+import {motion} from 'framer-motion';
+import {createPortal} from 'react-dom';
 import {
     X,
     Play,
@@ -32,19 +33,71 @@ interface BuildExecution {
 }
 
 interface BuildDetailPanelProps {
-    buildRow: BuildRow;
+    buildRow?: BuildRow | null;
     onClose: () => void;
     onRunBuild?: () => void;
+    isOpen?: boolean;
+    sidebarWidth?: number;
+    renderInline?: boolean; // If true, render inline instead of using portal
 }
 
 export default function BuildDetailPanel({
     buildRow,
     onClose,
     onRunBuild,
+    isOpen = true,
+    sidebarWidth = 256,
+    renderInline = false,
 }: BuildDetailPanelProps) {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfig, setShowConfig] = useState(true);
     const [showHistory, setShowHistory] = useState(true);
+    
+    // Form state for Build Configuration
+    const [configData, setConfigData] = useState({
+        jiraNumber: '',
+        qaApprover: '',
+        prodApprover: '',
+        snowNPCM: '',
+        snowCM: '',
+    });
+
+    // Create a default buildRow if none provided (for new builds)
+    const defaultBuildRow: BuildRow = {
+        id: `tmp-${Date.now()}`,
+        connectorName: '',
+        description: '',
+        entity: '',
+        product: 'DevOps',
+        service: 'Integration',
+        status: 'ACTIVE',
+        scope: '',
+    };
+
+    const currentBuildRow = buildRow || defaultBuildRow;
+
+    // Initialize config data from buildRow when it changes
+    useEffect(() => {
+        if (buildRow) {
+            // TODO: Load config data from buildRow if it exists
+            // For now, use default values
+            setConfigData({
+                jiraNumber: 'JIRA1234',
+                qaApprover: 'ABC Approver',
+                prodApprover: 'DEF',
+                snowNPCM: '',
+                snowCM: '',
+            });
+        } else {
+            setConfigData({
+                jiraNumber: '',
+                qaApprover: '',
+                prodApprover: '',
+                snowNPCM: '',
+                snowCM: '',
+            });
+        }
+    }, [buildRow]);
 
     // Mock build executions data - replace with actual API call
     const [buildExecutions] = useState<BuildExecution[]>([
@@ -107,14 +160,43 @@ export default function BuildDetailPanel({
         // TODO: Implement delete logic
     };
 
-    return (
-        <div className='h-full flex flex-col bg-white'>
-            {/* Header with Action Buttons */}
-            <div className='flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50'>
-                <h2 className='text-base font-semibold text-gray-900 truncate flex-1'>
-                    {buildRow.buildName || 'Build Details'}
-                </h2>
-                <div className='flex items-center gap-1.5'>
+    if (!isOpen) return null;
+
+    const panelContent = (
+        <>
+            {/* Backdrop - Only show when not rendering inline */}
+            {!renderInline && (
+                <div
+                    className={`fixed inset-0 bg-black transition-opacity duration-300 z-40 ${
+                        isOpen ? 'opacity-40' : 'opacity-0 pointer-events-none'
+                    }`}
+                    style={{
+                        left: `${sidebarWidth}px`,
+                    }}
+                    onClick={onClose}
+                />
+            )}
+
+            {/* Build Detail Panel */}
+            <div
+                className={`${renderInline ? 'relative h-full flex flex-col' : 'fixed top-0'} ${renderInline ? '' : 'bg-white shadow-2xl'} transform transition-all duration-300 ease-in-out ${renderInline ? '' : 'z-50'} ${renderInline ? '' : 'border-r border-slate-200'} ${
+                    isOpen
+                        ? 'translate-x-0 opacity-100'
+                        : renderInline ? 'opacity-100' : 'translate-x-full opacity-0 pointer-events-none'
+                }`}
+                style={renderInline ? {} : {
+                    left: `${sidebarWidth}px`,
+                    width: '750px',
+                }}
+                aria-hidden={!isOpen}
+            >
+                <div className={`${renderInline ? 'h-full flex flex-col' : 'h-full flex flex-col bg-white'}`}>
+                    {/* Header with Action Buttons */}
+                    <div className={`flex items-center justify-between ${renderInline ? 'px-4' : 'px-4'} ${renderInline ? 'py-3' : 'py-3'} ${renderInline ? 'border-b border-blue-200 bg-blue-50' : 'border-b border-blue-200 bg-blue-50'} ${renderInline ? 'sticky top-0 z-30 shadow-sm' : ''}`}>
+                        <h2 className={`${renderInline ? 'text-xs font-bold' : 'text-base font-semibold'} text-blue-900 truncate flex-1`}>
+                            {currentBuildRow.connectorName || 'Build Details'}
+                        </h2>
+                        <div className='flex items-center gap-1.5'>
                     <button
                         onClick={handleRun}
                         disabled={isRunning}
@@ -130,7 +212,8 @@ export default function BuildDetailPanel({
                     </button>
                     <button
                         onClick={() => {
-                            /* TODO: Edit */
+                            // TODO: Implement edit functionality
+                            console.log('Edit build:', currentBuildRow.id);
                         }}
                         className='p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors'
                         title='Edit'
@@ -139,7 +222,8 @@ export default function BuildDetailPanel({
                     </button>
                     <button
                         onClick={() => {
-                            /* TODO: Copy */
+                            // TODO: Implement copy functionality
+                            console.log('Copy build:', currentBuildRow.id);
                         }}
                         className='p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors'
                         title='Copy'
@@ -148,7 +232,11 @@ export default function BuildDetailPanel({
                     </button>
                     <button
                         onClick={() => {
-                            /* TODO: Delete */
+                            if (confirm('Are you sure you want to delete this build?')) {
+                                // TODO: Implement delete functionality
+                                console.log('Delete build:', currentBuildRow.id);
+                                onClose();
+                            }
                         }}
                         className='p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors'
                         title='Delete'
@@ -193,8 +281,10 @@ export default function BuildDetailPanel({
                                 </label>
                                 <input
                                     type='text'
-                                    defaultValue='JIRA1234'
+                                    value={configData.jiraNumber}
+                                    onChange={(e) => setConfigData(prev => ({ ...prev, jiraNumber: e.target.value }))}
                                     className='w-full px-2.5 py-1.5 border border-green-400 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    placeholder='Enter JIRA number'
                                 />
                             </div>
                             <div>
@@ -203,8 +293,10 @@ export default function BuildDetailPanel({
                                 </label>
                                 <input
                                     type='text'
-                                    defaultValue='ABC Approver'
+                                    value={configData.qaApprover}
+                                    onChange={(e) => setConfigData(prev => ({ ...prev, qaApprover: e.target.value }))}
                                     className='w-full px-2.5 py-1.5 border border-green-400 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    placeholder='Enter QA approver'
                                 />
                             </div>
                             <div>
@@ -213,8 +305,10 @@ export default function BuildDetailPanel({
                                 </label>
                                 <input
                                     type='text'
-                                    defaultValue='DEF'
+                                    value={configData.prodApprover}
+                                    onChange={(e) => setConfigData(prev => ({ ...prev, prodApprover: e.target.value }))}
                                     className='w-full px-2.5 py-1.5 border border-green-400 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    placeholder='Enter Prod approver'
                                 />
                             </div>
                             <div>
@@ -223,7 +317,10 @@ export default function BuildDetailPanel({
                                 </label>
                                 <input
                                     type='text'
+                                    value={configData.snowNPCM}
+                                    onChange={(e) => setConfigData(prev => ({ ...prev, snowNPCM: e.target.value }))}
                                     className='w-full px-2.5 py-1.5 border border-green-400 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    placeholder='Enter SNOW NPCM'
                                 />
                             </div>
                             <div className='col-span-2'>
@@ -232,7 +329,10 @@ export default function BuildDetailPanel({
                                 </label>
                                 <input
                                     type='text'
+                                    value={configData.snowCM}
+                                    onChange={(e) => setConfigData(prev => ({ ...prev, snowCM: e.target.value }))}
                                     className='w-full px-2.5 py-1.5 border border-green-400 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                    placeholder='Enter SNOW CM'
                                 />
                             </div>
                         </div>
@@ -372,6 +472,14 @@ export default function BuildDetailPanel({
                     )}
                 </div>
             )}
-        </div>
+                </div>
+            </div>
+        </>
     );
+
+    if (renderInline) {
+        return panelContent;
+    }
+
+    return createPortal(panelContent, document.body);
 }

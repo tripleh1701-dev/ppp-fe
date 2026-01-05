@@ -29,6 +29,9 @@ export interface Connector {
     githubApplicationId?: string;
     githubApplicationIdEncryption?: string; // 'Plaintext' or 'Encrypted'
     githubPrivateKey?: string;
+    urlType?: string; // 'Account' or 'Repository' for GitHub Code connector
+    connectionType?: string; // 'HTTP' or 'SSH' for GitHub Code connector
+    githubAccountUrl?: string; // GitHub Account URL field for GitHub Code connector
     status: boolean; // true = Active, false = Inactive
     description: string;
 }
@@ -37,7 +40,7 @@ interface ConnectorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave?: (connectors: Connector[]) => void; // Bulk save functionality
-    onSaveIndividual?: (connectors: Connector[]) => void; // Individual save functionality
+    onSaveIndividual?: (connectors: Connector[], connectorName?: string, description?: string) => void; // Individual save functionality
     connectorName: string;
     initialConnectors?: Connector[];
     selectedEnterprise?: string;
@@ -48,6 +51,9 @@ interface ConnectorModalProps {
     product?: string; // Product name
     service?: string; // Service name
     rowId?: string; // ConnectorRow ID for storing test results
+    fixedCategoryAndConnector?: boolean; // If true, category and connector fields are fixed/read-only
+    fromBuilds?: boolean; // If true, opened from BuildsTable - fields should be blank and mandatory
+    connectorDescription?: string; // Description from the row (for Manage Connectors screen)
 }
 
 // OAuth Button Component - Uses native event listener to bypass popup blockers
@@ -354,11 +360,11 @@ function CategoryDropdown({
                 type="button"
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
-                className={`w-full text-left px-2 py-1 pr-8 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
+                className={`w-full text-left px-2 py-1 pr-8 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors min-h-[28px] flex items-center justify-between ${
                     isError
                         ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                } ${disabled ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed' : 'bg-white'}`}
             >
                 <span>{displayValue}</span>
                 <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -513,7 +519,7 @@ function EncryptionTypeDropdown({
     );
 }
 
-// Custom Dropdown Component for Credential Name - filters by Account, Enterprise, Workstream, Product, and Service
+// Custom Dropdown Component for Credential Name - filters by Account, Enterprise, Workstream, Product, Service, and Connector
 function CredentialNameDropdown({
     value,
     onChange,
@@ -527,6 +533,7 @@ function CredentialNameDropdown({
     workstream = '',
     product = '',
     service = '',
+    connector = '', // Filter by selected connector
 }: {
     value: string;
     onChange: (value: string) => void;
@@ -540,6 +547,7 @@ function CredentialNameDropdown({
     workstream?: string;
     product?: string;
     service?: string;
+    connector?: string; // Filter by selected connector
 }) {
     const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<Array<{id: string; name: string}>>([]);
@@ -615,7 +623,7 @@ function CredentialNameDropdown({
             console.log('📦 [CredentialDropdown] Loaded', allCredentials.length, 'credentials from localStorage');
             console.log('📦 [CredentialDropdown] Sample credential structure:', allCredentials.length > 0 ? allCredentials[0] : 'No credentials');
 
-            // Filter credentials by account, enterprise, entity (workstream), product, and service
+            // Filter credentials by account, enterprise, entity (workstream), product, service, and connector
             const filteredCredentials = allCredentials.filter((credential) => {
                 // Match entity (workstream) - case-insensitive
                 const entityMatch = !workstream || !credential.entity || 
@@ -629,13 +637,28 @@ function CredentialNameDropdown({
                 const serviceMatch = !service || !credential.service || 
                     credential.service.toLowerCase() === service.toLowerCase();
                 
-                return entityMatch && productMatch && serviceMatch;
+                // Match connector - only show credentials that have this connector
+                let connectorMatch = true;
+                if (connector && connector.trim()) {
+                    // Check if credential has connectors array and if it contains the selected connector
+                    if (credential.connectors && credential.connectors.length > 0) {
+                        connectorMatch = credential.connectors.some(
+                            c => c.connector && c.connector.toLowerCase() === connector.toLowerCase()
+                        );
+                    } else {
+                        // If no connectors array, don't show this credential
+                        connectorMatch = false;
+                    }
+                }
+                
+                return entityMatch && productMatch && serviceMatch && connectorMatch;
             });
 
             console.log('🔍 [CredentialDropdown] Filtered to', filteredCredentials.length, 'credentials matching filters:', {
                 workstream,
                 product,
-                service
+                service,
+                connector
             });
             console.log('🔍 [CredentialDropdown] Filtered credentials:', filteredCredentials);
 
@@ -682,7 +705,7 @@ function CredentialNameDropdown({
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service]);
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service, connector]);
 
     // Load credentials when dropdown opens
     useEffect(() => {
@@ -696,14 +719,14 @@ function CredentialNameDropdown({
         if (value && selectedAccountId && selectedEnterpriseId) {
             loadCredentials();
         }
-    }, [value, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
+    }, [value, selectedAccountId, selectedEnterpriseId, workstream, product, service, connector, loadCredentials]);
 
     // Refresh credentials when filters change (even if dropdown is already open)
     useEffect(() => {
         if (open && selectedAccountId && selectedEnterpriseId) {
             loadCredentials();
         }
-    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, loadCredentials]);
+    }, [open, selectedAccountId, selectedEnterpriseId, workstream, product, service, connector, loadCredentials]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -717,6 +740,37 @@ function CredentialNameDropdown({
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
     }, [open]);
+
+    // Listen for credential saved event to refresh dropdown
+    useEffect(() => {
+        if (!selectedAccountId || !selectedEnterpriseId) return;
+        
+        const handleCredentialSaved = (event: CustomEvent) => {
+            const detail = event.detail;
+            console.log('🔄 [CredentialDropdown] Credential saved event received:', detail);
+            
+            // Reload credentials if the saved credential matches our filters
+            if (detail.accountId === selectedAccountId && detail.enterpriseId === selectedEnterpriseId) {
+                // Check if the saved credential matches our current filters
+                const matchesWorkstream = !workstream || !detail.workstream || detail.workstream.toLowerCase() === workstream.toLowerCase();
+                const matchesProduct = !product || !detail.product || detail.product.toLowerCase() === product.toLowerCase();
+                const matchesService = !service || !detail.service || detail.service.toLowerCase() === service.toLowerCase();
+                const matchesConnector = !connector || !detail.connector || detail.connector.toLowerCase() === connector.toLowerCase();
+                
+                if (matchesWorkstream && matchesProduct && matchesService && matchesConnector) {
+                    console.log('✅ [CredentialDropdown] Saved credential matches filters - reloading credentials');
+                    loadCredentials();
+                } else {
+                    console.log('⚠️ [CredentialDropdown] Saved credential does not match filters - skipping reload');
+                }
+            }
+        };
+        
+        window.addEventListener('credentialSaved', handleCredentialSaved as EventListener);
+        return () => {
+            window.removeEventListener('credentialSaved', handleCredentialSaved as EventListener);
+        };
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service, connector, loadCredentials]);
 
     // Listen for storage changes to refresh credentials when they're deleted/modified in Manage Credentials
     useEffect(() => {
@@ -1068,11 +1122,11 @@ function ConnectorDropdown({
                 type="button"
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
-                className={`w-full text-left ${iconName && value ? 'pl-8' : 'pl-2'} pr-8 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
+                className={`w-full text-left ${iconName && value ? 'pl-8' : 'pl-2'} pr-8 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors min-h-[28px] flex items-center justify-between ${
                     isError
                         ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                } ${disabled ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed' : 'bg-white'}`}
             >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     {iconName && value && (
@@ -1143,8 +1197,13 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     workstream = '',
     product = '',
     service = '',
-    rowId = ''
+    rowId = '',
+    fixedCategoryAndConnector = false,
+    fromBuilds = false,
+    connectorDescription: propConnectorDescription = ''
 }) => {
+    const [connectorNameState, setConnectorNameState] = useState<string>(connectorName || '');
+    const [connectorDescription, setConnectorDescription] = useState<string>('');
     const [connectors, setConnectors] = useState<Connector[]>([{
         id: generateId(),
         category: '',
@@ -1158,6 +1217,9 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         apiKeyEncryption: 'Encrypted', // Default to Encrypted
         personalAccessToken: '',
         tokenEncryption: 'Plaintext',
+        urlType: 'Account', // Default to 'Account' for GitHub Code connector
+        connectionType: 'HTTP', // Default to 'HTTP' for GitHub Code connector
+        githubAccountUrl: '',
         status: true, // Default to Active (true)
         description: ''
     }]);
@@ -1236,13 +1298,20 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             }
             
             const allCredentials: CredentialRow[] = JSON.parse(stored);
-            const availableCredentialNames = new Set(
-                allCredentials.map(cred => cred.credentialName).filter(Boolean)
-            );
             
-            // Check each connector and clear credentialName if it doesn't exist
+            // Check each connector and clear credentialName if it doesn't exist or doesn't match filters
             setConnectors(prev => prev.map(connector => {
-                if (connector.credentialName && !availableCredentialNames.has(connector.credentialName)) {
+                if (!connector.credentialName) {
+                    return connector; // No credential name to validate
+                }
+                
+                // Find the credential by name
+                const credential = allCredentials.find(
+                    cred => cred.credentialName === connector.credentialName
+                );
+                
+                // Check if credential exists
+                if (!credential) {
                     console.log('🗑️ [CredentialValidation] Credential name not found - clearing:', connector.credentialName, 'from connector:', connector.id);
                     return {
                         ...connector,
@@ -1261,12 +1330,68 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                         githubPrivateKey: ''
                     };
                 }
+                
+                // Check if credential matches current workstream/product/service
+                const entityMatch = !workstream || !credential.entity || 
+                    credential.entity.toLowerCase() === workstream.toLowerCase();
+                const productMatch = !product || !credential.product || 
+                    credential.product.toLowerCase() === product.toLowerCase();
+                const serviceMatch = !service || !credential.service || 
+                    credential.service.toLowerCase() === service.toLowerCase();
+                
+                // Check if credential has the matching connector
+                let connectorMatch = true;
+                if (connector.connector && connector.connector.trim()) {
+                    if (credential.connectors && credential.connectors.length > 0) {
+                        connectorMatch = credential.connectors.some(
+                            c => c.connector && c.connector.toLowerCase() === connector.connector.toLowerCase()
+                        );
+                    } else {
+                        connectorMatch = false;
+                    }
+                }
+                
+                // If credential doesn't match filters, clear it
+                if (!entityMatch || !productMatch || !serviceMatch || !connectorMatch) {
+                    console.log('🗑️ [CredentialValidation] Credential does not match filters - clearing:', {
+                        credentialName: connector.credentialName,
+                        connectorId: connector.id,
+                        workstreamMatch: entityMatch,
+                        productMatch: productMatch,
+                        serviceMatch: serviceMatch,
+                        connectorMatch: connectorMatch,
+                        credentialWorkstream: credential.entity,
+                        credentialProduct: credential.product,
+                        credentialService: credential.service,
+                        currentWorkstream: workstream,
+                        currentProduct: product,
+                        currentService: service,
+                        connectorName: connector.connector
+                    });
+                    return {
+                        ...connector,
+                        credentialName: '',
+                        authenticationType: '',
+                        username: '',
+                        usernameEncryption: 'Plaintext',
+                        apiKey: '',
+                        apiKeyEncryption: 'Encrypted',
+                        personalAccessToken: '',
+                        tokenEncryption: 'Plaintext',
+                        githubInstallationId: '',
+                        githubInstallationIdEncryption: 'Plaintext',
+                        githubApplicationId: '',
+                        githubApplicationIdEncryption: 'Plaintext',
+                        githubPrivateKey: ''
+                    };
+                }
+                
                 return connector;
             }));
         } catch (error) {
             console.error('❌ [CredentialValidation] Error validating credential names:', error);
         }
-    }, [selectedAccountId, selectedEnterpriseId]);
+    }, [selectedAccountId, selectedEnterpriseId, workstream, product, service]);
 
     const validateConnector = (connector: Connector): { errors: string[]; messages: Record<string, string> } => {
         const errors: string[] = [];
@@ -1284,10 +1409,71 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             messages.connector = 'Connector is required';
         }
         
-        // Validate URL - required
-        if (!connector.url || !connector.url.trim()) {
-            errors.push('url');
-            messages.url = 'URL is required';
+        // Validate URL or GitHub-specific fields based on connector type
+        if (connector.category === 'code' && connector.connector === 'GitHub') {
+            // Validate URL Type - required for GitHub Code connector
+            if (!connector.urlType || !connector.urlType.trim()) {
+                errors.push('urlType');
+                messages.urlType = 'URL Type is required';
+            }
+            
+            // Validate Connection Type - required for GitHub Code connector
+            if (!connector.connectionType || !connector.connectionType.trim()) {
+                errors.push('connectionType');
+                messages.connectionType = 'Connection Type is required';
+            }
+            
+            // Validate GitHub URL - required for GitHub Code connector
+            if (!connector.githubAccountUrl || !connector.githubAccountUrl.trim()) {
+                errors.push('githubAccountUrl');
+                messages.githubAccountUrl = connector.urlType === 'Repository' 
+                    ? 'GitHub Repository URL is required' 
+                    : 'GitHub Account URL is required';
+            } else {
+                // Validate GitHub URL format based on Connection Type and URL Type
+                const url = connector.githubAccountUrl.trim();
+                if (connector.urlType === 'Account') {
+                    // Account URLs: Only account-identifying portion, no repo name
+                    if (connector.connectionType === 'HTTP') {
+                        // HTTP Account URLs: https://github.com/YOUR_ACCOUNT_NAME/ (no repo name)
+                        const httpAccountPattern = /^https?:\/\/github\.com\/[\w.-]+\/?$/i;
+                        if (!httpAccountPattern.test(url)) {
+                            errors.push('githubAccountUrl');
+                            messages.githubAccountUrl = 'Account URL must be in format: https://github.com/YOUR_ACCOUNT_NAME/ (do not include repo name)';
+                        }
+                    } else if (connector.connectionType === 'SSH') {
+                        // SSH Account URLs: git@github.com:YOUR_ACCOUNT_NAME/ (no repo name)
+                        const sshAccountPattern = /^git@github\.com:[\w.-]+\/?$/i;
+                        if (!sshAccountPattern.test(url)) {
+                            errors.push('githubAccountUrl');
+                            messages.githubAccountUrl = 'Account URL must be in format: git@github.com:YOUR_ACCOUNT_NAME/ (do not include repo name)';
+                        }
+                    }
+                } else if (connector.urlType === 'Repository') {
+                    // Repository URLs: Complete URL with repo name ending in .git
+                    if (connector.connectionType === 'HTTP') {
+                        // HTTP Repository URLs: https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git
+                        const httpRepoPattern = /^https?:\/\/github\.com\/[\w.-]+\/[\w.-]+\.git$/i;
+                        if (!httpRepoPattern.test(url)) {
+                            errors.push('githubAccountUrl');
+                            messages.githubAccountUrl = 'Repository URL must be in format: https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git';
+                        }
+                    } else if (connector.connectionType === 'SSH') {
+                        // SSH Repository URLs: git@github.com:YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git
+                        const sshRepoPattern = /^git@github\.com:[\w.-]+\/[\w.-]+\.git$/i;
+                        if (!sshRepoPattern.test(url)) {
+                            errors.push('githubAccountUrl');
+                            messages.githubAccountUrl = 'Repository URL must be in format: git@github.com:YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git';
+                        }
+                    }
+                }
+            }
+        } else {
+            // Validate URL - required for other connectors
+            if (!connector.url || !connector.url.trim()) {
+                errors.push('url');
+                messages.url = 'URL is required';
+            }
         }
         
         // Validate Credential Name - required
@@ -1512,9 +1698,18 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                     console.log('🔌 Loading initial connectors:', initialConnectors);
                     setConnectors(initialConnectors);
                     setOriginalConnectors(JSON.parse(JSON.stringify(initialConnectors))); // Deep copy
-                    setActivelyEditingNewConnector(new Set());
-                    setEditingConnectorId(null); // Clear any editing state to show summary view
-                    console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    // If category and connector are fixed, always show edit form (not summary view)
+                    if (fixedCategoryAndConnector) {
+                        // Mark all connectors as actively editing to show edit form
+                        const editingIds = new Set(initialConnectors.map(c => c.id));
+                        setActivelyEditingNewConnector(editingIds);
+                        setEditingConnectorId(null);
+                        console.log('🔌 Loaded', initialConnectors.length, 'connector(s) with fixed category/connector - showing edit form');
+                    } else {
+                        setActivelyEditingNewConnector(new Set());
+                        setEditingConnectorId(null); // Clear any editing state to show summary view
+                        console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    }
                     
                     // Validate credential names after loading
                     setTimeout(() => {
@@ -1626,7 +1821,22 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             wasOpenRef.current = false;
             console.log('🔍 ConnectorModal closed - reset wasOpenRef');
         }
-    }, [isOpen, initialConnectors, connectors, connectorName, validateAndCleanCredentialNames]);
+    }, [isOpen, initialConnectors, connectors, connectorName, validateAndCleanCredentialNames, fixedCategoryAndConnector]);
+
+    // Initialize connectorNameState and connectorDescription when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            if (fromBuilds) {
+                // When opened from BuildsTable, always start with blank fields
+                setConnectorNameState('');
+                setConnectorDescription('');
+            } else {
+                // When opened from Manage Connectors, auto-fill from props
+                setConnectorNameState(connectorName || '');
+                setConnectorDescription(propConnectorDescription || '');
+            }
+        }
+    }, [isOpen, fromBuilds, connectorName, propConnectorDescription]);
     
     // Listen for credential storage changes to validate and clean credential names
     useEffect(() => {
@@ -1932,12 +2142,17 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                 category: '',
                 connector: '',
                 authenticationType: '',
+                url: '',
+                credentialName: '',
                 username: '',
                 usernameEncryption: 'Plaintext',
                 apiKey: '',
                 apiKeyEncryption: 'Encrypted', // Default to Encrypted
                 personalAccessToken: '',
                 tokenEncryption: 'Plaintext',
+                urlType: 'Account', // Default to 'Account' for GitHub Code connector
+                connectionType: 'HTTP', // Default to 'HTTP' for GitHub Code connector
+                githubAccountUrl: '',
                 status: true, // Default to Active (true)
                 description: ''
             }
@@ -2026,8 +2241,23 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
         if (!connector) return;
 
         // Check if required fields are filled
-        if (!connector.connector || !connector.credentialName || !connector.url) {
+        // For GitHub Code connector, check githubAccountUrl; for others, check url
+        const hasUrl = connector.category === 'code' && connector.connector === 'GitHub'
+            ? connector.githubAccountUrl
+            : connector.url;
+        
+        if (!connector.connector || !connector.credentialName || !hasUrl) {
             console.warn('Cannot test connectivity - missing required fields');
+            return;
+        }
+
+        // Validate accountId and enterpriseId are present (required for OAuth token lookup)
+        if (!selectedAccountId || !selectedEnterpriseId) {
+            console.warn('Cannot test connectivity - missing accountId or enterpriseId');
+            setTestConnectivityStatus(prev => ({
+                ...prev,
+                [connectorId]: 'failed'
+            }));
             return;
         }
 
@@ -2087,9 +2317,25 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                     if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
                                         updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
                                     }
+                                } else if (authType === 'Username and Token' || (!authType && foundCredentialConnector.username && foundCredentialConnector.personalAccessToken)) {
+                                    // For GitHub: Username and Token (Personal Access Token)
+                                    username = foundCredentialConnector.username || connector.username || '';
+                                    apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
+                                    
+                                    // Also update the connector's authentication type if not set
+                                    if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
+                                        updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
+                                    }
                                 } else if (authType === 'Personal Access Token' || (!authType && foundCredentialConnector.personalAccessToken)) {
                                     apiToken = foundCredentialConnector.personalAccessToken || connector.personalAccessToken || '';
                                     
+                                    // Also update the connector's authentication type if not set
+                                    if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
+                                        updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
+                                    }
+                                } else if (authType === 'OAuth') {
+                                    // For OAuth, check if OAuth has been successfully configured
+                                    // OAuth status is tracked in oauthStatus state
                                     // Also update the connector's authentication type if not set
                                     if (!connector.authenticationType && foundCredentialConnector.authenticationType) {
                                         updateConnector(connectorId, 'authenticationType', foundCredentialConnector.authenticationType);
@@ -2132,33 +2378,73 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             }
 
             // Build test connection payload
+            // For GitHub Code connector, use githubAccountUrl; for others, use url
+            const urlValue = connector.category === 'code' && connector.connector === 'GitHub'
+                ? connector.githubAccountUrl || ''
+                : connector.url || '';
+            
+            // Build test payload with only provided values (no hardcoded defaults)
             const testPayload: any = {
                 connectorName: connector.connector,
-                url: connector.url || '',
+                url: urlValue,
                 credentialName: connector.credentialName,
             };
+            
+            // Add GitHub-specific fields for Code connector
+            if (connector.category === 'code' && connector.connector === 'GitHub') {
+                if (connector.urlType) testPayload.urlType = connector.urlType; // 'Account' or 'Repository'
+                if (connector.connectionType) testPayload.connectionType = connector.connectionType; // 'HTTP' or 'SSH'
+            }
+            
+            // Add context parameters only if they exist (no hardcoded values)
+            if (selectedAccountId) testPayload.accountId = selectedAccountId;
+            if (selectedAccountName) testPayload.accountName = selectedAccountName;
+            if (selectedEnterpriseId) testPayload.enterpriseId = selectedEnterpriseId;
+            if (selectedEnterprise) testPayload.enterpriseName = selectedEnterprise;
+            if (workstream) testPayload.workstream = workstream;
+            if (product) testPayload.product = product;
+            if (service) testPayload.service = service;
 
             // Add authentication details based on authentication type
             // For JIRA: Username and API Key (API Token)
             if (authType === 'Username and API Key' || (!authType && username && apiToken)) {
                 testPayload.username = username || connector.username || '';
                 testPayload.apiToken = apiToken || connector.apiKey || ''; // JIRA uses API Token, not API Key
+            } else if (authType === 'Username and Token' || (!authType && username && apiToken)) {
+                // For GitHub: Username and Token (Personal Access Token)
+                testPayload.username = username || connector.username || '';
+                testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
             } else if (authType === 'Personal Access Token' || (!authType && apiToken && !username)) {
                 testPayload.personalAccessToken = apiToken || connector.personalAccessToken || '';
+            } else if (authType === 'OAuth') {
+                // For OAuth authentication, OAuth is already configured in Manage Credentials
+                // The backend will use the OAuth token associated with this credential name
+                testPayload.authenticationType = 'OAuth';
+                // OAuth is configured at the credential level, so we can proceed with testing
+                console.log('🔑 [Test Connectivity] Using OAuth authentication for credential:', connector.credentialName);
             }
             
-            // Validate that we have the required fields
-            if (!testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
+            // Validate that we have the required fields (skip validation for OAuth as it's handled above)
+            if (authType !== 'OAuth' && !testPayload.username && !testPayload.apiToken && !testPayload.personalAccessToken) {
                 throw new Error('Missing authentication credentials. Please ensure the credential contains username and API token.');
             }
 
             console.log('🧪 [Test Connectivity] Sending test request:', {
                 connector: connector.connector,
-                url: connector.url,
+                url: urlValue,
                 credentialName: connector.credentialName,
                 authenticationType: authType,
+                accountId: selectedAccountId || '(empty)',
+                accountName: selectedAccountName || '(empty)',
+                enterpriseId: selectedEnterpriseId || '(empty)',
+                enterpriseName: selectedEnterprise || '(empty)',
+                workstream: workstream || '(empty)',
+                product: product || '(empty)',
+                service: service || '(empty)',
                 hasUsername: !!testPayload.username,
                 hasApiToken: !!testPayload.apiToken,
+                hasPersonalAccessToken: !!testPayload.personalAccessToken,
+                oauthConfigured: testPayload.oauthConfigured,
                 username: testPayload.username ? `${testPayload.username.substring(0, 5)}...` : 'none',
                 apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
                 apiTokenPreview: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 10)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 5)}` : 'none',
@@ -2170,6 +2456,13 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                 connectorName: testPayload.connectorName,
                 url: testPayload.url,
                 credentialName: testPayload.credentialName,
+                accountId: testPayload.accountId || '(empty)',
+                accountName: testPayload.accountName || '(empty)',
+                enterpriseId: testPayload.enterpriseId || '(empty)',
+                enterpriseName: testPayload.enterpriseName || '(empty)',
+                workstream: testPayload.workstream || '(empty)',
+                product: testPayload.product || '(empty)',
+                service: testPayload.service || '(empty)',
                 username: testPayload.username || '(empty)',
                 apiToken: testPayload.apiToken ? `${testPayload.apiToken.substring(0, 20)}...${testPayload.apiToken.substring(testPayload.apiToken.length - 10)}` : '(empty)',
                 apiTokenLength: testPayload.apiToken ? testPayload.apiToken.length : 0,
@@ -2209,20 +2502,26 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             }));
 
             // Store test result in localStorage for Status column in Manage Connectors screen
-            if (rowId && selectedAccountId && selectedEnterpriseId) {
+            if (selectedAccountId && selectedEnterpriseId) {
                 try {
                     const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
                     const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
                     const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
-                    results[rowId] = {
-                        status: success ? 'success' : 'failed',
-                        timestamp: Date.now()
-                    };
-                    if (typeof window !== 'undefined') {
-                        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-                        console.log('💾 [ConnectorDetailsModal] Saved test result to localStorage for row:', rowId, 'status:', success ? 'success' : 'failed');
-                        // Dispatch event to notify Status column to refresh
-                        window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                    
+                    // If rowId is available, use it; otherwise use connectorName as key (will be migrated when connector is saved)
+                    const resultKey = rowId || (connectorNameState ? `temp_${connectorNameState}_${workstream}_${product}_${service}` : null);
+                    
+                    if (resultKey) {
+                        results[resultKey] = {
+                            status: success ? 'success' : 'failed',
+                            timestamp: Date.now()
+                        };
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                            console.log('💾 [ConnectorDetailsModal] Saved test result to localStorage for key:', resultKey, 'status:', success ? 'success' : 'failed', 'rowId:', rowId || 'none (using temp key)');
+                            // Dispatch event to notify Status column to refresh
+                            window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                        }
                     }
                 } catch (error) {
                     console.error('❌ [ConnectorDetailsModal] Error saving test result to localStorage:', error);
@@ -2256,20 +2555,26 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             }));
 
             // Store failed test result in localStorage for Status column in Manage Connectors screen
-            if (rowId && selectedAccountId && selectedEnterpriseId) {
+            if (selectedAccountId && selectedEnterpriseId) {
                 try {
                     const STORAGE_KEY = `connector_test_results_${selectedAccountId}_${selectedEnterpriseId}`;
                     const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
                     const results: Record<string, { status: 'success' | 'failed'; timestamp: number }> = stored ? JSON.parse(stored) : {};
-                    results[rowId] = {
-                        status: 'failed',
-                        timestamp: Date.now()
-                    };
-                    if (typeof window !== 'undefined') {
-                        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-                        console.log('💾 [ConnectorDetailsModal] Saved failed test result to localStorage for row:', rowId);
-                        // Dispatch event to notify Status column to refresh
-                        window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                    
+                    // If rowId is available, use it; otherwise use connectorName as key (will be migrated when connector is saved)
+                    const resultKey = rowId || (connectorNameState ? `temp_${connectorNameState}_${workstream}_${product}_${service}` : null);
+                    
+                    if (resultKey) {
+                        results[resultKey] = {
+                            status: 'failed',
+                            timestamp: Date.now()
+                        };
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+                            console.log('💾 [ConnectorDetailsModal] Saved failed test result to localStorage for key:', resultKey, 'rowId:', rowId || 'none (using temp key)');
+                            // Dispatch event to notify Status column to refresh
+                            window.dispatchEvent(new Event('connectorTestResultUpdated'));
+                        }
                     }
                 } catch (error) {
                     console.error('❌ [ConnectorDetailsModal] Error saving test result to localStorage:', error);
@@ -2310,12 +2615,39 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
     };
 
     const handleSaveIndividualConnector = (connector: Connector) => {
+        console.log('💾 [ConnectorDetailsModal] Save button clicked - handleSaveIndividualConnector called');
+        console.log('💾 [ConnectorDetailsModal] Modal opened from:', fixedCategoryAndConnector ? 'Manage Builds Screen (Stage Row)' : 'Manage Connectors Screen');
+        console.log('💾 [ConnectorDetailsModal] Connector Name from header:', connectorNameState);
+        console.log('💾 [ConnectorDetailsModal] Description from header:', connectorDescription);
+        console.log('💾 [ConnectorDetailsModal] Connector being saved:', {
+            id: connector.id,
+            category: connector.category,
+            connector: connector.connector,
+            urlType: connector.urlType,
+            githubAccountUrl: connector.githubAccountUrl,
+            url: connector.url,
+            credentialName: connector.credentialName,
+            authenticationType: connector.authenticationType
+        });
+        
+        // Validate connector name is provided
+        if (!connectorNameState || !connectorNameState.trim()) {
+            console.error('❌ [ConnectorDetailsModal] Validation failed: Connector Name is required');
+            alert('Connector Name is required');
+            return;
+        }
+
         // Get the latest connector from state to ensure we have the most up-to-date values
         const currentConnector = connectors.find(c => c.id === connector.id) || connector;
         const connectorToSave = { ...currentConnector };
         
+        // Update description from header field
+        connectorToSave.description = connectorDescription;
+        console.log('💾 [ConnectorDetailsModal] Updated connector description:', connectorDescription);
+        
         const connectorValidation = validateConnector(connectorToSave);
         if (connectorValidation.errors.length > 0) {
+            console.error('❌ [ConnectorDetailsModal] Validation errors:', connectorValidation.errors);
             // Update validation errors to show the errors for this connector
             setValidationErrors(prevErrors => ({
                 ...prevErrors,
@@ -2327,6 +2659,8 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
             }));
             return; // Don't proceed if there are validation errors
         }
+        
+        console.log('✅ [ConnectorDetailsModal] Validation passed, proceeding with save');
 
         // Clear any existing validation errors for this connector
         setValidationErrors(prevErrors => {
@@ -2386,8 +2720,9 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                 c.category.trim() || c.connector.trim()
             );
             // Defer the call to avoid updating parent during render
+            // Pass connectorNameState along with connectors
             setTimeout(() => {
-                onSaveIndividual(validConnectors);
+                onSaveIndividual(validConnectors, connectorNameState.trim(), connectorDescription.trim());
             }, 0);
         }
     };
@@ -2491,10 +2826,24 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                         </div>
                         
                         {/* Connector Info */}
-                        <div className="mt-4">
-                            <div className="text-blue-100 text-sm font-medium mb-1">Connector Name</div>
-                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
-                                <div className="text-white font-medium truncate text-xs">{connectorName || '\u00A0'}</div>
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-blue-100 text-sm font-medium mb-1">Connector Name{fromBuilds ? ' *' : ''}</div>
+                                <input
+                                    type="text"
+                                    value={connectorNameState}
+                                    onChange={(e) => setConnectorNameState(e.target.value)}
+                                    className="w-full px-2 py-1 border border-white/20 rounded-lg text-sm bg-white/10 backdrop-blur-sm text-white min-h-[28px] focus:outline-none focus:ring-2 focus:ring-white/30"
+                                />
+                            </div>
+                            <div>
+                                <div className="text-blue-100 text-sm font-medium mb-1">Description</div>
+                                <input
+                                    type="text"
+                                    value={connectorDescription}
+                                    onChange={(e) => setConnectorDescription(e.target.value)}
+                                    className="w-full px-2 py-1 border border-white/20 rounded-lg text-sm bg-white/10 backdrop-blur-sm text-white min-h-[28px] focus:outline-none focus:ring-2 focus:ring-white/30"
+                                />
                             </div>
                         </div>
                     </div>
@@ -2591,13 +2940,29 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         value={connector.category || ''}
                                                         onChange={(newCategory) => {
                                                             updateConnector(connector.id, 'category', newCategory);
-                                                            // Clear connector when category changes
+                                                            // Clear connector, credential name, authentication fields, and GitHub-specific fields when category changes
                                                             if (newCategory !== connector.category) {
                                                                 updateConnector(connector.id, 'connector', '');
+                                                                updateConnector(connector.id, 'credentialName', '');
+                                                                updateConnector(connector.id, 'authenticationType', '');
+                                                                updateConnector(connector.id, 'username', '');
+                                                                updateConnector(connector.id, 'usernameEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'apiKey', '');
+                                                                updateConnector(connector.id, 'apiKeyEncryption', 'Encrypted');
+                                                                updateConnector(connector.id, 'personalAccessToken', '');
+                                                                updateConnector(connector.id, 'tokenEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubInstallationId', '');
+                                                                updateConnector(connector.id, 'githubInstallationIdEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubApplicationId', '');
+                                                                updateConnector(connector.id, 'githubApplicationIdEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubPrivateKey', '');
+                                                                updateConnector(connector.id, 'urlType', 'Account');
+                                                                updateConnector(connector.id, 'connectionType', 'HTTP');
+                                                                updateConnector(connector.id, 'githubAccountUrl', '');
                                                             }
                                                         }}
                                                         options={availableCategories}
-                                                        disabled={loadingGlobalSettings || availableCategories.length === 0}
+                                                        disabled={fixedCategoryAndConnector || loadingGlobalSettings || availableCategories.length === 0}
                                                         isError={validationErrors[connector.id]?.includes('category') || false}
                                                         placeholder="Select category..."
                                                     />
@@ -2622,16 +2987,34 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                         value={connector.connector || ''}
                                                         onChange={(newConnector) => {
                                                             updateConnector(connector.id, 'connector', newConnector);
-                                                            // Clear authentication type when connector changes
+                                                            // Clear authentication type, credential name, authentication fields, and GitHub-specific fields when connector changes
                                                             if (newConnector !== connector.connector) {
                                                                 updateConnector(connector.id, 'authenticationType', '');
+                                                                updateConnector(connector.id, 'credentialName', '');
+                                                                updateConnector(connector.id, 'username', '');
+                                                                updateConnector(connector.id, 'usernameEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'apiKey', '');
+                                                                updateConnector(connector.id, 'apiKeyEncryption', 'Encrypted');
+                                                                updateConnector(connector.id, 'personalAccessToken', '');
+                                                                updateConnector(connector.id, 'tokenEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubInstallationId', '');
+                                                                updateConnector(connector.id, 'githubInstallationIdEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubApplicationId', '');
+                                                                updateConnector(connector.id, 'githubApplicationIdEncryption', 'Plaintext');
+                                                                updateConnector(connector.id, 'githubPrivateKey', '');
+                                                                // Reset GitHub-specific fields if not GitHub Code connector
+                                                                if (!(connector.category === 'code' && newConnector === 'GitHub')) {
+                                                                    updateConnector(connector.id, 'urlType', 'Account');
+                                                                    updateConnector(connector.id, 'connectionType', 'HTTP');
+                                                                    updateConnector(connector.id, 'githubAccountUrl', '');
+                                                                }
                                                             }
                                                         }}
                                                         options={connector.category ? getOrderedToolsForCategory(connector.category) : []}
-                                                        disabled={loadingGlobalSettings || !connector.category || getOrderedToolsForCategory(connector.category).length === 0}
+                                                        disabled={fixedCategoryAndConnector || loadingGlobalSettings || !connector.category || getOrderedToolsForCategory(connector.category).length === 0}
                                                         isError={validationErrors[connector.id]?.includes('connector') || false}
                                                         placeholder="Select connector..."
-                                                        iconName={connector.connectorIconName}
+                                                        iconName={connector.connectorIconName || (connector.connector ? getToolConfig(connector.connector)?.iconName : undefined)}
                                                     />
                                                     {validationErrors[connector.id]?.includes('connector') && (
                                                         <p className="text-red-500 text-xs mt-1">
@@ -2650,27 +3033,141 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                     Connectivity Details
                                                 </h3>
                                                 <div className="space-y-4">
-                                                    {/* URL Field */}
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                            URL *
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={connector.url || ''}
-                                                            onChange={(e) => updateConnector(connector.id, 'url', e.target.value)}
-                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                validationErrors[connector.id]?.includes('url')
-                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                            }`}
-                                                        />
-                                                        {validationErrors[connector.id]?.includes('url') && (
-                                                            <p className="text-red-500 text-xs mt-1">
-                                                                {validationMessages[connector.id]?.url || 'URL is required'}
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                                    {/* GitHub Code Connector Specific Fields */}
+                                                    {connector.category === 'code' && connector.connector === 'GitHub' ? (
+                                                        <>
+                                                            {/* URL Type Radio Buttons */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    URL Type *
+                                                                </label>
+                                                                <div className="flex gap-4">
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`urlType-${connector.id}`}
+                                                                            value="Account"
+                                                                            checked={connector.urlType === 'Account'}
+                                                                            onChange={(e) => updateConnector(connector.id, 'urlType', e.target.value)}
+                                                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                        <span className="text-sm text-gray-700">Account</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`urlType-${connector.id}`}
+                                                                            value="Repository"
+                                                                            checked={connector.urlType === 'Repository'}
+                                                                            onChange={(e) => updateConnector(connector.id, 'urlType', e.target.value)}
+                                                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                        <span className="text-sm text-gray-700">Repository</span>
+                                                                    </label>
+                                                                </div>
+                                                                {validationErrors[connector.id]?.includes('urlType') && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.urlType || 'URL Type is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Connection Type Radio Buttons */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    Connection Type *
+                                                                </label>
+                                                                <div className="flex gap-4">
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`connectionType-${connector.id}`}
+                                                                            value="HTTP"
+                                                                            checked={connector.connectionType === 'HTTP'}
+                                                                            onChange={(e) => updateConnector(connector.id, 'connectionType', e.target.value)}
+                                                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                        <span className="text-sm text-gray-700">HTTP</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`connectionType-${connector.id}`}
+                                                                            value="SSH"
+                                                                            checked={connector.connectionType === 'SSH'}
+                                                                            onChange={(e) => updateConnector(connector.id, 'connectionType', e.target.value)}
+                                                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                        <span className="text-sm text-gray-700">SSH</span>
+                                                                    </label>
+                                                                </div>
+                                                                {validationErrors[connector.id]?.includes('connectionType') && (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.connectionType || 'Connection Type is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            {/* GitHub URL Field - Changes based on URL Type */}
+                                                            <div>
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    {connector.urlType === 'Repository' ? 'GitHub Repository URL *' : 'GitHub Account URL *'}
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={connector.githubAccountUrl || ''}
+                                                                    onChange={(e) => updateConnector(connector.id, 'githubAccountUrl', e.target.value)}
+                                                                    placeholder={
+                                                                        connector.urlType === 'Repository'
+                                                                            ? (connector.connectionType === 'HTTP' 
+                                                                                ? 'https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git' 
+                                                                                : 'git@github.com:YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git')
+                                                                            : (connector.connectionType === 'HTTP' 
+                                                                                ? 'https://github.com/YOUR_ACCOUNT_NAME/' 
+                                                                                : 'git@github.com:YOUR_ACCOUNT_NAME/')
+                                                                    }
+                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                        validationErrors[connector.id]?.includes('githubAccountUrl')
+                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                    }`}
+                                                                />
+                                                                {validationErrors[connector.id]?.includes('githubAccountUrl') ? (
+                                                                    <p className="text-red-500 text-xs mt-1">
+                                                                        {validationMessages[connector.id]?.githubAccountUrl || (connector.urlType === 'Repository' ? 'GitHub Repository URL is required' : 'GitHub Account URL is required')}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-gray-500 text-xs mt-1">
+                                                                        {connector.urlType === 'Repository' 
+                                                                            ? 'Provide the complete URL to the GitHub repository (e.g., https://github.com/YOUR_ACCOUNT_NAME/YOUR_REPO_NAME.git)'
+                                                                            : 'Provide only the account-identifying portion of the GitHub URL (e.g., https://github.com/YOUR_ACCOUNT_NAME/). Do not include a repo name.'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        /* Regular URL Field for other connectors */
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                URL *
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={connector.url || ''}
+                                                                onChange={(e) => updateConnector(connector.id, 'url', e.target.value)}
+                                                                className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                    validationErrors[connector.id]?.includes('url')
+                                                                        ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                        : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                }`}
+                                                            />
+                                                            {validationErrors[connector.id]?.includes('url') && (
+                                                                <p className="text-red-500 text-xs mt-1">
+                                                                    {validationMessages[connector.id]?.url || 'URL is required'}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
 
                                                     {/* Credential Name Dropdown */}
                                                     <div>
@@ -2772,6 +3269,7 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                                     workstream={workstream}
                                                                     product={product}
                                                                     service={service}
+                                                                    connector={connector.connector || ''}
                                                                     isError={validationErrors[connector.id]?.includes('credentialName') || false}
                                                                     placeholder="Select credential name..."
                                                                 />
@@ -2784,7 +3282,10 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                                     testConnectivityStatus[connector.id] === 'testing' ||
                                                                     !connector.connector ||
                                                                     !connector.credentialName ||
-                                                                    !connector.url
+                                                                    // For GitHub Code connector, check githubAccountUrl; for others, check url
+                                                                    (connector.category === 'code' && connector.connector === 'GitHub' 
+                                                                        ? !connector.githubAccountUrl 
+                                                                        : !connector.url)
                                                                 }
                                                                 className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                                                                     testConnectivityStatus[connector.id] === 'testing'
@@ -2795,7 +3296,12 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                                         ? 'bg-red-100 text-red-700 hover:bg-red-200'
                                                                         : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                                                                 } ${
-                                                                    (!connector.connector || !connector.credentialName || !connector.url)
+                                                                    (testConnectivityStatus[connector.id] === 'testing' ||
+                                                                    !connector.connector ||
+                                                                    !connector.credentialName ||
+                                                                    (connector.category === 'code' && connector.connector === 'GitHub' 
+                                                                        ? !connector.githubAccountUrl 
+                                                                        : !connector.url))
                                                                         ? 'opacity-50 cursor-not-allowed'
                                                                         : 'cursor-pointer'
                                                                 }`}
@@ -3173,16 +3679,44 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* URL and Credential Details */}
+                                                {/* Connectivity Details */}
                                                 <div className="border-t border-slate-200 pt-4 mt-4 space-y-4">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">URL</div>
-                                                        <div className="text-sm font-medium text-slate-600 break-words">{connector.url || 'N/A'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Credential Name</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.credentialName || 'N/A'}</div>
-                                                    </div>
+                                                    {/* GitHub Code Connector Specific Fields */}
+                                                    {connector.category === 'code' && connector.connector === 'GitHub' ? (
+                                                        <>
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">URL Type</div>
+                                                                    <div className="text-sm font-medium text-slate-600">{connector.urlType || 'N/A'}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Connection Type</div>
+                                                                    <div className="text-sm font-medium text-slate-600">{connector.connectionType || 'N/A'}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">
+                                                                    {connector.urlType === 'Repository' ? 'GitHub Repository URL' : 'GitHub Account URL'}
+                                                                </div>
+                                                                <div className="text-sm font-medium text-slate-600 break-words">{connector.githubAccountUrl || 'N/A'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Credential Name</div>
+                                                                <div className="text-sm font-medium text-slate-600">{connector.credentialName || 'N/A'}</div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">URL</div>
+                                                                <div className="text-sm font-medium text-slate-600 break-words">{connector.url || 'N/A'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Credential Name</div>
+                                                                <div className="text-sm font-medium text-slate-600">{connector.credentialName || 'N/A'}</div>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
 
                                             </div>
@@ -3274,11 +3808,31 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                         
                         // Process each credential to save
                         for (const credential of credentials) {
+                            // Ensure we have the correct connector value
+                            const finalConnector = credential.connector || connectorConnector || '';
+                            const finalCategory = credential.category || connectorCategory || '';
+                            
+                            // Get connector icon name from tool config
+                            const toolConfig = getToolConfig(finalConnector);
+                            const connectorIconName = toolConfig?.iconName || '';
+                            
+                            console.log('💾 [Credential Save] Saving credential:', {
+                                credentialName: credential.credentialName,
+                                entity: credential.entity || workstream,
+                                product: credential.product || product,
+                                service: credential.service || service,
+                                category: finalCategory,
+                                connector: finalConnector,
+                                connectorIconName: connectorIconName,
+                                authenticationType: credential.authenticationType
+                            });
+                            
                             // Build connector object for the credential row
                             const connectorData = {
                                 id: generateId(),
-                                category: credential.category || connectorCategory || '',
-                                connector: credential.connector || connectorConnector || '',
+                                category: finalCategory,
+                                connector: finalConnector,
+                                connectorIconName: connectorIconName, // Add connector icon name
                                 authenticationType: credential.authenticationType || '',
                                 username: credential.username || '',
                                 usernameEncryption: credential.usernameEncryption || 'Plaintext',
@@ -3333,6 +3887,10 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                 if (credential.service) {
                                     existingRow.service = credential.service;
                                 }
+                                // Update connector icon name if connector was added/updated
+                                if (connectorIconName) {
+                                    existingRow.connectorIconName = connectorIconName;
+                                }
                             } else {
                                 // Create new credential row
                                 const newCredentialRow: CredentialRow = {
@@ -3343,11 +3901,22 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                                     product: credential.product || product || '',
                                     service: credential.service || service || '',
                                     scope: credential.scope || credential.connector || connectorConnector || '',
+                                    connectorIconName: connectorIconName, // Add connector icon name at row level
                                     connectors: [connectorData]
                                 };
                                 
+                                console.log('➕ [Credential Save] Created new credential row:', {
+                                    credentialName: newCredentialRow.credentialName,
+                                    entity: newCredentialRow.entity,
+                                    product: newCredentialRow.product,
+                                    service: newCredentialRow.service,
+                                    connectorIconName: newCredentialRow.connectorIconName,
+                                    connectorCount: newCredentialRow.connectors?.length || 0,
+                                    connector: newCredentialRow.connectors?.[0]?.connector || 'N/A',
+                                    category: newCredentialRow.connectors?.[0]?.category || 'N/A'
+                                });
+                                
                                 existingCredentials.push(newCredentialRow);
-                                console.log('➕ [Credential Save] Created new credential row:', credential.credentialName);
                             }
                         }
                         
@@ -3356,10 +3925,31 @@ const ConnectorDetailsModal: React.FC<ConnectorModalProps> = ({
                             window.localStorage.setItem(storageKey, JSON.stringify(existingCredentials));
                             console.log('✅ [Credential Save] Saved', existingCredentials.length, 'credentials to localStorage');
                             console.log('✅ [Credential Save] Storage key:', storageKey);
+                            
+                            // Dispatch custom event to notify other components (like Manage Credentials screen) about the change
+                            window.dispatchEvent(new CustomEvent('credentialsStorageChanged', {
+                                detail: { accountId, enterpriseId, key: storageKey }
+                            }));
                         }
                         
                         // Close the modal after successful save
                         setShowCredentialModal(false);
+                        
+                        // Trigger refresh of credential dropdown by dispatching a custom event
+                        // The CredentialNameDropdown will listen to this event and reload credentials
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('credentialSaved', {
+                                detail: { 
+                                    credentialName: credentials[0]?.credentialName,
+                                    accountId,
+                                    enterpriseId,
+                                    workstream: workstream || credentials[0]?.entity,
+                                    product: product || credentials[0]?.product,
+                                    service: service || credentials[0]?.service,
+                                    connector: connectorConnector
+                                }
+                            }));
+                        }
                         
                         // Show success message
                         console.log('✅ Credential saved successfully to local storage');

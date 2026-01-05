@@ -3487,7 +3487,7 @@ export default function ManageEnvironments() {
                                 <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
                                     <div className='mt-2'>
                                         <p className='text-sm text-gray-900'>
-                                            Are you sure you want to delete this Connector?
+                                            Are you sure you want to delete this Environment?
                                         </p>
                                     </div>
                                 </div>
@@ -3653,6 +3653,7 @@ export default function ManageEnvironments() {
                             // TODO: Implement API call to save individual connector when backend is ready
                         }}
                         connectorName={latestRow.connectorName || ''}
+                        rowId={latestRow.id}
                         initialConnectors={(() => {
                             const savedConnectors = latestRow.connectors || [];
                             console.log('📥 [Environments Page] Loading initialConnectors for row:', latestRow.id, 'connectors:', savedConnectors.length);
@@ -3666,6 +3667,8 @@ export default function ManageEnvironments() {
                         workstream={latestRow.entity || ''}
                         product={latestRow.product || ''}
                         service={latestRow.service || ''}
+                        fromBuilds={false}
+                        environmentDescription={latestRow.description || ''}
                     />
                 );
             })()}
