@@ -13,7 +13,7 @@ const inter = Inter({
 // Get base path for production (handles API Gateway stage prefix)
 // Must include /prod stage for API Gateway deployments
 const isProd = process.env.NODE_ENV === 'production';
-const basePath = isProd ? (process.env.NEXT_PUBLIC_BASE_PATH || '/prod') : '';
+const basePath = isProd ? process.env.NEXT_PUBLIC_BASE_PATH || '/prod' : '';
 
 export const metadata: Metadata = {
     title: 'Systiva - Enterprise CI/CD Platform',

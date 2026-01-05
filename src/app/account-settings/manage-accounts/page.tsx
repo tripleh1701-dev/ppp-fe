@@ -1089,18 +1089,38 @@ export default function ManageAccounts() {
         );
 
         // Check for incomplete temporary rows (exclude completely blank rows)
+        // Mandatory fields: Account Name, Master Account, Cloud Type, License Details, Technical User
+        // Address is OPTIONAL
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasAccountName = hasValue(config.accountName);
             const hasMasterAccount = hasValue(config.masterAccount);
             const hasCloudType = hasValue(config.cloudType);
+            const hasLicenses =
+                config.licenses &&
+                Array.isArray(config.licenses) &&
+                config.licenses.length > 0;
+            const hasTechnicalUsers =
+                config.technicalUsers &&
+                Array.isArray(config.technicalUsers) &&
+                config.technicalUsers.length > 0;
 
             // Don't include completely blank rows (new rows that haven't been touched)
             const isCompletelyBlank =
-                !hasAccountName && !hasMasterAccount && !hasCloudType;
+                !hasAccountName &&
+                !hasMasterAccount &&
+                !hasCloudType &&
+                !hasLicenses &&
+                !hasTechnicalUsers;
             if (isCompletelyBlank) return false;
 
-            // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            // Row is incomplete if it has some data but not all required fields
+            return (
+                !hasAccountName ||
+                !hasMasterAccount ||
+                !hasCloudType ||
+                !hasLicenses ||
+                !hasTechnicalUsers
+            );
         });
 
         // Check for incomplete existing rows (exclude completely blank rows)
@@ -1108,14 +1128,32 @@ export default function ManageAccounts() {
             const hasAccountName = hasValue(config.accountName);
             const hasMasterAccount = hasValue(config.masterAccount);
             const hasCloudType = hasValue(config.cloudType);
+            const hasLicenses =
+                config.licenses &&
+                Array.isArray(config.licenses) &&
+                config.licenses.length > 0;
+            const hasTechnicalUsers =
+                config.technicalUsers &&
+                Array.isArray(config.technicalUsers) &&
+                config.technicalUsers.length > 0;
 
             // Don't include completely blank rows (existing rows shouldn't be blank, but just in case)
             const isCompletelyBlank =
-                !hasAccountName && !hasMasterAccount && !hasCloudType;
+                !hasAccountName &&
+                !hasMasterAccount &&
+                !hasCloudType &&
+                !hasLicenses &&
+                !hasTechnicalUsers;
             if (isCompletelyBlank) return false;
 
-            // Row is incomplete if it has some data but not all required fields (Account Name, Master Account, Cloud Type)
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            // Row is incomplete if it has some data but not all required fields
+            return (
+                !hasAccountName ||
+                !hasMasterAccount ||
+                !hasCloudType ||
+                !hasLicenses ||
+                !hasTechnicalUsers
+            );
         });
 
         // Combine all incomplete rows
@@ -1133,6 +1171,18 @@ export default function ManageAccounts() {
                     missingFields.add('Master Account');
                 if (!hasValue(config.cloudType))
                     missingFields.add('Cloud Type');
+                if (
+                    !config.licenses ||
+                    !Array.isArray(config.licenses) ||
+                    config.licenses.length === 0
+                )
+                    missingFields.add('License Details');
+                if (
+                    !config.technicalUsers ||
+                    !Array.isArray(config.technicalUsers) ||
+                    config.technicalUsers.length === 0
+                )
+                    missingFields.add('Technical User');
             });
 
             const incompleteCount = incompleteRows.length;
@@ -1194,6 +1244,8 @@ export default function ManageAccounts() {
     );
 
     // Function to check for incomplete rows
+    // Mandatory fields: Account Name, Master Account, Cloud Type, License Details, Technical User
+    // Address is OPTIONAL
     const getIncompleteRows = () => {
         const effectiveConfigs = getEffectiveAccounts();
 
@@ -1203,7 +1255,19 @@ export default function ManageAccounts() {
                 const hasMasterAccount = hasValue(config.masterAccount);
                 const hasCloudType = hasValue(config.cloudType);
 
-                // Check if this account has incomplete licenses
+                // Check if account has at least one license (mandatory)
+                const hasLicenses =
+                    config.licenses &&
+                    Array.isArray(config.licenses) &&
+                    config.licenses.length > 0;
+
+                // Check if account has at least one technical user (mandatory)
+                const hasTechnicalUsers =
+                    config.technicalUsers &&
+                    Array.isArray(config.technicalUsers) &&
+                    config.technicalUsers.length > 0;
+
+                // Check if this account has incomplete licenses (if licenses exist)
                 const hasIncompleteLicenses =
                     config.licenses &&
                     config.licenses.length > 0 &&
@@ -1238,7 +1302,11 @@ export default function ManageAccounts() {
                 // When validation errors are being shown, include completely blank rows for highlighting
                 // Otherwise, don't include completely blank rows (new rows that haven't been touched)
                 const isCompletelyBlank =
-                    !hasAccountName && !hasMasterAccount && !hasCloudType;
+                    !hasAccountName &&
+                    !hasMasterAccount &&
+                    !hasCloudType &&
+                    !hasLicenses &&
+                    !hasTechnicalUsers;
                 if (
                     isCompletelyBlank &&
                     !showValidationErrors &&
@@ -1248,12 +1316,17 @@ export default function ManageAccounts() {
 
                 // Row is incomplete if:
                 // 1. It has some data but not all required main fields (Account Name, Master Account, Cloud Type), OR
-                // 2. It's completely blank and validation is active, OR
-                // 3. It has incomplete license data
+                // 2. It doesn't have at least one license (mandatory), OR
+                // 3. It doesn't have at least one technical user (mandatory), OR
+                // 4. It's completely blank and validation is active, OR
+                // 5. It has incomplete license data
+                // Note: Address is OPTIONAL
                 const isIncomplete =
                     !hasAccountName ||
                     !hasMasterAccount ||
                     !hasCloudType ||
+                    !hasLicenses ||
+                    !hasTechnicalUsers ||
                     hasIncompleteLicenses;
 
                 return isIncomplete;
@@ -1382,24 +1455,52 @@ export default function ManageAccounts() {
                     const isTemp = String(config.id).startsWith('tmp-');
                     if (!isTemp) return false;
 
-                    // Be more strict about what constitutes a complete account row
+                    // Mandatory fields for new account creation:
+                    // - Account Name, Master Account, Cloud Type (required)
+                    // - At least one License (required)
+                    // - At least one Technical User (required)
+                    // - Address is OPTIONAL
                     const hasAccountName =
                         hasValue(config.accountName) &&
                         safeTrim(config.accountName).length > 0;
-                    const hasAddress =
-                        hasValue(config.address) &&
-                        safeTrim(config.address).length > 0;
+                    const hasMasterAccount =
+                        hasValue(config.masterAccount) &&
+                        safeTrim(config.masterAccount).length > 0;
+                    const hasCloudType =
+                        hasValue(config.cloudType) &&
+                        safeTrim(config.cloudType).length > 0;
+                    const hasLicenses =
+                        config.licenses &&
+                        Array.isArray(config.licenses) &&
+                        config.licenses.length > 0;
+                    const hasTechnicalUsers =
+                        config.technicalUsers &&
+                        Array.isArray(config.technicalUsers) &&
+                        config.technicalUsers.length > 0;
 
-                    const isComplete = hasAccountName && hasAddress;
+                    // All mandatory fields must be present (address is optional)
+                    const isComplete =
+                        hasAccountName &&
+                        hasMasterAccount &&
+                        hasCloudType &&
+                        hasLicenses &&
+                        hasTechnicalUsers;
 
                     if (isTemp && !isComplete) {
                         console.log(
                             `🚫 Skipping incomplete temporary account ${config.id}:`,
                             {
                                 hasAccountName: !!hasAccountName,
-                                hasAddress: !!hasAddress,
+                                hasMasterAccount: !!hasMasterAccount,
+                                hasCloudType: !!hasCloudType,
+                                hasLicenses: !!hasLicenses,
+                                hasTechnicalUsers: !!hasTechnicalUsers,
                                 accountNameValue: config.accountName,
-                                addressValue: config.address,
+                                masterAccountValue: config.masterAccount,
+                                cloudTypeValue: config.cloudType,
+                                licensesCount: config.licenses?.length || 0,
+                                technicalUsersCount:
+                                    config.technicalUsers?.length || 0,
                             },
                         );
                     }
@@ -1416,16 +1517,25 @@ export default function ManageAccounts() {
 
                     if (isExisting && isModified) {
                         // Double-check that the record still has all required fields
+                        // Address is OPTIONAL - not required for update
                         const hasAccountName = hasValue(config.accountName);
                         const hasMasterAccount = hasValue(config.masterAccount);
                         const hasCloudType = hasValue(config.cloudType);
-                        const hasAddress = hasValue(config.address);
+                        const hasLicenses =
+                            config.licenses &&
+                            Array.isArray(config.licenses) &&
+                            config.licenses.length > 0;
+                        const hasTechnicalUsers =
+                            config.technicalUsers &&
+                            Array.isArray(config.technicalUsers) &&
+                            config.technicalUsers.length > 0;
 
                         const isComplete =
                             hasAccountName &&
                             hasMasterAccount &&
                             hasCloudType &&
-                            hasAddress;
+                            hasLicenses &&
+                            hasTechnicalUsers;
 
                         console.log(
                             `🔍 Checking modified account ${config.id}: isComplete=${isComplete}`,
@@ -1433,11 +1543,14 @@ export default function ManageAccounts() {
                                 hasAccountName: !!hasAccountName,
                                 hasMasterAccount: !!hasMasterAccount,
                                 hasCloudType: !!hasCloudType,
-                                hasAddress: !!hasAddress,
+                                hasLicenses: !!hasLicenses,
+                                hasTechnicalUsers: !!hasTechnicalUsers,
                                 accountNameValue: config.accountName,
                                 masterAccountValue: config.masterAccount,
                                 cloudTypeValue: config.cloudType,
-                                addressValue: config.address,
+                                licensesCount: config.licenses?.length || 0,
+                                technicalUsersCount:
+                                    config.technicalUsers?.length || 0,
                             },
                         );
 
@@ -1679,6 +1792,8 @@ export default function ManageAccounts() {
 
         try {
             // Get all temporary (unsaved) rows that are complete using current ref
+            // Mandatory fields: Account Name, Master Account, Cloud Type, License Details, Technical User
+            // Address is OPTIONAL
             const temporaryRows = accountsRef.current.filter((config) => {
                 const isTemp = String(config.id).startsWith('tmp-');
                 if (!isTemp) return false;
@@ -1686,11 +1801,26 @@ export default function ManageAccounts() {
                 const hasAccountName = hasValue(config.accountName);
                 const hasMasterAccount = hasValue(config.masterAccount);
                 const hasCloudType = hasValue(config.cloudType);
+                const hasLicenses =
+                    config.licenses &&
+                    Array.isArray(config.licenses) &&
+                    config.licenses.length > 0;
+                const hasTechnicalUsers =
+                    config.technicalUsers &&
+                    Array.isArray(config.technicalUsers) &&
+                    config.technicalUsers.length > 0;
 
-                return hasAccountName && hasMasterAccount && hasCloudType;
+                return (
+                    hasAccountName &&
+                    hasMasterAccount &&
+                    hasCloudType &&
+                    hasLicenses &&
+                    hasTechnicalUsers
+                );
             });
 
             // Get all modified existing records that are still complete
+            // For updates: same mandatory fields, address is optional
             const modifiedRows = accountsRef.current.filter((config) => {
                 const isExisting = !String(config.id).startsWith('tmp-');
                 const isModified = modifiedExistingRecordsRef.current.has(
@@ -1699,12 +1829,25 @@ export default function ManageAccounts() {
 
                 if (isExisting && isModified) {
                     // Double-check that the record still has all required fields
+                    // Address is OPTIONAL - not required for update
                     const hasAccountName = hasValue(config.accountName);
                     const hasMasterAccount = hasValue(config.masterAccount);
                     const hasCloudType = hasValue(config.cloudType);
+                    const hasLicenses =
+                        config.licenses &&
+                        Array.isArray(config.licenses) &&
+                        config.licenses.length > 0;
+                    const hasTechnicalUsers =
+                        config.technicalUsers &&
+                        Array.isArray(config.technicalUsers) &&
+                        config.technicalUsers.length > 0;
 
                     const isComplete =
-                        hasAccountName && hasMasterAccount && hasCloudType;
+                        hasAccountName &&
+                        hasMasterAccount &&
+                        hasCloudType &&
+                        hasLicenses &&
+                        hasTechnicalUsers;
 
                     console.log(
                         `🔍 Checking modified account ${config.id}: isComplete=${isComplete}`,
@@ -1712,10 +1855,14 @@ export default function ManageAccounts() {
                             hasAccountName: !!hasAccountName,
                             hasMasterAccount: !!hasMasterAccount,
                             hasCloudType: !!hasCloudType,
+                            hasLicenses: !!hasLicenses,
+                            hasTechnicalUsers: !!hasTechnicalUsers,
                             accountNameValue: config.accountName,
                             masterAccountValue: config.masterAccount,
                             cloudTypeValue: config.cloudType,
-                            addressValue: config.address,
+                            licensesCount: config.licenses?.length || 0,
+                            technicalUsersCount:
+                                config.technicalUsers?.length || 0,
                         },
                     );
 
