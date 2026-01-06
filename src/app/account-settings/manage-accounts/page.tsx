@@ -26,7 +26,12 @@ import AddressModal from '@/components/AddressModal';
 import TechnicalUserModal, {
     TechnicalUser,
 } from '@/components/TechnicalUserModal';
-import {api, fetchExternalAccounts, onboardAccount} from '@/utils/api';
+import {
+    api,
+    fetchExternalAccounts,
+    onboardAccount,
+    updateAccount,
+} from '@/utils/api';
 
 // Helper function to safely trim strings - handles null, undefined, numbers, objects
 const safeTrim = (value: any): string => {
@@ -1635,10 +1640,8 @@ export default function ManageAccounts() {
                         await autoSaveNewAccount(tempRow.id);
                     }
 
-                    // Save modified existing accounts via API
-                    const apiBase =
-                        process.env.NEXT_PUBLIC_API_BASE ||
-                        'http://localhost:4000';
+                    // Save modified existing accounts via PUT API
+                    // This does NOT re-trigger infrastructure provisioning
                     for (const modifiedRow of modifiedRows) {
                         console.log(
                             `💾 Saving modified existing account: ${modifiedRow.id}`,
@@ -1648,6 +1651,7 @@ export default function ManageAccounts() {
                             const transformedLicenses = (
                                 modifiedRow.licenses || []
                             ).map((license: any) => ({
+                                id: license.id,
                                 enterprise: license.enterprise || '',
                                 product: license.product || '',
                                 service: license.service || '',
@@ -1660,9 +1664,12 @@ export default function ManageAccounts() {
                                     license.licenseEnd ||
                                     '',
                                 users:
-                                    license.numberOfUsers ||
-                                    license.users ||
-                                    '',
+                                    parseInt(
+                                        license.numberOfUsers ||
+                                            license.users ||
+                                            '0',
+                                        10,
+                                    ) || 0,
                                 renewalNotice: license.renewalNotice || false,
                                 noticePeriod: parseInt(
                                     license.noticePeriodDays ||
@@ -1676,34 +1683,23 @@ export default function ManageAccounts() {
                                     [],
                             }));
 
-                            const response = await fetch(
-                                `${apiBase}/api/accounts`,
-                                {
-                                    method: 'PUT',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                        id: modifiedRow.id,
-                                        accountName:
-                                            modifiedRow.accountName || '',
-                                        masterAccount:
-                                            modifiedRow.masterAccount || '',
-                                        cloudType: modifiedRow.cloudType || '',
-                                        address: modifiedRow.address || '',
-                                        country: modifiedRow.country || '',
-                                        addresses: modifiedRow.addresses || [],
-                                        licenses: transformedLicenses,
-                                    }),
-                                },
-                            );
-
-                            if (!response.ok) {
-                                throw new Error('Failed to update account');
-                            }
+                            // Use the centralized updateAccount function
+                            // This updates the account WITHOUT re-triggering infrastructure
+                            await updateAccount({
+                                id: modifiedRow.id,
+                                accountName: modifiedRow.accountName || '',
+                                masterAccount: modifiedRow.masterAccount || '',
+                                cloudType: modifiedRow.cloudType || '',
+                                address: modifiedRow.address || '',
+                                country: modifiedRow.country || '',
+                                addresses: modifiedRow.addresses || [],
+                                technicalUsers:
+                                    modifiedRow.technicalUsers || [],
+                                licenses: transformedLicenses,
+                            });
 
                             console.log(
-                                `✅ Modified account ${modifiedRow.id} saved via API`,
+                                `✅ Modified account ${modifiedRow.id} saved via PUT API (no infra re-provisioning)`,
                             );
                         } catch (error) {
                             console.error(
@@ -1898,9 +1894,8 @@ export default function ManageAccounts() {
                     await autoSaveNewAccount(tempRow.id);
                 }
 
-                // Save modified existing accounts via API
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
+                // Save modified existing accounts via PUT API
+                // This does NOT re-trigger infrastructure provisioning
                 for (const modifiedRow of modifiedRows) {
                     console.log(
                         `💾 Saving modified existing account: ${modifiedRow.id}`,
@@ -1910,6 +1905,7 @@ export default function ManageAccounts() {
                         const transformedLicenses = (
                             modifiedRow.licenses || []
                         ).map((license: any) => ({
+                            id: license.id,
                             enterprise: license.enterprise || '',
                             product: license.product || '',
                             service: license.service || '',
@@ -1921,7 +1917,13 @@ export default function ManageAccounts() {
                                 license.licenseEndDate ||
                                 license.licenseEnd ||
                                 '',
-                            users: license.numberOfUsers || license.users || '',
+                            users:
+                                parseInt(
+                                    license.numberOfUsers ||
+                                        license.users ||
+                                        '0',
+                                    10,
+                                ) || 0,
                             renewalNotice: license.renewalNotice || false,
                             noticePeriod: parseInt(
                                 license.noticePeriodDays ||
@@ -1935,33 +1937,22 @@ export default function ManageAccounts() {
                                 [],
                         }));
 
-                        const response = await fetch(
-                            `${apiBase}/api/accounts`,
-                            {
-                                method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    id: modifiedRow.id,
-                                    accountName: modifiedRow.accountName || '',
-                                    masterAccount:
-                                        modifiedRow.masterAccount || '',
-                                    cloudType: modifiedRow.cloudType || '',
-                                    address: modifiedRow.address || '',
-                                    country: modifiedRow.country || '',
-                                    addresses: modifiedRow.addresses || [],
-                                    licenses: transformedLicenses,
-                                }),
-                            },
-                        );
-
-                        if (!response.ok) {
-                            throw new Error('Failed to update account');
-                        }
+                        // Use the centralized updateAccount function
+                        // This updates the account WITHOUT re-triggering infrastructure
+                        await updateAccount({
+                            id: modifiedRow.id,
+                            accountName: modifiedRow.accountName || '',
+                            masterAccount: modifiedRow.masterAccount || '',
+                            cloudType: modifiedRow.cloudType || '',
+                            address: modifiedRow.address || '',
+                            country: modifiedRow.country || '',
+                            addresses: modifiedRow.addresses || [],
+                            technicalUsers: modifiedRow.technicalUsers || [],
+                            licenses: transformedLicenses,
+                        });
 
                         console.log(
-                            `✅ Modified account ${modifiedRow.id} saved via API`,
+                            `✅ Modified account ${modifiedRow.id} saved via PUT API (no infra re-provisioning)`,
                         );
                     } catch (error) {
                         console.error('Error updating account via API:', error);

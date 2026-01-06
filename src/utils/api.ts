@@ -661,8 +661,12 @@ export async function fetchExternalAccounts(): Promise<MappedAccount[]> {
                 const mapped = {
                     id: account.accountId || account.id || '',
                     accountName: account.accountName || '',
-                    // masterAccount is same as accountName per user requirement
-                    masterAccount: account.accountName || '',
+                    // masterAccount should use actual backend value, fallback to accountName if not present
+                    masterAccount:
+                        account.masterAccount ||
+                        account.master_account ||
+                        account.accountName ||
+                        '',
                     // cloudType maps subscriptionTier to display value:
                     // platform/public → "Public Cloud", private → "Private Cloud"
                     cloudType: mapSubscriptionTierToCloudType(
@@ -837,6 +841,107 @@ export async function onboardAccount(
         return responseData;
     } catch (error) {
         console.error('❌ Error onboarding account:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update account payload interface
+ */
+export interface UpdateAccountPayload {
+    id: string; // Account ID (required)
+    accountName?: string;
+    masterAccount?: string;
+    cloudType?: string;
+    address?: string;
+    country?: string;
+    addresses?: AddressDetails[];
+    technicalUsers?: TechnicalUser[];
+    licenses?: License[];
+}
+
+/**
+ * Update account response interface
+ */
+export interface UpdateAccountResponse {
+    id?: string;
+    accountId?: string;
+    accountName?: string;
+    masterAccount?: string;
+    cloudType?: string;
+    address?: string;
+    updatedAt?: string;
+    error?: string;
+}
+
+/**
+ * Update an existing account via PUT API
+ * This updates the account data WITHOUT re-triggering infrastructure provisioning
+ *
+ * @param payload - Account update details including the account ID
+ * @returns API response with updated account details
+ */
+export async function updateAccount(
+    payload: UpdateAccountPayload,
+): Promise<UpdateAccountResponse> {
+    // Use ppp-be-main backend PUT endpoint
+    // Endpoint: /api/v1/app/api/accounts
+    const url = `${API_BASE}/api/v1/app/api/accounts`;
+
+    // Get authentication token
+    const token = getAuthToken();
+
+    // Build headers
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    } else {
+        console.warn('⚠️ No auth token found. API call may fail with 401.');
+    }
+
+    try {
+        console.log('🔄 Updating account:', payload.id);
+        console.log('📤 PUT to:', url);
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(payload),
+        });
+
+        const responseData = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            console.error(
+                '❌ Update account API error:',
+                res.status,
+                responseData,
+            );
+
+            if (res.status === 401) {
+                console.error(
+                    '🔐 Authentication failed. Token may be expired or missing.',
+                );
+            }
+
+            throw new Error(
+                `Update account API ${res.status}: ${
+                    responseData.message ||
+                    responseData.msg ||
+                    responseData.error ||
+                    JSON.stringify(responseData)
+                }`,
+            );
+        }
+
+        console.log('✅ Account updated successfully:', responseData);
+        return responseData;
+    } catch (error) {
+        console.error('❌ Error updating account:', error);
         throw error;
     }
 }
