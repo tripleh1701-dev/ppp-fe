@@ -4785,10 +4785,6 @@ export default function ManageAccounts() {
         try {
             // Skip API call for temporary accounts (not yet in database)
             if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
-                // Save to backend API first
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-
                 // Get the current account data to preserve other fields
                 const currentAccount = accounts.find(
                     (acc) => acc.id === selectedAccountForTechnicalUser.id,
@@ -4800,7 +4796,14 @@ export default function ManageAccounts() {
                     return;
                 }
 
-                const requestData = {
+                console.log('🔍 Bulk Technical User API Request - Using updateAccount:', {
+                    accountId: selectedAccountForTechnicalUser.id,
+                    technicalUsers: users,
+                    userCount: users.length,
+                });
+
+                // Use centralized updateAccount function (with proper auth and API path)
+                await updateAccount({
                     id: selectedAccountForTechnicalUser.id,
                     accountName: currentAccount.accountName || '',
                     masterAccount: currentAccount.masterAccount || '',
@@ -4810,44 +4813,9 @@ export default function ManageAccounts() {
                     addresses: currentAccount.addresses || [],
                     licenses: currentAccount.licenses || [],
                     technicalUsers: users,
-                };
-
-                console.log('🔍 Bulk Technical User API Request Data:', {
-                    url: `${apiBase}/api/accounts`,
-                    method: 'PUT',
-                    data: requestData,
-                    technicalUsers: users,
-                    userCount: users.length,
                 });
 
-                const response = await fetch(`${apiBase}/api/accounts`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ API Error Response:', {
-                        status: response.status,
-                        statusText: response.statusText,
-                        errorText: errorText,
-                    });
-                    throw new Error(
-                        `Failed to save technical users to API: ${response.statusText} - ${errorText}`,
-                    );
-                }
-
-                const responseData = await response.json();
-                console.log('✅ Technical users saved to API successfully', {
-                    response: responseData,
-                    technicalUsersInResponse:
-                        responseData?.technicalUsers || 'Not present',
-                    willRefetchFromUsersAPI:
-                        'Technical users will be refreshed from /api/users on next page load',
-                });
+                console.log('✅ Technical users saved to API successfully via updateAccount');
             } else {
                 console.log(
                     '⏭️ Skipping API save for temporary account:',
@@ -4856,7 +4824,7 @@ export default function ManageAccounts() {
             }
         } catch (error) {
             console.error('❌ Error saving technical users to API:', error);
-            // Continue with local save even if API fails
+            showErrorNotification('Failed to save technical users. Please try again.');
         }
 
         // Update local state
@@ -4877,6 +4845,36 @@ export default function ManageAccounts() {
 
         // Force table refresh for blue dot visibility
         setTableRefreshKey((prev) => prev + 1);
+
+        // For temporary accounts, check if all mandatory fields are complete and trigger autosave
+        if (selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
+            const account = accounts.find(
+                (a) => a.id === selectedAccountForTechnicalUser.id,
+            );
+            if (account) {
+                const hasAccountName = hasValue(account.accountName);
+                const hasMasterAccount = hasValue(account.masterAccount);
+                const hasCloudType = hasValue(account.cloudType);
+                const hasLicenses =
+                    account.licenses &&
+                    Array.isArray(account.licenses) &&
+                    account.licenses.length > 0;
+                const hasTechnicalUsers = users && users.length > 0;
+
+                if (
+                    hasAccountName &&
+                    hasMasterAccount &&
+                    hasCloudType &&
+                    hasLicenses &&
+                    hasTechnicalUsers
+                ) {
+                    console.log(
+                        '✅ Technical users saved on complete temporary account, starting auto-save timer...',
+                    );
+                    debouncedAutoSave();
+                }
+            }
+        }
 
         handleCloseTechnicalUserModal();
     };
@@ -4920,10 +4918,6 @@ export default function ManageAccounts() {
         try {
             // Skip API call for temporary accounts (not yet in database)
             if (!selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
-                // Save to backend API first
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000';
-
                 // Get the current account data to preserve other fields
                 const currentAccount = accounts.find(
                     (acc) => acc.id === selectedAccountForTechnicalUser.id,
@@ -4935,7 +4929,14 @@ export default function ManageAccounts() {
                     return;
                 }
 
-                const requestData = {
+                console.log('🔍 Individual Technical User API Request - Using updateAccount:', {
+                    accountId: selectedAccountForTechnicalUser.id,
+                    technicalUsers: validatedUsers,
+                    userCount: validatedUsers.length,
+                });
+
+                // Use centralized updateAccount function (with proper auth and API path)
+                await updateAccount({
                     id: selectedAccountForTechnicalUser.id,
                     accountName: currentAccount.accountName || '',
                     masterAccount: currentAccount.masterAccount || '',
@@ -4944,48 +4945,10 @@ export default function ManageAccounts() {
                     country: currentAccount.country || '',
                     addresses: currentAccount.addresses || [],
                     licenses: currentAccount.licenses || [],
-                    technicalUsers: validatedUsers, // Use validated users with corrected status
-                };
-
-                console.log('🔍 Individual Technical User API Request Data:', {
-                    url: `${apiBase}/api/accounts`,
-                    method: 'PUT',
-                    data: requestData,
-                    technicalUsers: validatedUsers, // Show validated users in log
-                    userCount: validatedUsers.length,
+                    technicalUsers: validatedUsers,
                 });
 
-                const response = await fetch(`${apiBase}/api/accounts`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ Individual API Error Response:', {
-                        status: response.status,
-                        statusText: response.statusText,
-                        errorText: errorText,
-                    });
-                    throw new Error(
-                        `Failed to save technical user to API: ${response.statusText} - ${errorText}`,
-                    );
-                }
-
-                const responseData = await response.json();
-                console.log(
-                    '✅ Individual technical user saved to API successfully',
-                    {
-                        response: responseData,
-                        technicalUsersInResponse:
-                            responseData?.technicalUsers || 'Not present',
-                        willRefetchFromUsersAPI:
-                            'Technical users will be refreshed from /api/users on next page load',
-                    },
-                );
+                console.log('✅ Individual technical user saved to API successfully via updateAccount');
             } else {
                 console.log(
                     '⏭️ Skipping API save for temporary account:',
@@ -4997,7 +4960,7 @@ export default function ManageAccounts() {
                 '❌ Error saving individual technical user to API:',
                 error,
             );
-            // Continue with local save even if API fails
+            showErrorNotification('Failed to save technical user. Please try again.');
         }
 
         // Update local state
@@ -5019,7 +4982,37 @@ export default function ManageAccounts() {
         // Force table refresh for immediate blue dot visibility
         setTableRefreshKey((prev) => prev + 1);
 
-        showBlueNotification('Technical user saved successfully');
+        // For temporary accounts, check if all mandatory fields are complete and trigger autosave
+        if (selectedAccountForTechnicalUser.id.startsWith('tmp-')) {
+            const account = accounts.find(
+                (a) => a.id === selectedAccountForTechnicalUser.id,
+            );
+            if (account) {
+                const hasAccountName = hasValue(account.accountName);
+                const hasMasterAccount = hasValue(account.masterAccount);
+                const hasCloudType = hasValue(account.cloudType);
+                const hasLicenses =
+                    account.licenses &&
+                    Array.isArray(account.licenses) &&
+                    account.licenses.length > 0;
+                const hasTechnicalUsers = validatedUsers && validatedUsers.length > 0;
+
+                if (
+                    hasAccountName &&
+                    hasMasterAccount &&
+                    hasCloudType &&
+                    hasLicenses &&
+                    hasTechnicalUsers
+                ) {
+                    console.log(
+                        '✅ Individual technical user saved on complete temporary account, starting auto-save timer...',
+                    );
+                    debouncedAutoSave();
+                }
+            }
+        } else {
+            showBlueNotification('Technical user saved successfully');
+        }
     };
 
     return (
@@ -6598,6 +6591,8 @@ export default function ManageAccounts() {
                                                 }
                                             } else {
                                                 // For temporary rows, check if the main row is complete before triggering auto-save
+                                                // Mandatory: Account Name, Master Account, Cloud Type, Licenses, Technical Users
+                                                // Address is OPTIONAL
                                                 const account = accounts.find(
                                                     (a) => a.id === rowId,
                                                 );
@@ -6614,15 +6609,22 @@ export default function ManageAccounts() {
                                                         hasValue(
                                                             account.cloudType,
                                                         );
-                                                    const hasAddress = hasValue(
-                                                        account.address,
-                                                    );
+                                                    // Check licenses (the value being set includes the new license)
+                                                    const hasLicenses =
+                                                        value &&
+                                                        Array.isArray(value) &&
+                                                        value.length > 0;
+                                                    const hasTechnicalUsers =
+                                                        account.technicalUsers &&
+                                                        Array.isArray(account.technicalUsers) &&
+                                                        account.technicalUsers.length > 0;
 
                                                     if (
                                                         hasAccountName &&
                                                         hasMasterAccount &&
                                                         hasCloudType &&
-                                                        hasAddress
+                                                        hasLicenses &&
+                                                        hasTechnicalUsers
                                                     ) {
                                                         console.log(
                                                             '✅ License change on complete temporary account, starting auto-save timer...',

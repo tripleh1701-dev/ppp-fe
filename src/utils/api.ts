@@ -718,17 +718,22 @@ export interface AddressDetails {
 }
 
 export interface TechnicalUser {
+    id?: string;
     firstName?: string;
     middleName?: string;
     lastName?: string;
     adminUsername?: string;
     adminEmail?: string;
+    emailAddress?: string;
     adminPassword?: string;
+    password?: string;
     assignedUserGroup?: string;
     assignedRole?: string;
     assignmentStartDate?: string;
     assignmentEndDate?: string;
-    status?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string | boolean; // Can be string ('Active'/'Inactive') or boolean
     createdBy?: string;
 }
 
