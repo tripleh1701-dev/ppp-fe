@@ -166,28 +166,23 @@ export default function NavigationSidebar({
 
                     // If firstName/lastName not available, try to extract from name or email
                     if (!firstName && !lastName) {
-                        // Try full name
-                        if (userData.name) {
+                        // Try full name (only if it's a proper name with spaces, not an email)
+                        if (userData.name && userData.name.includes(' ') && !userData.name.includes('@')) {
                             const nameParts = userData.name.trim().split(' ');
                             firstName = nameParts[0] || '';
                             lastName = nameParts.slice(1).join(' ') || '';
                         }
-                        // Fall back to email prefix
-                        else if (userData.email) {
-                            const emailPrefix = userData.email.split('@')[0];
+                        // Fall back to email prefix (handles email-style usernames)
+                        const email = userData.email || userData.emailAddress || '';
+                        if ((!firstName || !lastName) && email) {
+                            const emailPrefix = email.split('@')[0];
                             // Try to split by common separators (., _, -)
                             const parts = emailPrefix.split(/[._-]/);
                             if (parts.length >= 2) {
-                                firstName =
-                                    parts[0].charAt(0).toUpperCase() +
-                                    parts[0].slice(1);
-                                lastName =
-                                    parts[1].charAt(0).toUpperCase() +
-                                    parts[1].slice(1);
-                            } else {
-                                firstName =
-                                    emailPrefix.charAt(0).toUpperCase() +
-                                    emailPrefix.slice(1);
+                                firstName = firstName || (parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase());
+                                lastName = lastName || (parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase());
+                            } else if (!firstName) {
+                                firstName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).toLowerCase();
                             }
                         }
                     }
@@ -195,7 +190,7 @@ export default function NavigationSidebar({
                     setCurrentUser({
                         firstName: firstName,
                         lastName: lastName,
-                        emailAddress: userData.email || '',
+                        emailAddress: userData.email || userData.emailAddress || '',
                         role: userData.role || 'User',
                     });
                 }

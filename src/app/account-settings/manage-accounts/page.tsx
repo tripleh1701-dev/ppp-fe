@@ -96,6 +96,7 @@ export default function ManageAccounts() {
     // Notification state
     const [notificationMessage, setNotificationMessage] = useState<string>('');
     const [showNotification, setShowNotification] = useState(false);
+    const [notificationType, setNotificationType] = useState<'success' | 'error'>('success');
 
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -243,7 +244,7 @@ export default function ManageAccounts() {
     const hideRef = useRef<HTMLDivElement>(null);
     const groupRef = useRef<HTMLDivElement>(null);
 
-    // Helper function to show notifications
+    // Helper function to show success notifications
     const showBlueNotification = (
         message: string,
         duration: number = 3000,
@@ -255,7 +256,25 @@ export default function ManageAccounts() {
             'AI Panel Collapsed:',
             isAIPanelCollapsed,
         );
+        setNotificationType('success');
         setNotificationMessage(showCheckmark ? `✅ ${message}` : message);
+        setShowNotification(true);
+        setTimeout(() => {
+            setShowNotification(false);
+        }, duration);
+    };
+
+    // Helper function to show error notifications
+    const showErrorNotification = (
+        message: string,
+        duration: number = 5000,
+    ) => {
+        console.log(
+            '❌ Showing error notification:',
+            message,
+        );
+        setNotificationType('error');
+        setNotificationMessage(`❌ ${message}`);
         setShowNotification(true);
         setTimeout(() => {
             setShowNotification(false);
@@ -1070,9 +1089,15 @@ export default function ManageAccounts() {
                 );
             }
 
-            console.log(' New account saved automatically!');
-        } catch (error) {
-            console.error(' Auto-save failed:', error);
+            console.log('✅ New account saved automatically!');
+        } catch (error: any) {
+            console.error('❌ Auto-save failed:', error);
+            // Extract error message from API response
+            const errorMessage = error?.message ||
+                error?.msg ||
+                'Account creation failed. Please try again.';
+            // Show error notification to user
+            showErrorNotification(errorMessage);
         } finally {
             // Remove from saving state
             setSavingRows((prev) => {
@@ -1967,8 +1992,13 @@ export default function ManageAccounts() {
                         console.log(
                             `✅ Modified account ${modifiedRow.id} saved via PUT API (no infra re-provisioning)`,
                         );
-                    } catch (error) {
-                        console.error('Error updating account via API:', error);
+                    } catch (error: any) {
+                        console.error('❌ Error updating account via API:', error);
+                        const errorMessage = error?.message ||
+                            error?.msg ||
+                            'Failed to update account. Please try again.';
+                        showErrorNotification(errorMessage);
+                        throw error; // Re-throw to stop processing
                     }
                 }
 
@@ -2146,21 +2176,41 @@ export default function ManageAccounts() {
         );
 
         // Check for incomplete temporary rows (including completely blank ones)
+        // Mandatory: Account Name, Master Account, Cloud Type, At least one License, At least one Technical User
         const incompleteTemporaryRows = temporaryRows.filter((config: any) => {
             const hasAccountName = hasValue(config.accountName);
             const hasMasterAccount = hasValue(config.masterAccount);
             const hasCloudType = hasValue(config.cloudType);
+            const hasLicenses = config.licenses && config.licenses.length > 0;
+            const hasTechnicalUsers =
+                config.technicalUsers && config.technicalUsers.length > 0;
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            return (
+                !hasAccountName ||
+                !hasMasterAccount ||
+                !hasCloudType ||
+                !hasLicenses ||
+                !hasTechnicalUsers
+            );
         });
 
         // Check for incomplete existing rows (including completely blank ones)
+        // Mandatory: Account Name, Master Account, Cloud Type, At least one License, At least one Technical User
         const incompleteExistingRows = existingRows.filter((config: any) => {
             const hasAccountName = hasValue(config.accountName);
             const hasMasterAccount = hasValue(config.masterAccount);
             const hasCloudType = hasValue(config.cloudType);
+            const hasLicenses = config.licenses && config.licenses.length > 0;
+            const hasTechnicalUsers =
+                config.technicalUsers && config.technicalUsers.length > 0;
 
-            return !hasAccountName || !hasMasterAccount || !hasCloudType;
+            return (
+                !hasAccountName ||
+                !hasMasterAccount ||
+                !hasCloudType ||
+                !hasLicenses ||
+                !hasTechnicalUsers
+            );
         });
 
         // Combine all incomplete rows
@@ -2414,11 +2464,18 @@ export default function ManageAccounts() {
             if (incompleteRows.length > 0) {
                 incompleteRows.forEach((config) => {
                     if (!hasValue(config.accountName))
-                        allMissingFields.add('Account');
+                        allMissingFields.add('Account Name');
                     if (!hasValue(config.masterAccount))
                         allMissingFields.add('Master Account');
                     if (!hasValue(config.cloudType))
                         allMissingFields.add('Cloud Type');
+                    if (!config.licenses || config.licenses.length === 0)
+                        allMissingFields.add('At least one License');
+                    if (
+                        !config.technicalUsers ||
+                        config.technicalUsers.length === 0
+                    )
+                        allMissingFields.add('At least one Technical User');
                 });
                 totalIncompleteCount += incompleteRows.length;
             }
@@ -5849,13 +5906,9 @@ export default function ManageAccounts() {
                                                         key={c}
                                                         className='flex items-center justify-between py-1.5'
                                                     >
-                                                        <span className='text-sm capitalize'>
-                                                            {c === 'accountName'
-                                                                ? 'Account'
-                                                                : c ===
-                                                                  'address'
-                                                                ? 'Address'
-                                                                : c}
+                                                        <span className='text-sm'>
+                                                            {columnLabels[c] ||
+                                                                c}
                                                         </span>
                                                         <input
                                                             type='checkbox'
@@ -7335,14 +7388,20 @@ export default function ManageAccounts() {
                         // Right positioning handled by CSS classes for consistency
                     }}
                 >
-                    <div className='bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 rounded-lg shadow-lg relative'>
+                    <div className={`${
+                        notificationType === 'error'
+                            ? 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500'
+                            : 'bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500'
+                    } rounded-lg shadow-lg relative`}>
                         {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
-                        <div className='absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-100'></div>
+                        <div className={`absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent ${
+                            notificationType === 'error' ? 'border-t-red-100' : 'border-t-blue-100'
+                        }`}></div>
                         <div className='p-4'>
                             <div className='flex items-start'>
                                 <div className='flex-shrink-0'>
                                     <svg
-                                        className='h-5 w-5 text-blue-600'
+                                        className={`h-5 w-5 ${notificationType === 'error' ? 'text-red-600' : 'text-blue-600'}`}
                                         fill='currentColor'
                                         viewBox='0 0 20 20'
                                     >
@@ -7354,13 +7413,17 @@ export default function ManageAccounts() {
                                     </svg>
                                 </div>
                                 <div className='ml-3 flex-1'>
-                                    <p className='text-sm font-medium text-blue-800'>
+                                    <p className={`text-sm font-medium ${notificationType === 'error' ? 'text-red-800' : 'text-blue-800'}`}>
                                         {notificationMessage}
                                     </p>
                                 </div>
                                 <div className='ml-4 flex-shrink-0 flex'>
                                     <button
-                                        className='inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors duration-200'
+                                        className={`inline-flex ${
+                                            notificationType === 'error'
+                                                ? 'text-red-400 hover:text-red-600 focus:text-red-600'
+                                                : 'text-blue-400 hover:text-blue-600 focus:text-blue-600'
+                                        } focus:outline-none transition-colors duration-200`}
                                         onClick={() =>
                                             setShowNotification(false)
                                         }
