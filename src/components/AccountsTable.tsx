@@ -50,7 +50,6 @@ import {
     Layers,
     FoldVertical,
     UnfoldVertical,
-    Clock,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
