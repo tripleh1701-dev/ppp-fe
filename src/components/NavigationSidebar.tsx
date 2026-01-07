@@ -159,9 +159,42 @@ export default function NavigationSidebar({
                 const userStr = localStorage.getItem('systiva_user');
                 if (userStr) {
                     const userData = JSON.parse(userStr);
+
+                    // Try to get firstName and lastName from various sources
+                    let firstName = userData.firstName || '';
+                    let lastName = userData.lastName || '';
+
+                    // If firstName/lastName not available, try to extract from name or email
+                    if (!firstName && !lastName) {
+                        // Try full name
+                        if (userData.name) {
+                            const nameParts = userData.name.trim().split(' ');
+                            firstName = nameParts[0] || '';
+                            lastName = nameParts.slice(1).join(' ') || '';
+                        }
+                        // Fall back to email prefix
+                        else if (userData.email) {
+                            const emailPrefix = userData.email.split('@')[0];
+                            // Try to split by common separators (., _, -)
+                            const parts = emailPrefix.split(/[._-]/);
+                            if (parts.length >= 2) {
+                                firstName =
+                                    parts[0].charAt(0).toUpperCase() +
+                                    parts[0].slice(1);
+                                lastName =
+                                    parts[1].charAt(0).toUpperCase() +
+                                    parts[1].slice(1);
+                            } else {
+                                firstName =
+                                    emailPrefix.charAt(0).toUpperCase() +
+                                    emailPrefix.slice(1);
+                            }
+                        }
+                    }
+
                     setCurrentUser({
-                        firstName: userData.firstName || '',
-                        lastName: userData.lastName || '',
+                        firstName: firstName,
+                        lastName: lastName,
                         emailAddress: userData.email || '',
                         role: userData.role || 'User',
                     });

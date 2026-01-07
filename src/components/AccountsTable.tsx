@@ -50,6 +50,7 @@ import {
     Layers,
     FoldVertical,
     UnfoldVertical,
+    Clock,
 } from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {api} from '../utils/api';
@@ -505,6 +506,11 @@ export interface AccountRow {
     technicalUsers?: any[]; // Add technical users field
     // Add licenses array for expandable sub-rows
     licenses?: License[];
+    // Audit columns from DynamoDB
+    createdBy?: string | number;
+    creationDate?: string;
+    lastUpdatedBy?: string | number;
+    lastUpdateDate?: string;
 }
 
 // License interface for sub-rows
@@ -4277,6 +4283,10 @@ interface AccountsTableProps {
         | 'cloudType'
         | 'address'
         | 'technicalUser'
+        | 'createdBy'
+        | 'creationDate'
+        | 'lastUpdatedBy'
+        | 'lastUpdateDate'
         | 'actions'
     >;
     highlightQuery?: string;
@@ -4511,7 +4521,7 @@ function LicenseSubRow({
 
             {/* License row content with grid structure */}
             <div
-                className={`grid gap-3 p-3 transition-all duration-200 ${
+                className={`grid gap-2 p-2 transition-all duration-200 ${
                     isTableRow
                         ? `border-l border-r border-blue-200 hover:bg-blue-50/50 ${
                               isLastRow ? 'rounded-b-lg border-b' : 'border-b'
@@ -4520,7 +4530,7 @@ function LicenseSubRow({
                 }`}
                 style={{
                     gridTemplateColumns:
-                        '30px 28px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px',
+                        '24px 24px minmax(60px, 1fr) minmax(60px, 1fr) minmax(60px, 1fr) minmax(70px, 0.8fr) minmax(70px, 0.8fr) minmax(45px, 0.5fr) 40px minmax(55px, 0.5fr) minmax(60px, 0.6fr)',
                 }}
             >
                 {/* Delete Button Column - First in grid */}
@@ -5626,6 +5636,83 @@ function SortableAccountRow({
                                 </div>
                             )}
                     </button>
+                </div>
+            )}
+            {/* Audit Columns - Read Only */}
+            {cols.includes('createdBy') && (
+                <div
+                    className={`relative flex items-center text-slate-600 text-[11px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='createdBy'
+                    style={{width: '100%'}}
+                    title={`Created by: ${row.createdBy || 'N/A'}`}
+                >
+                    <span className='truncate'>{row.createdBy || '-'}</span>
+                </div>
+            )}
+            {cols.includes('creationDate') && (
+                <div
+                    className={`relative flex items-center text-slate-600 text-[11px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='creationDate'
+                    style={{width: '100%'}}
+                    title={`Created: ${row.creationDate || 'N/A'}`}
+                >
+                    <span className='truncate'>
+                        {row.creationDate
+                            ? new Date(row.creationDate).toLocaleDateString()
+                            : '-'}
+                    </span>
+                </div>
+            )}
+            {cols.includes('lastUpdatedBy') && (
+                <div
+                    className={`relative flex items-center text-slate-600 text-[11px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='lastUpdatedBy'
+                    style={{width: '100%'}}
+                    title={`Last updated by: ${row.lastUpdatedBy || 'N/A'}`}
+                >
+                    <span className='truncate'>{row.lastUpdatedBy || '-'}</span>
+                </div>
+            )}
+            {cols.includes('lastUpdateDate') && (
+                <div
+                    className={`relative flex items-center text-slate-600 text-[11px] w-full border-r border-slate-200 px-2 py-1 ${
+                        isSelected
+                            ? 'bg-blue-50'
+                            : index % 2 === 0
+                            ? 'bg-white'
+                            : 'bg-slate-50/70'
+                    }`}
+                    data-row-id={row.id}
+                    data-col='lastUpdateDate'
+                    style={{width: '100%'}}
+                    title={`Last updated: ${row.lastUpdateDate || 'N/A'}`}
+                >
+                    <span className='truncate'>
+                        {row.lastUpdateDate
+                            ? new Date(row.lastUpdateDate).toLocaleDateString()
+                            : '-'}
+                    </span>
                 </div>
             )}
             {/* actions column removed */}
@@ -6813,12 +6900,17 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
 
         const columnOrder: AccountsTableProps['visibleColumns'] = useMemo(
             () => [
-                // Only the required columns
+                // Required columns
                 'accountName',
                 'masterAccount',
                 'cloudType',
                 'address',
                 'technicalUser',
+                // Audit columns from DynamoDB
+                'createdBy',
+                'creationDate',
+                'lastUpdatedBy',
+                'lastUpdateDate',
             ],
             [],
         );
@@ -6840,6 +6932,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
                     cloudType: '160px', // Cloud Type column
                     address: '120px', // Address column - increased width for icon + text alignment
                     technicalUser: '140px', // Technical User column - increased width for icon + text alignment
+                    createdBy: '130px', // Created By column
+                    creationDate: '150px', // Creation Date column
+                    lastUpdatedBy: '130px', // Last Updated By column
+                    lastUpdateDate: '150px', // Last Update Date column
                     email: '220px', // Email column - increased for label + arrows + resize handle
                     phone: 'minmax(650px, 1fr)', // Phone column with flexible width - increased minimum
                 } as Record<string, string>),
@@ -8155,6 +8251,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
                                     cloudType: 'Cloud Type',
                                     address: 'Address',
                                     technicalUser: 'Technical User',
+                                    createdBy: 'Created By',
+                                    creationDate: 'Creation Date',
+                                    lastUpdatedBy: 'Last Updated By',
+                                    lastUpdateDate: 'Last Update Date',
                                 };
 
                                 // Merge custom labels with defaults
@@ -8170,6 +8270,10 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
                                         cloudType: <FileText size={14} />,
                                         address: <MapPin size={14} />,
                                         technicalUser: <User size={14} />,
+                                        createdBy: <User size={14} />,
+                                        creationDate: <Clock size={14} />,
+                                        lastUpdatedBy: <User size={14} />,
+                                        lastUpdateDate: <Clock size={14} />,
                                     };
                                 return (
                                     <div
@@ -8427,13 +8531,13 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
                                                         </h4>
 
                                                         {/* License Table Container */}
-                                                        <div className='ml-6 relative'>
+                                                        <div className='ml-6 relative overflow-x-auto'>
                                                             {/* Table Header */}
                                                             <div
-                                                                className='grid gap-3 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black'
+                                                                className='grid gap-2 p-2 bg-blue-100/70 border border-blue-300 rounded-t-lg font-medium text-xs text-black min-w-fit'
                                                                 style={{
                                                                     gridTemplateColumns:
-                                                                        '30px 28px minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(90px, 0.6fr) minmax(80px, 0.6fr) minmax(80px, 0.6fr) 80px 50px 90px 120px',
+                                                                        '24px 24px minmax(60px, 1fr) minmax(60px, 1fr) minmax(60px, 1fr) minmax(70px, 0.8fr) minmax(70px, 0.8fr) minmax(45px, 0.5fr) 40px minmax(55px, 0.5fr) minmax(60px, 0.6fr)',
                                                                 }}
                                                             >
                                                                 <div></div>

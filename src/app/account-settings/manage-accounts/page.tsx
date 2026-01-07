@@ -413,19 +413,27 @@ export default function ManageAccounts() {
         }
     };
 
-    // All available columns
+    // All available columns (including audit columns from DynamoDB)
     type ColumnType =
         | 'accountName'
         | 'masterAccount'
         | 'cloudType'
         | 'address'
-        | 'technicalUser';
+        | 'technicalUser'
+        | 'createdBy'
+        | 'creationDate'
+        | 'lastUpdatedBy'
+        | 'lastUpdateDate';
     const allCols: ColumnType[] = [
         'accountName',
         'masterAccount',
         'cloudType',
         'address',
         'technicalUser',
+        'createdBy',
+        'creationDate',
+        'lastUpdatedBy',
+        'lastUpdateDate',
     ];
 
     // Columns available in toolbar panels (excludes address and technicalUser)
@@ -567,6 +575,11 @@ export default function ManageAccounts() {
                 addressData: actualAddressData,
                 technicalUsers: actualTechnicalUsers,
                 licenses: transformedLicenses,
+                // Audit columns from DynamoDB
+                createdBy: a.CREATED_BY || a.createdBy || '',
+                creationDate: a.CREATION_DATE || a.creationDate || '',
+                lastUpdatedBy: a.LAST_UPDATED_BY || a.lastUpdatedBy || '',
+                lastUpdateDate: a.LAST_UPDATE_DATE || a.lastUpdateDate || '',
             };
 
             return rowData;
@@ -579,13 +592,17 @@ export default function ManageAccounts() {
         closeAllDialogs();
     };
 
-    // Column label mapping
+    // Column label mapping (includes audit columns from DynamoDB)
     const columnLabels: Record<string, string> = {
         accountName: 'Account',
         masterAccount: 'Master Account',
         cloudType: 'Cloud Type',
         address: 'Address',
         technicalUser: 'Technical User',
+        createdBy: 'Created By',
+        creationDate: 'Creation Date',
+        lastUpdatedBy: 'Last Updated By',
+        lastUpdateDate: 'Last Update Date',
     };
 
     // Sort functions
@@ -1352,65 +1369,61 @@ export default function ManageAccounts() {
     };
 
     // Enhanced function to detect any unsaved changes including partial data
+    // Only warn for COMPLETE rows that haven't been saved yet (all mandatory fields filled)
     const getUnsavedChanges = useCallback(() => {
         const effectiveConfigs = getEffectiveAccounts();
 
-        // Check for any rows with partial data that would be lost
-        const hasPartialData = effectiveConfigs.some((config: any) => {
+        // Check for COMPLETE new rows that haven't been saved yet
+        // (Only warn if all mandatory fields are filled - partial data doesn't trigger warning)
+        const hasCompleteUnsavedData = effectiveConfigs.some((config: any) => {
             const hasAccountName = hasValue(config.accountName);
             const hasMasterAccount = hasValue(config.masterAccount);
             const hasCloudType = hasValue(config.cloudType);
-            const hasAddress = hasValue(config.address);
+            const hasLicenses =
+                config.licenses &&
+                Array.isArray(config.licenses) &&
+                config.licenses.length > 0;
             const hasTechnicalUsers =
-                config.technicalUsers && config.technicalUsers.length > 0;
+                config.technicalUsers &&
+                Array.isArray(config.technicalUsers) &&
+                config.technicalUsers.length > 0;
 
-            // Check if it's a new row (temporary ID) with any data
+            // Check if it's a new row (temporary ID) with ALL mandatory fields
             const isNewRow = String(config.id).startsWith('tmp-');
-            const hasAnyData =
-                hasAccountName ||
-                hasMasterAccount ||
-                hasCloudType ||
-                hasAddress ||
+            const isComplete =
+                hasAccountName &&
+                hasMasterAccount &&
+                hasCloudType &&
+                hasLicenses &&
                 hasTechnicalUsers;
 
-            // If it's a new row with any data, it's unsaved
-            if (isNewRow && hasAnyData) {
-                console.log('🔍 Found unsaved new row:', config.id, {
-                    hasAccountName: !!hasAccountName,
-                    hasMasterAccount: !!hasMasterAccount,
-                    hasCloudType: !!hasCloudType,
-                    hasAddress: !!hasAddress,
-                    hasTechnicalUsers: !!hasTechnicalUsers,
-                });
+            // Only warn for COMPLETE new rows that need to be saved
+            if (isNewRow && isComplete) {
+                console.log('🔍 Found complete unsaved new row:', config.id);
                 return true;
             }
 
-            // Check for incomplete existing rows that have been modified
-            const isIncomplete =
-                hasAnyData &&
-                (!hasAccountName || !hasMasterAccount || !hasCloudType);
-            if (isIncomplete) {
-                console.log('🔍 Found incomplete existing row:', config.id);
-            }
-            return isIncomplete;
+            return false;
         });
 
-        // Check for pending local changes
-        const hasPendingChanges = Object.keys(pendingLocalChanges).length > 0;
-
-        // Check for modified existing records
+        // Check for modified existing records that need to be saved
         const hasModifiedRecords = modifiedExistingRecords.size > 0;
 
-        console.log('🔍 Unsaved changes check:', {
-            hasPartialData,
-            hasPendingChanges,
-            hasModifiedRecords,
-            pendingLocalChangesKeys: Object.keys(pendingLocalChanges),
-            modifiedExistingRecordsArray: Array.from(modifiedExistingRecords),
-        });
+        // Only log when there are actual changes to reduce console noise
+        if (hasCompleteUnsavedData || hasModifiedRecords) {
+            console.log('🔍 Unsaved changes check:', {
+                hasCompleteUnsavedData,
+                hasModifiedRecords,
+                modifiedExistingRecordsArray: Array.from(
+                    modifiedExistingRecords,
+                ),
+            });
+        }
 
-        return hasPartialData || hasPendingChanges || hasModifiedRecords;
-    }, [getEffectiveAccounts, pendingLocalChanges, modifiedExistingRecords]);
+        // Only warn for complete unsaved data or modified existing records
+        // Partial/incomplete data does NOT trigger the warning
+        return hasCompleteUnsavedData || hasModifiedRecords;
+    }, [getEffectiveAccounts, modifiedExistingRecords]);
 
     // Track unsaved changes - place after getUnsavedChanges is defined
     useEffect(() => {
@@ -2842,11 +2855,22 @@ export default function ManageAccounts() {
                                     config.masterAccount,
                                 );
                                 const hasCloudType = hasValue(config.cloudType);
+                                // License and Technical User are mandatory
+                                const hasLicenses =
+                                    config.licenses &&
+                                    Array.isArray(config.licenses) &&
+                                    config.licenses.length > 0;
+                                const hasTechnicalUsers =
+                                    config.technicalUsers &&
+                                    Array.isArray(config.technicalUsers) &&
+                                    config.technicalUsers.length > 0;
 
                                 return (
                                     hasAccountName &&
                                     hasMasterAccount &&
-                                    hasCloudType
+                                    hasCloudType &&
+                                    hasLicenses &&
+                                    hasTechnicalUsers
                                 );
                             },
                         );
