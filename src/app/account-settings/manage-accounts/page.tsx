@@ -96,7 +96,9 @@ export default function ManageAccounts() {
     // Notification state
     const [notificationMessage, setNotificationMessage] = useState<string>('');
     const [showNotification, setShowNotification] = useState(false);
-    const [notificationType, setNotificationType] = useState<'success' | 'error'>('success');
+    const [notificationType, setNotificationType] = useState<
+        'success' | 'error'
+    >('success');
 
     // Delete confirmation modal state
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -269,10 +271,7 @@ export default function ManageAccounts() {
         message: string,
         duration: number = 5000,
     ) => {
-        console.log(
-            '❌ Showing error notification:',
-            message,
-        );
+        console.log('❌ Showing error notification:', message);
         setNotificationType('error');
         setNotificationMessage(`❌ ${message}`);
         setShowNotification(true);
@@ -1050,7 +1049,7 @@ export default function ManageAccounts() {
             // Preserve display order for the new ID
             const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
 
-            // Update the account with the real ID
+            // Update the account with the real ID and audit columns from API response
             setAccounts((prev) => {
                 const updated = prev.map((acc) =>
                     acc.id === tempRowId
@@ -1067,6 +1066,38 @@ export default function ManageAccounts() {
                                   apiResponse.data?.lastModified ||
                                   apiResponse.updatedAt ||
                                   new Date().toISOString(),
+                              // Include audit columns from API response
+                              CREATED_BY:
+                                  apiResponse.data?.CREATED_BY ||
+                                  apiResponse.data?.createdBy ||
+                                  apiResponse.CREATED_BY ||
+                                  apiResponse.createdBy ||
+                                  acc.CREATED_BY,
+                              CREATION_DATE:
+                                  apiResponse.data?.CREATION_DATE ||
+                                  apiResponse.data?.creationDate ||
+                                  apiResponse.CREATION_DATE ||
+                                  apiResponse.creationDate ||
+                                  apiResponse.data?.createdAt ||
+                                  acc.CREATION_DATE,
+                              LAST_UPDATED_BY:
+                                  apiResponse.data?.LAST_UPDATED_BY ||
+                                  apiResponse.data?.lastUpdatedBy ||
+                                  apiResponse.LAST_UPDATED_BY ||
+                                  apiResponse.lastUpdatedBy ||
+                                  acc.LAST_UPDATED_BY,
+                              LAST_UPDATE_DATE:
+                                  apiResponse.data?.LAST_UPDATE_DATE ||
+                                  apiResponse.data?.lastUpdateDate ||
+                                  apiResponse.LAST_UPDATE_DATE ||
+                                  apiResponse.lastUpdateDate ||
+                                  apiResponse.data?.updatedAt ||
+                                  acc.LAST_UPDATE_DATE,
+                              // Also include licenses from API response if present
+                              licenses:
+                                  apiResponse.data?.licenses ||
+                                  apiResponse.licenses ||
+                                  acc.licenses,
                           }
                         : acc,
                 );
@@ -1093,7 +1124,8 @@ export default function ManageAccounts() {
         } catch (error: any) {
             console.error('❌ Auto-save failed:', error);
             // Extract error message from API response
-            const errorMessage = error?.message ||
+            const errorMessage =
+                error?.message ||
                 error?.msg ||
                 'Account creation failed. Please try again.';
             // Show error notification to user
@@ -1993,8 +2025,12 @@ export default function ManageAccounts() {
                             `✅ Modified account ${modifiedRow.id} saved via PUT API (no infra re-provisioning)`,
                         );
                     } catch (error: any) {
-                        console.error('❌ Error updating account via API:', error);
-                        const errorMessage = error?.message ||
+                        console.error(
+                            '❌ Error updating account via API:',
+                            error,
+                        );
+                        const errorMessage =
+                            error?.message ||
                             error?.msg ||
                             'Failed to update account. Please try again.';
                         showErrorNotification(errorMessage);
@@ -4796,11 +4832,14 @@ export default function ManageAccounts() {
                     return;
                 }
 
-                console.log('🔍 Bulk Technical User API Request - Using updateAccount:', {
-                    accountId: selectedAccountForTechnicalUser.id,
-                    technicalUsers: users,
-                    userCount: users.length,
-                });
+                console.log(
+                    '🔍 Bulk Technical User API Request - Using updateAccount:',
+                    {
+                        accountId: selectedAccountForTechnicalUser.id,
+                        technicalUsers: users,
+                        userCount: users.length,
+                    },
+                );
 
                 // Use centralized updateAccount function (with proper auth and API path)
                 await updateAccount({
@@ -4815,7 +4854,9 @@ export default function ManageAccounts() {
                     technicalUsers: users,
                 });
 
-                console.log('✅ Technical users saved to API successfully via updateAccount');
+                console.log(
+                    '✅ Technical users saved to API successfully via updateAccount',
+                );
             } else {
                 console.log(
                     '⏭️ Skipping API save for temporary account:',
@@ -4824,7 +4865,9 @@ export default function ManageAccounts() {
             }
         } catch (error) {
             console.error('❌ Error saving technical users to API:', error);
-            showErrorNotification('Failed to save technical users. Please try again.');
+            showErrorNotification(
+                'Failed to save technical users. Please try again.',
+            );
         }
 
         // Update local state
@@ -4929,11 +4972,14 @@ export default function ManageAccounts() {
                     return;
                 }
 
-                console.log('🔍 Individual Technical User API Request - Using updateAccount:', {
-                    accountId: selectedAccountForTechnicalUser.id,
-                    technicalUsers: validatedUsers,
-                    userCount: validatedUsers.length,
-                });
+                console.log(
+                    '🔍 Individual Technical User API Request - Using updateAccount:',
+                    {
+                        accountId: selectedAccountForTechnicalUser.id,
+                        technicalUsers: validatedUsers,
+                        userCount: validatedUsers.length,
+                    },
+                );
 
                 // Use centralized updateAccount function (with proper auth and API path)
                 await updateAccount({
@@ -4948,7 +4994,9 @@ export default function ManageAccounts() {
                     technicalUsers: validatedUsers,
                 });
 
-                console.log('✅ Individual technical user saved to API successfully via updateAccount');
+                console.log(
+                    '✅ Individual technical user saved to API successfully via updateAccount',
+                );
             } else {
                 console.log(
                     '⏭️ Skipping API save for temporary account:',
@@ -4960,7 +5008,9 @@ export default function ManageAccounts() {
                 '❌ Error saving individual technical user to API:',
                 error,
             );
-            showErrorNotification('Failed to save technical user. Please try again.');
+            showErrorNotification(
+                'Failed to save technical user. Please try again.',
+            );
         }
 
         // Update local state
@@ -4995,7 +5045,8 @@ export default function ManageAccounts() {
                     account.licenses &&
                     Array.isArray(account.licenses) &&
                     account.licenses.length > 0;
-                const hasTechnicalUsers = validatedUsers && validatedUsers.length > 0;
+                const hasTechnicalUsers =
+                    validatedUsers && validatedUsers.length > 0;
 
                 if (
                     hasAccountName &&
@@ -6616,8 +6667,11 @@ export default function ManageAccounts() {
                                                         value.length > 0;
                                                     const hasTechnicalUsers =
                                                         account.technicalUsers &&
-                                                        Array.isArray(account.technicalUsers) &&
-                                                        account.technicalUsers.length > 0;
+                                                        Array.isArray(
+                                                            account.technicalUsers,
+                                                        ) &&
+                                                        account.technicalUsers
+                                                            .length > 0;
 
                                                     if (
                                                         hasAccountName &&
@@ -7390,20 +7444,30 @@ export default function ManageAccounts() {
                         // Right positioning handled by CSS classes for consistency
                     }}
                 >
-                    <div className={`${
-                        notificationType === 'error'
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500'
-                            : 'bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500'
-                    } rounded-lg shadow-lg relative`}>
+                    <div
+                        className={`${
+                            notificationType === 'error'
+                                ? 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500'
+                                : 'bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500'
+                        } rounded-lg shadow-lg relative`}
+                    >
                         {/* Small arrow pointing down to indicate relation to Save button - positioned more to the right */}
-                        <div className={`absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent ${
-                            notificationType === 'error' ? 'border-t-red-100' : 'border-t-blue-100'
-                        }`}></div>
+                        <div
+                            className={`absolute -bottom-2 right-12 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent ${
+                                notificationType === 'error'
+                                    ? 'border-t-red-100'
+                                    : 'border-t-blue-100'
+                            }`}
+                        ></div>
                         <div className='p-4'>
                             <div className='flex items-start'>
                                 <div className='flex-shrink-0'>
                                     <svg
-                                        className={`h-5 w-5 ${notificationType === 'error' ? 'text-red-600' : 'text-blue-600'}`}
+                                        className={`h-5 w-5 ${
+                                            notificationType === 'error'
+                                                ? 'text-red-600'
+                                                : 'text-blue-600'
+                                        }`}
                                         fill='currentColor'
                                         viewBox='0 0 20 20'
                                     >
@@ -7415,7 +7479,13 @@ export default function ManageAccounts() {
                                     </svg>
                                 </div>
                                 <div className='ml-3 flex-1'>
-                                    <p className={`text-sm font-medium ${notificationType === 'error' ? 'text-red-800' : 'text-blue-800'}`}>
+                                    <p
+                                        className={`text-sm font-medium ${
+                                            notificationType === 'error'
+                                                ? 'text-red-800'
+                                                : 'text-blue-800'
+                                        }`}
+                                    >
                                         {notificationMessage}
                                     </p>
                                 </div>
