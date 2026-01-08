@@ -178,18 +178,14 @@ export default function ManageGroups() {
             setLoading(true);
             console.log('🔄 [ManageGroups] Loading groups with context:', {
                 accountId: selectedAccountId,
-                accountName: selectedAccountName,
                 enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterpriseName,
                 search,
             });
 
             const data = await accessControlApi.listGroups({
                 search,
                 accountId: selectedAccountId,
-                accountName: selectedAccountName,
                 enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterpriseName,
             });
             console.log(`📊 [ManageGroups] Loaded ${data?.length || 0} groups`);
             setGroups(data);
@@ -201,9 +197,7 @@ export default function ManageGroups() {
     }, [
         isInitialized,
         selectedAccountId,
-        selectedAccountName,
         selectedEnterpriseId,
-        selectedEnterpriseName,
         search,
     ]);
 
@@ -246,9 +240,7 @@ export default function ManageGroups() {
             // Include account/enterprise context when creating group
             await accessControlApi.createGroup(formData as any, {
                 accountId: selectedAccountId,
-                accountName: selectedAccountName,
                 enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterpriseName,
             });
             setFormData({name: '', description: ''});
             setShowCreateModal(false);
@@ -268,9 +260,7 @@ export default function ManageGroups() {
             // Include account/enterprise context when updating group
             await accessControlApi.updateGroup(editingGroup.id, formData, {
                 accountId: selectedAccountId,
-                accountName: selectedAccountName,
                 enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterpriseName,
             });
             setFormData({name: '', description: ''});
             setEditingGroup(null);
@@ -290,9 +280,7 @@ export default function ManageGroups() {
             // Include account/enterprise context when deleting group
             await accessControlApi.deleteGroup(deleteGroupId, {
                 accountId: selectedAccountId,
-                accountName: selectedAccountName,
                 enterpriseId: selectedEnterpriseId,
-                enterpriseName: selectedEnterpriseName,
             });
             setDeleteGroupId(null);
             await loadGroups();

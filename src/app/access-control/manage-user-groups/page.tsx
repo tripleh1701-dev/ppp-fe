@@ -21,14 +21,14 @@ import { generateId } from '@/utils/id-generator';
 export default function ManageUserGroups() {
     // Router for navigation interception
     const router = useRouter();
-    
+
     // Debug: Track re-renders
     const renderCountRef = useRef(0);
     renderCountRef.current += 1;
 
     // User Group data state
     const [userGroups, setUserGroups] = useState<UserGroupRow[]>([]);
-    
+
     // Client-side display order tracking - independent of API timestamps
     const displayOrderRef = useRef<Map<string, number>>(new Map());
 
@@ -40,7 +40,7 @@ export default function ManageUserGroups() {
             return orderA - orderB;
         });
     }, []);
-    
+
     const [isLoading, setIsLoading] = useState(true);
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
@@ -56,7 +56,7 @@ export default function ManageUserGroups() {
     const [validationMessage, setValidationMessage] = useState('');
     const [incompleteRows, setIncompleteRows] = useState<string[]>([]);
     const [externalFieldErrors, setExternalFieldErrors] = useState<{[key:string]: Record<string,string>}>({});
-    
+
     // Duplicate entry modal state
     const [showDuplicateModal, setShowDuplicateModal] = useState(false);
     const [duplicateMessage, setDuplicateMessage] = useState('');
@@ -65,7 +65,7 @@ export default function ManageUserGroups() {
     // Assigned roles modal state
     const [selectedGroupForRoles, setSelectedGroupForRoles] = useState<UserGroupRow | null>(null);
     const [showRolesModal, setShowRolesModal] = useState(false);
-    
+
     // Navigation warning state - exactly like Manage Users
     const [showNavigationWarning, setShowNavigationWarning] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState<
@@ -75,17 +75,17 @@ export default function ManageUserGroups() {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [preventNavigation, setPreventNavigation] = useState(false);
     const [userConfirmedLeave, setUserConfirmedLeave] = useState(false);
-    
+
     // Initialize state with localStorage values to prevent initial empty state
     const initializeFromLocalStorage = () => {
         if (typeof window === 'undefined') return { enterprise: '', enterpriseId: '', accountId: '', accountName: '' };
-        
+
         try {
             const savedName = window.localStorage.getItem('selectedEnterpriseName');
             const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
             const savedAccountId = window.localStorage.getItem('selectedAccountId');
             const savedAccountName = window.localStorage.getItem('selectedAccountName');
-            
+
             return {
                 enterprise: savedName || '',
                 enterpriseId: (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '',
@@ -99,63 +99,63 @@ export default function ManageUserGroups() {
     };
 
     const initialValues = initializeFromLocalStorage();
-    
+
     // Selected Enterprise from top right corner
     const [selectedEnterprise, setSelectedEnterprise] = useState<string>(initialValues.enterprise);
     const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>(initialValues.enterpriseId);
-    
+
     // Selected Account from top right corner
     const [selectedAccountId, setSelectedAccountId] = useState<string>(initialValues.accountId);
     const [selectedAccountName, setSelectedAccountName] = useState<string>(initialValues.accountName);
-    
+
     // Track if we've completed initial localStorage loading to prevent premature auto-refresh
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
-    
+
     // Load selected enterprise from localStorage and listen for changes
     useEffect(() => {
         const loadSelectedEnterprise = () => {
             try {
                 console.log('🐛 [ManageUserGroups Page] Loading localStorage values...');
-                
+
                 const savedName = window.localStorage.getItem('selectedEnterpriseName');
                 const savedEnterpriseId = window.localStorage.getItem('selectedEnterpriseId');
                 const savedAccountId = window.localStorage.getItem('selectedAccountId');
                 const savedAccountName = window.localStorage.getItem('selectedAccountName');
-                
+
                 console.log('🐛 [ManageUserGroups Page] localStorage values:', {
                     selectedEnterpriseName: savedName,
                     selectedEnterpriseId: savedEnterpriseId,
                     selectedAccountId: savedAccountId,
                     selectedAccountName: savedAccountName
                 });
-                
+
                 // Only update state if values have actually changed to prevent unnecessary re-renders
                 if (savedName !== selectedEnterprise) {
                     setSelectedEnterprise(savedName || '');
                 }
-                
+
                 const newEnterpriseId = (savedEnterpriseId && savedEnterpriseId !== 'null') ? savedEnterpriseId : '';
                 if (newEnterpriseId !== selectedEnterpriseId) {
                     setSelectedEnterpriseId(newEnterpriseId);
                 }
-                
+
                 const newAccountId = (savedAccountId && savedAccountId !== 'null') ? savedAccountId : '';
                 const newAccountName = (savedAccountName && savedAccountName !== 'null') ? savedAccountName : '';
-                
+
                 if (newAccountId !== selectedAccountId) {
                     setSelectedAccountId(newAccountId);
                 }
                 if (newAccountName !== selectedAccountName) {
                     setSelectedAccountName(newAccountName);
                 }
-                
+
                 console.log('🐛 [ManageUserGroups Page] Setting state values:', {
                     enterprise: savedName || '',
                     enterpriseId: newEnterpriseId,
                     accountId: newAccountId,
                     accountName: newAccountName
                 });
-                
+
                 // Mark as initialized after first load
                 setIsInitialized(true);
             } catch (error) {
@@ -196,7 +196,7 @@ export default function ManageUserGroups() {
             selectedAccountName
         });
     }, [selectedEnterprise, selectedEnterpriseId, selectedAccountId, selectedAccountName]);
-    
+
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
     const [deletingRow, setDeletingRow] = useState(false);
 
@@ -254,9 +254,9 @@ export default function ManageUserGroups() {
     const [ActiveGroupLabel, setActiveGroupLabel] = useState<
         'None' | 'Group Name' | 'Workstream' | 'Product' | 'Service'
     >('None');
-    
+
     type ColumnType = 'groupName' | 'description' | 'entity' | 'product' | 'service' | 'roles' | 'actions';
-    
+
     const [visibleCols, setVisibleCols] = useState<ColumnType[]>([
         'groupName',
         'description',
@@ -288,9 +288,7 @@ export default function ManageUserGroups() {
         try {
             const queryParams = new URLSearchParams();
             if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
-            if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
             if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
-            if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
 
             const rolesUrl = `/api/user-management/roles${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
@@ -421,31 +419,31 @@ export default function ManageUserGroups() {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-            
+
             // Check if any dialog is open
             if (!filterVisible && !sortOpen && !hideOpen && !groupOpen) {
                 return; // No dialog is open
             }
-            
+
             // Check if click is outside dialog containers
             const isOutsideFilter = filterRef.current && !filterRef.current.contains(target);
             const isOutsideSort = sortRef.current && !sortRef.current.contains(target);
             const isOutsideHide = hideRef.current && !hideRef.current.contains(target);
             const isOutsideGroup = groupRef.current && !groupRef.current.contains(target);
-            
+
             // Close Filter panel if:
             // 1. Clear All was clicked, OR
             // 2. All filter fields are empty (no values entered)
             if (filterVisible && isOutsideFilter) {
                 const currentForm = filterFormRef.current;
                 const isFilterEmpty = !currentForm.groupName && !currentForm.entity && !currentForm.product && !currentForm.service;
-                
+
                 if (filterClearedRef.current || isFilterEmpty) {
                     setFilterVisible(false);
                     filterClearedRef.current = false; // Reset flag
                 }
             }
-            
+
             // Close Sort, Hide, Group panels immediately on outside click
             if (sortOpen && isOutsideSort) {
                 setSortOpen(false);
@@ -460,7 +458,7 @@ export default function ManageUserGroups() {
 
         // Add event listener
         document.addEventListener('mousedown', handleClickOutside);
-        
+
         // Cleanup
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
@@ -469,7 +467,7 @@ export default function ManageUserGroups() {
 
     // All available columns
     const allCols: ColumnType[] = ['groupName', 'description', 'entity', 'product', 'service', 'roles'];
-    
+
     // Columns available for sorting
     const sortableCols: ColumnType[] = ['groupName', 'description', 'entity', 'product', 'service'];
 
@@ -569,9 +567,9 @@ export default function ManageUserGroups() {
 
         return filtered;
     }, [
-        userGroups, 
-        appliedSearchTerm, 
-        activeFilters, 
+        userGroups,
+        appliedSearchTerm,
+        activeFilters,
         sortColumn,
         sortDirection
     ]);
@@ -606,7 +604,7 @@ export default function ManageUserGroups() {
     const clearSorting = () => {
         setSortColumn('');
         setSortDirection('');
-        
+
         // Dispatch custom event to clear table sorting
         const clearEvent = new CustomEvent('clearTableSorting');
         window.dispatchEvent(clearEvent);
@@ -626,50 +624,42 @@ export default function ManageUserGroups() {
     };
 
     // Load user groups from database. Accept optional filters so we can request groups
-    // for a specific account/enterprise combination: { accountId, accountName, enterpriseId, enterpriseName }
+    // for a specific account/enterprise combination: { accountId, enterpriseId }
     const loadUserGroups = useCallback(async (filters?: {
         accountId?: string | null;
-        accountName?: string | null;
         enterpriseId?: string | null;
-        enterpriseName?: string | null;
     }) => {
         setIsLoading(true);
         try {
             let url = '/api/user-management/groups';
-            
+
             // Add account/enterprise filtering parameters if provided
-            if (filters && (filters.accountId || filters.accountName || filters.enterpriseId || filters.enterpriseName)) {
+            if (filters && (filters.accountId || filters.enterpriseId)) {
                 const params = new URLSearchParams();
-                
+
                 if (filters.accountId) {
                     params.append('accountId', filters.accountId);
-                }
-                if (filters.accountName) {
-                    params.append('accountName', filters.accountName);
                 }
                 if (filters.enterpriseId) {
                     params.append('enterpriseId', filters.enterpriseId);
                 }
-                if (filters.enterpriseName) {
-                    params.append('enterpriseName', filters.enterpriseName);
-                }
-                
+
                 url += `?${params.toString()}`;
             }
 
             console.log('🌐 [API Call] Making request to:', url);
             console.log('🔍 [API Call] Filters applied:', filters);
             console.log('🌐 [API Call] Full URL being called:', `${API_BASE || 'http://localhost:3000'}${url}`);
-            
+
             const response = await api.get<any>(url);
-            
+
             console.log('📥 [API Response] Raw response:', response);
             console.log('📥 [API Response] Response type:', typeof response);
             console.log('📥 [API Response] Response keys:', response ? Object.keys(response) : 'null');
-            
+
             let groupsData = response;
             console.log('🔄 [API Processing] Initial groupsData:', groupsData);
-            
+
             if (response && typeof response === 'object' && 'data' in response) {
                 groupsData = response.data;
                 console.log('🔄 [API Processing] Extracted data property:', groupsData);
@@ -691,9 +681,7 @@ export default function ManageUserGroups() {
                 try {
                     const params = new URLSearchParams();
                     if (filters?.accountId) params.append('accountId', filters.accountId);
-                    if (filters?.accountName) params.append('accountName', filters.accountName);
                     if (filters?.enterpriseId) params.append('enterpriseId', filters.enterpriseId);
-                    if (filters?.enterpriseName) params.append('enterpriseName', filters.enterpriseName);
 
                     const apiUrl = `/api/user-management/groups/${groupId}/roles${params.toString() ? `?${params.toString()}` : ''}`;
                     const response = await api.get<any>(apiUrl);
@@ -783,7 +771,7 @@ export default function ManageUserGroups() {
         } catch (error) {
             console.error('Failed to load user groups:', error);
             setUserGroups([]);
-            
+
             // Provide specific error feedback based on error type
             let errorMessage = 'Failed to load user groups';
             if (error && typeof error === 'object') {
@@ -798,7 +786,7 @@ export default function ManageUserGroups() {
                     errorMessage = `Failed to load user groups: ${err.message}`;
                 }
             }
-            
+
             // Only show notification on first load failure. Use ref to get latest value.
             if ((userGroupsRef.current?.length || 0) === 0) {
                 showBlueNotification(errorMessage, 5000, false);
@@ -840,9 +828,7 @@ export default function ManageUserGroups() {
             console.log('✅ [ManageUserGroups] Both Account and Enterprise selected, loading filtered data');
             loadUserGroups({
                 accountId: selectedAccountId,
-                accountName: selectedAccountName || null,
                 enterpriseId: enterpriseId || null,
-                enterpriseName: selectedEnterprise || null,
             });
             return;
         }
@@ -851,19 +837,19 @@ export default function ManageUserGroups() {
         console.log('⚠️ [ManageUserGroups] Missing Account or Enterprise selection, clearing table');
         setUserGroups([]);
         setIsLoading(false);
-        
+
         // Show a notification to guide user (only after initialization to avoid false warnings)
         if (!selectedAccountId) {
             showBlueNotification('Please select an Account from the top-right dropdown to view user groups', 5000, false);
         }
         // Enterprise notification removed - enterprise is now auto-selected based on account licenses
     }, [selectedAccountId, selectedAccountName, selectedEnterprise, selectedEnterpriseId, isInitialized, loadUserGroups]);
-    
+
     // Load dropdown options whenever userGroups changes - use a ref to prevent infinite loops
     const userGroupsCountRef = useRef(0);
     const dropdownOptionsLoadedRef = useRef(false);
     useEffect(() => {
-        if (!isLoading && userGroups.length > 0 && 
+        if (!isLoading && userGroups.length > 0 &&
             (userGroups.length !== userGroupsCountRef.current || !dropdownOptionsLoadedRef.current)) {
             userGroupsCountRef.current = userGroups.length;
             dropdownOptionsLoadedRef.current = true;
@@ -877,7 +863,7 @@ export default function ManageUserGroups() {
             loadDropdownOptions();
         }
     }, [isLoading, selectedAccountId, selectedEnterprise, selectedEnterpriseId, loadDropdownOptions]);
-    
+
     // Clear auto-save timer on component unmount - exactly like Manage Users
     useEffect(() => {
         return () => {
@@ -964,12 +950,12 @@ export default function ManageUserGroups() {
     // Function to validate incomplete rows and return validation details - exactly like Manage Users
     const validateIncompleteRows = () => {
         // Get all temporary (unsaved) rows
-        const temporaryRows = userGroups.filter((group: any) => 
+        const temporaryRows = userGroups.filter((group: any) =>
             String(group.id).startsWith('tmp-')
         );
 
         // Get all existing rows
-        const existingRows = userGroups.filter((group: any) => 
+        const existingRows = userGroups.filter((group: any) =>
             !String(group.id).startsWith('tmp-')
         );
 
@@ -1005,7 +991,7 @@ export default function ManageUserGroups() {
 
         // Combine all incomplete rows
         const incompleteRows = [...incompleteTemporaryRows, ...incompleteExistingRows];
-        
+
         if (incompleteRows.length > 0) {
             const missingFields = new Set<string>();
             incompleteRows.forEach((group) => {
@@ -1014,17 +1000,17 @@ export default function ManageUserGroups() {
                 if (!group.product?.trim()) missingFields.add('Product');
                 if (!group.service?.trim()) missingFields.add('Service');
             });
-            
+
             const incompleteCount = incompleteRows.length;
             const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}. Please complete all required fields (${Array.from(missingFields).join(', ')}) before adding a new row.`;
-            
+
             return {
                 hasIncomplete: true,
                 incompleteRows,
                 message
             };
         }
-        
+
         return {
             hasIncomplete: false,
             incompleteRows: [],
@@ -1035,7 +1021,7 @@ export default function ManageUserGroups() {
     // Handle adding new user group row
     const handleAddNewRow = () => {
         console.log('➕ Add new row requested');
-        
+
         // Clear any pending autosave to prevent blank rows from being saved
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
@@ -1047,7 +1033,7 @@ export default function ManageUserGroups() {
         }
         setAutoSaveCountdown(null);
         setIsAutoSaving(false);
-        
+
         // Check if there's already a blank row
         if (hasBlankRow()) {
             showBlueNotification(
@@ -1067,14 +1053,14 @@ export default function ManageUserGroups() {
                 5000,
                 false // No checkmark for error message
             );
-            
+
             // Enable red border highlighting for incomplete rows
             setShowValidationErrors(true);
             setIncompleteRows(validation.incompleteRows.map((r: any) => r.id));
-            
+
             return;
         }
-        
+
         const newGroup: UserGroupRow = {
             id: `tmp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             groupName: '',
@@ -1084,18 +1070,18 @@ export default function ManageUserGroups() {
             service: '',
             roles: '',
         };
-        
+
         // Add to end of array with display order
         displayOrderRef.current.set(newGroup.id, Date.now());
-        
+
         setUserGroups([...userGroups, newGroup]);
-        
+
         // Clear validation errors when adding a new row to ensure new rows start with normal styling
         if (showValidationErrors) {
             setShowValidationErrors(false);
             setExternalFieldErrors({});
         }
-        
+
         console.log('➕ Added new blank row:', newGroup.id);
     };
 
@@ -1105,7 +1091,7 @@ export default function ManageUserGroups() {
     // Handle field updates
     const handleUpdateField = useCallback((rowId: string, field: string, value: any) => {
         console.log('🔄 handleUpdateField called:', { rowId, field, value });
-        
+
         // First, update the state
         let updatedGroup: UserGroupRow | null = null;
         setUserGroups(prev => {
@@ -1120,7 +1106,7 @@ export default function ManageUserGroups() {
                             return newSet;
                         });
                     }
-                    
+
                     // Create new object with updated field
                     updatedGroup = { ...group, [field]: value };
                     return updatedGroup;
@@ -1128,16 +1114,16 @@ export default function ManageUserGroups() {
                 return group; // Return same reference for unchanged rows
             });
         });
-        
+
         // Check if all mandatory fields are now filled for this row
         if (updatedGroup) {
             const hasGroupName = (updatedGroup as any).groupName?.trim() && (updatedGroup as any).groupName.trim().length > 0;
             const hasEntity = (updatedGroup as any).entity?.trim() && (updatedGroup as any).entity.trim().length > 0;
             const hasProduct = (updatedGroup as any).product?.trim() && (updatedGroup as any).product.trim().length > 0;
             const hasService = (updatedGroup as any).service?.trim() && (updatedGroup as any).service.trim().length > 0;
-            
+
             const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
-            
+
             console.log('🔍 Checking if row is complete after update:', {
                 rowId,
                 field,
@@ -1148,7 +1134,7 @@ export default function ManageUserGroups() {
                 hasService,
                 isComplete
             });
-            
+
             // Only trigger autosave if all mandatory fields are filled
             if (isComplete && debouncedAutoSaveRef.current) {
                 console.log('✅ All mandatory fields filled - triggering autosave timer');
@@ -1229,9 +1215,7 @@ export default function ManageUserGroups() {
             try {
                 await loadUserGroups({
                     accountId: selectedAccountId || undefined,
-                    accountName: selectedAccountName || undefined,
                     enterpriseId: selectedEnterpriseId || undefined,
-                    enterpriseName: selectedEnterprise || undefined,
                 });
             } catch (error) {
                 console.error('Failed to refresh user groups after saving roles:', error);
@@ -1244,23 +1228,21 @@ export default function ManageUserGroups() {
             sortConfigsByDisplayOrder,
             loadUserGroups,
             selectedAccountId,
-            selectedAccountName,
             selectedEnterpriseId,
-            selectedEnterprise,
             handleCloseRolesModal,
         ],
     );
 
     const confirmDelete = async () => {
         if (!pendingDeleteRowId) return;
-        
+
         setDeletingRow(true);
         try {
             console.log('🗑️ Deleting user group:', pendingDeleteRowId);
-            
+
             // Add a small delay to show the loading state
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             // Find the group to be deleted for debugging
             const groupToDelete = userGroups.find(g => g.id === pendingDeleteRowId);
             console.log('📄 User group data to delete:', groupToDelete);
@@ -1271,13 +1253,11 @@ export default function ManageUserGroups() {
                     // Build delete URL with query parameters
                     const deleteParams = new URLSearchParams();
                     if (selectedAccountId) deleteParams.append('accountId', selectedAccountId);
-                    if (selectedAccountName) deleteParams.append('accountName', selectedAccountName);
                     if (selectedEnterpriseId) deleteParams.append('enterpriseId', selectedEnterpriseId);
-                    if (selectedEnterprise) deleteParams.append('enterpriseName', selectedEnterprise);
-                    
+
                     const deleteUrl = `/api/user-management/groups/${pendingDeleteRowId}?${deleteParams.toString()}`;
                     console.log('🗑️ Deleting user group with URL:', deleteUrl);
-                    
+
                     await api.del(deleteUrl);
                     console.log('✅ User group deleted from database via API');
                 } catch (error) {
@@ -1308,7 +1288,7 @@ export default function ManageUserGroups() {
             });
 
             console.log('✅ User group deleted successfully');
-            
+
             // Show success notification
             showBlueNotification('Successfully deleted 1 entries.');
 
@@ -1324,12 +1304,12 @@ export default function ManageUserGroups() {
                 pendingDeleteRowId,
                 storageType: 'database'
             });
-            
+
             // Log the specific error message if available
             if (error instanceof Error) {
                 console.error('❌ Error message:', error.message);
             }
-            
+
             // Show error notification
             showBlueNotification('Failed to delete user group. Please try again.', 5000, false);
         } finally {
@@ -1362,7 +1342,7 @@ export default function ManageUserGroups() {
         const isDuplicate = userGroupsRef.current.some((existingGroup) => {
             // Skip the current temporary row being saved
             if (existingGroup.id === tempRowId) return false;
-            
+
             // Check if all key fields match
             return existingGroup.groupName?.toLowerCase().trim() === group.groupName?.toLowerCase().trim() &&
                    existingGroup.entity?.toLowerCase().trim() === group.entity?.toLowerCase().trim() &&
@@ -1372,10 +1352,10 @@ export default function ManageUserGroups() {
 
         if (isDuplicate) {
             console.error('❌ Duplicate entry detected - User group with same Group Name, Workstream, Product, and Service already exists');
-            
+
             // Mark that duplicate was detected (to suppress generic error notification)
             duplicateDetectedRef.current = true;
-            
+
             // Clear autosave timer and countdown
             if (autoSaveTimerRef.current) {
                 clearTimeout(autoSaveTimerRef.current);
@@ -1386,13 +1366,13 @@ export default function ManageUserGroups() {
             }
             setAutoSaveCountdown(null);
             setIsAutoSaving(false);
-            
+
             // Show duplicate modal
             setDuplicateMessage(
                 `This combination of Group Name (${group.groupName}), Workstream (${group.entity}), Product (${group.product}), and Service (${group.service}) already exists in another row. Please use a different combination.`
             );
             setShowDuplicateModal(true);
-            
+
             // Don't save the duplicate - return early instead of throwing error
             setSavingRows((prev) => {
                 const newSet = new Set(prev);
@@ -1407,20 +1387,18 @@ export default function ManageUserGroups() {
         const checkQueryParams = new URLSearchParams();
         checkQueryParams.append('name', group.groupName);
         if (selectedAccountId) checkQueryParams.append('accountId', selectedAccountId);
-        if (selectedAccountName) checkQueryParams.append('accountName', selectedAccountName);
         if (selectedEnterpriseId) checkQueryParams.append('enterpriseId', selectedEnterpriseId);
-        if (selectedEnterprise) checkQueryParams.append('enterpriseName', selectedEnterprise);
-        
+
         try {
             const existingGroupsResponse = await api.get<any[]>(`/api/user-management/groups?${checkQueryParams.toString()}`);
             console.log('📦 [AutoSave] Existing groups response:', existingGroupsResponse);
-            
+
             const existingGroupsArray = Array.isArray(existingGroupsResponse) ? existingGroupsResponse : [];
             const exactMatch = existingGroupsArray.find(
                 (g: any) => g.name?.toLowerCase().trim() === group.groupName.toLowerCase().trim() ||
                             g.groupName?.toLowerCase().trim() === group.groupName.toLowerCase().trim()
             );
-            
+
             if (exactMatch) {
                 // Group already exists (created via + Add button), UPDATE it with the filled fields
                 console.log('✅ [AutoSave] Found existing group created via + Add, updating with fields:', exactMatch.id);
@@ -1432,17 +1410,15 @@ export default function ManageUserGroups() {
                     service: group.service,
                     roles: group.roles || '',
                     accountId: selectedAccountId,
-                    accountName: selectedAccountName,
-                    enterpriseId: selectedEnterpriseId,
-                    enterpriseName: selectedEnterprise
+                    enterpriseId: selectedEnterpriseId
                 };
-                
+
                 console.log('📦 [AutoSave] Updating group with data:', updateData);
                 await api.put(`/api/user-management/groups/${exactMatch.id}`, updateData);
-                
+
                 // Get the display order before updating
                 const oldDisplayOrder = displayOrderRef.current.get(tempRowId);
-                
+
                 // Update the row ID in state to use the real database ID
                 setUserGroups((prev) => {
                     const updated = prev.map((g) =>
@@ -1453,16 +1429,16 @@ export default function ManageUserGroups() {
                     // Apply stable sorting to maintain display order
                     return sortConfigsByDisplayOrder(updated);
                 });
-                
+
                 // Update display order reference with the new ID
                 if (oldDisplayOrder !== undefined) {
                     displayOrderRef.current.delete(tempRowId); // Remove old reference
                     displayOrderRef.current.set(exactMatch.id, oldDisplayOrder); // Add new reference
                     console.log(`📍 [AutoSave] Preserved display order ${oldDisplayOrder} for updated group ID ${exactMatch.id}`);
                 }
-                
+
                 console.log('✅ [AutoSave] Updated existing group with filled fields:', exactMatch.id);
-                
+
                 // Clean up after successful update
                 setSavingRows((prev) => {
                     const newSet = new Set(prev);
@@ -1480,9 +1456,7 @@ export default function ManageUserGroups() {
                     service: group.service,
                     roles: group.roles || '',
                     accountId: selectedAccountId,
-                    accountName: selectedAccountName,
-                    enterpriseId: selectedEnterpriseId,
-                    enterpriseName: selectedEnterprise
+                    enterpriseId: selectedEnterpriseId
                 };
 
                 console.log('📡 [AutoSave] Calling API POST /api/user-management/groups with data:', groupData);
@@ -1490,7 +1464,7 @@ export default function ManageUserGroups() {
                 console.log('📥 [AutoSave] API Response received:', savedGroup);
                 console.log('📥 [AutoSave] API Response type:', typeof savedGroup);
                 console.log('📥 [AutoSave] API Response has id?', savedGroup?.id);
-                
+
                 const savedGroupId = savedGroup?.id || newId;
                 console.log('🆔 [AutoSave] Using saved group ID:', savedGroupId);
 
@@ -1528,7 +1502,7 @@ export default function ManageUserGroups() {
                 }
 
                 console.log('🎉 [AutoSave] New user group saved successfully to database with ID:', savedGroupId);
-                
+
                 // Clean up after successful save
                 setSavingRows((prev) => {
                     const newSet = new Set(prev);
@@ -1539,10 +1513,10 @@ export default function ManageUserGroups() {
         } catch (apiError) {
             console.error('❌ [AutoSave] Failed to save user group to database:', apiError);
             console.error('❌ [AutoSave] Error details:', JSON.stringify(apiError, null, 2));
-            
+
             // Show error notification instead of throwing
             showBlueNotification('Failed to auto-save user group. Please try saving manually.', 5000, false);
-            
+
             // Clean up saving state
             setSavingRows((prev) => {
                 const newSet = new Set(prev);
@@ -1555,7 +1529,7 @@ export default function ManageUserGroups() {
     // Debounced auto-save function with countdown - exactly like Manage Users
     const debouncedAutoSave = useCallback(async () => {
         console.log('🕐 debouncedAutoSave called - clearing existing timer and starting new one');
-        
+
         // Clear existing timer
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
@@ -1571,7 +1545,7 @@ export default function ManageUserGroups() {
 
         // Start countdown
         setAutoSaveCountdown(10);
-        
+
         // Countdown interval
         const countdownInterval = setInterval(() => {
             setAutoSaveCountdown((prev) => {
@@ -1588,32 +1562,32 @@ export default function ManageUserGroups() {
         const timer = setTimeout(async () => {
             try {
                 console.log('🔥 10-second timer triggered - starting auto-save process');
-                
+
                 // Clear the timer ref immediately since it's now executing - prevents navigation warning
                 autoSaveTimerRef.current = null;
                 console.log('✅ Cleared autoSaveTimerRef - navigation should be allowed during autosave execution');
-                
+
                 // Reset duplicate detection flag at the start of each autosave
                 duplicateDetectedRef.current = false;
-                
+
                 setIsAutoSaving(true);
                 setAutoSaveCountdown(null);
                 clearInterval(countdownIntervalRef.current!);
                 countdownIntervalRef.current = null;
-                
+
                 // Get all temporary (unsaved) rows that are complete using current ref
                 const temporaryRows = userGroupsRef.current.filter((group) => {
                     const isTemp = String(group.id).startsWith('tmp-');
                     if (!isTemp) return false;
-                    
+
                     // Be more strict about what constitutes a complete user group row
                     const hasGroupName = group.groupName?.trim() && group.groupName.trim().length > 0;
                     const hasEntity = group.entity?.trim() && group.entity.trim().length > 0;
                     const hasProduct = group.product?.trim() && group.product.trim().length > 0;
                     const hasService = group.service?.trim() && group.service.trim().length > 0;
-                    
+
                     const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
-                    
+
                     if (isTemp && !isComplete) {
                         console.log(`🚫 Skipping incomplete temporary user group ${group.id}:`, {
                             hasGroupName: !!hasGroupName,
@@ -1626,24 +1600,24 @@ export default function ManageUserGroups() {
                             serviceValue: group.service
                         });
                     }
-                    
+
                     return isComplete;
                 });
-                
+
                 // Get all modified existing records that are still complete
                 const modifiedRows = userGroupsRef.current.filter((group) => {
                     const isExisting = !String(group.id).startsWith('tmp-');
                     const isModified = modifiedExistingRecordsRef.current.has(String(group.id));
-                    
+
                     if (isExisting && isModified) {
                         // Double-check that the record still has all required fields
                         const hasGroupName = group.groupName?.trim();
                         const hasEntity = group.entity?.trim();
                         const hasProduct = group.product?.trim();
                         const hasService = group.service?.trim();
-                        
+
                         const isComplete = hasGroupName && hasEntity && hasProduct && hasService;
-                        
+
                         console.log(`🔍 Checking modified user group ${group.id}: isComplete=${isComplete}`, {
                             hasGroupName: !!hasGroupName,
                             hasEntity: !!hasEntity,
@@ -1654,19 +1628,19 @@ export default function ManageUserGroups() {
                             productValue: group.product,
                             serviceValue: group.service
                         });
-                        
+
                         return isComplete;
                     }
-                    
+
                     console.log(`🔍 Checking user group ${group.id}: isExisting=${isExisting}, isModified=${isModified}`);
                     return false;
                 });
-                
+
             console.log(`📊 Found ${temporaryRows.length} complete temporary user groups to auto-save`);
             console.log(`📊 Found ${modifiedRows.length} modified existing user groups to auto-save`);
-            
+
             // Check for orphaned records in modifiedExistingRecords
-            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId => 
+            const orphanedRecords = Array.from(modifiedExistingRecordsRef.current).filter(recordId =>
                 !userGroupsRef.current.find(group => String(group.id) === recordId)
             );
             if (orphanedRecords.length > 0) {
@@ -1682,24 +1656,24 @@ export default function ManageUserGroups() {
                 orphanedRecords.forEach(recordId => cleanedSet.delete(recordId));
                 modifiedExistingRecordsRef.current = cleanedSet;
             }
-            
+
             const totalRowsToSave = temporaryRows.length + modifiedRows.length;
             if (totalRowsToSave > 0) {
                 console.log('💾 Auto-saving user groups after 10 seconds of inactivity...', temporaryRows.map(r => r.id));
-                
+
                 let successCount = 0;
                 let failureCount = 0;
-                
+
                 // Save new temporary user groups
                 for (const tempRow of temporaryRows) {
                     console.log(`💾 Auto-saving user group: ${tempRow.id}`);
-                    
+
                     // Reset duplicate flag before each save attempt
                     const duplicateFlagBefore = duplicateDetectedRef.current;
-                    
+
                     try {
                         await autoSaveNewUserGroup(tempRow.id);
-                        
+
                         // Check if duplicate was detected during save
                         if (!duplicateDetectedRef.current || duplicateFlagBefore === duplicateDetectedRef.current) {
                             // Only count as success if no duplicate was detected
@@ -1716,7 +1690,7 @@ export default function ManageUserGroups() {
                         }
                     }
                 }
-                
+
                 // Save modified existing user groups to database via API
                 for (const modifiedRow of modifiedRows) {
                     console.log(`💾 Saving modified existing user group: ${modifiedRow.id}`);
@@ -1725,7 +1699,7 @@ export default function ManageUserGroups() {
                         const isDuplicate = userGroupsRef.current.some((existingGroup) => {
                             // Skip the current row being updated
                             if (existingGroup.id === modifiedRow.id) return false;
-                            
+
                             // Check if all key fields match with another existing record
                             return existingGroup.groupName?.toLowerCase().trim() === modifiedRow.groupName?.toLowerCase().trim() &&
                                    existingGroup.entity?.toLowerCase().trim() === modifiedRow.entity?.toLowerCase().trim() &&
@@ -1735,20 +1709,20 @@ export default function ManageUserGroups() {
 
                         if (isDuplicate) {
                             console.error(`❌ Duplicate entry detected for autosave update: ${modifiedRow.groupName}`);
-                            
+
                             // Mark that duplicate was detected (to suppress generic error notification)
                             duplicateDetectedRef.current = true;
-                            
+
                             // Show duplicate modal
                             setDuplicateMessage(
                                 `This combination of Group Name (${modifiedRow.groupName}), Workstream (${modifiedRow.entity}), Product (${modifiedRow.product}), and Service (${modifiedRow.service}) already exists in another row. Please use a different combination.`
                             );
                             setShowDuplicateModal(true);
-                            
+
                             failureCount++;
                             continue; // Skip this row
                         }
-                        
+
                         await api.put(`/api/user-management/groups/${modifiedRow.id}`, {
                             groupName: modifiedRow.groupName,
                             description: modifiedRow.description || '',
@@ -1757,9 +1731,7 @@ export default function ManageUserGroups() {
                             service: modifiedRow.service,
                             roles: modifiedRow.roles || '',
                             accountId: selectedAccountId,
-                            accountName: selectedAccountName,
-                            enterpriseId: selectedEnterpriseId,
-                            enterpriseName: selectedEnterprise
+                            enterpriseId: selectedEnterpriseId
                         });
                         console.log(`✅ Modified user group ${modifiedRow.id} saved successfully`);
                         successCount++;
@@ -1768,14 +1740,14 @@ export default function ManageUserGroups() {
                         failureCount++;
                     }
                 }
-                
+
                 // Clear the modified records tracking only if all saves succeeded
                 if (failureCount === 0) {
                     setModifiedExistingRecords(new Set());
                     modifiedExistingRecordsRef.current = new Set();
                     console.log('✅ Cleared modifiedExistingRecords - no more unsaved changes');
                 }
-                
+
                 // Show appropriate notification based on results
                 // Don't show any notification if duplicate modal was shown
                 if (duplicateDetectedRef.current && successCount === 0 && failureCount === 0) {
@@ -1785,31 +1757,29 @@ export default function ManageUserGroups() {
                     // All succeeded and no duplicates
                     console.log('✨ Showing auto-save success animation for all entries');
                     setShowAutoSaveSuccess(true);
-                    
+
                     const message = temporaryRows.length > 0 && modifiedRows.length > 0
                         ? `Auto-saved ${temporaryRows.length} new and ${modifiedRows.length} updated entries`
                         : temporaryRows.length > 0
                         ? `Auto-saved ${temporaryRows.length} new entries`
                         : `Auto-saved ${modifiedRows.length} updated entries`;
-                    
+
                     showBlueNotification(message);
-                    
+
                     setTimeout(() => {
                         console.log('✨ Hiding auto-save success animation');
                         setShowAutoSaveSuccess(false);
                     }, 3000);
-                    
+
                     console.log(`✅ Auto-saved ${successCount} entries successfully`);
-                    
+
                     // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
                     console.log('🔄 Reloading user groups after successful autosave to update IDs...');
                     await loadUserGroups({
                         accountId: selectedAccountId,
-                        accountName: selectedAccountName,
-                        enterpriseId: selectedEnterpriseId,
-                        enterpriseName: selectedEnterprise
+                        enterpriseId: selectedEnterpriseId
                     });
-                    
+
                     console.log('✅ Reload complete after autosave - checking state:', {
                         autoSaveTimerRef: autoSaveTimerRef.current,
                         modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
@@ -1828,7 +1798,7 @@ export default function ManageUserGroups() {
             } else {
                 console.log('ℹ️ No complete rows to auto-save');
             }
-            
+
             setIsAutoSaving(false);
             } catch (error) {
                 console.error('❌ Auto-save error:', error);
@@ -1848,12 +1818,12 @@ export default function ManageUserGroups() {
     const getUnsavedChanges = () => {
         const hasActiveTimer = !!autoSaveTimerRef.current;
         const hasModifiedRecords = modifiedExistingRecordsRef.current.size > 0;
-        const hasTempRows = userGroupsRef.current.some((group: any) => 
+        const hasTempRows = userGroupsRef.current.some((group: any) =>
             String(group.id).startsWith('tmp-')
         );
-        
+
         const hasUnsavedChanges = hasActiveTimer || hasModifiedRecords || hasTempRows;
-        
+
         console.log('🔍 [getUnsavedChanges] Check:', {
             hasActiveTimer,
             hasModifiedRecords,
@@ -1863,7 +1833,7 @@ export default function ManageUserGroups() {
             totalGroups: userGroupsRef.current.length,
             hasUnsavedChanges
         });
-        
+
         return hasUnsavedChanges;
     };
 
@@ -1882,7 +1852,7 @@ export default function ManageUserGroups() {
 
                 // Row is incomplete if any required field is missing
                 const isIncomplete = !hasGroupName || !hasEntity || !hasProduct || !hasService;
-                
+
                 console.log('🔍 Row validation check:', {
                     id: group.id,
                     hasGroupName,
@@ -1891,11 +1861,11 @@ export default function ManageUserGroups() {
                     hasService,
                     isIncomplete
                 });
-                
+
                 return isIncomplete;
             })
             .map((group: any) => group.id);
-            
+
         // Only log when showValidationErrors is true to prevent infinite loops
         if (showValidationErrors && incompleteRows.length > 0) {
             console.log('🔍 getIncompleteRows result:', {
@@ -1905,7 +1875,7 @@ export default function ManageUserGroups() {
                 sampleGroupIds: userGroups.slice(0, 3).map(g => g.id)
             });
         }
-        
+
         return incompleteRows;
     };
 
@@ -1914,7 +1884,7 @@ export default function ManageUserGroups() {
         // Store reference to original methods
         const originalPush = router.push;
         const originalReplace = router.replace;
-        
+
         // Store original router for use in navigation confirmation
         originalRouterRef.current = { push: originalPush, replace: originalReplace };
 
@@ -1923,7 +1893,7 @@ export default function ManageUserGroups() {
             // Check for unsaved changes but allow navigation if user has confirmed
             const currentUnsavedChanges = getUnsavedChanges();
             const currentIncompleteRows = getIncompleteRows();
-            
+
             if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
                 console.log('🚨 Navigation intercepted - push method:', {
                     hasUnsavedChanges: currentUnsavedChanges,
@@ -1931,7 +1901,7 @@ export default function ManageUserGroups() {
                     modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
                     userConfirmedLeave
                 });
-                
+
                 if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
                     setIncompleteRows(currentIncompleteRows);
                     setPendingNavigationUrl(href);
@@ -1947,7 +1917,7 @@ export default function ManageUserGroups() {
             // Check for unsaved changes but allow navigation if user has confirmed
             const currentUnsavedChanges = getUnsavedChanges();
             const currentIncompleteRows = getIncompleteRows();
-            
+
             if (typeof href === 'string' && (currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
                 console.log('🚨 Navigation intercepted - replace method:', {
                     hasUnsavedChanges: currentUnsavedChanges,
@@ -1955,7 +1925,7 @@ export default function ManageUserGroups() {
                     modifiedExistingRecords: Array.from(modifiedExistingRecordsRef.current),
                     userConfirmedLeave
                 });
-                
+
                 if (currentIncompleteRows.length > 0 || currentUnsavedChanges) {
                     setIncompleteRows(currentIncompleteRows);
                     setPendingNavigationUrl(href);
@@ -1970,7 +1940,7 @@ export default function ManageUserGroups() {
         const handlePopState = (event: PopStateEvent) => {
             const currentUnsavedChanges = getUnsavedChanges();
             const currentIncompleteRows = getIncompleteRows();
-            
+
             if ((currentUnsavedChanges || currentIncompleteRows.length > 0) && !userConfirmedLeave) {
                 event.preventDefault();
                 // Push current state back to prevent navigation
@@ -2005,10 +1975,10 @@ export default function ManageUserGroups() {
     // Handle save all - exactly like Manage Users
     const handleSaveAll = async () => {
         console.log('💾 Save all clicked - validating and saving user groups...');
-        
+
         // Reset duplicate detection flag at the start of manual save
         duplicateDetectedRef.current = false;
-        
+
         // Clear auto-save timer since user is manually saving
         if (autoSaveTimerRef.current) {
             console.log('🛑 Manual save clicked - clearing auto-save timer');
@@ -2019,12 +1989,12 @@ export default function ManageUserGroups() {
                 clearInterval(countdownIntervalRef.current);
             }
         }
-        
+
         // Get temporary (unsaved) and existing rows
-        const temporaryRows = userGroups.filter((group: any) => 
+        const temporaryRows = userGroups.filter((group: any) =>
             String(group.id).startsWith('tmp-')
         );
-        const existingRows = userGroups.filter((group: any) => 
+        const existingRows = userGroups.filter((group: any) =>
             !String(group.id).startsWith('tmp-')
         );
 
@@ -2052,12 +2022,12 @@ export default function ManageUserGroups() {
 
         // Combine all incomplete rows
         const incompleteRowsData = [...incompleteTemporaryRows, ...incompleteExistingRows];
-        
+
         // Get count of modified existing rows
-        const modifiedExistingRowsCount = existingRows.filter((group: any) => 
+        const modifiedExistingRowsCount = existingRows.filter((group: any) =>
             modifiedExistingRecords.has(group.id)
         ).length;
-        
+
         if (temporaryRows.length === 0 && modifiedExistingRowsCount === 0) {
             showBlueNotification('No unsaved entries to save.', 3000, false);
             return;
@@ -2065,7 +2035,7 @@ export default function ManageUserGroups() {
 
         if (incompleteRowsData.length > 0) {
             const allMissingFields = new Set<string>();
-            
+
             console.log('🔍 Checking missing fields for incomplete rows:', incompleteRowsData);
             incompleteRowsData.forEach((group) => {
                 console.log('📋 Checking group:', {
@@ -2075,27 +2045,27 @@ export default function ManageUserGroups() {
                     product: group.product || '(empty)',
                     service: group.service || '(empty)'
                 });
-                
+
                 // Check for missing fields
                 if (!group.groupName?.trim()) allMissingFields.add('Group Name');
                 if (!group.entity?.trim()) allMissingFields.add('Entity');
                 if (!group.product?.trim()) allMissingFields.add('Product');
                 if (!group.service?.trim()) allMissingFields.add('Service');
             });
-            
+
             console.log('📝 All missing fields:', Array.from(allMissingFields));
-            
+
             const incompleteCount = incompleteRowsData.length;
             const message = `Found ${incompleteCount} incomplete record${incompleteCount > 1 ? 's' : ''}.\nMissing required fields: ${Array.from(allMissingFields).join(', ')}`;
-            
+
             setValidationMessage(message);
             setShowValidationErrors(true); // Enable red border highlighting for validation errors
-            
+
             // Set incomplete row IDs for highlighting
             const incompleteRowIds = incompleteRowsData.map(r => r.id);
             console.log('🎯 Setting incomplete row IDs for highlighting:', incompleteRowIds);
             setIncompleteRows(incompleteRowIds); // Store incomplete row IDs for highlighting
-            
+
             setShowValidationModal(true);
             return;
         }
@@ -2110,9 +2080,9 @@ export default function ManageUserGroups() {
                 const hasService = group.service?.trim();
                 return hasGroupName && hasEntity && hasProduct && hasService;
             });
-            
+
             console.log('✅ Complete temporary rows to save:', completeTemporaryRows.length, completeTemporaryRows);
-            
+
             // Get complete modified existing rows
             const completeModifiedRows = existingRows.filter((group: any) => {
                 const hasGroupName = group.groupName?.trim();
@@ -2122,11 +2092,11 @@ export default function ManageUserGroups() {
                 const isModified = modifiedExistingRecords.has(group.id);
                 return hasGroupName && hasEntity && hasProduct && hasService && isModified;
             });
-            
+
             console.log('✅ Complete modified rows to save:', completeModifiedRows.length, completeModifiedRows);
-            
+
             let failedCount = 0;
-            
+
             // Save temporary rows to database
             for (const tempGroup of completeTemporaryRows) {
                 try {
@@ -2134,7 +2104,7 @@ export default function ManageUserGroups() {
                     const isDuplicate = userGroups.some((existingGroup: any) => {
                         // Skip the current temporary row being saved
                         if (existingGroup.id === tempGroup.id) return false;
-                        
+
                         // Check if all key fields match
                         return existingGroup.groupName?.toLowerCase().trim() === tempGroup.groupName?.toLowerCase().trim() &&
                                existingGroup.entity?.toLowerCase().trim() === tempGroup.entity?.toLowerCase().trim() &&
@@ -2144,38 +2114,36 @@ export default function ManageUserGroups() {
 
                     if (isDuplicate) {
                         console.error('❌ Duplicate entry detected for:', tempGroup.groupName);
-                        
+
                         // Mark that duplicate was detected
                         duplicateDetectedRef.current = true;
-                        
+
                         // Show duplicate modal
                         setDuplicateMessage(
                             `This combination of Group Name (${tempGroup.groupName}), Workstream (${tempGroup.entity}), Product (${tempGroup.product}), and Service (${tempGroup.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
-                        
+
                         failedCount++;
                         continue; // Skip this row and continue with others
                     }
-                    
+
                     // Check if a group with this name already exists in the database (created via + Add button)
                     console.log('🔍 Checking if group exists in database:', tempGroup.groupName);
                     const queryParams = new URLSearchParams();
                     queryParams.append('name', tempGroup.groupName);
                     if (selectedAccountId) queryParams.append('accountId', selectedAccountId);
-                    if (selectedAccountName) queryParams.append('accountName', selectedAccountName);
                     if (selectedEnterpriseId) queryParams.append('enterpriseId', selectedEnterpriseId);
-                    if (selectedEnterprise) queryParams.append('enterpriseName', selectedEnterprise);
-                    
+
                     const existingGroupsResponse = await api.get<any[]>(`/api/user-management/groups?${queryParams.toString()}`);
                     console.log('📦 Existing groups response:', existingGroupsResponse);
-                    
+
                     const existingGroupsArray = Array.isArray(existingGroupsResponse) ? existingGroupsResponse : [];
                     const exactMatch = existingGroupsArray.find(
                         (g: any) => g.name?.toLowerCase().trim() === tempGroup.groupName.toLowerCase().trim() ||
                                     g.groupName?.toLowerCase().trim() === tempGroup.groupName.toLowerCase().trim()
                     );
-                    
+
                     if (exactMatch) {
                         // Group already exists (created via + Add button), UPDATE it with the filled fields
                         console.log('✅ Found existing group created via + Add, updating with fields:', exactMatch.id);
@@ -2187,14 +2155,12 @@ export default function ManageUserGroups() {
                             service: tempGroup.service,
                             roles: tempGroup.roles || '',
                             accountId: selectedAccountId,
-                            accountName: selectedAccountName,
-                            enterpriseId: selectedEnterpriseId,
-                            enterpriseName: selectedEnterprise
+                            enterpriseId: selectedEnterpriseId
                         };
-                        
+
                         console.log('📦 Updating group with data:', updateData);
                         await api.put(`/api/user-management/groups/${exactMatch.id}`, updateData);
-                        
+
                         // Update the row ID in state to use the real database ID
                         setUserGroups((prev) =>
                             prev.map((g) =>
@@ -2203,7 +2169,7 @@ export default function ManageUserGroups() {
                                     : g,
                             ),
                         );
-                        
+
                         savedCount++;
                         console.log('✅ Updated existing group with filled fields:', exactMatch.id);
                     } else {
@@ -2217,15 +2183,13 @@ export default function ManageUserGroups() {
                             service: tempGroup.service,
                             roles: tempGroup.roles || '',
                             accountId: selectedAccountId,
-                            accountName: selectedAccountName,
-                            enterpriseId: selectedEnterpriseId,
-                            enterpriseName: selectedEnterprise
+                            enterpriseId: selectedEnterpriseId
                         };
-                        
+
                         console.log('💾 Creating new user group:', groupData);
                         const savedGroup = await api.post('/api/user-management/groups', groupData) as any;
                         const savedGroupId = savedGroup?.id || newId;
-                        
+
                         // Update the row ID in state
                         setUserGroups((prev) =>
                             prev.map((g) =>
@@ -2234,7 +2198,7 @@ export default function ManageUserGroups() {
                                     : g,
                             ),
                         );
-                        
+
                         savedCount++;
                         console.log('🎉 New user group saved successfully!');
                     }
@@ -2243,7 +2207,7 @@ export default function ManageUserGroups() {
                     failedCount++;
                 }
             }
-            
+
             // Save modified existing rows to database
             for (const modifiedGroup of completeModifiedRows) {
                 try {
@@ -2251,7 +2215,7 @@ export default function ManageUserGroups() {
                     const isDuplicate = userGroups.some((existingGroup: any) => {
                         // Skip the current row being updated
                         if (existingGroup.id === modifiedGroup.id) return false;
-                        
+
                         // Check if all key fields match with another existing record
                         return existingGroup.groupName?.toLowerCase().trim() === modifiedGroup.groupName?.toLowerCase().trim() &&
                                existingGroup.entity?.toLowerCase().trim() === modifiedGroup.entity?.toLowerCase().trim() &&
@@ -2261,20 +2225,20 @@ export default function ManageUserGroups() {
 
                     if (isDuplicate) {
                         console.error('❌ Duplicate entry detected for update:', modifiedGroup.groupName);
-                        
+
                         // Mark that duplicate was detected
                         duplicateDetectedRef.current = true;
-                        
+
                         // Show duplicate modal
                         setDuplicateMessage(
                             `This combination of Group Name (${modifiedGroup.groupName}), Workstream (${modifiedGroup.entity}), Product (${modifiedGroup.product}), and Service (${modifiedGroup.service}) already exists in another row. Please use a different combination.`
                         );
                         setShowDuplicateModal(true);
-                        
+
                         failedCount++;
                         continue; // Skip this row and continue with others
                     }
-                    
+
                     const groupData = {
                         groupName: modifiedGroup.groupName,
                         description: modifiedGroup.description || '',
@@ -2283,14 +2247,12 @@ export default function ManageUserGroups() {
                         service: modifiedGroup.service,
                         roles: modifiedGroup.roles || '',
                         accountId: selectedAccountId,
-                        accountName: selectedAccountName,
-                        enterpriseId: selectedEnterpriseId,
-                        enterpriseName: selectedEnterprise
+                        enterpriseId: selectedEnterpriseId
                     };
-                    
+
                     console.log('💾 Updating existing user group:', modifiedGroup.id, groupData);
                     await api.put(`/api/user-management/groups/${modifiedGroup.id}`, groupData);
-                    
+
                     // Update the row's updatedAt timestamp in state
                     setUserGroups((prev) =>
                         prev.map((g) =>
@@ -2299,7 +2261,7 @@ export default function ManageUserGroups() {
                                 : g,
                         ),
                     );
-                    
+
                     savedCount++;
                     console.log('🎉 Existing user group updated successfully!');
                 } catch (error) {
@@ -2307,13 +2269,13 @@ export default function ManageUserGroups() {
                     failedCount++;
                 }
             }
-            
+
             // Clear the modified records tracking after successful saves
             if (completeModifiedRows.length > 0 && failedCount === 0) {
                 setModifiedExistingRecords(new Set());
                 console.log('✨ Cleared modified records tracking');
             }
-            
+
             if (savedCount > 0 && failedCount === 0) {
                 const newCount = completeTemporaryRows.length;
                 const updatedCount = completeModifiedRows.length;
@@ -2322,21 +2284,19 @@ export default function ManageUserGroups() {
                     : newCount > 0
                     ? `Successfully saved ${newCount} new entries.`
                     : `Successfully saved ${updatedCount} updated entries.`;
-                
+
                 showBlueNotification(message);
                 setShowValidationErrors(false); // Clear validation errors on successful save
                 setExternalFieldErrors({});
                 setIncompleteRows([]);
-                
+
                 // Reload data from backend to get real IDs and clear unsaved state - exactly like Manage Users
                 console.log('🔄 Reloading user groups after successful manual save to update IDs...');
                 await loadUserGroups({
                     accountId: selectedAccountId,
-                    accountName: selectedAccountName,
-                    enterpriseId: selectedEnterpriseId,
-                    enterpriseName: selectedEnterprise
+                    enterpriseId: selectedEnterpriseId
                 });
-                
+
                 console.log('✅ Reload complete after manual save - checking state:', {
                     autoSaveTimerRef: autoSaveTimerRef.current,
                     modifiedRecordsSize: modifiedExistingRecordsRef.current.size,
@@ -2385,12 +2345,12 @@ export default function ManageUserGroups() {
     const [showEntitySuggestions, setShowEntitySuggestions] = useState(false);
     const [showProductSuggestions, setShowProductSuggestions] = useState(false);
     const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
-    
+
     const [filteredGroupNames, setFilteredGroupNames] = useState<Array<{id: string; name: string}>>([]);
     const [filteredEntities, setFilteredEntities] = useState<Array<{id: string; name: string}>>([]);
     const [filteredProducts, setFilteredProducts] = useState<Array<{id: string; name: string}>>([]);
     const [filteredServices, setFilteredServices] = useState<Array<{id: string; name: string}>>([]);
-    
+
     const [selectedGroupNameIndex, setSelectedGroupNameIndex] = useState(-1);
     const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
     const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
@@ -2403,10 +2363,10 @@ export default function ManageUserGroups() {
         if (filterForm.entity) filters.entity = filterForm.entity;
         if (filterForm.product) filters.product = filterForm.product;
         if (filterForm.service) filters.service = filterForm.service;
-        
+
         setActiveFilters(filters);
         closeAllDialogs();
-        
+
         // Reset the cleared flag when panel is closed via Apply
         filterClearedRef.current = false;
     };
@@ -2419,7 +2379,7 @@ export default function ManageUserGroups() {
             service: '',
         });
         setActiveFilters({});
-        
+
         // Mark that filters were cleared - allow closing on outside click
         filterClearedRef.current = true;
     };
@@ -2599,10 +2559,10 @@ export default function ManageUserGroups() {
                                                                 ...filterForm,
                                                                 groupName: value,
                                                             });
-                                                            
+
                                                             // Reset cleared flag when user starts typing again
                                                             filterClearedRef.current = false;
-                                                            
+
                                                             // Filter group names
                                                             const filtered = (dropdownOptions.groupNames || []).filter(groupName =>
                                                                 groupName.name.toLowerCase().includes(value.toLowerCase())
@@ -2614,7 +2574,7 @@ export default function ManageUserGroups() {
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'ArrowDown') {
                                                                 e.preventDefault();
-                                                                setSelectedGroupNameIndex(prev => 
+                                                                setSelectedGroupNameIndex(prev =>
                                                                     prev < filteredGroupNames.length - 1 ? prev + 1 : prev
                                                                 );
                                                             } else if (e.key === 'ArrowUp') {
@@ -2685,10 +2645,10 @@ export default function ManageUserGroups() {
                                                                 ...filterForm,
                                                                 entity: value,
                                                             });
-                                                            
+
                                                             // Reset cleared flag when user starts typing again
                                                             filterClearedRef.current = false;
-                                                            
+
                                                             // Filter entities
                                                             const filtered = (dropdownOptions.entities || []).filter(entity =>
                                                                 entity.name.toLowerCase().includes(value.toLowerCase())
@@ -2700,7 +2660,7 @@ export default function ManageUserGroups() {
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'ArrowDown') {
                                                                 e.preventDefault();
-                                                                setSelectedEntityIndex(prev => 
+                                                                setSelectedEntityIndex(prev =>
                                                                     prev < filteredEntities.length - 1 ? prev + 1 : prev
                                                                 );
                                                             } else if (e.key === 'ArrowUp') {
@@ -2771,10 +2731,10 @@ export default function ManageUserGroups() {
                                                                 ...filterForm,
                                                                 product: value,
                                                             });
-                                                            
+
                                                             // Reset cleared flag when user starts typing again
                                                             filterClearedRef.current = false;
-                                                            
+
                                                             // Filter products
                                                             const filtered = (dropdownOptions.products || []).filter(product =>
                                                                 product.name.toLowerCase().includes(value.toLowerCase())
@@ -2786,7 +2746,7 @@ export default function ManageUserGroups() {
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'ArrowDown') {
                                                                 e.preventDefault();
-                                                                setSelectedProductIndex(prev => 
+                                                                setSelectedProductIndex(prev =>
                                                                     prev < filteredProducts.length - 1 ? prev + 1 : prev
                                                                 );
                                                             } else if (e.key === 'ArrowUp') {
@@ -2857,10 +2817,10 @@ export default function ManageUserGroups() {
                                                                 ...filterForm,
                                                                 service: value,
                                                             });
-                                                            
+
                                                             // Reset cleared flag when user starts typing again
                                                             filterClearedRef.current = false;
-                                                            
+
                                                             // Filter services
                                                             const filtered = (dropdownOptions.services || []).filter(service =>
                                                                 service.name.toLowerCase().includes(value.toLowerCase())
@@ -2872,7 +2832,7 @@ export default function ManageUserGroups() {
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'ArrowDown') {
                                                                 e.preventDefault();
-                                                                setSelectedServiceIndex(prev => 
+                                                                setSelectedServiceIndex(prev =>
                                                                     prev < filteredServices.length - 1 ? prev + 1 : prev
                                                                 );
                                                             } else if (e.key === 'ArrowUp') {
@@ -3215,7 +3175,7 @@ export default function ManageUserGroups() {
                         {/* Progress bar animation for auto-save countdown */}
                         {autoSaveCountdown && (
                             <div className="absolute inset-0 bg-blue-200/30 rounded-md overflow-hidden">
-                                <div 
+                                <div
                                     className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-linear"
                                     style={{
                                         width: autoSaveCountdown ? `${((10 - autoSaveCountdown) / 10) * 100}%` : '0%'
@@ -3223,12 +3183,12 @@ export default function ManageUserGroups() {
                                 ></div>
                             </div>
                         )}
-                        
+
                         {/* Auto-save success wave animation */}
                         {showAutoSaveSuccess && (
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-ping"></div>
                         )}
-                        
+
                         {isAutoSaving ? (
                             <div className='h-4 w-4 animate-spin'>
                                 <svg
@@ -3745,20 +3705,20 @@ export default function ManageUserGroups() {
                     onConfirm={() => {
                         console.log('🔄 User confirmed navigation - clearing states and executing navigation');
                         setShowNavigationWarning(false);
-                        
+
                         // Clear all unsaved states IMMEDIATELY
                         setIncompleteRows([]);
                         setHasUnsavedChanges(false);
                         setPreventNavigation(false);
                         setUserConfirmedLeave(true);
-                        
+
                         // Execute navigation immediately after state update
                         if (pendingNavigationUrl) {
                             console.log('🔄 Executing pending navigation to:', pendingNavigationUrl);
                             // Clear the pending URL first
                             const targetUrl = pendingNavigationUrl;
                             setPendingNavigationUrl(null);
-                            
+
                             // Use setTimeout to ensure state updates are processed first
                             setTimeout(() => {
                                 if (originalRouterRef.current) {
@@ -3788,4 +3748,3 @@ export default function ManageUserGroups() {
         </div>
     );
 }
-

@@ -53,33 +53,25 @@ export interface ListUsersOptions {
     search?: string;
     status?: 'ACTIVE' | 'INACTIVE';
     accountId?: string | null;
-    accountName?: string | null;
     enterpriseId?: string | null;
-    enterpriseName?: string | null;
 }
 
 export interface ListGroupsOptions {
     search?: string;
     accountId?: string | null;
-    accountName?: string | null;
     enterpriseId?: string | null;
-    enterpriseName?: string | null;
 }
 
 export interface ListRolesOptions {
     groupId?: string;
     accountId?: string | null;
-    accountName?: string | null;
     enterpriseId?: string | null;
-    enterpriseName?: string | null;
 }
 
 // Context interface for CRUD operations with account/enterprise
 export interface AccountEnterpriseContext {
     accountId: string;
-    accountName: string;
     enterpriseId: string;
-    enterpriseName: string;
 }
 
 export interface ListUsersResponse {
@@ -107,25 +99,18 @@ export class AccessControlApiService {
         if (options.search) params.append('search', options.search);
         if (options.status) params.append('status', options.status);
 
-        // Add account parameters even if they exist (including null values)
-        // The backend needs to receive them to determine filtering
-        if (options.accountId !== undefined) {
-            params.append('accountId', options.accountId || '');
+        // Only send accountId and enterpriseId - backend looks up names
+        if (options.accountId) {
+            params.append('accountId', options.accountId);
         }
-        if (options.accountName !== undefined) {
-            params.append('accountName', options.accountName || '');
-        }
-        if (options.enterpriseId !== undefined) {
-            params.append('enterpriseId', options.enterpriseId || '');
-        }
-        if (options.enterpriseName !== undefined) {
-            params.append('enterpriseName', options.enterpriseName || '');
+        if (options.enterpriseId) {
+            params.append('enterpriseId', options.enterpriseId);
         }
 
         const queryString = params.toString();
         const endpoint = queryString
-            ? `/api/users?${queryString}`
-            : '/api/users';
+            ? `/api/user-management/users?${queryString}`
+            : '/api/user-management/users';
 
         return api.get<UserRecord[]>(endpoint);
     }
@@ -140,7 +125,7 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<UserRecord> {
         const payload = context ? {...userData, ...context} : userData;
-        return api.post<UserRecord>('/api/users', payload);
+        return api.post<UserRecord>('/api/user-management/users', payload);
     }
 
     /**
@@ -155,7 +140,10 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<UserRecord> {
         const payload = context ? {...updates, ...context} : updates;
-        return api.put<UserRecord>(`/api/users/${userId}`, payload);
+        return api.put<UserRecord>(
+            `/api/user-management/users/${userId}`,
+            payload,
+        );
     }
 
     /**
@@ -171,20 +159,16 @@ export class AccessControlApiService {
             const params = new URLSearchParams();
             if (context.accountId)
                 params.append('accountId', context.accountId);
-            if (context.accountName)
-                params.append('accountName', context.accountName);
             if (context.enterpriseId)
                 params.append('enterpriseId', context.enterpriseId);
-            if (context.enterpriseName)
-                params.append('enterpriseName', context.enterpriseName);
             const queryString = params.toString();
             return api.del(
                 queryString
-                    ? `/api/users/${userId}?${queryString}`
-                    : `/api/users/${userId}`,
+                    ? `/api/user-management/users/${userId}?${queryString}`
+                    : `/api/user-management/users/${userId}`,
             );
         }
-        return api.del(`/api/users/${userId}`);
+        return api.del(`/api/user-management/users/${userId}`);
     }
 
     /**
@@ -235,17 +219,12 @@ export class AccessControlApiService {
 
         const params = new URLSearchParams();
         if (options.search) params.append('search', options.search);
-        if (options.accountId !== undefined) {
-            params.append('accountId', options.accountId || '');
+        // Only send accountId and enterpriseId - backend looks up names
+        if (options.accountId) {
+            params.append('accountId', options.accountId);
         }
-        if (options.accountName !== undefined) {
-            params.append('accountName', options.accountName || '');
-        }
-        if (options.enterpriseId !== undefined) {
-            params.append('enterpriseId', options.enterpriseId || '');
-        }
-        if (options.enterpriseName !== undefined) {
-            params.append('enterpriseName', options.enterpriseName || '');
+        if (options.enterpriseId) {
+            params.append('enterpriseId', options.enterpriseId);
         }
 
         const queryString = params.toString();
@@ -299,12 +278,8 @@ export class AccessControlApiService {
             const params = new URLSearchParams();
             if (context.accountId)
                 params.append('accountId', context.accountId);
-            if (context.accountName)
-                params.append('accountName', context.accountName);
             if (context.enterpriseId)
                 params.append('enterpriseId', context.enterpriseId);
-            if (context.enterpriseName)
-                params.append('enterpriseName', context.enterpriseName);
             const queryString = params.toString();
             return api.del(
                 queryString
@@ -371,17 +346,12 @@ export class AccessControlApiService {
 
         const params = new URLSearchParams();
         if (options.groupId) params.append('groupId', options.groupId);
-        if (options.accountId !== undefined) {
-            params.append('accountId', options.accountId || '');
+        // Only send accountId and enterpriseId - backend looks up names
+        if (options.accountId) {
+            params.append('accountId', options.accountId);
         }
-        if (options.accountName !== undefined) {
-            params.append('accountName', options.accountName || '');
-        }
-        if (options.enterpriseId !== undefined) {
-            params.append('enterpriseId', options.enterpriseId || '');
-        }
-        if (options.enterpriseName !== undefined) {
-            params.append('enterpriseName', options.enterpriseName || '');
+        if (options.enterpriseId) {
+            params.append('enterpriseId', options.enterpriseId);
         }
 
         const queryString = params.toString();
@@ -442,12 +412,8 @@ export class AccessControlApiService {
             const params = new URLSearchParams();
             if (context.accountId)
                 params.append('accountId', context.accountId);
-            if (context.accountName)
-                params.append('accountName', context.accountName);
             if (context.enterpriseId)
                 params.append('enterpriseId', context.enterpriseId);
-            if (context.enterpriseName)
-                params.append('enterpriseName', context.enterpriseName);
             const queryString = params.toString();
             return api.del(
                 queryString
