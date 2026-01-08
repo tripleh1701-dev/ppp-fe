@@ -202,14 +202,18 @@ export class AccessControlApiService {
      * Assign user to a group
      */
     async assignUserToGroup(userId: string, groupId: string): Promise<void> {
-        await api.post(`/api/users/${userId}/groups`, {groupId});
+        await api.post(`/api/user-management/users/${userId}/groups`, {
+            groupId,
+        });
     }
 
     /**
      * Remove user from a group
      */
     async removeUserFromGroup(userId: string, groupId: string): Promise<void> {
-        await api.del(`/api/users/${userId}/groups/${groupId}`);
+        await api.del(
+            `/api/user-management/users/${userId}/groups?groupId=${groupId}`,
+        );
     }
 
     // ========================================
@@ -246,8 +250,8 @@ export class AccessControlApiService {
 
         const queryString = params.toString();
         const endpoint = queryString
-            ? `/api/groups?${queryString}`
-            : '/api/groups';
+            ? `/api/user-management/groups?${queryString}`
+            : '/api/user-management/groups';
         return api.get<GroupRecord[]>(endpoint);
     }
 
@@ -261,7 +265,7 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<GroupRecord> {
         const payload = context ? {...groupData, ...context} : groupData;
-        return api.post<GroupRecord>('/api/groups', payload);
+        return api.post<GroupRecord>('/api/user-management/groups', payload);
     }
 
     /**
@@ -276,7 +280,10 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<GroupRecord> {
         const payload = context ? {...updates, ...context} : updates;
-        return api.put<GroupRecord>(`/api/groups/${groupId}`, payload);
+        return api.put<GroupRecord>(
+            `/api/user-management/groups/${groupId}`,
+            payload,
+        );
     }
 
     /**
@@ -301,47 +308,48 @@ export class AccessControlApiService {
             const queryString = params.toString();
             return api.del(
                 queryString
-                    ? `/api/groups/${groupId}?${queryString}`
-                    : `/api/groups/${groupId}`,
+                    ? `/api/user-management/groups/${groupId}?${queryString}`
+                    : `/api/user-management/groups/${groupId}`,
             );
         }
-        return api.del(`/api/groups/${groupId}`);
+        return api.del(`/api/user-management/groups/${groupId}`);
     }
 
     /**
      * Get users in a group
      */
     async getGroupUsers(groupId: string): Promise<UserRecord[]> {
-        const response = await api.get<{
-            success: boolean;
-            data: {users: UserRecord[]};
-        }>(`/api/user-groups/${groupId}/users`);
-        return response.data.users;
+        // Note: This endpoint might need to be implemented in user-management controller
+        const response = await api.get<UserRecord[]>(
+            `/api/user-management/groups/${groupId}/users`,
+        );
+        return Array.isArray(response) ? response : [];
     }
 
     /**
      * Get roles assigned to a group
      */
     async getGroupRoles(groupId: string): Promise<RoleRecord[]> {
-        const response = await api.get<{
-            success: boolean;
-            data: {roles: RoleRecord[]};
-        }>(`/api/user-groups/${groupId}/roles`);
-        return response.data.roles;
+        const response = await api.get<RoleRecord[]>(
+            `/api/user-management/groups/${groupId}/roles`,
+        );
+        return Array.isArray(response) ? response : [];
     }
 
     /**
      * Assign role to group
      */
     async assignRoleToGroup(groupId: string, roleId: string): Promise<void> {
-        await api.post(`/api/user-groups/${groupId}/roles`, {roleId});
+        await api.post(`/api/user-management/groups/${groupId}/roles`, {
+            roleId,
+        });
     }
 
     /**
      * Remove role from group
      */
     async removeRoleFromGroup(groupId: string, roleId: string): Promise<void> {
-        await api.del(`/api/user-groups/${groupId}/roles/${roleId}`);
+        await api.del(`/api/user-management/groups/${groupId}/roles/${roleId}`);
     }
 
     // ========================================
@@ -378,8 +386,8 @@ export class AccessControlApiService {
 
         const queryString = params.toString();
         const endpoint = queryString
-            ? `/api/roles?${queryString}`
-            : '/api/roles';
+            ? `/api/user-management/roles?${queryString}`
+            : '/api/user-management/roles';
         return api.get<RoleRecord[]>(endpoint);
     }
 
@@ -387,7 +395,7 @@ export class AccessControlApiService {
      * Get role details by ID
      */
     async getRole(roleId: string): Promise<RoleRecord> {
-        return api.get<RoleRecord>(`/api/roles/${roleId}`);
+        return api.get<RoleRecord>(`/api/user-management/roles/${roleId}`);
     }
 
     /**
@@ -400,7 +408,7 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<RoleRecord> {
         const payload = context ? {...roleData, ...context} : roleData;
-        return api.post<RoleRecord>('/api/roles', payload);
+        return api.post<RoleRecord>('/api/user-management/roles', payload);
     }
 
     /**
@@ -415,7 +423,10 @@ export class AccessControlApiService {
         context?: Partial<AccountEnterpriseContext>,
     ): Promise<RoleRecord> {
         const payload = context ? {...updates, ...context} : updates;
-        return api.put<RoleRecord>(`/api/roles/${roleId}`, payload);
+        return api.put<RoleRecord>(
+            `/api/user-management/roles/${roleId}`,
+            payload,
+        );
     }
 
     /**
@@ -440,11 +451,11 @@ export class AccessControlApiService {
             const queryString = params.toString();
             return api.del(
                 queryString
-                    ? `/api/roles/${roleId}?${queryString}`
-                    : `/api/roles/${roleId}`,
+                    ? `/api/user-management/roles/${roleId}?${queryString}`
+                    : `/api/user-management/roles/${roleId}`,
             );
         }
-        return api.del(`/api/roles/${roleId}`);
+        return api.del(`/api/user-management/roles/${roleId}`);
     }
 
     // ========================================
