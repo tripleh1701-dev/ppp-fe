@@ -2258,13 +2258,137 @@ export default function EnterpriseConfiguration() {
         setFoldingRowId(null);
     };
 
+    // State for linkage-in-use warning
+    const [showLinkageInUseWarning, setShowLinkageInUseWarning] =
+        useState(false);
+    const [linkageInUseMessage, setLinkageInUseMessage] = useState('');
+
+    // Check if the enterprise/product/service linkage is used in any account licenses
+    const checkLinkageUsage = async (
+        configId: string,
+    ): Promise<{isUsed: boolean; accounts: string[]}> => {
+        try {
+            const config = enterpriseConfigs.find((c) => c.id === configId);
+            if (!config) return {isUsed: false, accounts: []};
+
+            console.log('🔍 Checking linkage usage for:', {
+                enterprise: config.enterprise,
+                product: config.product,
+                services: config.services,
+            });
+
+            // Fetch all accounts to check their licenses
+            const accountsResponse = await api.get<any[]>('/api/accounts');
+            const accounts = Array.isArray(accountsResponse)
+                ? accountsResponse
+                : [];
+
+            const accountsUsingLinkage: string[] = [];
+
+            for (const account of accounts) {
+                if (account.licenses && Array.isArray(account.licenses)) {
+                    for (const license of account.licenses) {
+                        const servicesList = config.services
+                            ? config.services
+                                  .split(',')
+                                  .map((s: string) => s.trim().toLowerCase())
+                            : [];
+
+                        const licenseEnterprise = (
+                            license.enterprise || ''
+                        ).toLowerCase();
+                        const licenseProduct = (
+                            license.product || ''
+                        ).toLowerCase();
+                        const licenseService = (
+                            license.service || ''
+                        ).toLowerCase();
+                        const configEnterprise = (
+                            config.enterprise || ''
+                        ).toLowerCase();
+                        const configProduct = (
+                            config.product || ''
+                        ).toLowerCase();
+
+                        // Check if this license uses the same enterprise + product + service combination
+                        const matchesEnterprise =
+                            licenseEnterprise === configEnterprise;
+                        const matchesProduct = licenseProduct === configProduct;
+                        const matchesService =
+                            servicesList.length === 0 ||
+                            servicesList.includes(licenseService) ||
+                            licenseService === '';
+
+                        if (
+                            matchesEnterprise &&
+                            matchesProduct &&
+                            matchesService
+                        ) {
+                            if (
+                                !accountsUsingLinkage.includes(
+                                    account.accountName,
+                                )
+                            ) {
+                                accountsUsingLinkage.push(account.accountName);
+                            }
+                        }
+                    }
+                }
+            }
+
+            console.log('📊 Linkage usage check result:', {
+                isUsed: accountsUsingLinkage.length > 0,
+                accounts: accountsUsingLinkage,
+            });
+
+            return {
+                isUsed: accountsUsingLinkage.length > 0,
+                accounts: accountsUsingLinkage,
+            };
+        } catch (error) {
+            console.error('❌ Error checking linkage usage:', error);
+            return {isUsed: false, accounts: []};
+        }
+    };
+
     // Handle delete confirmation
     const handleDeleteConfirm = async () => {
         if (!pendingDeleteRowId) return;
 
         setDeletingRow(true);
         try {
-            console.log('🗑️ Deleting enterprise linkage:', pendingDeleteRowId);
+            console.log(
+                '🗑️ Checking if enterprise linkage is in use:',
+                pendingDeleteRowId,
+            );
+
+            // First check if the linkage is used in any account licenses
+            const usageCheck = await checkLinkageUsage(pendingDeleteRowId);
+
+            if (usageCheck.isUsed) {
+                // Linkage is in use - show warning and prevent deletion
+                const config = enterpriseConfigs.find(
+                    (c) => c.id === pendingDeleteRowId,
+                );
+                const accountsList = usageCheck.accounts.slice(0, 3).join(', ');
+                const moreAccounts =
+                    usageCheck.accounts.length > 3
+                        ? ` and ${usageCheck.accounts.length - 3} more`
+                        : '';
+
+                setLinkageInUseMessage(
+                    `Cannot delete this linkage. The combination of Enterprise "${config?.enterprise}", ` +
+                        `Product "${config?.product}", and Service(s) "${config?.services}" is currently used in ` +
+                        `license details for the following account(s): ${accountsList}${moreAccounts}. ` +
+                        `Please remove the linkage from those account licenses first.`,
+                );
+                setShowLinkageInUseWarning(true);
+                setShowDeleteConfirmation(false);
+                setDeletingRow(false);
+                return;
+            }
+
+            console.log('✅ Linkage not in use, proceeding with deletion');
 
             // Call the backend delete API
             await api.del(
@@ -2288,13 +2412,42 @@ export default function EnterpriseConfiguration() {
 
             // Trigger table re-render
             setTableVersion((prev) => prev + 1);
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Failed to delete enterprise linkage:', error);
-            // Show error notification using the blue notification system
-            showBlueNotification(
-                'Failed to delete the enterprise configuration. Please try again.',
-                5000, // Show for 5 seconds for error messages
-            );
+
+            // Check if this is a "linkage in use" error from the backend
+            const errorResponse = error?.response?.data || error?.data || error;
+            if (
+                errorResponse?.error === 'Linkage is in use' ||
+                errorResponse?.accountsUsingLinkage
+            ) {
+                // Backend detected that linkage is attached to account licenses
+                const accountsList =
+                    errorResponse.accountsUsingLinkage
+                        ?.slice(0, 3)
+                        .join(', ') || 'some accounts';
+                const moreAccounts =
+                    errorResponse.accountsUsingLinkage?.length > 3
+                        ? ` and ${
+                              errorResponse.accountsUsingLinkage.length - 3
+                          } more`
+                        : '';
+
+                // Use the backend message or construct our own
+                const message =
+                    errorResponse.message ||
+                    `Cannot delete this linkage. It is currently used in license details for the following account(s): ${accountsList}${moreAccounts}. Please remove the linkage from those account licenses first.`;
+
+                setLinkageInUseMessage(message);
+                setShowLinkageInUseWarning(true);
+                setShowDeleteConfirmation(false);
+            } else {
+                // Generic error - show notification
+                showBlueNotification(
+                    'Failed to delete the enterprise configuration. Please try again.',
+                    5000, // Show for 5 seconds for error messages
+                );
+            }
         } finally {
             setDeletingRow(false);
         }
@@ -4378,6 +4531,66 @@ export default function EnterpriseConfiguration() {
                                     onClick={handleDeleteCancel}
                                 >
                                     No
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            )}
+
+            {/* Linkage In Use Warning Modal */}
+            {showLinkageInUseWarning && (
+                <div className='fixed inset-0 z-50 overflow-y-auto'>
+                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                        <div
+                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                            onClick={() => setShowLinkageInUseWarning(false)}
+                        ></div>
+
+                        <motion.div
+                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                            initial={{opacity: 0, scale: 0.9}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.9}}
+                            transition={{duration: 0.2}}
+                        >
+                            <div className='sm:flex sm:items-start'>
+                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                    <svg
+                                        className='h-6 w-6 text-amber-600'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        strokeWidth='1.5'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'
+                                        />
+                                    </svg>
+                                </div>
+                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                    <h3 className='text-lg font-semibold leading-6 text-gray-900'>
+                                        Cannot Delete Linkage
+                                    </h3>
+                                    <div className='mt-2'>
+                                        <p className='text-sm text-gray-600'>
+                                            {linkageInUseMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                <button
+                                    type='button'
+                                    className='inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto'
+                                    onClick={() => {
+                                        setShowLinkageInUseWarning(false);
+                                        setPendingDeleteRowId(null);
+                                    }}
+                                >
+                                    OK, I Understand
                                 </button>
                             </div>
                         </motion.div>

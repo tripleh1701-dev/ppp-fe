@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useCallback} from 'react';
 import {
     accessControlApi,
     GroupRecord,
@@ -64,23 +64,148 @@ export default function ManageGroups() {
     const [showUsersModal, setShowUsersModal] = useState(false);
     const [showRolesModal, setShowRolesModal] = useState(false);
 
+    // Account/Enterprise context from localStorage (breadcrumb selection)
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [selectedAccountName, setSelectedAccountName] = useState<string>('');
+    const [selectedEnterpriseId, setSelectedEnterpriseId] =
+        useState<string>('');
+    const [selectedEnterpriseName, setSelectedEnterpriseName] =
+        useState<string>('');
+    const [isInitialized, setIsInitialized] = useState(false);
+
     // Form state
     const [formData, setFormData] = useState({
         name: '',
         description: '',
     });
 
-    const loadGroups = async () => {
+    // Load account/enterprise context from localStorage
+    useEffect(() => {
+        const loadSelectedValues = () => {
+            try {
+                console.log('🔄 [ManageGroups] Loading localStorage values...');
+
+                const savedAccountId =
+                    window.localStorage.getItem('selectedAccountId');
+                const savedAccountName = window.localStorage.getItem(
+                    'selectedAccountName',
+                );
+                const savedEnterpriseId = window.localStorage.getItem(
+                    'selectedEnterpriseId',
+                );
+                const savedEnterpriseName = window.localStorage.getItem(
+                    'selectedEnterpriseName',
+                );
+
+                console.log('🔍 [ManageGroups] localStorage values:', {
+                    selectedAccountId: savedAccountId,
+                    selectedAccountName: savedAccountName,
+                    selectedEnterpriseId: savedEnterpriseId,
+                    selectedEnterpriseName: savedEnterpriseName,
+                });
+
+                setSelectedAccountId(
+                    savedAccountId && savedAccountId !== 'null'
+                        ? savedAccountId
+                        : '',
+                );
+                setSelectedAccountName(
+                    savedAccountName && savedAccountName !== 'null'
+                        ? savedAccountName
+                        : '',
+                );
+                setSelectedEnterpriseId(
+                    savedEnterpriseId && savedEnterpriseId !== 'null'
+                        ? savedEnterpriseId
+                        : '',
+                );
+                setSelectedEnterpriseName(
+                    savedEnterpriseName && savedEnterpriseName !== 'null'
+                        ? savedEnterpriseName
+                        : '',
+                );
+
+                setIsInitialized(true);
+            } catch (error) {
+                console.warn('Failed to load from localStorage:', error);
+                setIsInitialized(true);
+            }
+        };
+
+        loadSelectedValues();
+
+        // Listen for storage events (when user changes account/enterprise in breadcrumb)
+        const handleStorageChange = (event: StorageEvent) => {
+            if (event.key?.startsWith('selected')) {
+                console.log(
+                    '🔄 [ManageGroups] Storage event detected, reloading values',
+                );
+                loadSelectedValues();
+            }
+        };
+
+        // Listen for custom localStorage events
+        const handleLocalStorageUpdate = () => {
+            console.log('🔄 [ManageGroups] Custom localStorage event detected');
+            loadSelectedValues();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener(
+            'localStorageUpdated',
+            handleLocalStorageUpdate,
+        );
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener(
+                'localStorageUpdated',
+                handleLocalStorageUpdate,
+            );
+        };
+    }, []);
+
+    const loadGroups = useCallback(async () => {
+        // Only load if we have account/enterprise context
+        if (!isInitialized || !selectedAccountId || !selectedEnterpriseId) {
+            console.log(
+                '🔄 [ManageGroups] Waiting for account/enterprise selection...',
+            );
+            return;
+        }
+
         try {
             setLoading(true);
-            const data = await accessControlApi.listGroups(search);
+            console.log('🔄 [ManageGroups] Loading groups with context:', {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterpriseName,
+                search,
+            });
+
+            const data = await accessControlApi.listGroups({
+                search,
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterpriseName,
+            });
+            console.log(`📊 [ManageGroups] Loaded ${data?.length || 0} groups`);
             setGroups(data);
         } catch (error) {
             console.error('Error loading groups:', error);
         } finally {
             setLoading(false);
         }
-    };
+    }, [
+        isInitialized,
+        selectedAccountId,
+        selectedAccountName,
+        selectedEnterpriseId,
+        selectedEnterpriseName,
+        search,
+    ]);
 
     const loadGroupUsers = async (groupId: string) => {
         try {
@@ -102,14 +227,29 @@ export default function ManageGroups() {
         }
     };
 
+    // Load groups when account/enterprise context changes
     useEffect(() => {
-        loadGroups();
-    }, [search, loadGroups]);
+        if (isInitialized && selectedAccountId && selectedEnterpriseId) {
+            loadGroups();
+        }
+    }, [
+        isInitialized,
+        selectedAccountId,
+        selectedEnterpriseId,
+        search,
+        loadGroups,
+    ]);
 
     const handleCreateGroup = async () => {
         try {
             setLoading(true);
-            await accessControlApi.createGroup(formData);
+            // Include account/enterprise context when creating group
+            await accessControlApi.createGroup(formData as any, {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterpriseName,
+            });
             setFormData({name: '', description: ''});
             setShowCreateModal(false);
             await loadGroups();
@@ -125,7 +265,13 @@ export default function ManageGroups() {
 
         try {
             setLoading(true);
-            await accessControlApi.updateGroup(editingGroup.id, formData);
+            // Include account/enterprise context when updating group
+            await accessControlApi.updateGroup(editingGroup.id, formData, {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterpriseName,
+            });
             setFormData({name: '', description: ''});
             setEditingGroup(null);
             await loadGroups();
@@ -141,7 +287,13 @@ export default function ManageGroups() {
 
         try {
             setLoading(true);
-            await accessControlApi.deleteGroup(deleteGroupId);
+            // Include account/enterprise context when deleting group
+            await accessControlApi.deleteGroup(deleteGroupId, {
+                accountId: selectedAccountId,
+                accountName: selectedAccountName,
+                enterpriseId: selectedEnterpriseId,
+                enterpriseName: selectedEnterpriseName,
+            });
             setDeleteGroupId(null);
             await loadGroups();
         } catch (error) {

@@ -6063,6 +6063,116 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
             }
         }, [rows, hasInitializedLicenses]);
 
+        // Sync rowLicenses when rows change (e.g., after autosave converts tmp-* IDs to real IDs)
+        // This ensures licenses are properly associated with their new account IDs
+        useEffect(() => {
+            if (!hasInitializedLicenses) return;
+
+            setRowLicenses((prevLicenses) => {
+                const updatedLicenses = {...prevLicenses};
+                let hasChanges = false;
+
+                rows.forEach((row) => {
+                    // If this row has licenses from props but not in state, add them
+                    if (
+                        row.licenses &&
+                        row.licenses.length > 0 &&
+                        !updatedLicenses[row.id]
+                    ) {
+                        console.log(
+                            `🔄 Syncing licenses for account ${row.accountName} (ID: ${row.id})`,
+                            row.licenses.length,
+                        );
+                        updatedLicenses[row.id] = row.licenses;
+                        hasChanges = true;
+                    }
+                    // If this row has licenses in props that are different from state, update them
+                    else if (
+                        row.licenses &&
+                        row.licenses.length > 0 &&
+                        updatedLicenses[row.id]
+                    ) {
+                        // Check if props licenses have more/different data than state
+                        const propsLicenseIds = new Set(
+                            row.licenses.map((l) => l.id),
+                        );
+                        const stateLicenseIds = new Set(
+                            updatedLicenses[row.id].map((l) => l.id),
+                        );
+
+                        // If all licenses are the same IDs, check if any have more complete data
+                        if (propsLicenseIds.size === stateLicenseIds.size) {
+                            const rowLicenses = row.licenses || []; // Safe reference for use in callback
+                            const mergedLicenses = updatedLicenses[row.id].map(
+                                (stateLicense) => {
+                                    const propsLicense = rowLicenses.find(
+                                        (l) => l.id === stateLicense.id,
+                                    );
+                                    if (propsLicense) {
+                                        // Merge props into state, preferring state values where they exist
+                                        return {
+                                            ...propsLicense,
+                                            ...stateLicense,
+                                            // But keep contactDetails from state if it exists and is more complete
+                                            contactDetails:
+                                                stateLicense.contactDetails ||
+                                                propsLicense.contactDetails,
+                                        };
+                                    }
+                                    return stateLicense;
+                                },
+                            );
+                            updatedLicenses[row.id] = mergedLicenses;
+                        }
+                    }
+                });
+
+                // Also handle ID migrations (tmp-* to real ID)
+                // Find any licenses that are keyed by tmp-* IDs that no longer exist in rows
+                const currentRowIds = new Set(rows.map((r) => r.id));
+                const orphanedTmpIds = Object.keys(updatedLicenses).filter(
+                    (id) => id.startsWith('tmp-') && !currentRowIds.has(id),
+                );
+
+                if (orphanedTmpIds.length > 0) {
+                    console.log(
+                        '🔄 Found orphaned tmp licenses to migrate:',
+                        orphanedTmpIds,
+                    );
+                    // Try to match orphaned licenses to new rows by accountName
+                    orphanedTmpIds.forEach((tmpId) => {
+                        // Find the row that was previously this tmp ID by matching license content
+                        const orphanedLicenses = updatedLicenses[tmpId];
+                        if (orphanedLicenses && orphanedLicenses.length > 0) {
+                            // Look for a row that has licenses with matching IDs
+                            const matchingRow = rows.find((row) =>
+                                row.licenses?.some((l) =>
+                                    orphanedLicenses.some(
+                                        (ol) => ol.id === l.id,
+                                    ),
+                                ),
+                            );
+                            if (matchingRow && matchingRow.id !== tmpId) {
+                                console.log(
+                                    `🔄 Migrating licenses from ${tmpId} to ${matchingRow.id}`,
+                                );
+                                updatedLicenses[matchingRow.id] =
+                                    orphanedLicenses;
+                                delete updatedLicenses[tmpId];
+                                hasChanges = true;
+                            }
+                        }
+                    });
+                }
+
+                if (hasChanges) {
+                    rowLicensesRef.current = updatedLicenses;
+                }
+
+                return updatedLicenses;
+            });
+        }, [rows, hasInitializedLicenses]);
+
         // Load selected enterprise from localStorage and listen for changes
         useEffect(() => {
             const loadSelectedEnterprise = () => {
