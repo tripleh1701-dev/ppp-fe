@@ -1544,10 +1544,22 @@ export default function ManageAccounts() {
                     const hasCloudType =
                         hasValue(config.cloudType) &&
                         safeTrim(config.cloudType).length > 0;
-                    const hasLicenses =
+                    // Check that ALL licenses are complete (not just present)
+                    const hasCompleteLicenses =
                         config.licenses &&
                         Array.isArray(config.licenses) &&
-                        config.licenses.length > 0;
+                        config.licenses.length > 0 &&
+                        config.licenses.every(
+                            (license: any) =>
+                                hasValue(license.enterprise) &&
+                                hasValue(license.product) &&
+                                hasValue(license.service) &&
+                                hasValue(license.licenseStartDate) &&
+                                hasValue(license.licenseEndDate) &&
+                                hasValue(license.numberOfUsers) &&
+                                (!license.renewalNotice ||
+                                    hasValue(license.noticePeriodDays)),
+                        );
                     const hasTechnicalUsers =
                         config.technicalUsers &&
                         Array.isArray(config.technicalUsers) &&
@@ -1558,7 +1570,7 @@ export default function ManageAccounts() {
                         hasAccountName &&
                         hasMasterAccount &&
                         hasCloudType &&
-                        hasLicenses &&
+                        hasCompleteLicenses &&
                         hasTechnicalUsers;
 
                     if (isTemp && !isComplete) {
@@ -1568,7 +1580,7 @@ export default function ManageAccounts() {
                                 hasAccountName: !!hasAccountName,
                                 hasMasterAccount: !!hasMasterAccount,
                                 hasCloudType: !!hasCloudType,
-                                hasLicenses: !!hasLicenses,
+                                hasCompleteLicenses: !!hasCompleteLicenses,
                                 hasTechnicalUsers: !!hasTechnicalUsers,
                                 accountNameValue: config.accountName,
                                 masterAccountValue: config.masterAccount,
@@ -1596,10 +1608,22 @@ export default function ManageAccounts() {
                         const hasAccountName = hasValue(config.accountName);
                         const hasMasterAccount = hasValue(config.masterAccount);
                         const hasCloudType = hasValue(config.cloudType);
-                        const hasLicenses =
+                        // Check that ALL licenses are complete (not just present)
+                        const hasCompleteLicenses =
                             config.licenses &&
                             Array.isArray(config.licenses) &&
-                            config.licenses.length > 0;
+                            config.licenses.length > 0 &&
+                            config.licenses.every(
+                                (license: any) =>
+                                    hasValue(license.enterprise) &&
+                                    hasValue(license.product) &&
+                                    hasValue(license.service) &&
+                                    hasValue(license.licenseStartDate) &&
+                                    hasValue(license.licenseEndDate) &&
+                                    hasValue(license.numberOfUsers) &&
+                                    (!license.renewalNotice ||
+                                        hasValue(license.noticePeriodDays)),
+                            );
                         const hasTechnicalUsers =
                             config.technicalUsers &&
                             Array.isArray(config.technicalUsers) &&
@@ -1609,7 +1633,7 @@ export default function ManageAccounts() {
                             hasAccountName &&
                             hasMasterAccount &&
                             hasCloudType &&
-                            hasLicenses &&
+                            hasCompleteLicenses &&
                             hasTechnicalUsers;
 
                         console.log(
@@ -1618,7 +1642,7 @@ export default function ManageAccounts() {
                                 hasAccountName: !!hasAccountName,
                                 hasMasterAccount: !!hasMasterAccount,
                                 hasCloudType: !!hasCloudType,
-                                hasLicenses: !!hasLicenses,
+                                hasCompleteLicenses: !!hasCompleteLicenses,
                                 hasTechnicalUsers: !!hasTechnicalUsers,
                                 accountNameValue: config.accountName,
                                 masterAccountValue: config.masterAccount,
@@ -6660,11 +6684,36 @@ export default function ManageAccounts() {
                                                         hasValue(
                                                             account.cloudType,
                                                         );
-                                                    // Check licenses (the value being set includes the new license)
-                                                    const hasLicenses =
+                                                    // Check licenses - ALL licenses must be complete (not just present)
+                                                    const hasCompleteLicenses =
                                                         value &&
                                                         Array.isArray(value) &&
-                                                        value.length > 0;
+                                                        value.length > 0 &&
+                                                        value.every(
+                                                            (license: any) =>
+                                                                hasValue(
+                                                                    license.enterprise,
+                                                                ) &&
+                                                                hasValue(
+                                                                    license.product,
+                                                                ) &&
+                                                                hasValue(
+                                                                    license.service,
+                                                                ) &&
+                                                                hasValue(
+                                                                    license.licenseStartDate,
+                                                                ) &&
+                                                                hasValue(
+                                                                    license.licenseEndDate,
+                                                                ) &&
+                                                                hasValue(
+                                                                    license.numberOfUsers,
+                                                                ) &&
+                                                                (!license.renewalNotice ||
+                                                                    hasValue(
+                                                                        license.noticePeriodDays,
+                                                                    )),
+                                                        );
                                                     const hasTechnicalUsers =
                                                         account.technicalUsers &&
                                                         Array.isArray(
@@ -6677,13 +6726,24 @@ export default function ManageAccounts() {
                                                         hasAccountName &&
                                                         hasMasterAccount &&
                                                         hasCloudType &&
-                                                        hasLicenses &&
+                                                        hasCompleteLicenses &&
                                                         hasTechnicalUsers
                                                     ) {
                                                         console.log(
                                                             '✅ License change on complete temporary account, starting auto-save timer...',
                                                         );
                                                         debouncedAutoSave();
+                                                    } else {
+                                                        console.log(
+                                                            '⏳ License incomplete on temporary account, not triggering auto-save:',
+                                                            {
+                                                                hasAccountName,
+                                                                hasMasterAccount,
+                                                                hasCloudType,
+                                                                hasCompleteLicenses,
+                                                                hasTechnicalUsers,
+                                                            },
+                                                        );
                                                     }
                                                 }
                                             }
