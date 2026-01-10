@@ -5855,9 +5855,24 @@ const AccountsTable = forwardRef<any, AccountsTableProps>(
             const currentIds = rows.map((r) => r.id).join(',');
             const prevIds = prevRowsRef.current.map((r) => r.id).join(',');
 
+            // IMPORTANT: Also compare actual field values to detect data changes
+            // This fixes the issue where API returns different data with same IDs but the UI showed stale data
+            const getRowSignature = (r: AccountRow) =>
+                `${r.id}|${r.accountName || ''}|${r.masterAccount || ''}|${
+                    r.cloudType || ''
+                }|${r.address || ''}|${r.country || ''}|${
+                    r.technicalUsers?.length || 0
+                }|${r.licenses?.length || 0}`;
+
+            const currentSignatures = rows.map(getRowSignature).join('::');
+            const prevSignatures = prevRowsRef.current
+                .map(getRowSignature)
+                .join('::');
+
             if (
                 currentIds === prevIds &&
-                rows.length === prevRowsRef.current.length
+                rows.length === prevRowsRef.current.length &&
+                currentSignatures === prevSignatures
             ) {
                 return {
                     baseLocalRows: prevRowsRef.current,

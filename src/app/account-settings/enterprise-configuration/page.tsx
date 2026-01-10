@@ -1953,33 +1953,80 @@ export default function EnterpriseConfiguration() {
     ) => {
         console.log(`🔄 Updating ${type} - ${action}:`, {oldName, newName});
 
-        // Update dropdown options
-        if (action === 'update' && newName) {
-            setDropdownOptions((prev) => {
-                const updated = {
-                    ...prev,
-                    [type]: prev[type].map((item) =>
-                        item.name === oldName ? {...item, name: newName} : item,
-                    ),
-                };
+        // Find the item by name to get its ID for the API call
+        const item = dropdownOptions[type]?.find((opt) => opt.name === oldName);
+        if (!item) {
+            console.error(`❌ Could not find ${type} with name: ${oldName}`);
+            return;
+        }
+
+        // Determine the API endpoint based on type
+        const apiPath =
+            type === 'enterprises'
+                ? '/api/enterprises'
+                : type === 'products'
+                ? '/api/products'
+                : '/api/services';
+
+        try {
+            if (action === 'update' && newName) {
+                // Call PUT API to persist the rename to the backend
                 console.log(
-                    `✅ Updated dropdown options for ${type}:`,
-                    updated[type],
+                    `📤 Calling PUT ${apiPath}/${item.id} with name: ${newName}`,
                 );
-                return updated;
-            });
-        } else if (action === 'delete') {
-            setDropdownOptions((prev) => {
-                const updated = {
-                    ...prev,
-                    [type]: prev[type].filter((item) => item.name !== oldName),
-                };
+                await api.put(`${apiPath}/${item.id}`, {name: newName});
                 console.log(
-                    `🗑️ Removed from dropdown options for ${type}:`,
-                    updated[type],
+                    `✅ Successfully renamed ${type} "${oldName}" to "${newName}" (ID: ${item.id})`,
                 );
-                return updated;
-            });
+
+                // Update local dropdown options
+                setDropdownOptions((prev) => {
+                    const updated = {
+                        ...prev,
+                        [type]: prev[type].map((opt) =>
+                            opt.name === oldName
+                                ? {...opt, name: newName}
+                                : opt,
+                        ),
+                    };
+                    console.log(
+                        `✅ Updated dropdown options for ${type}:`,
+                        updated[type],
+                    );
+                    return updated;
+                });
+            } else if (action === 'delete') {
+                // Call DELETE API to remove from backend
+                console.log(`📤 Calling DELETE ${apiPath}/${item.id}`);
+                await api.del(`${apiPath}/${item.id}`);
+                console.log(
+                    `✅ Successfully deleted ${type} "${oldName}" (ID: ${item.id})`,
+                );
+
+                // Update local dropdown options
+                setDropdownOptions((prev) => {
+                    const updated = {
+                        ...prev,
+                        [type]: prev[type].filter(
+                            (opt) => opt.name !== oldName,
+                        ),
+                    };
+                    console.log(
+                        `🗑️ Removed from dropdown options for ${type}:`,
+                        updated[type],
+                    );
+                    return updated;
+                });
+            }
+        } catch (error: any) {
+            console.error(`❌ Failed to ${action} ${type}:`, error);
+            // Show error message to user
+            alert(
+                `Failed to ${action} ${type}: ${
+                    error.message || 'Unknown error'
+                }`,
+            );
+            return; // Don't update local state if API call failed
         }
 
         // Update all affected rows in the table

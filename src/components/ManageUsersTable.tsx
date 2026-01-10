@@ -63,7 +63,7 @@ const getUserGroupColor = (userGroupName: string) => {
     for (let i = 0; i < key.length; i++) {
         hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
     }
-    
+
     // Blueish user group color palette - consistent across all components
     const userGroupColors = [
         {
@@ -97,7 +97,7 @@ const getUserGroupColor = (userGroupName: string) => {
             tone: 'slate' as const,
         },
     ];
-    
+
     return userGroupColors[hash % userGroupColors.length];
 };
 
@@ -204,7 +204,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                             setIsOpen(true);
                             setHighlightedIndex(0);
                         } else {
-                            setHighlightedIndex(prev => 
+                            setHighlightedIndex(prev =>
                                 prev < options.length - 1 ? prev + 1 : prev
                             );
                         }
@@ -229,16 +229,16 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                         <span className="text-slate-400">{placeholder}</span>
                     )}
                 </span>
-                <ChevronDown 
-                    size={12} 
-                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+                <ChevronDown
+                    size={12}
+                    className={`text-slate-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
             {isOpen && dropdownPosition && createPortal(
-                <div 
+                <div
                     className="fixed z-[99999] bg-white border border-gray-200 rounded-md shadow-xl"
-                    style={{ 
+                    style={{
                         top: `${dropdownPosition.top}px`,
                         left: `${dropdownPosition.left}px`,
                         width: `${dropdownPosition.width}px`,
@@ -264,7 +264,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
                                 setHighlightedIndex(-1);
                             }}
                             className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
-                                value === option.value ? 'bg-blue-100 text-blue-700' : 
+                                value === option.value ? 'bg-blue-100 text-blue-700' :
                                 highlightedIndex === index ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                             }`}
                         >
@@ -485,24 +485,24 @@ const validateEmail = (value: string): string | null => {
     if (!value || value.trim().length === 0) {
         return 'Email address is required';
     }
-    
+
     const trimmedValue = value.trim();
-    
+
     if (trimmedValue.length < 5) {
         return 'Email address must be at least 5 characters long';
     }
-    
+
     if (trimmedValue.length > 254) {
         return 'Email address must not exceed 254 characters';
     }
-    
+
     // RFC 5322 compliant email regex (simplified but comprehensive)
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    
+
     if (!emailRegex.test(trimmedValue)) {
         return 'Please enter a valid email address';
     }
-    
+
     return null;
 };
 
@@ -577,7 +577,7 @@ function InlineEditableText({
     const [draft, setDraft] = React.useState<string>(value || '');
     const [validationError, setValidationError] = React.useState<string | null>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
-    
+
     React.useEffect(() => {
         if (!editing) {
             // Apply filter to initial value when not editing
@@ -588,7 +588,7 @@ function InlineEditableText({
     React.useEffect(() => {
         if (editing) {
             inputRef.current?.focus();
-            
+
             // Filter the draft value when entering edit mode
             if (filterFn && draft) {
                 const filteredDraft = filterFn(draft);
@@ -596,7 +596,7 @@ function InlineEditableText({
                     setDraft(filteredDraft);
                 }
             }
-            
+
             // Validate immediately when entering edit mode if there's existing content
             if (draft && validateFn) {
                 const error = validateFn(draft);
@@ -616,12 +616,12 @@ function InlineEditableText({
 
     const commit = () => {
         let next = (draft || '').trim();
-        
+
         // Apply filter before validation and commit
         if (filterFn) {
             next = filterFn(next);
         }
-        
+
         // Validate if validation function is provided
         if (validateFn) {
             const error = validateFn(next);
@@ -630,7 +630,7 @@ function InlineEditableText({
                 return; // Don't commit if validation fails
             }
         }
-        
+
         if (next !== (value || '')) onCommit(next);
         setValidationError(null);
         setEditing(false);
@@ -652,7 +652,7 @@ function InlineEditableText({
                         const cursorPos = target.selectionStart;
                         const newValue = filterFn ? filterFn(target.value) : target.value;
                         setDraft(newValue);
-                        
+
                         // Restore cursor position after filtering
                         setTimeout(() => {
                             if (target.selectionStart !== null && cursorPos !== null) {
@@ -667,13 +667,13 @@ function InlineEditableText({
                     }}
                     onBlur={() => {
                         let next = (draft || '').trim();
-                        
+
                         // Apply filter before validation
                         if (filterFn) {
                             next = filterFn(next);
                             setDraft(next); // Update draft with filtered value
                         }
-                        
+
                         // Validate on blur if validation function is provided
                         if (validateFn) {
                             const error = validateFn(next);
@@ -682,13 +682,13 @@ function InlineEditableText({
                                 return; // Keep editing mode if validation fails
                             }
                         }
-                        
+
                         commit();
                     }}
                     onKeyDown={(e: any) => {
                         if (e.key === 'Enter') {
                             const next = (draft || '').trim();
-                            
+
                             // Validate before committing on Enter
                             if (validateFn) {
                                 const error = validateFn(next);
@@ -697,14 +697,14 @@ function InlineEditableText({
                                     return; // Don't commit if validation fails
                                 }
                             }
-                            
+
                             commit();
                         }
                         if (e.key === 'Escape') cancel();
                         if (e.key === 'Tab') {
                             e.preventDefault();
                             const next = (draft || '').trim();
-                            
+
                             // Validate before moving to next field on Tab
                             if (validateFn) {
                                 const error = validateFn(next);
@@ -713,7 +713,7 @@ function InlineEditableText({
                                     return; // Don't move to next field if validation fails
                                 }
                             }
-                            
+
                             if (next !== (value || '')) onCommit(next);
                             setValidationError(null);
                             setEditing(false);
@@ -737,7 +737,7 @@ function InlineEditableText({
         );
     }
     const isEmpty = !value || value.length === 0;
-    
+
     // Show input immediately for empty fields (like Enterprise Configuration)
     if (editing || isEmpty) {
         return (
@@ -751,7 +751,7 @@ function InlineEditableText({
                         const cursorPos = target.selectionStart;
                         const newValue = filterFn ? filterFn(target.value) : target.value;
                         setDraft(newValue);
-                        
+
                         // Restore cursor position after filtering
                         setTimeout(() => {
                             if (target.selectionStart !== null && cursorPos !== null) {
@@ -766,13 +766,13 @@ function InlineEditableText({
                     }}
                     onBlur={() => {
                         let next = (draft || '').trim();
-                        
+
                         // Apply filter before validation
                         if (filterFn) {
                             next = filterFn(next);
                             setDraft(next); // Update draft with filtered value
                         }
-                        
+
                         // Validate on blur if validation function is provided
                         if (validateFn) {
                             const error = validateFn(next);
@@ -781,14 +781,14 @@ function InlineEditableText({
                                 return; // Keep editing mode if validation fails
                             }
                         }
-                        
+
                         commit();
                     }}
                     onFocus={() => setEditing(true)}
                     onKeyDown={(e: any) => {
                         if (e.key === 'Enter') {
                             const next = (draft || '').trim();
-                            
+
                             // Validate before committing on Enter
                             if (validateFn) {
                                 const error = validateFn(next);
@@ -797,14 +797,14 @@ function InlineEditableText({
                                     return; // Don't commit if validation fails
                                 }
                             }
-                            
+
                             commit();
                         }
                         if (e.key === 'Escape') cancel();
                         if (e.key === 'Tab') {
                             e.preventDefault();
                             const next = (draft || '').trim();
-                            
+
                             // Validate before moving to next field on Tab
                             if (validateFn) {
                                 const error = validateFn(next);
@@ -813,7 +813,7 @@ function InlineEditableText({
                                     return; // Don't move to next field if validation fails
                                 }
                             }
-                            
+
                             if (next !== (value || '')) onCommit(next);
                             setValidationError(null);
                             setEditing(false);
@@ -836,7 +836,7 @@ function InlineEditableText({
             </div>
         );
     }
-    
+
     // Show display mode for non-empty fields
     return (
         <motion.span
@@ -945,12 +945,12 @@ function SimpleChipInput({
                 onBlur={commit}
                 placeholder={placeholder}
                 className={`min-w-0 w-full rounded-sm border ${
-                    isError 
-                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200' 
+                    isError
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200'
                         : 'border-blue-300 bg-white'
                 } px-1 py-1 text-[12px] focus:outline-none focus:ring-2 ${
-                    isError 
-                        ? 'focus:ring-red-200 focus:border-red-500' 
+                    isError
+                        ? 'focus:ring-red-200 focus:border-red-500'
                         : 'focus:ring-blue-200 focus:border-blue-500'
                 }`}
             />
@@ -1402,18 +1402,18 @@ function UserGroupMultiSelect({
         const rect = containerRef.current?.getBoundingClientRect();
         if (rect && typeof window !== 'undefined') {
             // Find table container for better positioning
-            const tableContainer = containerRef.current?.closest('[role="table"]') || 
+            const tableContainer = containerRef.current?.closest('[role="table"]') ||
                                   containerRef.current?.closest('.overflow-auto') ||
                                   document.body;
             const tableRect = tableContainer.getBoundingClientRect();
-            
+
             const width = 256;
             // Constrain within table bounds
             const tableRightBound = tableRect.right - width - 16;
             const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
             const minLeft = Math.max(tableRect.left + 16, 16);
             const left = Math.max(minLeft, Math.min(maxLeft, rect.left));
-            
+
             const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
             const top = Math.min(tableBottomBound, rect.bottom + 8);
             setDropdownPos({top, left, width});
@@ -1424,24 +1424,24 @@ function UserGroupMultiSelect({
     React.useEffect(() => {
         if (showMoreServices && moreServicesRef.current) {
             const rect = moreServicesRef.current.getBoundingClientRect();
-            
+
             // Find the table container to ensure dropdown stays within table bounds
-            const tableContainer = moreServicesRef.current.closest('[role="table"]') || 
+            const tableContainer = moreServicesRef.current.closest('[role="table"]') ||
                                   moreServicesRef.current.closest('.overflow-auto') ||
                                   document.body;
             const tableRect = tableContainer.getBoundingClientRect();
-            
+
             // Calculate width with stricter table container constraints
             const maxWidth = Math.min(280, tableRect.width * 0.4, window.innerWidth * 0.3);
             const width = Math.max(180, Math.min(maxWidth, rect.width));
-            
+
             // Ensure dropdown stays strictly within table container horizontally
             const idealLeft = rect.left;
             const tableRightBound = tableRect.right - width - 16; // More margin from table edge
             const maxLeft = Math.min(tableRightBound, window.innerWidth - width - 16);
             const minLeft = Math.max(tableRect.left + 16, 16); // More margin from table edge
             const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
-            
+
             // Ensure dropdown stays within both table and viewport vertically
             const tableBottomBound = Math.min(tableRect.bottom - 50, window.innerHeight - 200);
             const top = Math.min(tableBottomBound, rect.bottom + 8);
@@ -1480,23 +1480,23 @@ function UserGroupMultiSelect({
             setShowAdder(false);
             setAdding('');
             setQuery('');
-            
+
             // Focus next row's first field (Enterprise) after selecting existing service
             const currentElement = inputRef?.current;
             if (currentElement) {
                 // Find the closest div with data-row-id attribute
                 const currentRowDiv = currentElement.closest('[data-row-id]');
                 const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                
+
                 if (currentRowId) {
                     // Find the next row (increment the row number)
                     const currentRowNum = parseInt(currentRowId);
                     const nextRowId = (currentRowNum + 1).toString();
-                    
+
                     // Find the enterprise column in the next row
                     const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                     const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                    
+
                     if (nextInput) {
                         // Use requestAnimationFrame to ensure DOM is updated
                         requestAnimationFrame(() => {
@@ -1531,16 +1531,16 @@ function UserGroupMultiSelect({
                     // Find the closest div with data-row-id attribute
                     const currentRowDiv = currentElement.closest('[data-row-id]');
                     const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                    
+
                     if (currentRowId) {
                         // Find the next row (increment the row number)
                         const currentRowNum = parseInt(currentRowId);
                         const nextRowId = (currentRowNum + 1).toString();
-                        
+
                         // Find the enterprise column in the next row
                         const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                         const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                        
+
                         if (nextInput) {
                             // Use requestAnimationFrame to ensure DOM is updated
                             requestAnimationFrame(() => {
@@ -1568,23 +1568,23 @@ function UserGroupMultiSelect({
                 );
                 if (existingItem) {
                     toggleUserGroup(existingItem.name);
-                    
+
                     // Focus next row's first field (Enterprise) after selecting existing service
                     const currentElement = inputRef?.current;
                     if (currentElement) {
                         // Find the closest div with data-row-id attribute
                         const currentRowDiv = currentElement.closest('[data-row-id]');
                         const currentRowId = currentRowDiv?.getAttribute('data-row-id');
-                        
+
                         if (currentRowId) {
                             // Find the next row (increment the row number)
                             const currentRowNum = parseInt(currentRowId);
                             const nextRowId = (currentRowNum + 1).toString();
-                            
+
                             // Find the enterprise column in the next row
                             const nextRowDiv = document.querySelector(`[data-row-id="${nextRowId}"][data-col="enterprise"]`);
                             const nextInput = nextRowDiv?.querySelector('input') as HTMLInputElement;
-                            
+
                             if (nextInput) {
                                 // Use requestAnimationFrame to ensure DOM is updated
                                 requestAnimationFrame(() => {
@@ -1629,7 +1629,7 @@ function UserGroupMultiSelect({
                     .map((service: string, index: number) => {
                         // Use consistent color function
                         const colorTheme = getUserGroupColor(service);
-                        
+
                         return (
                             <motion.span
                                 key={service}
@@ -1671,9 +1671,9 @@ function UserGroupMultiSelect({
                         >
                             +{selectedUserGroups.length - visibleCount}
                         </button>
-                        
+
                         {/* Dropdown for additional services */}
-                        {showMoreServices && moreServicesPos && 
+                        {showMoreServices && moreServicesPos &&
                             createPortal(
                                 <div
                                     className='bg-white border border-slate-200 rounded-lg shadow-lg max-w-xs min-w-48'
@@ -1695,7 +1695,7 @@ function UserGroupMultiSelect({
                                             {selectedUserGroups.slice(visibleCount).map((userGroup, idx) => {
                                                 const colorTheme = getUserGroupColor(userGroup);
                                                 return (
-                                                    <div 
+                                                    <div
                                                         key={`additional-${idx}`}
                                                         className='flex items-center group/additional w-full'
                                                     >
@@ -1726,7 +1726,7 @@ function UserGroupMultiSelect({
                         }
                     </div>
                 )}
-                
+
                 {/* Show input field when no services selected OR when actively adding more OR when there's an error */}
                 {selectedUserGroups.length === 0 || open || isError ? (
                     <input
@@ -1746,22 +1746,22 @@ function UserGroupMultiSelect({
                                 // Find the closest div with data-col attribute (current column)
                                 const currentColDiv = currentElement.closest('[data-col]');
                                 const currentRowId = currentColDiv?.getAttribute('data-row-id');
-                                
+
                                 if (currentRowId) {
                                     // For services column, move to next row's first column (enterprise)
                                     // Find next row by looking for the next row ID
                                     const allRows = document.querySelectorAll('[data-row-id]');
-                                    const currentRowIndex = Array.from(allRows).findIndex(row => 
+                                    const currentRowIndex = Array.from(allRows).findIndex(row =>
                                         row.getAttribute('data-row-id') === currentRowId
                                     );
-                                    
+
                                     // Find next row's enterprise column
                                     const nextRowElements = Array.from(allRows).slice(currentRowIndex + 1);
-                                    const nextEnterpriseCol = nextRowElements.find(row => 
+                                    const nextEnterpriseCol = nextRowElements.find(row =>
                                         row.getAttribute('data-col') === 'enterprise'
                                     );
                                     const nextInput = nextEnterpriseCol?.querySelector('input') as HTMLInputElement;
-                                    
+
                                     if (nextInput) {
                                         // Use requestAnimationFrame to ensure DOM is updated
                                         requestAnimationFrame(() => {
@@ -1775,12 +1775,12 @@ function UserGroupMultiSelect({
                             if (e.key === 'Enter' && query.trim()) {
                                 e.preventDefault(); // Prevent form submission
                                 e.stopPropagation(); // Stop event bubbling
-                                
+
                                 // Check for exact match first
-                                const exactMatch = options.find(opt => 
+                                const exactMatch = options.find(opt =>
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
-                                
+
                                 if (exactMatch) {
                                     // Add existing service and navigate
                                     toggleService(exactMatch.name);
@@ -1802,7 +1802,7 @@ function UserGroupMultiSelect({
                                             toggleUserGroup(created.name);
                                             setQuery('');
                                             setOpen(false);
-                                            
+
                                             // Navigate to next row
                                             navigateToNextRow(e.target as HTMLInputElement);
 
@@ -1831,18 +1831,18 @@ function UserGroupMultiSelect({
                                 }
                             } else if (e.key === 'Tab' && query.trim()) {
                                 // Check for exact match in all options when Tab is pressed
-                                const exactMatch = options.find(opt => 
+                                const exactMatch = options.find(opt =>
                                     opt.name.toLowerCase() === query.toLowerCase().trim()
                                 );
                                 if (exactMatch) {
                                     e.preventDefault(); // Prevent default Tab behavior
                                     e.stopPropagation(); // Stop event bubbling
-                                    
+
                                     // Add the service first
                                     toggleService(exactMatch.name);
                                     setQuery('');
                                     setOpen(false);
-                                    
+
                                     // Navigate to next row
                                     navigateToNextRow(e.target as HTMLInputElement);
                                 } else {
@@ -2381,39 +2381,39 @@ function AsyncChipSelect({
     // Function to calculate optimal dropdown position
     const calculateDropdownPosition = React.useCallback(() => {
         if (!containerRef.current) return;
-        
+
         const containerRect = containerRef.current.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
         const dropdownHeight = 300; // Max height of dropdown
         const spaceBelow = viewportHeight - containerRect.bottom;
         const spaceAbove = containerRect.top;
-        
+
         // Find the table container to ensure dropdown stays within table bounds
         const tableContainer = containerRef.current.closest('.compact-table') ||
-                              containerRef.current.closest('[role="table"]') || 
+                              containerRef.current.closest('[role="table"]') ||
                               containerRef.current.closest('.rounded-xl') ||
                               containerRef.current.closest('.overflow-auto') ||
                               containerRef.current.closest('.w-full.compact-table') ||
                               document.querySelector('.compact-table') ||
                               document.body;
         const tableRect = tableContainer.getBoundingClientRect();
-        
+
         // Calculate portal position with table container constraints
         const maxWidth = Math.min(120, tableRect.width - 64, viewportWidth - 64); // Reduced to match dropdown width
         const width = Math.max(100, Math.min(maxWidth, containerRect.width));
-        
+
         // Ensure dropdown stays within table container horizontally with more padding
         const idealLeft = containerRect.left;
         const maxLeft = Math.min(tableRect.right - width - 32, viewportWidth - width - 32); // More padding
         const minLeft = Math.max(tableRect.left + 32, 32); // More padding
         const left = Math.max(minLeft, Math.min(maxLeft, idealLeft));
-        
+
         // Prefer below if there's enough space, otherwise use above if there's more space above
         // For user fields, always prefer below unless there's really no space
         let top;
         const forceBelow = type === 'status';
-        
+
         if (forceBelow && spaceBelow >= 100) {
             // For status fields, show below if there's at least 100px space
             setDropdownPosition('below');
@@ -2430,11 +2430,11 @@ function AsyncChipSelect({
             setDropdownPosition('above');
             top = Math.max(tableRect.top + 10, containerRect.top - dropdownHeight - 4);
         }
-        
+
         // Final constraint to ensure dropdown is within table bounds
         top = Math.max(top, tableRect.top + 10);
         top = Math.min(top, tableRect.bottom - 100);
-        
+
         setDropdownPortalPos({ top, left, width });
     }, [type]);
 
@@ -2458,8 +2458,8 @@ function AsyncChipSelect({
         setLoading(true);
         try {
             let allData: Array<{id: string; name: string}> = [];
-            
-            
+
+
             // Use dropdownOptions if available for firstName
             if (type === 'firstName' && dropdownOptions?.firstNames) {
                 allData = dropdownOptions.firstNames;
@@ -2499,7 +2499,7 @@ function AsyncChipSelect({
                     '/api/accountNames',
                 ) || [];
             }
-            
+
             setAllOptions(allData);
         } catch (error) {
             console.error(`API call failed for ${type}:`, error);
@@ -2518,19 +2518,19 @@ function AsyncChipSelect({
         // Apply search filter
         if (query) {
             const queryLower = query.toLowerCase();
-            filtered = filtered.filter(opt => 
+            filtered = filtered.filter(opt =>
                 opt.name.toLowerCase().startsWith(queryLower)
             );
-            
+
             // Sort filtered results: exact matches first, then alphabetical
             filtered = filtered.sort((a, b) => {
                 const aLower = a.name.toLowerCase();
                 const bLower = b.name.toLowerCase();
-                
+
                 // Exact match comes first
                 if (aLower === queryLower && bLower !== queryLower) return -1;
                 if (bLower === queryLower && aLower !== queryLower) return 1;
-                
+
                 // Otherwise alphabetical order
                 return aLower.localeCompare(bLower);
             });
@@ -2658,7 +2658,7 @@ function AsyncChipSelect({
                 // Notify parent component about the new item
                 if (onNewItemCreated) {
                     let dropdownType: string;
-                    
+
                     switch (type) {
                         case 'firstName':
                             dropdownType = 'firstNames';
@@ -2679,7 +2679,7 @@ function AsyncChipSelect({
                             dropdownType = 'emails'; // fallback
                             break;
                     }
-                    
+
                     // Only call if this is a supported type for the callback
                     if (type === 'firstName' || type === 'middleName' || type === 'lastName' || type === 'emailAddress' || type === 'assignedUserGroups') {
                         onNewItemCreated(dropdownType as any, created);
@@ -2783,9 +2783,9 @@ function AsyncChipSelect({
                         </span>
                         {/* Dropdown arrow for status */}
                         {type === 'status' && (
-                            <ChevronDown 
-                                size={12} 
-                                className="text-slate-400 flex-shrink-0 ml-1" 
+                            <ChevronDown
+                                size={12}
+                                className="text-slate-400 flex-shrink-0 ml-1"
                             />
                         )}
                         {/* Hide X button for password fields to avoid overlap with eye icon */}
@@ -2807,7 +2807,7 @@ function AsyncChipSelect({
                         )}
                     </motion.span>
                 )}
-                
+
                 {/* Show input when no value selected or actively typing */}
                 {(!current && !value) || open ? (
                     <div className="relative w-full">
@@ -2818,14 +2818,14 @@ function AsyncChipSelect({
                             onChange={(e: any) => {
                                 const newValue = e.target.value;
                                 setQuery(newValue);
-                                
+
                                 // Only open dropdown when typing if there are options to show
                                 if (allOptions.length > 0) {
                                     setOpen(true);
                                 }
-                                
+
                                 // Don't load options if dropdown is disabled (empty options array)
-                                
+
                                 // Clear current selection if user clears the input completely
                                 if (newValue === '') {
                                     onChange('');
@@ -2849,12 +2849,12 @@ function AsyncChipSelect({
                                     onFocus();
                                     // The modal handling will return focus to the appropriate field
                                 }
-                                
+
                                 // Only open dropdown on focus if there are options to show
                                 if (allOptions.length > 0) {
                                     setOpen(true);
                                 }
-                                
+
                                 // Don't load options if dropdown is disabled (empty options array)
                                 if (false) {
                                     loadAllOptions();
@@ -2864,7 +2864,7 @@ function AsyncChipSelect({
                                 if (e.key === 'Enter' || e.key === 'Tab') {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    
+
                                     // Save current value immediately
                                     const newValue = query.trim();
                                     if (newValue) {
@@ -2872,7 +2872,7 @@ function AsyncChipSelect({
                                         setQuery('');
                                         setOpen(false);
                                     }
-                                    
+
                                     // Use provided tab navigation functions
                                     setTimeout(() => {
                                         if (e.key === 'Tab' && e.shiftKey && onTabPrev) {
@@ -2893,10 +2893,10 @@ function AsyncChipSelect({
                     </div>
                 ) : null}
             </div>
-            
+
             {/* Full Autocomplete Dropdown - Portal Based */}
             {open && dropdownPortalPos && allOptions.length > 0 && createPortal(
-                <div 
+                <div
                     ref={dropdownRef}
                     className='bg-white border border-gray-200 rounded-md shadow-md'
                     onMouseDown={(e: any) => e.stopPropagation()}
@@ -2919,26 +2919,26 @@ function AsyncChipSelect({
                             ) : (
                                 (() => {
                                     // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim() 
-                                        ? options.filter(opt => 
+                                    const filteredOptions = query.trim()
+                                        ? options.filter(opt =>
                                             opt.name.toLowerCase().startsWith(query.toLowerCase()) ||
                                             opt.name.toLowerCase().includes(query.toLowerCase())
                                         ).sort((a, b) => {
                                             const aLower = a.name.toLowerCase();
                                             const bLower = b.name.toLowerCase();
                                             const queryLower = query.toLowerCase();
-                                            
+
                                             // Prioritize starts with matches
                                             const aStartsWith = aLower.startsWith(queryLower);
                                             const bStartsWith = bLower.startsWith(queryLower);
-                                            
+
                                             if (aStartsWith && !bStartsWith) return -1;
                                             if (bStartsWith && !aStartsWith) return 1;
-                                            
+
                                             return aLower.localeCompare(bLower);
                                         })
                                         : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
-                                    
+
 
                                     return (
                                         <div>
@@ -2961,7 +2961,7 @@ function AsyncChipSelect({
                                                     ))}
                                                 </div>
                                             )}
-                                            
+
                                             {/* Show "No results" message */}
                                             {filteredOptions.length === 0 && (
                                                 <div className='px-3 py-2 text-center text-sm text-slate-500'>
@@ -3146,12 +3146,12 @@ function SortableAccountRow({
         width: number;
     } | null>(null);
     const [currentPasswordValue, setCurrentPasswordValue] = useState<string>(row.password || '');
-    
+
     // Update local password value when row password changes
     useEffect(() => {
         setCurrentPasswordValue(row.password || '');
     }, [row.password]);
-    
+
     // Track password field focus state and calculate position
     useEffect(() => {
         const checkFocus = () => {
@@ -3163,7 +3163,7 @@ function SortableAccountRow({
             }
             if (passwordFieldRef.current?.contains(activeElement)) {
                 // Check if it's actually an input field (not a button or other element)
-                if (activeElement instanceof HTMLInputElement || 
+                if (activeElement instanceof HTMLInputElement ||
                     activeElement.tagName === 'INPUT' ||
                     activeElement.closest('[data-col="password"] input') === activeElement) {
                     setIsPasswordFocused(true);
@@ -3182,11 +3182,11 @@ function SortableAccountRow({
                 setPasswordRequirementsPos(null);
             }
         };
-        
+
         const handleFocusIn = () => {
             setTimeout(checkFocus, 10);
         };
-        
+
         const handleFocusOut = () => {
             setTimeout(() => {
                 checkFocus();
@@ -3200,7 +3200,7 @@ function SortableAccountRow({
                 }
             }, 10);
         };
-        
+
         // Update position on scroll/resize when password is focused
         const updatePosition = () => {
             if (isPasswordFocused && passwordFieldRef.current) {
@@ -3212,26 +3212,26 @@ function SortableAccountRow({
                 });
             }
         };
-        
+
         // Track password input value in real-time for immediate requirement updates
         const handlePasswordInput = (e: Event) => {
             const target = e.target as HTMLInputElement;
-            if (target && 
-                passwordFieldRef.current?.contains(target) && 
+            if (target &&
+                passwordFieldRef.current?.contains(target) &&
                 (target.type === 'password' || target.closest('[data-col="password"]'))) {
                 setCurrentPasswordValue(target.value || '');
             }
         };
-        
+
         document.addEventListener('focusin', handleFocusIn);
         document.addEventListener('focusout', handleFocusOut);
         document.addEventListener('input', handlePasswordInput);
         window.addEventListener('scroll', updatePosition, true);
         window.addEventListener('resize', updatePosition);
-        
+
         // Initial check
         checkFocus();
-        
+
         return () => {
             document.removeEventListener('focusin', handleFocusIn);
             document.removeEventListener('focusout', handleFocusOut);
@@ -3240,7 +3240,7 @@ function SortableAccountRow({
             window.removeEventListener('resize', updatePosition);
         };
     }, [isPasswordFocused]);
-    
+
     // Validation state management for each field
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{
         firstName?: string;
@@ -3295,7 +3295,7 @@ function SortableAccountRow({
                 return; // Prevent focus - modal will handle returning focus to correct field
             }
         }
-        
+
         // Allow focus if no errors or focusing the error field itself
         if (originalFocusHandler) {
             originalFocusHandler();
@@ -3345,7 +3345,7 @@ function SortableAccountRow({
                         const nextButton = document.querySelector(
                             `[data-row-id="${row.id}"][data-col="${nextCol}"] button`,
                         ) as HTMLButtonElement;
-                        
+
                         if (nextButton) {
                             nextButton.focus();
                         } else {
@@ -3401,7 +3401,7 @@ function SortableAccountRow({
                         const prevButton = document.querySelector(
                             `[data-row-id="${row.id}"][data-col="${prevCol}"] button`,
                         ) as HTMLButtonElement;
-                        
+
                         if (prevButton) {
                             prevButton.focus();
                         } else {
@@ -3502,8 +3502,8 @@ function SortableAccountRow({
             onMouseEnter={() => setIsRowHovered(true)}
             onMouseLeave={() => setIsRowHovered(false)}
             className={`w-full grid items-center gap-0 border rounded-lg transition-all duration-200 ease-in-out h-11 mb-1 pb-1 ${
-                isSelected 
-                    ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200' 
+                isSelected
+                    ? 'border-blue-300 bg-blue-50 shadow-md ring-1 ring-blue-200'
                     : 'border-slate-200 hover:bg-blue-50 hover:shadow-lg hover:ring-1 hover:ring-blue-200 hover:border-blue-300 hover:-translate-y-0.5'
             } ${index % 2 === 0 ? (isSelected ? '' : 'bg-white') : (isSelected ? '' : 'bg-slate-50/70')} ${
                 inFillRange ? 'bg-primary-50/40' : ''
@@ -3578,7 +3578,7 @@ function SortableAccountRow({
                             : ''
                     }`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3633,7 +3633,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3688,7 +3688,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3743,7 +3743,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3798,7 +3798,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3823,10 +3823,10 @@ function SortableAccountRow({
                                 const currentStatus = row.status || 'ACTIVE'; // Default to Active
                                 const isCurrentlyActive = currentStatus === 'ACTIVE';
                                 const newStatus = isCurrentlyActive ? 'INACTIVE' : 'ACTIVE';
-                                
+
                                 // Update status field
                                 onUpdateField(row.id, 'status' as any, newStatus);
-                                
+
                                 // Auto-populate dates based on status change
                                 if (newStatus === 'ACTIVE') {
                                     // Activating user - clear end date and set start date to today
@@ -3856,7 +3856,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3881,13 +3881,13 @@ function SortableAccountRow({
                                         return; // Don't update the field
                                     }
                                 }
-                                
+
                                 // Check if the selected date is in the past
                                 if (v && v.trim() !== '') {
                                     const selectedDate = new Date(v);
                                     const today = new Date();
                                     today.setHours(0, 0, 0, 0); // Set to start of day for comparison
-                                    
+
                                     if (selectedDate < today) {
                                         // Show modal for past date selection
                                         if (onShowStartDateProtectionModal) {
@@ -3896,7 +3896,7 @@ function SortableAccountRow({
                                         return; // Don't update the field
                                     }
                                 }
-                                
+
                                 // Allow the change if it passes all validations
                                 onUpdateField(row.id, 'startDate' as any, v);
                             }}
@@ -3917,7 +3917,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -3936,7 +3936,7 @@ function SortableAccountRow({
                                     const selectedDate = new Date(v);
                                     const today = new Date();
                                     today.setHours(0, 0, 0, 0); // Set to start of day for comparison
-                                    
+
                                     if (selectedDate < today) {
                                         // Show modal for past date selection
                                         if (onShowStartDateProtectionModal) {
@@ -3945,12 +3945,12 @@ function SortableAccountRow({
                                         return; // Don't update the field
                                     }
                                 }
-                                
+
                                 // Check if end date is before start date
                                 if (v && v.trim() !== '' && row.startDate && row.startDate.trim() !== '') {
                                     const endDate = new Date(v);
                                     const startDate = new Date(row.startDate);
-                                    
+
                                     if (endDate < startDate) {
                                         // Show modal for invalid end date selection
                                         if (onShowStartDateProtectionModal) {
@@ -3959,10 +3959,10 @@ function SortableAccountRow({
                                         return; // Don't update the field
                                     }
                                 }
-                                
+
                                 // Update the end date
                                 onUpdateField(row.id, 'endDate' as any, v);
-                                
+
                                 // If end date is cleared (empty), automatically set status to Active
                                 if (!v || v.trim() === '') {
                                     onUpdateField(row.id, 'status' as any, 'Active');
@@ -3985,7 +3985,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -4086,7 +4086,7 @@ function SortableAccountRow({
                         </div>
                         {/* Password Requirements - shown when field is focused, positioned absolutely */}
                         {isPasswordFocused && passwordRequirementsPos && createPortal(
-                            <div 
+                            <div
                                 className="fixed z-[99999] p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-lg"
                                 style={{
                                     top: `${passwordRequirementsPos.top}px`,
@@ -4122,7 +4122,7 @@ function SortableAccountRow({
                 <div
                     className={`group flex items-center gap-1.5 border-r border-slate-200 px-2 py-1 w-full overflow-visible`}
                     style={{
-                        backgroundColor: isSelected 
+                        backgroundColor: isSelected
                             ? 'rgb(239 246 255)' // bg-blue-50
                             : (index % 2 === 0 ? 'white' : 'rgb(248 250 252 / 0.7)') // bg-white or bg-slate-50/70
                     }}
@@ -4160,8 +4160,8 @@ function SortableAccountRow({
             {cols.includes('assignedUserGroups') && (
                 <div
                     className={`relative flex items-center justify-center text-slate-700 text-[12px] w-full border-r border-slate-200 px-2 py-1 ${
-                        isSelected 
-                            ? 'bg-blue-50' 
+                        isSelected
+                            ? 'bg-blue-50'
                             : (index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70')
                     }`}
                     data-row-id={row.id}
@@ -4238,7 +4238,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     // Local validation state to track rows with errors
     const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
     const [fieldValidationErrors, setFieldValidationErrors] = useState<{[key: string]: Record<string, string>}>({});
-    
+
     // Global validation modal state
     const [globalValidationModal, setGlobalValidationModal] = useState<{
         open: boolean;
@@ -4277,65 +4277,65 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 const fieldInput = document.querySelector(
                     `[data-row-id="${globalValidationModal.rowId}"][data-col="${globalValidationModal.field}"] input`
                 ) as HTMLInputElement;
-                
+
                 if (fieldInput) {
                     fieldInput.focus();
                     fieldInput.select(); // Select all text to help user fix the issue
                 }
             }, 100);
         }
-        
+
         setGlobalValidationModal({ open: false, field: '', message: '', rowId: '' });
     }, [globalValidationModal.rowId, globalValidationModal.field, globalValidationModal.message]);
 
     // Enhanced validation functions (same as TechnicalUserModal)
     const validateName = useCallback((name: string, fieldName: string): { isValid: boolean; error?: string } => {
         const trimmed = name.trim();
-        
+
         if (!trimmed) {
             return { isValid: false, error: `${fieldName} is required` };
         }
-        
+
         if (trimmed.length < 2) {
             return { isValid: false, error: `${fieldName} must be at least 2 characters long` };
         }
-        
+
         if (trimmed.length > 50) {
             return { isValid: false, error: `${fieldName} must not exceed 50 characters` };
         }
-        
+
         // Allow letters, spaces, hyphens, and apostrophes
         const nameRegex = /^[a-zA-Z\s\-']+$/;
         if (!nameRegex.test(trimmed)) {
             return { isValid: false, error: `${fieldName} can only contain letters, spaces, hyphens, and apostrophes` };
         }
-        
+
         // Check for multiple consecutive spaces or special characters
         if (/\s{2,}|[-']{2,}/.test(trimmed)) {
             return { isValid: false, error: `${fieldName} cannot contain consecutive spaces or special characters` };
         }
-        
+
         return { isValid: true };
     }, []);
 
     const validateEmail = useCallback((email: string): { isValid: boolean; error?: string } => {
         const trimmed = email.trim();
-        
+
         if (!trimmed) {
             return { isValid: false, error: 'Email address is required' };
         }
-        
+
         // More comprehensive email regex
         const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-        
+
         if (!emailRegex.test(trimmed)) {
             return { isValid: false, error: 'Please enter a valid email address' };
         }
-        
+
         if (trimmed.length > 254) {
             return { isValid: false, error: 'Email address is too long' };
         }
-        
+
         return { isValid: true };
     }, []);
 
@@ -4343,61 +4343,61 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         if (!password) {
             return { isValid: false, error: 'Password is required' };
         }
-        
+
         if (password.length < 8) {
             return { isValid: false, error: 'Password must be at least 8 characters long' };
         }
-        
+
         if (password.length > 128) {
             return { isValid: false, error: 'Password must not exceed 128 characters' };
         }
-        
+
         // Check for at least one uppercase letter
         if (!/[A-Z]/.test(password)) {
             return { isValid: false, error: 'Password must contain at least one uppercase letter' };
         }
-        
+
         // Check for at least one lowercase letter
         if (!/[a-z]/.test(password)) {
             return { isValid: false, error: 'Password must contain at least one lowercase letter' };
         }
-        
+
         // Check for at least one number
         if (!/\d/.test(password)) {
             return { isValid: false, error: 'Password must contain at least one number' };
         }
-        
+
         // Check for at least one special character
         if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
             return { isValid: false, error: 'Password must contain at least one special character (!@#$%^&*...)' };
         }
-        
+
         // Check for common weak patterns
         const commonPatterns = [
             /(.)\1{2,}/, // Three or more consecutive identical characters
             /123|234|345|456|567|678|789|890/, // Sequential numbers
             /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i, // Sequential letters
         ];
-        
+
         for (const pattern of commonPatterns) {
             if (pattern.test(password)) {
                 return { isValid: false, error: 'Password contains common patterns and is not secure enough' };
             }
         }
-        
+
         return { isValid: true };
     }, []);
 
     // Field validation handlers
     const handleFieldValidation = useCallback((rowId: string, fieldName: string, value: string, validationFn: (val: string, fieldName?: string) => { isValid: boolean; error?: string }) => {
         const validation = fieldName.includes('Name') ? validationFn(value, fieldName) : validationFn(value);
-        
+
         setFieldValidationErrors(prev => {
             const newErrors = { ...prev };
             if (!newErrors[rowId]) {
                 newErrors[rowId] = {};
             }
-            
+
             if (!validation.isValid) {
                 newErrors[rowId][fieldName] = validation.error || `${fieldName} is invalid`;
             } else {
@@ -4406,62 +4406,71 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     delete newErrors[rowId];
                 }
             }
-            
+
             return newErrors;
         });
-        
+
         return validation.isValid;
     }, []);
-    
+
     // State for license deletion
     const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<string | null>(null);
     const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
-    
+
     // Temporary empty rowLicenses to prevent errors during cleanup
     const rowLicenses: Record<string, any[]> = {};
     const setRowLicenses = () => {}; // Placeholder
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set<string>());
-    
+
     // Validation state
 
     // Use refs to track previous values and avoid infinite loops
     const prevRowsRef = useRef<AccountRow[]>([]);
     const orderRef = useRef<string[]>([]);
-    
+
     // Keep local state for editing, but initialize it safely
     const [localEdits, setLocalEdits] = useState<Record<string, Partial<AccountRow>>>({});
-    
+
     // Use useMemo for base derived state with stable comparison
     const { baseLocalRows, order } = useMemo(() => {
         // Check if rows array length or IDs have changed (shallow comparison)
         const currentIds = rows.map(r => r.id).join(',');
         const prevIds = prevRowsRef.current.map(r => r.id).join(',');
-        
+
         // Also check if assignedUserGroups have changed (for badge updates)
         const currentGroupCounts = rows.map(r => `${r.id}:${r.assignedUserGroups?.length || 0}`).join(',');
         const prevGroupCounts = prevRowsRef.current.map(r => `${r.id}:${r.assignedUserGroups?.length || 0}`).join(',');
-        
-        if (currentIds === prevIds && 
+
+        // IMPORTANT: Also compare actual field values to detect data changes
+        // This fixes the issue where API returns different data with same IDs but the UI showed stale data
+        const getRowSignature = (r: AccountRow) =>
+            `${r.id}|${r.firstName || ''}|${r.lastName || ''}|${r.emailAddress || ''}|${r.status || ''}|${r.middleName || ''}|${r.startDate || ''}|${r.endDate || ''}|${r.password || ''}|${r.technicalUser || false}`;
+
+        const currentSignatures = rows.map(getRowSignature).join('::');
+        const prevSignatures = prevRowsRef.current.map(getRowSignature).join('::');
+
+        if (currentIds === prevIds &&
             rows.length === prevRowsRef.current.length &&
-            currentGroupCounts === prevGroupCounts) {
+            currentGroupCounts === prevGroupCounts &&
+            currentSignatures === prevSignatures) {
             // No changes detected - return cached data
             return {
                 baseLocalRows: prevRowsRef.current,
                 order: orderRef.current
             };
         }
-        
+
         // Update refs and create new state
         prevRowsRef.current = rows.map(r => ({ ...r }));
         const newOrder = rows.map(r => r.id);
         orderRef.current = newOrder;
-        
+
         return {
             baseLocalRows: prevRowsRef.current,
             order: newOrder
         };
     }, [rows]);
-    
+
     // Apply local edits to create final localRows with stable reference
     const localRows = useMemo(() => {
         return baseLocalRows.map(row => {
@@ -4475,22 +4484,22 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             };
         });
     }, [baseLocalRows, localEdits]);
-    
+
     // Helper function to validate email format
     const isValidEmail = (email: string): boolean => {
         if (!email || !email.trim()) return false;
-        
+
         const trimmed = email.trim();
-        
+
         // Length validation
         if (trimmed.length < 5 || trimmed.length > 254) return false;
-        
+
         // RFC 5322 compliant email regex
         const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-        
+
         return emailRegex.test(trimmed);
     };
-    
+
     // Helper function to check if a field is missing/invalid
     const isFieldMissing = (row: AccountRow, field: string): boolean => {
         switch (field) {
@@ -4523,7 +4532,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
         // Check if this row has validation errors (either from parent or local validation)
         const hasValidationError = showValidationErrors && (incompleteRowIds.includes(rowId) || validationErrors.has(rowId));
-        
+
         if (!hasValidationError) return false;
 
         // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
@@ -4534,7 +4543,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     // Function to validate all rows and highlight missing fields
     const validateAndHighlightErrors = () => {
         const errorRowIds = new Set<string>();
-        
+
         localRows.forEach(row => {
             // Check if any required field is missing
             if (isFieldMissing(row, 'firstName') ||
@@ -4545,16 +4554,16 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 errorRowIds.add(row.id);
             }
         });
-        
+
         setValidationErrors(errorRowIds);
         return errorRowIds;
     };
-    
+
     // Effect to trigger validation when requested
     useEffect(() => {
         if (triggerValidation) {
             const errorRowIds = new Set<string>();
-            
+
             // Use baseLocalRows with localEdits applied inline to avoid dependency issues
             baseLocalRows.forEach(baseRow => {
                 const row = { ...baseRow, ...(localEdits[baseRow.id] || {}) };
@@ -4567,9 +4576,9 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     errorRowIds.add(row.id);
                 }
             });
-            
+
             setValidationErrors(errorRowIds);
-            
+
             if (onValidationComplete) {
                 onValidationComplete(Array.from(errorRowIds));
             }
@@ -4677,7 +4686,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     function updateRowField(rowId: string, key: keyof AccountRow, value: any) {
         let changed: AccountRow | null = null;
-        
+
         // Update local edits instead of directly modifying localRows
         setLocalEdits(prev => {
             // Use baseLocalRows with current edits to avoid circular dependency
@@ -4687,7 +4696,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 const currentRow = { ...baseRow, ...currentEdits };
                 const next = {...currentRow, [key]: value} as AccountRow;
                 changed = next;
-                
+
                 return {
                     ...prev,
                     [rowId]: {
@@ -4698,7 +4707,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             }
             return prev;
         });
-        
+
         if (changed) schedulePersist(changed);
 
         // Also call the parent's onUpdateField function if provided
@@ -4709,8 +4718,8 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
 
     // Helper function to check if main row fields are complete
     const isMainRowComplete = (row: AccountRow): boolean => {
-        return !!(row.firstName && row.firstName.trim() && 
-                 row.lastName && row.lastName.trim() && 
+        return !!(row.firstName && row.firstName.trim() &&
+                 row.lastName && row.lastName.trim() &&
                  row.emailAddress && row.emailAddress.trim());
     };
 
@@ -4718,7 +4727,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     const [groupBy, setGroupBy] = useState<
         'none' | 'firstName' | 'lastName' | 'emailAddress' | 'status'
     >('none');
-    
+
     // sync external groupBy
     React.useEffect(() => {
         if (groupByExternal) setGroupBy(groupByExternal);
@@ -4741,7 +4750,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         ],
         [],
     );
-    
+
     // Continue with component structure
     const cols = useMemo(() => {
         const base = (columnOrder || []) as string[];
@@ -4774,15 +4783,15 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     const gridTemplate = useMemo(() => {
         // Always include delete button column first with fixed width
         const deleteCol = '32px'; // Fixed width for delete button
-        
+
         const base = cols.map((c, index) => {
             // Use dynamic width if available, otherwise fall back to default
             const dynamicWidth = colWidths[c];
-            
+
             // Define minimum and maximum widths per column
             const constraints = {
                 firstName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
-                middleName: { min: 160, max: 250 }, // Increased even more for Middle Name - prevents arrow overlap  
+                middleName: { min: 160, max: 250 }, // Increased even more for Middle Name - prevents arrow overlap
                 lastName: { min: 140, max: 250 }, // Increased to match Enterprise Config - prevents arrow overlap
                 emailAddress: { min: 180, max: 300 }, // Email needs more space - prevents arrow overlap
                 status: { min: 140, max: 200 }, // Increased to match Enterprise Config - prevents arrow overlap
@@ -4792,18 +4801,18 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 technicalUser: { min: 120, max: 180 }, // No sort arrows, can be smaller
                 assignedUserGroups: { min: 160, max: 200 } // User Groups - width to fit label + icon
             };
-            
+
             const columnConstraints = constraints[c as keyof typeof constraints] || { min: 140, max: 250 };
-            
+
             if (dynamicWidth && dynamicWidth > 0) {
                 // Clamp the dynamic width within constraints for all columns
                 const clampedWidth = Math.max(
-                    columnConstraints.min, 
+                    columnConstraints.min,
                     Math.min(columnConstraints.max, dynamicWidth)
                 );
                 return `${clampedWidth}px`;
             }
-            
+
             // Use default size from colSizes or fallback to constraint minimum
             const defaultSize = colSizes[c];
             if (defaultSize) {
@@ -4817,14 +4826,14 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 }
                 return defaultSize;
             }
-            
+
             // Final fallback - Services gets remaining space
             if (c === 'services') {
                 return `minmax(${columnConstraints.min}px, 1fr)`;
             }
             return `${columnConstraints.min}px`;
         });
-        
+
         const custom = customColumns.map(() => '110px');
         const parts = [deleteCol, ...base, ...custom].filter(Boolean);
         return parts.join(' ');
@@ -4846,66 +4855,66 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     ) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const tableContainer = e.currentTarget.closest('.grid');
         if (!tableContainer) return;
-        
+
         const startX = e.clientX;
         const startWidth = colWidths[colKey] || parseInt(colSizes[colKey]?.replace('px', '') || '140') || 140;
-        
+
         // Define column-specific constraints
         const constraints = {
             enterprise: { min: 140, max: 250 }, // Increased min to prevent arrow overlap
             product: { min: 140, max: 280 }, // Reduced max to prevent over-expansion
             services: { min: 500, max: 2000 } // Increased minimum to ensure Services content visibility when scrolled
         };
-        
+
         const columnConstraints = constraints[colKey as keyof typeof constraints] || { min: 100, max: 250 };
-        
+
         // Add visual feedback during resize
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        
+
         const onMove = (ev: MouseEvent) => {
             ev.preventDefault();
             const delta = ev.clientX - startX;
             const newWidth = Math.max(
-                columnConstraints.min, 
+                columnConstraints.min,
                 Math.min(columnConstraints.max, startWidth + delta)
             );
-            
+
             setColWidths((prev) => ({
                 ...prev,
                 [colKey]: newWidth
             }));
-            
+
             // Trigger scroll check during resize to detect Services column visibility
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
                     const containerWidth = tableContainerRef.current.clientWidth;
-                    
+
                     // Check if Services content is getting hidden
                     const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-                    
+
                     servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
                         const serviceRect = serviceElement.getBoundingClientRect();
                         const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                        
+
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-                        
+
                         if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-                    
+
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -4913,50 +4922,50 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-                    
-                    const needsScrollbar = 
-                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+
+                    const needsScrollbar =
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) ||
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
                         (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
-                    
+
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 10);
         };
-        
+
         const onUp = () => {
             // Remove visual feedback
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            
+
             // Final check for scrollbar need after resize is complete
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     const contentWidth = tableContainerRef.current.scrollWidth;
                     const containerWidth = tableContainerRef.current.clientWidth;
-                    
+
                     // Check if Services content is hidden
                     const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
                     let servicesContentHidden = false;
-                    
+
                     servicesColumns.forEach(serviceCol => {
                         const serviceElement = serviceCol as HTMLElement;
                         const serviceRect = serviceElement.getBoundingClientRect();
                         const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                        
+
                         // Enhanced threshold based on zoom and AI panel state
                         const currentZoom = window.devicePixelRatio || 1;
                         const isZoomedIn = currentZoom > 1.1;
                         let widthThreshold = 500; // Increased base threshold for better content visibility
                         if (isZoomedIn) widthThreshold += 50;
                         if (isAIInsightsPanelOpen) widthThreshold += 50;
-                        
+
                         if (serviceRect.right > containerRect.right || serviceRect.width < widthThreshold) {
                             servicesContentHidden = true;
                         }
                     });
-                    
+
                     // Enhanced scrollbar logic with zoom and AI panel considerations
                     const currentZoom = window.devicePixelRatio || 1;
                     const isZoomedIn = currentZoom > 1.1;
@@ -4964,21 +4973,21 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
                     const availableWidth = viewportWidth - aiPanelWidth;
                     const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
-                    
-                    const needsScrollbar = 
-                        (contentWidth * zoomAdjustedThreshold > containerWidth) || 
+
+                    const needsScrollbar =
+                        (contentWidth * zoomAdjustedThreshold > containerWidth) ||
                         servicesContentHidden ||
                         (isZoomedIn && contentWidth > availableWidth * 0.95) ||
                         (isAIInsightsPanelOpen && contentWidth > availableWidth * 0.9);
-                    
+
                     setShouldShowHorizontalScroll(needsScrollbar);
                 }
             }, 50);
-            
+
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-        
+
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };
@@ -5024,9 +5033,9 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             return <>{text}</>;
         }
     };
-    
+
     // Handle delete click - directly call parent's onDelete function
-    
+
     // Use external sort state if provided, otherwise fall back to internal state
     const [internalSortCol, setInternalSortCol] = useState<
         | 'accountName'
@@ -5044,9 +5053,9 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             setInternalSortCol(null);
             setInternalSortDir(null);
         };
-        
+
         window.addEventListener('clearTableSorting', handleClearSorting);
-        
+
         return () => {
             window.removeEventListener('clearTableSorting', handleClearSorting);
         };
@@ -5066,15 +5075,15 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         direction?: 'asc' | 'desc'
     ) => {
         let nextDir: 'asc' | 'desc';
-        
+
         // Check if external sorting is actively being used (both props provided and not empty)
         const isExternalSorting = externalSortColumn && externalSortDirection;
-        
+
         if (isExternalSorting) {
             // When external sort is actively controlled, use external state for calculation
-            nextDir = direction || 
+            nextDir = direction ||
                 (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
-            
+
             // Notify parent to update external sort state
             if (onSortChange) {
                 onSortChange(col, nextDir);
@@ -5083,17 +5092,17 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             // When using internal sort (including first time with no sorting)
             nextDir = direction ||
                 (internalSortCol === col && internalSortDir === 'asc' ? 'desc' : 'asc');
-            
+
             // Update internal state first (this actually sorts the table)
             setInternalSortCol(col);
             setInternalSortDir(nextDir);
-            
+
             // Then notify parent to update Sort panel (for toolbar sync)
             if (onSortChange) {
                 onSortChange(col, nextDir);
             }
         }
-        
+
         // Always dispatch custom event for parent component to listen to
         notifyParentSortChange(col, nextDir);
     };
@@ -5108,7 +5117,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             },
             bubbles: true
         });
-        
+
         // Dispatch the event from the document to ensure it reaches the parent
         document.dispatchEvent(event);
     };
@@ -5135,10 +5144,10 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
         }
 
         const groups: Record<string, AccountRow[]> = {};
-        
+
         displayItems.forEach((item) => {
             let groupKey = '';
-            
+
             switch (groupBy) {
                 case 'firstName':
                     groupKey = item.firstName || '(No First Name)';
@@ -5155,7 +5164,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 default:
                     groupKey = 'All Records';
             }
-            
+
             if (!groups[groupKey]) {
                 groups[groupKey] = [];
             }
@@ -5182,55 +5191,55 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
     // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
     const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
-    
+
     useEffect(() => {
         const checkScrollNeed = () => {
             if (!tableContainerRef.current) return;
-            
+
             // With 10+ columns, we likely always need horizontal scrolling
             // Simplified logic: if we have more than 6 columns, enable scrolling
             const totalColumns = 10; // firstName, middleName, lastName, emailAddress, status, startDate, endDate, password, technicalUser, assignedUserGroups
             const shouldAlwaysScroll = totalColumns > 6;
-            
+
             if (shouldAlwaysScroll) {
                 setShouldShowHorizontalScroll(true);
                 return;
             }
-            
+
             // Get current zoom level
             const currentZoom = window.devicePixelRatio || 1;
             const baseZoom = 1;
             const zoomFactor = currentZoom / baseZoom;
-            
+
             // Get viewport dimensions accounting for AI insights panel
             const viewportWidth = window.innerWidth;
             const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
             const availableWidth = viewportWidth - aiPanelWidth;
-            
+
             // Check if content width exceeds container width with a larger buffer for hover effects
             const contentWidth = tableContainerRef.current.scrollWidth;
             const containerWidth = tableContainerRef.current.clientWidth;
-            
+
             // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
             const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
-            
+
             // Only show scrollbar when content genuinely exceeds container accounting for hover effects
             const isContentOverflowing = contentWidth > containerWidth + hoverBuffer;
-            
+
             // Check if Services column content is actually being cut off
             const servicesColumns = tableContainerRef.current.querySelectorAll('[data-col="services"]');
             let servicesContentHidden = false;
-            
+
             if (servicesColumns.length > 0) {
                 servicesColumns.forEach(serviceCol => {
                     const serviceElement = serviceCol as HTMLElement;
                     const serviceRect = serviceElement.getBoundingClientRect();
                     const containerRect = tableContainerRef.current!.getBoundingClientRect();
-                    
+
                     // More reasonable threshold - minimum 300px for services content
                     const minServicesWidth = 300;
                     const bufferZone = 15; // Additional buffer for hover effects
-                    
+
                     // Only trigger if Services column is actually cut off or too narrow to display content properly
                     if (serviceRect.right > containerRect.right - bufferZone || serviceRect.width < minServicesWidth) {
                         // Additional check: see if there's actually content being cut off
@@ -5247,27 +5256,27 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     }
                 });
             }
-            
+
             // Show scrollbar only when there's genuine overflow or content is being cut off
             const needsScrollbar = isContentOverflowing || servicesContentHidden;
-            
+
             setShouldShowHorizontalScroll(needsScrollbar);
         };
-        
+
         // Check on mount and when table structure changes
         let scrollCheckTimeout: NodeJS.Timeout;
         const debouncedScrollCheck = () => {
             clearTimeout(scrollCheckTimeout);
             scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
         };
-        
+
         checkScrollNeed();
-        
+
         // Use ResizeObserver for better performance
         const resizeObserver = new ResizeObserver(() => {
             debouncedScrollCheck(); // Use debounced version
         });
-        
+
         // Use MutationObserver to detect when Services content changes
         const mutationObserver = new MutationObserver((mutations) => {
             let shouldCheck = false;
@@ -5284,7 +5293,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 debouncedScrollCheck(); // Use debounced version
             }
         });
-        
+
         if (tableContainerRef.current) {
             resizeObserver.observe(tableContainerRef.current);
             mutationObserver.observe(tableContainerRef.current, {
@@ -5293,7 +5302,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 attributes: true,
                 attributeFilter: ['style', 'class']
             });
-            
+
             // Also observe all column cells for resize changes
             const columnCells = tableContainerRef.current.querySelectorAll('[data-col]');
             columnCells.forEach(cell => {
@@ -5302,29 +5311,29 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                 }
             });
         }
-        
+
         // Also listen for window resize (zoom changes)
         window.addEventListener('resize', debouncedScrollCheck);
-        
+
         // Listen for zoom via keyboard shortcuts and mouse wheel
         const handleKeyZoom = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '0')) {
                 debouncedScrollCheck();
             }
         };
-        
+
         const handleWheelZoom = (e: WheelEvent) => {
             if (e.ctrlKey || e.metaKey) {
                 debouncedScrollCheck();
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyZoom);
         window.addEventListener('wheel', handleWheelZoom, { passive: true });
-        
+
         // Call checkScrollNeed initially
         checkScrollNeed();
-        
+
         return () => {
             resizeObserver.disconnect();
             mutationObserver.disconnect();
@@ -5334,7 +5343,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
             clearTimeout(scrollCheckTimeout);
         };
     }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
-    
+
     return (
         <div className='compact-table safari-tight manage-users-table' style={{ width: 'max(100%, 1400px)', minWidth: 'max-content' }}>
             {/* Using browser default scrollbars only - remove internal scroll containers */}
@@ -5345,38 +5354,38 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         overflow: visible !important;
                         position: relative;
                     }
-                    
+
                     /* Ensure all field value containers span full width */
                     .manage-users-table [data-col] .bg-white {
                         width: 100% !important;
                         min-width: 100% !important;
                         display: flex !important;
                     }
-                    
+
                     /* Ensure AsyncChipSelect containers span full width */
                     .manage-users-table .relative.min-w-0 {
                         width: 100% !important;
                     }
-                    
+
                     /* Ensure all motion spans with white background span full width */
                     .manage-users-table motion-span[style*="background"] {
                         width: 100% !important;
                         min-width: 100% !important;
                     }
-                    
+
                     /* Force all motion spans in data cells to be full width */
                     .manage-users-table [data-col] motion-span {
                         width: 100% !important;
                         display: flex !important;
                     }
-                    
+
                     /* Table container with proper scrolling */
                     div[role="table"] {
                         position: relative;
                         overflow-y: visible !important;
                         overflow-x: ${shouldShowHorizontalScroll ? 'auto !important' : 'hidden !important'};
                     }
-                    
+
                     /* Ensure the header row respects the container's rounded corners */
                     .manage-users-table .rounded-xl > .bg-slate-50 {
                         border-top-left-radius: 0.75rem !important;  /* Match rounded-xl */
@@ -5386,48 +5395,48 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         border-right: none !important;
                         border-top: none !important;
                     }
-                    
+
                     /* Ensure the header container clips content properly */
                     .manage-users-table .rounded-xl {
                         overflow: hidden !important;
                         border-radius: 0.75rem !important;
                     }
-                    
+
                     /* Override any border-radius interference */
                     .manage-users-table .bg-slate-50 > div.rounded-sm {
                         border-radius: 0.125rem !important;
                     }
-                    
+
                     /* Prevent horizontal scrollbars on table cells and headers (except services) */
                     [data-col]:not([data-col="services"]) {
                         overflow-x: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
                     }
-                    
+
                     /* Specifically prevent scrollbars in column headers */
                     .bg-slate-50[data-col] {
                         overflow: hidden;
                         text-overflow: ellipsis;
                     }
-                    
+
                     /* Header row should not have scrollbars */
                     .bg-slate-50 > div {
                         overflow: hidden !important;
                         text-overflow: ellipsis;
                     }
-                    
+
                     /* Ensure header content fits properly */
                     .bg-slate-50 .relative {
                         overflow: hidden;
                         min-width: 0;
                     }
-                    
+
                     /* Ensure proper grid layout */
                     .grid {
                         display: grid;
                     }
-                    
+
                     /* Services column should allow content display within bounds */
                     [data-col="services"] {
                         overflow: visible;
@@ -5436,7 +5445,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         position: relative;
                         max-width: 600px;
                     }
-                    
+
                     /* Services column chips should display full text */
                     [data-col="services"] .inline-flex {
                         white-space: nowrap;
@@ -5445,14 +5454,14 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         min-width: max-content;
                         flex-shrink: 0;
                     }
-                    
+
                     /* Services column chip text should not be truncated */
                     [data-col="services"] .inline-flex span {
                         white-space: nowrap;
                         overflow: visible;
                         text-overflow: unset;
                     }
-                    
+
                     /* Services column container should wrap content */
                     [data-col="services"] > div {
                         white-space: normal;
@@ -5463,7 +5472,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         position: relative;
                         max-width: 100%;
                     }
-                    
+
                     /* Ensure dropdowns within Services column stay within bounds */
                     [data-col="services"] .absolute {
                         max-width: 100%;
@@ -5476,20 +5485,20 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         max-width: 100%;
                         box-sizing: border-box;
                     }
-                    
+
                     /* Ensure dropdowns don't extend beyond table container */
                     .z-\\[9999\\] {
                         max-width: calc(100vw - 32px) !important;
                         max-height: calc(100vh - 100px) !important;
                         overflow: auto !important;
                     }
-                    
+
                     /* Table container should contain overflow */
                     [role="table"] {
                         position: relative;
                         contain: layout style;
                     }
-                    
+
                     /* Hide any scrollbars that might appear in header elements */
                     .bg-slate-50 {
                         overflow: hidden;
@@ -5550,9 +5559,9 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                     </div>
                 </div>
             ) : (
-                <div 
+                <div
                     ref={tableContainerRef}
-                    role='table' 
+                    role='table'
                     className='p-0 w-full'
                     style={{
                         maxWidth: '100%',
@@ -5560,7 +5569,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                         boxSizing: 'border-box'
                     } as React.CSSProperties}
                 >
-                <div className='w-full relative' style={{ 
+                <div className='w-full relative' style={{
                     minWidth: 'max-content', // Let content determine the minimum width
                     width: 'max(100%, 1400px)' // Ensure wide enough to trigger browser horizontal scroll
                 }}>
@@ -5617,8 +5626,8 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                             ),
                         };
                         return (
-                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{ 
-                                minWidth: 'fit-content', 
+                            <div className='rounded-xl border border-slate-300 shadow-sm bg-white' style={{
+                                minWidth: 'fit-content',
                                 width: '100%',
                                 maxWidth: '100%',
                                 overflow: 'visible' // Allow chips to move freely on hover
@@ -5626,7 +5635,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                 <div
                                     className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
                                     style={{
-                                        gridTemplateColumns: gridTemplate, 
+                                        gridTemplateColumns: gridTemplate,
                                         minWidth: 'max-content',
                                         width: '100%',
                                         display: 'grid'
@@ -5636,13 +5645,13 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                     <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
                                         {/* Empty header for delete column */}
                                     </div>
-                                    
+
                                     {cols.map((c, idx) => (
                                         <div
                                             key={c}
                                             className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
-                                                idx === 0 
-                                                    ? 'border-l-0' 
+                                                idx === 0
+                                                    ? 'border-l-0'
                                                     : ''
                                             } ${
                                                 idx === 0 && pinFirst && !shouldShowHorizontalScroll
@@ -5760,13 +5769,13 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                     />
                                 </div>
                             ))}
-                            
+
                             {/* Add New Row Button */}
                             {onAddNewRow && (
-                                <div 
+                                <div
                                     className="grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                     style={{
-                                        gridTemplateColumns: gridTemplate, 
+                                        gridTemplateColumns: gridTemplate,
                                         minWidth: 'max-content',
                                         width: '100%'
                                     }}
@@ -5777,7 +5786,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                     <div className='flex items-center justify-center px-2 py-1'>
                                         {/* No delete icon for add row */}
                                     </div>
-                                    
+
                                     {/* Add new row content spanning all columns */}
                                     <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                         <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
@@ -5801,7 +5810,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                             </span>
                                         </h4>
                                     </div>
-                                    
+
                                     {/* Group Rows */}
                                     <div className='border-b border-slate-200 overflow-hidden'>
                                         {groupRows.map((r, idx) => (
@@ -5849,14 +5858,14 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                     </div>
                                 </div>
                             ))}
-                            
+
                             {/* Add New Row Button for grouped view */}
                             {onAddNewRow && (
                                 <div className='border border-slate-200 rounded-lg overflow-hidden mt-4'>
-                                    <div 
+                                    <div
                                         className="grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group"
                                         style={{
-                                            gridTemplateColumns: gridTemplate, 
+                                            gridTemplateColumns: gridTemplate,
                                             minWidth: 'max-content',
                                             width: '100%'
                                         }}
@@ -5867,7 +5876,7 @@ const ManageUsersTable = forwardRef<any, AccountsTableProps>(({
                                         <div className='flex items-center justify-center px-2 py-1'>
                                             {/* No delete icon for add row */}
                                         </div>
-                                        
+
                                         {/* Add new row content spanning all columns */}
                                         <div className="flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600" style={{gridColumn: `span ${cols.length}`}}>
                                             <svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' stroke='currentColor'>

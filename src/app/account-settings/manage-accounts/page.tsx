@@ -4329,8 +4329,13 @@ export default function ManageAccounts() {
                     apiBase = apiBase.slice(0, -4);
                 }
                 // Use offboard endpoint to trigger infrastructure deprovisioning
-                // Construct the correct URL: /api/v1/app/api/accounts/offboard?accountId={id}
-                const offboardUrl = `${apiBase}/api/v1/app/api/accounts/offboard?accountId=${pendingDeleteRowId}`;
+                // For local development (localhost), use direct path: /api/accounts/offboard
+                // For production (API Gateway), use: /api/v1/app/api/accounts/offboard
+                const isLocalDev = apiBase.includes('localhost');
+                const offboardPath = isLocalDev
+                    ? `/api/accounts/offboard?accountId=${pendingDeleteRowId}`
+                    : `/api/v1/app/api/accounts/offboard?accountId=${pendingDeleteRowId}`;
+                const offboardUrl = `${apiBase}${offboardPath}`;
                 console.log('🗑️ Offboard URL:', offboardUrl);
 
                 try {

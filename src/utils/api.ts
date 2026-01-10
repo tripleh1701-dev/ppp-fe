@@ -24,7 +24,7 @@ const getAuthToken = (): string | null => {
 const rawApiBase =
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:3000';
+    'http://localhost:4000';
 // Remove trailing /api or /api/v1 if present to normalize
 let cleanBase = rawApiBase;
 if (cleanBase.endsWith('/api/v1')) {
@@ -40,14 +40,17 @@ export const ADMIN_PORTAL_API_BASE =
     process.env.NEXT_PUBLIC_ADMIN_PORTAL_API_URL ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:3000';
+    'http://localhost:4000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // Ensure we don't have double slashes or double /api/ prefixes
     let cleanPath = path.startsWith('/') ? path : `/${path}`;
 
+    // Check if running locally (localhost) - skip API Gateway path transformations
+    const isLocalDevelopment = API_BASE.includes('localhost');
+
     // Route sys-app endpoints to ppp-be-main (workflow 10) at /api/v1/app/*
-    // These are handled by the simplified Lambda handler
+    // These are handled by the simplified Lambda handler (only in production)
     const sysAppEndpoints = [
         '/api/accounts',
         '/api/enterprises',
@@ -59,6 +62,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         '/api/roles',
         '/api/groups',
         '/api/pipeline-canvas',
+        '/api/account-licenses',
     ];
 
     const isSysAppEndpoint = sysAppEndpoints.some(
@@ -66,15 +70,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             cleanPath === endpoint || cleanPath.startsWith(`${endpoint}/`),
     );
 
-    if (isSysAppEndpoint) {
-        // Route to ppp-be-main backend at /api/v1/app/{path}
-        cleanPath = '/api/v1/app' + cleanPath;
-    } else if (
-        cleanPath.startsWith('/api/') &&
-        !cleanPath.startsWith('/api/v1/')
-    ) {
-        // Other endpoints go to admin-portal-be at /api/v1/*
-        cleanPath = '/api/v1' + cleanPath.slice(4); // Replace /api/ with /api/v1/
+    // For local development, don't transform paths - backend has routes directly
+    // For production (API Gateway), add the /api/v1/app prefix for sys-app endpoints
+    if (!isLocalDevelopment) {
+        if (isSysAppEndpoint) {
+            // Route to ppp-be-main backend at /api/v1/app/{path}
+            cleanPath = '/api/v1/app' + cleanPath;
+        } else if (
+            cleanPath.startsWith('/api/') &&
+            !cleanPath.startsWith('/api/v1/')
+        ) {
+            // Other endpoints go to admin-portal-be at /api/v1/*
+            cleanPath = '/api/v1' + cleanPath.slice(4); // Replace /api/ with /api/v1/
+        }
+    } else {
+        // Local development: transform user-management paths to include /v1/
+        if (cleanPath.startsWith('/api/user-management')) {
+            cleanPath = '/api/v1' + cleanPath.slice(4); // /api/user-management → /api/v1/user-management
+        }
+        // sysAppEndpoints stay as-is for local (e.g., /api/accounts)
     }
 
     const url = `${API_BASE}${cleanPath}`;

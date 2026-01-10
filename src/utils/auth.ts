@@ -8,7 +8,7 @@ const PASSWORD_CHALLENGE_KEY = 'systiva_password_challenge';
 // Use type assertion for process.env to avoid TypeScript errors
 declare const process: {env: Record<string, string | undefined>};
 const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+    process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 // API version prefix for all API calls
 const API_VERSION = '/api/v1';
 
