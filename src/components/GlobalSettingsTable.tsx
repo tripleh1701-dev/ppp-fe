@@ -487,7 +487,9 @@ export interface GlobalSettingsRow {
     id: string;
     // Global Settings fields
     account: string;
+    accountId?: string; // Account ID for API calls
     enterprise: string;
+    enterpriseId?: string; // Enterprise ID for API calls
     workstream: string; // This will be the workstream name (previously roleName)
     configuration: string;
     configurationDetails?: Record<string, string[]>; // Category -> tools mapping for tooltip

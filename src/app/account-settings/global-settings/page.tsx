@@ -991,11 +991,21 @@ export default function ManageGlobalSettings() {
                                     filters?.accountName ||
                                     selectedAccountName ||
                                     '',
+                                accountId:
+                                    setting.accountId ||
+                                    filters?.accountId ||
+                                    selectedAccountId ||
+                                    '',
                                 enterprise:
                                     setting.enterprise ||
                                     setting.enterpriseName ||
                                     filters?.enterpriseName ||
                                     selectedEnterprise ||
+                                    '',
+                                enterpriseId:
+                                    setting.enterpriseId ||
+                                    filters?.enterpriseId ||
+                                    selectedEnterpriseId ||
                                     '',
                                 workstream:
                                     setting.workstream ||
@@ -1410,7 +1420,9 @@ export default function ManageGlobalSettings() {
         const newRole: GlobalSettingsRow = {
             id: `tmp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             account: selectedAccountName || '',
+            accountId: selectedAccountId || '',
             enterprise: selectedEnterprise || '',
+            enterpriseId: selectedEnterpriseId || '',
             workstream: '',
             configuration: '',
             configurationDetails: {},
@@ -2976,10 +2988,13 @@ export default function ManageGlobalSettings() {
                             configuration: categoriesToSave, // API stores categories in 'configuration' field as object
                             configurationDetails: categoriesToSave,
                             categories: categoriesToSave, // Also save as categories for compatibility
-                            accountId: selectedAccountId,
-                            accountName: selectedAccountName,
-                            enterpriseId: selectedEnterpriseId,
-                            enterpriseName: selectedEnterprise,
+                            accountId: tempGroup.accountId || selectedAccountId,
+                            accountName:
+                                tempGroup.account || selectedAccountName,
+                            enterpriseId:
+                                tempGroup.enterpriseId || selectedEnterpriseId,
+                            enterpriseName:
+                                tempGroup.enterprise || selectedEnterprise,
                         };
 
                         console.log(
@@ -3037,10 +3052,13 @@ export default function ManageGlobalSettings() {
                             configuration: categoriesData, // API stores categories in 'configuration' field as object
                             configurationDetails: categoriesData,
                             categories: categoriesData, // Also save as categories for compatibility
-                            accountId: selectedAccountId,
-                            accountName: selectedAccountName,
-                            enterpriseId: selectedEnterpriseId,
-                            enterpriseName: selectedEnterprise,
+                            accountId: tempGroup.accountId || selectedAccountId,
+                            accountName:
+                                tempGroup.account || selectedAccountName,
+                            enterpriseId:
+                                tempGroup.enterpriseId || selectedEnterpriseId,
+                            enterpriseName:
+                                tempGroup.enterprise || selectedEnterprise,
                         };
 
                         console.log(
@@ -3168,12 +3186,22 @@ export default function ManageGlobalSettings() {
                             `/api/global-settings/${
                                 modifiedSetting.id
                             }?accountId=${
-                                selectedAccountId || ''
+                                modifiedSetting.accountId ||
+                                selectedAccountId ||
+                                ''
                             }&accountName=${
-                                selectedAccountName || ''
+                                modifiedSetting.account ||
+                                selectedAccountName ||
+                                ''
                             }&enterpriseId=${
-                                selectedEnterpriseId || ''
-                            }&enterpriseName=${selectedEnterprise || ''}`,
+                                modifiedSetting.enterpriseId ||
+                                selectedEnterpriseId ||
+                                ''
+                            }&enterpriseName=${
+                                modifiedSetting.enterprise ||
+                                selectedEnterprise ||
+                                ''
+                            }`,
                         );
                         if (currentSetting) {
                             existingConfig =
@@ -3196,12 +3224,22 @@ export default function ManageGlobalSettings() {
                                 `/api/global-settings/${encodeURIComponent(
                                     originalEntityName,
                                 )}?accountId=${
-                                    selectedAccountId || ''
+                                    modifiedSetting.accountId ||
+                                    selectedAccountId ||
+                                    ''
                                 }&accountName=${
-                                    selectedAccountName || ''
+                                    modifiedSetting.account ||
+                                    selectedAccountName ||
+                                    ''
                                 }&enterpriseId=${
-                                    selectedEnterpriseId || ''
-                                }&enterpriseName=${selectedEnterprise || ''}`,
+                                    modifiedSetting.enterpriseId ||
+                                    selectedEnterpriseId ||
+                                    ''
+                                }&enterpriseName=${
+                                    modifiedSetting.enterprise ||
+                                    selectedEnterprise ||
+                                    ''
+                                }`,
                             );
                             if (currentSetting) {
                                 existingConfig =
@@ -3243,10 +3281,15 @@ export default function ManageGlobalSettings() {
                         configuration: categoriesToSave, // API stores categories in 'configuration' field as object
                         configurationDetails: categoriesToSave,
                         categories: categoriesToSave, // Also save as categories for compatibility
-                        accountId: selectedAccountId,
-                        accountName: selectedAccountName,
-                        enterpriseId: selectedEnterpriseId,
-                        enterpriseName: selectedEnterprise,
+                        accountId:
+                            modifiedSetting.accountId || selectedAccountId,
+                        accountName:
+                            modifiedSetting.account || selectedAccountName,
+                        enterpriseId:
+                            modifiedSetting.enterpriseId ||
+                            selectedEnterpriseId,
+                        enterpriseName:
+                            modifiedSetting.enterprise || selectedEnterprise,
                     };
 
                     console.log(
@@ -4745,8 +4788,8 @@ export default function ManageGlobalSettings() {
                                     <p className='mt-2 text-sm text-slate-500'>
                                         No workstreams have been created yet for
                                         the selected Account and Enterprise
-                                        combination. Create a new workstream to get
-                                        started.
+                                        combination. Create a new workstream to
+                                        get started.
                                     </p>
                                     <div className='mt-6'>
                                         <button
