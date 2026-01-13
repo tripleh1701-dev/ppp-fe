@@ -361,16 +361,167 @@ function WorkflowBuilderContent({
     const [loadingServices, setLoadingServices] = useState(true);
     const [loadingEntities, setLoadingEntities] = useState(false);
 
-    // Fetch services from API
+    // Breadcrumb context state - reactive to account/enterprise selection
+    const [breadcrumbAccountId, setBreadcrumbAccountId] = useState<string>('');
+    const [breadcrumbAccountName, setBreadcrumbAccountName] =
+        useState<string>('');
+    const [breadcrumbEnterpriseId, setBreadcrumbEnterpriseId] =
+        useState<string>('');
+
+    // Initialize breadcrumb context from URL params or backend API (no localStorage)
+    useEffect(() => {
+        const loadContext = async () => {
+            // First try URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlAccountId = urlParams.get('accountId');
+            const urlAccountName = urlParams.get('accountName');
+            const urlEnterpriseId = urlParams.get('enterpriseId');
+
+            if (urlAccountId && urlAccountName && urlEnterpriseId) {
+                setBreadcrumbAccountId(urlAccountId);
+                setBreadcrumbAccountName(urlAccountName);
+                setBreadcrumbEnterpriseId(urlEnterpriseId);
+                return;
+            }
+
+            // If no URL params, fetch user preferences from backend API (stored in DynamoDB)
+            try {
+                const response = await fetch(
+                    'http://localhost:4000/api/user-preferences/current-context',
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    if (
+                        data.accountId &&
+                        data.accountName &&
+                        data.enterpriseId
+                    ) {
+                        setBreadcrumbAccountId(data.accountId);
+                        setBreadcrumbAccountName(data.accountName);
+                        setBreadcrumbEnterpriseId(data.enterpriseId);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.log('Could not fetch user preferences from backend');
+            }
+
+            // Listen for context updates via custom events (from breadcrumb component)
+            const handleContextUpdate = (e: CustomEvent) => {
+                const {accountId, accountName, enterpriseId} = e.detail || {};
+                if (accountId) setBreadcrumbAccountId(accountId);
+                if (accountName) setBreadcrumbAccountName(accountName);
+                if (enterpriseId) setBreadcrumbEnterpriseId(enterpriseId);
+            };
+
+            window.addEventListener(
+                'breadcrumbContextChanged',
+                handleContextUpdate as EventListener,
+            );
+
+            // Request current context from breadcrumb component
+            window.dispatchEvent(new CustomEvent('requestBreadcrumbContext'));
+
+            return () => {
+                window.removeEventListener(
+                    'breadcrumbContextChanged',
+                    handleContextUpdate as EventListener,
+                );
+            };
+        };
+
+        loadContext();
+
+        // Listen for URL changes (popstate)
+        const handlePopState = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlAccountId = urlParams.get('accountId');
+            const urlAccountName = urlParams.get('accountName');
+            const urlEnterpriseId = urlParams.get('enterpriseId');
+
+            if (urlAccountId) setBreadcrumbAccountId(urlAccountId);
+            if (urlAccountName) setBreadcrumbAccountName(urlAccountName);
+            if (urlEnterpriseId) setBreadcrumbEnterpriseId(urlEnterpriseId);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, []);
+
+    // Fetch services from global settings based on account/enterprise (reactive to breadcrumb)
     useEffect(() => {
         const fetchServices = async () => {
             try {
                 setLoadingServices(true);
+
+                // Only fetch if we have the required context from breadcrumb
+                if (
+                    !breadcrumbAccountId ||
+                    !breadcrumbAccountName ||
+                    !breadcrumbEnterpriseId
+                ) {
+                    console.log(
+                        'Missing account/enterprise context for fetching services',
+                    );
+                    setServiceOptions([]);
+                    setLoadingServices(false);
+                    return;
+                }
+
+                console.log('📦 Fetching services for:', {
+                    accountId: breadcrumbAccountId,
+                    accountName: breadcrumbAccountName,
+                    enterpriseId: breadcrumbEnterpriseId,
+                });
+
+                // Fetch services from global settings API
                 const response = await fetch(
-                    'http://localhost:4000/api/services',
+                    `http://localhost:4000/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
+                        breadcrumbAccountName,
+                    )}&enterpriseId=${breadcrumbEnterpriseId}`,
                 );
                 const data = await response.json();
-                setServiceOptions(data || []);
+
+                // Extract unique services from all workstream configurations
+                if (Array.isArray(data)) {
+                    const allServices = new Set<string>();
+                    data.forEach((workstream: any) => {
+                        const config = workstream.configuration;
+                        if (config && typeof config === 'object') {
+                            // Collect all tools from all categories as services
+                            const categories = [
+                                'plan',
+                                'code',
+                                'build',
+                                'test',
+                                'release',
+                                'deploy',
+                                'others',
+                            ];
+                            categories.forEach((cat) => {
+                                if (Array.isArray(config[cat])) {
+                                    config[cat].forEach((tool: string) => {
+                                        if (tool) allServices.add(tool);
+                                    });
+                                }
+                            });
+                        }
+                    });
+
+                    // Convert to options format
+                    const serviceList = Array.from(allServices).map(
+                        (service) => ({
+                            id: service,
+                            name: service,
+                        }),
+                    );
+                    console.log('📦 Loaded services:', serviceList.length);
+                    setServiceOptions(serviceList);
+                } else {
+                    setServiceOptions([]);
+                }
             } catch (error) {
                 console.error('Error fetching services:', error);
                 setServiceOptions([]);
@@ -379,61 +530,72 @@ function WorkflowBuilderContent({
             }
         };
         fetchServices();
-    }, []);
+    }, [breadcrumbAccountId, breadcrumbAccountName, breadcrumbEnterpriseId]);
 
-    // Fetch entities from global settings based on selected account and enterprise
+    // Fetch workstreams from global settings based on selected account and enterprise (reactive to breadcrumb)
     useEffect(() => {
-        const fetchEntities = async () => {
+        const fetchWorkstreams = async () => {
             try {
                 setLoadingEntities(true);
 
-                // Get account and enterprise from localStorage
-                const accountId =
-                    window.localStorage.getItem('selectedAccountId');
-                const accountName = window.localStorage.getItem(
-                    'selectedAccountName',
-                );
-                const enterpriseId = window.localStorage.getItem(
-                    'selectedEnterpriseId',
-                );
-
-                // Only fetch if we have the required context
-                if (!accountId || !accountName || !enterpriseId) {
+                // Only fetch if we have the required context from breadcrumb
+                if (
+                    !breadcrumbAccountId ||
+                    !breadcrumbAccountName ||
+                    !breadcrumbEnterpriseId
+                ) {
                     console.log(
-                        'Missing account/enterprise context for fetching entities',
+                        'Missing account/enterprise context for fetching workstreams',
                     );
                     setEntityOptions([]);
                     setLoadingEntities(false);
                     return;
                 }
 
+                console.log('📦 Fetching workstreams for:', {
+                    accountId: breadcrumbAccountId,
+                    accountName: breadcrumbAccountName,
+                    enterpriseId: breadcrumbEnterpriseId,
+                });
+
                 const response = await fetch(
-                    `http://localhost:4000/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
-                        accountName,
-                    )}&enterpriseId=${enterpriseId}`,
+                    `http://localhost:4000/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
+                        breadcrumbAccountName,
+                    )}&enterpriseId=${breadcrumbEnterpriseId}`,
                 );
                 const data = await response.json();
 
-                // Transform the response to match our format
+                // Transform the response to extract workstream names
                 if (Array.isArray(data)) {
-                    setEntityOptions(
-                        data.map((entity: any) => ({
-                            id: entity.entityName || entity.name || entity,
-                            name: entity.entityName || entity.name || entity,
-                        })),
+                    const workstreamOptions = data.map((workstream: any) => ({
+                        id:
+                            workstream.workstreamName ||
+                            workstream.entityName ||
+                            workstream.name ||
+                            workstream,
+                        name:
+                            workstream.workstreamName ||
+                            workstream.entityName ||
+                            workstream.name ||
+                            workstream,
+                    }));
+                    console.log(
+                        '📦 Loaded workstreams:',
+                        workstreamOptions.length,
                     );
+                    setEntityOptions(workstreamOptions);
                 } else {
                     setEntityOptions([]);
                 }
             } catch (error) {
-                console.error('Error fetching entities:', error);
+                console.error('Error fetching workstreams:', error);
                 setEntityOptions([]);
             } finally {
                 setLoadingEntities(false);
             }
         };
-        fetchEntities();
-    }, []); // Can add dependencies like [accountId, enterpriseId] if needed later
+        fetchWorkstreams();
+    }, [breadcrumbAccountId, breadcrumbAccountName, breadcrumbEnterpriseId]);
 
     // State for enabled connectors based on global settings
     const [enabledConnectors, setEnabledConnectors] = useState<string[]>([]);
@@ -1488,10 +1650,10 @@ function WorkflowBuilderContent({
                         {/* Gradient Separator */}
                         <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full'></div>
 
-                        {/* Entity Section */}
+                        {/* Workstream Section */}
                         <div className='flex items-center gap-2'>
                             <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
-                                Entity:
+                                Workstream:
                             </span>
                             <select
                                 value={entity}
@@ -1503,8 +1665,8 @@ function WorkflowBuilderContent({
                             >
                                 <option value=''>
                                     {loadingEntities
-                                        ? 'Loading entities...'
-                                        : 'Select Entity'}
+                                        ? 'Loading workstreams...'
+                                        : 'Select Workstream'}
                                 </option>
                                 {entityOptions.map((option) => (
                                     <option key={option.id} value={option.name}>
@@ -1687,7 +1849,48 @@ function WorkflowBuilderContent({
                                                             metadata,
                                                         );
 
-                                                    // Save to DynamoDB via API
+                                                    // Fetch account details to get awsAccountId and cloudType
+                                                    let awsAccountId:
+                                                        | string
+                                                        | undefined;
+                                                    let cloudType:
+                                                        | 'public'
+                                                        | 'private' = 'public';
+
+                                                    if (accountId) {
+                                                        try {
+                                                            const accountResponse =
+                                                                await fetch(
+                                                                    `http://localhost:4000/api/accounts/${accountId}`,
+                                                                );
+                                                            if (
+                                                                accountResponse.ok
+                                                            ) {
+                                                                const accountData =
+                                                                    await accountResponse.json();
+                                                                awsAccountId =
+                                                                    accountData.awsAccountId ||
+                                                                    accountData.accountAccountId;
+                                                                cloudType =
+                                                                    accountData.cloudType ||
+                                                                    accountData.subscriptionTier ||
+                                                                    'public';
+                                                                console.log(
+                                                                    '📦 Account details for pipeline save:',
+                                                                    {
+                                                                        awsAccountId,
+                                                                        cloudType,
+                                                                    },
+                                                                );
+                                                            }
+                                                        } catch (err) {
+                                                            console.log(
+                                                                '⚠️ Could not fetch account details, using defaults',
+                                                            );
+                                                        }
+                                                    }
+
+                                                    // Save to DynamoDB via API (in account's AWS DynamoDB if awsAccountId is available)
                                                     const pipelineData = {
                                                         pipelineName:
                                                             pipelineName,
@@ -1706,6 +1909,9 @@ function WorkflowBuilderContent({
                                                         yamlContent:
                                                             yamlContent,
                                                         createdBy: userEmail,
+                                                        awsAccountId:
+                                                            awsAccountId, // AWS account where DynamoDB is provisioned
+                                                        cloudType: cloudType, // 'public' or 'private' for table selection
                                                     };
 
                                                     console.log(

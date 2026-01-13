@@ -430,10 +430,41 @@ export default function Breadcrumbs({
         return items;
     }, [pathname]);
 
-    // Load accounts and enterprises - always load on all pages for global breadcrumb selectors
+    // Load accounts, enterprises, and user preferences from backend (DynamoDB, not localStorage)
     useEffect(() => {
         let mounted = true;
+
+        // First, try to load saved preferences from backend API
+        const loadSavedPreferences = async (): Promise<{
+            accountId?: string;
+            enterpriseId?: string;
+        }> => {
+            try {
+                const response = await api.get<any>(
+                    '/api/user-preferences/current-context',
+                );
+                if (response?.accountId && response?.enterpriseId) {
+                    console.log(
+                        '📦 [Breadcrumbs] Loaded preferences from DynamoDB:',
+                        response,
+                    );
+                    return {
+                        accountId: response.accountId,
+                        enterpriseId: response.enterpriseId,
+                    };
+                }
+            } catch (error) {
+                console.log(
+                    '⚠️ [Breadcrumbs] Could not load preferences from backend',
+                );
+            }
+            return {};
+        };
+
         (async () => {
+            // Load preferences first
+            const savedPrefs = await loadSavedPreferences();
+
             try {
                 console.log('🔄 Loading accounts for breadcrumb...');
                 const rawList = await api.get<any>('/api/accounts');
@@ -475,62 +506,35 @@ export default function Breadcrumbs({
                 }));
                 setAccounts(mapped);
 
-                // If no accounts exist, clear localStorage
+                // If no accounts exist, clear selection
                 if (mapped.length === 0) {
                     console.log(
                         '⚠️ No accounts found, clearing account selection',
                     );
                     setSelectedAccountId(undefined);
-                    try {
-                        window.localStorage.removeItem('selectedAccountId');
-                        window.localStorage.removeItem('selectedAccountName');
-                    } catch {}
                     return;
                 }
 
-                // Initialize selection
-                const savedId =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem('selectedAccountId') ||
-                          undefined
-                        : undefined;
-                const exists = savedId && mapped.some((x) => x.id === savedId);
+                // Initialize selection from backend preferences or default
+                const exists =
+                    savedPrefs.accountId &&
+                    mapped.some((x) => x.id === savedPrefs.accountId);
                 if (exists) {
-                    setSelectedAccountId(savedId);
-                    try {
-                        const acc = mapped.find((x) => x.id === savedId);
-                        window.localStorage.setItem(
-                            'selectedAccountId',
-                            savedId,
-                        );
-                        if (acc)
-                            window.localStorage.setItem(
-                                'selectedAccountName',
-                                acc.name,
-                            );
-                    } catch {}
+                    setSelectedAccountId(savedPrefs.accountId);
                 } else if (mapped.length > 0) {
                     // Default to Systiva if it exists, otherwise first account
                     const systivaAccount = mapped.find(
                         (x) => x.name.toLowerCase() === 'systiva',
                     );
                     const defaultAccount = systivaAccount || mapped[0];
-
                     setSelectedAccountId(defaultAccount.id);
-                    try {
-                        window.localStorage.setItem(
-                            'selectedAccountId',
-                            defaultAccount.id,
-                        );
-                        window.localStorage.setItem(
-                            'selectedAccountName',
-                            defaultAccount.name,
-                        );
-                    } catch {}
                 }
             } catch {}
         })();
         (async () => {
+            // Load preferences first
+            const savedPrefs = await loadSavedPreferences();
+
             try {
                 const rawEnterprises = await api.get<any>('/api/enterprises');
                 if (!mounted) return;
@@ -569,38 +573,15 @@ export default function Breadcrumbs({
                 );
                 setAllEnterprises(mapped); // Store all enterprises
                 setEnterprises(mapped); // Initially show all
-                const savedId =
-                    typeof window !== 'undefined'
-                        ? window.localStorage.getItem('selectedEnterpriseId') ||
-                          undefined
-                        : undefined;
-                const exists = savedId && mapped.some((x) => x.id === savedId);
+
+                // Initialize selection from backend preferences or default
+                const exists =
+                    savedPrefs.enterpriseId &&
+                    mapped.some((x) => x.id === savedPrefs.enterpriseId);
                 if (exists) {
-                    setSelectedEnterpriseId(savedId);
-                    try {
-                        const ent = mapped.find((x) => x.id === savedId);
-                        window.localStorage.setItem(
-                            'selectedEnterpriseId',
-                            savedId,
-                        );
-                        if (ent)
-                            window.localStorage.setItem(
-                                'selectedEnterpriseName',
-                                ent.name,
-                            );
-                    } catch {}
+                    setSelectedEnterpriseId(savedPrefs.enterpriseId);
                 } else if (mapped.length > 0) {
                     setSelectedEnterpriseId(mapped[0].id);
-                    try {
-                        window.localStorage.setItem(
-                            'selectedEnterpriseId',
-                            mapped[0].id,
-                        );
-                        window.localStorage.setItem(
-                            'selectedEnterpriseName',
-                            mapped[0].name,
-                        );
-                    } catch {}
                 }
             } catch {}
         })();
@@ -620,7 +601,9 @@ export default function Breadcrumbs({
 
             // Use cached account data instead of making another API call
             if (allAccountsData.length === 0) {
-                console.log('⏳ [Breadcrumbs] Waiting for accounts data to load...');
+                console.log(
+                    '⏳ [Breadcrumbs] Waiting for accounts data to load...',
+                );
                 setEnterprises(allEnterprises);
                 return;
             }
@@ -694,9 +677,8 @@ export default function Breadcrumbs({
             // If account has no licenses, show all enterprises (not empty list)
             const filtered =
                 enterpriseIds.size > 0
-                    ? allEnterprises.filter(
-                          (ent: {id: string; name: string}) =>
-                              enterpriseIds.has(ent.id),
+                    ? allEnterprises.filter((ent: {id: string; name: string}) =>
+                          enterpriseIds.has(ent.id),
                       )
                     : allEnterprises; // Show all if no license filtering
 
@@ -717,12 +699,21 @@ export default function Breadcrumbs({
                     '⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection',
                 );
                 setSelectedEnterpriseId(undefined);
-                try {
-                    window.localStorage.removeItem('selectedEnterpriseId');
-                    window.localStorage.removeItem('selectedEnterpriseName');
-                    // Dispatch enterprise change event
-                    window.dispatchEvent(new Event('enterpriseChanged'));
-                } catch {}
+                // Dispatch context change event
+                const currentAccount = accounts.find(
+                    (a: {id: string; name: string}) =>
+                        a.id === selectedAccountId,
+                );
+                window.dispatchEvent(
+                    new CustomEvent('breadcrumbContextChanged', {
+                        detail: {
+                            accountId: selectedAccountId,
+                            accountName: currentAccount?.name,
+                            enterpriseId: undefined,
+                            enterpriseName: undefined,
+                        },
+                    }),
+                );
             }
             // If enterprises available, ensure one is selected
             else if (
@@ -737,18 +728,29 @@ export default function Breadcrumbs({
                     filtered[0].name,
                 );
                 setSelectedEnterpriseId(filtered[0].id);
-                try {
-                    window.localStorage.setItem(
-                        'selectedEnterpriseId',
+                // Save to backend and dispatch context change event
+                const currentAccount = accounts.find(
+                    (a: {id: string; name: string}) =>
+                        a.id === selectedAccountId,
+                );
+                if (selectedAccountId && currentAccount) {
+                    saveContextToBackend(
+                        selectedAccountId,
+                        currentAccount.name,
                         filtered[0].id,
-                    );
-                    window.localStorage.setItem(
-                        'selectedEnterpriseName',
                         filtered[0].name,
                     );
-                    // Dispatch enterprise change event
-                    window.dispatchEvent(new Event('enterpriseChanged'));
-                } catch {}
+                }
+                window.dispatchEvent(
+                    new CustomEvent('breadcrumbContextChanged', {
+                        detail: {
+                            accountId: selectedAccountId,
+                            accountName: currentAccount?.name,
+                            enterpriseId: filtered[0].id,
+                            enterpriseName: filtered[0].name,
+                        },
+                    }),
+                );
             } else {
                 console.log(
                     '✅ [Breadcrumbs] Current enterprise is valid for this account:',
@@ -758,10 +760,53 @@ export default function Breadcrumbs({
         };
 
         filterEnterprisesByAccount();
-    }, [selectedAccountId, allEnterprises, allAccountsData, selectedEnterpriseId]);
+    }, [
+        selectedAccountId,
+        allEnterprises,
+        allAccountsData,
+        selectedEnterpriseId,
+    ]);
 
     const accountMenuRef = useRef<HTMLDivElement | null>(null);
     const enterpriseMenuRef = useRef<HTMLDivElement | null>(null);
+
+    // Listen for requestBreadcrumbContext events from other components
+    useEffect(() => {
+        const handleContextRequest = () => {
+            // Dispatch current context to requesting components
+            const acc = accounts.find(
+                (a: {id: string; name: string}) => a.id === selectedAccountId,
+            );
+            const ent = enterprises.find(
+                (e: {id: string; name: string}) =>
+                    e.id === selectedEnterpriseId,
+            );
+
+            if (selectedAccountId && selectedEnterpriseId) {
+                window.dispatchEvent(
+                    new CustomEvent('breadcrumbContextChanged', {
+                        detail: {
+                            accountId: selectedAccountId,
+                            accountName: acc?.name,
+                            enterpriseId: selectedEnterpriseId,
+                            enterpriseName: ent?.name,
+                        },
+                    }),
+                );
+            }
+        };
+
+        window.addEventListener(
+            'requestBreadcrumbContext',
+            handleContextRequest,
+        );
+        return () => {
+            window.removeEventListener(
+                'requestBreadcrumbContext',
+                handleContextRequest,
+            );
+        };
+    }, [selectedAccountId, selectedEnterpriseId, accounts, enterprises]);
 
     useEffect(() => {
         const onDocClick = (e: MouseEvent) => {
@@ -805,73 +850,119 @@ export default function Breadcrumbs({
         [enterprises, selectedEnterpriseId],
     );
 
+    // Save context to backend API (DynamoDB) instead of localStorage
+    const saveContextToBackend = async (
+        accountId: string,
+        accountName: string,
+        enterpriseId: string,
+        enterpriseName: string,
+    ) => {
+        try {
+            await api.post('/api/user-preferences/current-context', {
+                accountId,
+                accountName,
+                enterpriseId,
+                enterpriseName,
+            });
+            console.log('✅ Saved context to DynamoDB');
+        } catch (error) {
+            console.log('⚠️ Failed to save context to backend:', error);
+        }
+    };
+
     const updateAccount = (id: string, skipEnterpriseSync = false) => {
         setSelectedAccountId(id);
-        try {
-            window.localStorage.setItem('selectedAccountId', id);
-            const acc = accounts.find(
-                (a: {id: string; name: string}) => a.id === id,
-            );
-            if (acc)
-                window.localStorage.setItem('selectedAccountName', acc.name);
+        const acc = accounts.find(
+            (a: {id: string; name: string}) => a.id === id,
+        );
 
-            // Dispatch custom event to notify other components
-            window.dispatchEvent(
-                new CustomEvent('accountChanged', {
-                    detail: {id, name: acc?.name},
-                }),
-            );
+        // Dispatch custom event to notify other components (WorkflowBuilder listens to this)
+        const currentEnterprise = enterprises.find(
+            (e: {id: string; name: string}) => e.id === selectedEnterpriseId,
+        );
+        window.dispatchEvent(
+            new CustomEvent('breadcrumbContextChanged', {
+                detail: {
+                    accountId: id,
+                    accountName: acc?.name,
+                    enterpriseId: selectedEnterpriseId,
+                    enterpriseName: currentEnterprise?.name,
+                },
+            }),
+        );
 
-            // Auto-select "Global" enterprise when "Systiva" account is selected (case insensitive)
-            if (!skipEnterpriseSync && acc?.name?.toLowerCase() === 'systiva') {
-                const globalEnterprise = enterprises.find(
-                    (e: {id: string; name: string}) =>
-                        e.name?.toLowerCase() === 'global',
+        // Save to backend API (DynamoDB)
+        if (acc && selectedEnterpriseId && currentEnterprise) {
+            saveContextToBackend(
+                id,
+                acc.name,
+                selectedEnterpriseId,
+                currentEnterprise.name,
+            );
+        }
+
+        // Auto-select "Global" enterprise when "Systiva" account is selected (case insensitive)
+        if (!skipEnterpriseSync && acc?.name?.toLowerCase() === 'systiva') {
+            const globalEnterprise = enterprises.find(
+                (e: {id: string; name: string}) =>
+                    e.name?.toLowerCase() === 'global',
+            );
+            if (
+                globalEnterprise &&
+                globalEnterprise.id !== selectedEnterpriseId
+            ) {
+                console.log(
+                    '🔄 Auto-selecting Global enterprise for Systiva account',
                 );
-                if (
-                    globalEnterprise &&
-                    globalEnterprise.id !== selectedEnterpriseId
-                ) {
-                    console.log(
-                        '🔄 Auto-selecting Global enterprise for Systiva account',
-                    );
-                    updateEnterprise(globalEnterprise.id, true); // Skip account sync to avoid loop
-                }
+                updateEnterprise(globalEnterprise.id, true); // Skip account sync to avoid loop
             }
-        } catch {}
+        }
     };
 
     const updateEnterprise = (id: string, skipAccountSync = false) => {
         setSelectedEnterpriseId(id);
-        try {
-            window.localStorage.setItem('selectedEnterpriseId', id);
-            const ent = enterprises.find(
-                (e: {id: string; name: string}) => e.id === id,
-            );
-            if (ent)
-                window.localStorage.setItem('selectedEnterpriseName', ent.name);
+        const ent = enterprises.find(
+            (e: {id: string; name: string}) => e.id === id,
+        );
 
-            // Dispatch custom event to notify other components
-            window.dispatchEvent(
-                new CustomEvent('enterpriseChanged', {
-                    detail: {id, name: ent?.name},
-                }),
-            );
+        // Dispatch custom event to notify other components (WorkflowBuilder listens to this)
+        const currentAccount = accounts.find(
+            (a: {id: string; name: string}) => a.id === selectedAccountId,
+        );
+        window.dispatchEvent(
+            new CustomEvent('breadcrumbContextChanged', {
+                detail: {
+                    accountId: selectedAccountId,
+                    accountName: currentAccount?.name,
+                    enterpriseId: id,
+                    enterpriseName: ent?.name,
+                },
+            }),
+        );
 
-            // Auto-select "Systiva" account when "Global" enterprise is selected (case insensitive)
-            if (!skipAccountSync && ent?.name?.toLowerCase() === 'global') {
-                const systivaAccount = accounts.find(
-                    (a: {id: string; name: string}) =>
-                        a.name?.toLowerCase() === 'systiva',
+        // Save to backend API (DynamoDB)
+        if (selectedAccountId && currentAccount && ent) {
+            saveContextToBackend(
+                selectedAccountId,
+                currentAccount.name,
+                id,
+                ent.name,
+            );
+        }
+
+        // Auto-select "Systiva" account when "Global" enterprise is selected (case insensitive)
+        if (!skipAccountSync && ent?.name?.toLowerCase() === 'global') {
+            const systivaAccount = accounts.find(
+                (a: {id: string; name: string}) =>
+                    a.name?.toLowerCase() === 'systiva',
+            );
+            if (systivaAccount && systivaAccount.id !== selectedAccountId) {
+                console.log(
+                    '🔄 Auto-selecting Systiva account for Global enterprise',
                 );
-                if (systivaAccount && systivaAccount.id !== selectedAccountId) {
-                    console.log(
-                        '🔄 Auto-selecting Systiva account for Global enterprise',
-                    );
-                    updateAccount(systivaAccount.id, true); // Skip enterprise sync to avoid loop
-                }
+                updateAccount(systivaAccount.id, true); // Skip enterprise sync to avoid loop
             }
-        } catch {}
+        }
     };
 
     // Mobile breadcrumbs - simplified version
