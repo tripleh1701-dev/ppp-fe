@@ -611,15 +611,10 @@ function WorkflowBuilderContent({
     useEffect(() => {
         const fetchGlobalSettingsConfig = async () => {
             try {
-                // Get account, enterprise, and entity from localStorage
-                const accountId =
-                    window.localStorage.getItem('selectedAccountId');
-                const accountName = window.localStorage.getItem(
-                    'selectedAccountName',
-                );
-                const enterpriseId = window.localStorage.getItem(
-                    'selectedEnterpriseId',
-                );
+                // Get account, enterprise from breadcrumb context (not localStorage)
+                const accountId = breadcrumbAccountId;
+                const accountName = breadcrumbAccountName;
+                const enterpriseId = breadcrumbEnterpriseId;
 
                 // Use the entity from the component state
                 if (!accountId || !accountName || !enterpriseId || !entity) {
@@ -1768,25 +1763,13 @@ function WorkflowBuilderContent({
                                                         return;
                                                     }
 
-                                                    // Get account and enterprise from localStorage
-                                                    const accountId =
-                                                        window.localStorage.getItem(
-                                                            'selectedAccountId',
-                                                        );
-                                                    const accountName =
-                                                        window.localStorage.getItem(
-                                                            'selectedAccountName',
-                                                        );
-                                                    const enterpriseId =
-                                                        window.localStorage.getItem(
-                                                            'selectedEnterpriseId',
-                                                        );
-                                                    const enterpriseName =
-                                                        window.localStorage.getItem(
-                                                            'selectedEnterpriseName',
-                                                        );
+                                                    // Get account and enterprise from breadcrumb context (not localStorage)
+                                                    const accountId = breadcrumbAccountId;
+                                                    const accountName = breadcrumbAccountName;
+                                                    const enterpriseId = breadcrumbEnterpriseId;
+                                                    const enterpriseName = ''; // Will be fetched from API if needed
 
-                                                    // Get user info from localStorage
+                                                    // Get user info from localStorage (user auth info is OK to keep in localStorage)
                                                     const userStr =
                                                         window.localStorage.getItem(
                                                             'systiva_user',
@@ -2343,24 +2326,13 @@ function WorkflowBuilderContent({
                                     return;
                                 }
 
-                                // Get account and enterprise from localStorage
-                                const accountId =
-                                    window.localStorage.getItem(
-                                        'selectedAccountId',
-                                    );
-                                const accountName = window.localStorage.getItem(
-                                    'selectedAccountName',
-                                );
-                                const enterpriseId =
-                                    window.localStorage.getItem(
-                                        'selectedEnterpriseId',
-                                    );
-                                const enterpriseName =
-                                    window.localStorage.getItem(
-                                        'selectedEnterpriseName',
-                                    );
+                                // Get account and enterprise from breadcrumb context (not localStorage)
+                                const accountId = breadcrumbAccountId;
+                                const accountName = breadcrumbAccountName;
+                                const enterpriseId = breadcrumbEnterpriseId;
+                                const enterpriseName = ''; // Will be fetched from API if needed
 
-                                // Get user info from localStorage
+                                // Get user info from localStorage (user auth info is OK to keep in localStorage)
                                 const userStr =
                                     window.localStorage.getItem('systiva_user');
                                 const userData = userStr
