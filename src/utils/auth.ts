@@ -9,7 +9,7 @@ const PASSWORD_CHALLENGE_KEY = 'systiva_password_challenge';
 declare const process: {env: Record<string, string | undefined>};
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-// API version prefix for all API calls
+// API version prefix for all API calls (including auth)
 const API_VERSION = '/api/v1';
 
 export interface User {
@@ -41,6 +41,14 @@ export interface PasswordChallengeData {
     username: string;
     session: string;
 }
+
+// Helper function to extract role name from role (handles both string and object)
+const extractRoleName = (role: any): string | null => {
+    if (!role) return null;
+    if (typeof role === 'string') return role;
+    if (typeof role === 'object' && role.name) return role.name;
+    return null;
+};
 
 export const login = async (
     email: string,
@@ -112,11 +120,9 @@ export const login = async (
                           userFromResponse.emailAddress ||
                           email,
                 role:
-                    userFromResponse.role ||
-                    rolesArray[0]?.name ||
-                    (typeof rolesArray[0] === 'string'
-                        ? rolesArray[0]
-                        : 'User'),
+                    extractRoleName(userFromResponse.role) ||
+                    extractRoleName(rolesArray[0]) ||
+                    'User',
                 roles: rolesArray,
                 userRoles: rolesArray,
                 status: userFromResponse.status || 'active',
@@ -183,7 +189,7 @@ export const completePasswordChallenge = async (
 
     try {
         const response = await fetch(
-            `${API_BASE_URL}${API_VERSION}/auth/challenge`,
+            `${API_BASE_URL}${API_VERSION}/auth/complete-password-challenge`,
             {
                 method: 'POST',
                 headers: {
@@ -234,11 +240,9 @@ export const completePasswordChallenge = async (
                         ? `${userFromResponse.firstName} ${userFromResponse.lastName}`
                         : userFromResponse.username || challengeData.username,
                 role:
-                    userFromResponse.role ||
-                    rolesArray[0]?.name ||
-                    (typeof rolesArray[0] === 'string'
-                        ? rolesArray[0]
-                        : 'User'),
+                    extractRoleName(userFromResponse.role) ||
+                    extractRoleName(rolesArray[0]) ||
+                    'User',
                 roles: rolesArray,
                 userRoles: rolesArray,
                 status: userFromResponse.status || 'active',
@@ -312,7 +316,18 @@ export const getCurrentUser = (): User | null => {
         const userStr = localStorage.getItem(AUTH_USER_KEY);
         if (userStr) {
             try {
-                return JSON.parse(userStr);
+                const user = JSON.parse(userStr);
+                // Sanitize role - ensure it's a string, not an object
+                if (
+                    user &&
+                    typeof user.role === 'object' &&
+                    user.role !== null
+                ) {
+                    user.role = user.role.name || 'User';
+                    // Update localStorage with sanitized data
+                    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+                }
+                return user;
             } catch {
                 return null;
             }
