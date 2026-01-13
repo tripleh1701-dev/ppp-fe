@@ -437,7 +437,9 @@ export default function Breadcrumbs({
         // First, try to load saved preferences from backend API
         const loadSavedPreferences = async (): Promise<{
             accountId?: string;
+            accountName?: string;
             enterpriseId?: string;
+            enterpriseName?: string;
         }> => {
             try {
                 const response = await api.get<any>(
@@ -448,9 +450,43 @@ export default function Breadcrumbs({
                         '📦 [Breadcrumbs] Loaded preferences from DynamoDB:',
                         response,
                     );
+                    // Also save to localStorage for backward compatibility with other components
+                    if (typeof window !== 'undefined') {
+                        if (response.accountId)
+                            window.localStorage.setItem(
+                                'selectedAccountId',
+                                response.accountId,
+                            );
+                        if (response.accountName)
+                            window.localStorage.setItem(
+                                'selectedAccountName',
+                                response.accountName,
+                            );
+                        if (response.enterpriseId)
+                            window.localStorage.setItem(
+                                'selectedEnterpriseId',
+                                response.enterpriseId,
+                            );
+                        if (response.enterpriseName)
+                            window.localStorage.setItem(
+                                'selectedEnterpriseName',
+                                response.enterpriseName,
+                            );
+                        console.log(
+                            '✅ [Breadcrumbs] Synced preferences to localStorage:',
+                            response,
+                        );
+                        // Dispatch events so other components can react
+                        window.dispatchEvent(new CustomEvent('accountChanged'));
+                        window.dispatchEvent(
+                            new CustomEvent('enterpriseChanged'),
+                        );
+                    }
                     return {
                         accountId: response.accountId,
+                        accountName: response.accountName,
                         enterpriseId: response.enterpriseId,
+                        enterpriseName: response.enterpriseName,
                     };
                 }
             } catch (error) {
@@ -528,6 +564,22 @@ export default function Breadcrumbs({
                     );
                     const defaultAccount = systivaAccount || mapped[0];
                     setSelectedAccountId(defaultAccount.id);
+                    // Save default to localStorage for components that read from it
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(
+                            'selectedAccountId',
+                            defaultAccount.id,
+                        );
+                        window.localStorage.setItem(
+                            'selectedAccountName',
+                            defaultAccount.name,
+                        );
+                        console.log(
+                            '✅ [Breadcrumbs] Saved default account to localStorage:',
+                            defaultAccount,
+                        );
+                        window.dispatchEvent(new CustomEvent('accountChanged'));
+                    }
                 }
             } catch {}
         })();
@@ -581,7 +633,26 @@ export default function Breadcrumbs({
                 if (exists) {
                     setSelectedEnterpriseId(savedPrefs.enterpriseId);
                 } else if (mapped.length > 0) {
-                    setSelectedEnterpriseId(mapped[0].id);
+                    const defaultEnterprise = mapped[0];
+                    setSelectedEnterpriseId(defaultEnterprise.id);
+                    // Save default to localStorage for components that read from it
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(
+                            'selectedEnterpriseId',
+                            defaultEnterprise.id,
+                        );
+                        window.localStorage.setItem(
+                            'selectedEnterpriseName',
+                            defaultEnterprise.name,
+                        );
+                        console.log(
+                            '✅ [Breadcrumbs] Saved default enterprise to localStorage:',
+                            defaultEnterprise,
+                        );
+                        window.dispatchEvent(
+                            new CustomEvent('enterpriseChanged'),
+                        );
+                    }
                 }
             } catch {}
         })();
@@ -699,6 +770,12 @@ export default function Breadcrumbs({
                     '⚠️ [Breadcrumbs] No enterprises available for this account, clearing selection',
                 );
                 setSelectedEnterpriseId(undefined);
+                // Clear enterprise from localStorage
+                if (typeof window !== 'undefined') {
+                    window.localStorage.removeItem('selectedEnterpriseId');
+                    window.localStorage.removeItem('selectedEnterpriseName');
+                    window.dispatchEvent(new CustomEvent('enterpriseChanged'));
+                }
                 // Dispatch context change event
                 const currentAccount = accounts.find(
                     (a: {id: string; name: string}) =>
@@ -850,13 +927,35 @@ export default function Breadcrumbs({
         [enterprises, selectedEnterpriseId],
     );
 
-    // Save context to backend API (DynamoDB) instead of localStorage
+    // Save context to backend API (DynamoDB) AND localStorage for backward compatibility
     const saveContextToBackend = async (
         accountId: string,
         accountName: string,
         enterpriseId: string,
         enterpriseName: string,
     ) => {
+        // Save to localStorage for components that still read from it
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('selectedAccountId', accountId);
+            window.localStorage.setItem('selectedAccountName', accountName);
+            window.localStorage.setItem('selectedEnterpriseId', enterpriseId);
+            window.localStorage.setItem(
+                'selectedEnterpriseName',
+                enterpriseName,
+            );
+            console.log('✅ Saved context to localStorage:', {
+                accountId,
+                accountName,
+                enterpriseId,
+                enterpriseName,
+            });
+
+            // Dispatch events to notify listening components
+            window.dispatchEvent(new CustomEvent('accountChanged'));
+            window.dispatchEvent(new CustomEvent('enterpriseChanged'));
+        }
+
+        // Also save to backend API (DynamoDB)
         try {
             await api.post('/api/user-preferences/current-context', {
                 accountId,
