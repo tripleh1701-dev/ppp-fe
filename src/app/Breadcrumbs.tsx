@@ -5,7 +5,7 @@ import {usePathname} from 'next/navigation';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {Icon} from '@/components/Icons';
 import {api} from '@/utils/api';
-import AccountSettingsPanel from './AccountSettingsPanel';
+import AccountSettingsPanel from '@/components/AccountSettingsPanel';
 
 interface BreadcrumbItem {
     label: string;
