@@ -65,6 +65,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         '/api/account-licenses',
         '/api/user-management',
         '/api/global-settings',
+        '/api/user-preferences',
     ];
 
     const isSysAppEndpoint = sysAppEndpoints.some(

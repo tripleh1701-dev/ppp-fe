@@ -27,6 +27,7 @@ import PipelineHeader from './PipelineHeader';
 import WorkflowNode from './WorkflowNode';
 import PipelinePanels from './PipelinePanels';
 import PipelineCanvasToolbar from './PipelineCanvasToolbar';
+import {api} from '@/utils/api';
 
 import {usePipeline} from '@/contexts/PipelineContext';
 import {
@@ -58,7 +59,6 @@ import {
     loadPipelineYAML,
     getAllPipelineYAMLs,
 } from '@/utils/yamlPipelineUtils';
-import {api} from '@/utils/api';
 
 // Component configuration
 const nodeTypes = {
@@ -208,16 +208,9 @@ function WorkflowBuilderContent({
                 console.log('🔄 Loading pipeline from database:', pipelineId);
 
                 // Fetch pipeline data from backend
-                const response = await fetch(
-                    `http://localhost:4000/api/pipeline-canvas/${pipelineId}`,
+                const pipelineData = await api.get<any>(
+                    `/api/pipeline-canvas/${pipelineId}`,
                 );
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to fetch pipeline: ${response.statusText}`,
-                    );
-                }
-
-                const pipelineData = await response.json();
                 console.log('✅ Pipeline data loaded:', pipelineData);
 
                 // Set pipeline metadata
@@ -386,21 +379,14 @@ function WorkflowBuilderContent({
 
             // If no URL params, fetch user preferences from backend API (stored in DynamoDB)
             try {
-                const response = await fetch(
-                    'http://localhost:4000/api/user-preferences/current-context',
+                const data = await api.get<any>(
+                    '/api/user-preferences/current-context',
                 );
-                if (response.ok) {
-                    const data = await response.json();
-                    if (
-                        data.accountId &&
-                        data.accountName &&
-                        data.enterpriseId
-                    ) {
-                        setBreadcrumbAccountId(data.accountId);
-                        setBreadcrumbAccountName(data.accountName);
-                        setBreadcrumbEnterpriseId(data.enterpriseId);
-                        return;
-                    }
+                if (data.accountId && data.accountName && data.enterpriseId) {
+                    setBreadcrumbAccountId(data.accountId);
+                    setBreadcrumbAccountName(data.accountName);
+                    setBreadcrumbEnterpriseId(data.enterpriseId);
+                    return;
                 }
             } catch (error) {
                 console.log('Could not fetch user preferences from backend');
@@ -477,12 +463,11 @@ function WorkflowBuilderContent({
                 });
 
                 // Fetch services from global settings API
-                const response = await fetch(
-                    `http://localhost:4000/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
+                const data = await api.get<any[]>(
+                    `/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
                         breadcrumbAccountName,
                     )}&enterpriseId=${breadcrumbEnterpriseId}`,
                 );
-                const data = await response.json();
 
                 // Extract unique services from all workstream configurations
                 if (Array.isArray(data)) {
@@ -558,12 +543,11 @@ function WorkflowBuilderContent({
                     enterpriseId: breadcrumbEnterpriseId,
                 });
 
-                const response = await fetch(
-                    `http://localhost:4000/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
+                const data = await api.get<any[]>(
+                    `/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
                         breadcrumbAccountName,
                     )}&enterpriseId=${breadcrumbEnterpriseId}`,
                 );
-                const data = await response.json();
 
                 // Transform the response to extract workstream names
                 if (Array.isArray(data)) {
@@ -627,12 +611,11 @@ function WorkflowBuilderContent({
 
                 console.log('🔄 Fetching global settings for entity:', entity);
 
-                const response = await fetch(
-                    `http://localhost:4000/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
+                const data = await api.get<any[]>(
+                    `/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
                         accountName,
                     )}&enterpriseId=${enterpriseId}`,
                 );
-                const data = await response.json();
                 console.log(
                     '📦 [WorkflowBuilder] Raw global settings data:',
                     data,
@@ -1764,9 +1747,12 @@ function WorkflowBuilderContent({
                                                     }
 
                                                     // Get account and enterprise from breadcrumb context (not localStorage)
-                                                    const accountId = breadcrumbAccountId;
-                                                    const accountName = breadcrumbAccountName;
-                                                    const enterpriseId = breadcrumbEnterpriseId;
+                                                    const accountId =
+                                                        breadcrumbAccountId;
+                                                    const accountName =
+                                                        breadcrumbAccountName;
+                                                    const enterpriseId =
+                                                        breadcrumbEnterpriseId;
                                                     const enterpriseName = ''; // Will be fetched from API if needed
 
                                                     // Get user info from localStorage (user auth info is OK to keep in localStorage)
@@ -1842,30 +1828,24 @@ function WorkflowBuilderContent({
 
                                                     if (accountId) {
                                                         try {
-                                                            const accountResponse =
-                                                                await fetch(
-                                                                    `http://localhost:4000/api/accounts/${accountId}`,
+                                                            const accountData =
+                                                                await api.get<any>(
+                                                                    `/api/accounts/${accountId}`,
                                                                 );
-                                                            if (
-                                                                accountResponse.ok
-                                                            ) {
-                                                                const accountData =
-                                                                    await accountResponse.json();
-                                                                awsAccountId =
-                                                                    accountData.awsAccountId ||
-                                                                    accountData.accountAccountId;
-                                                                cloudType =
-                                                                    accountData.cloudType ||
-                                                                    accountData.subscriptionTier ||
-                                                                    'public';
-                                                                console.log(
-                                                                    '📦 Account details for pipeline save:',
-                                                                    {
-                                                                        awsAccountId,
-                                                                        cloudType,
-                                                                    },
-                                                                );
-                                                            }
+                                                            awsAccountId =
+                                                                accountData.awsAccountId ||
+                                                                accountData.accountAccountId;
+                                                            cloudType =
+                                                                accountData.cloudType ||
+                                                                accountData.subscriptionTier ||
+                                                                'public';
+                                                            console.log(
+                                                                '📦 Account details for pipeline save:',
+                                                                {
+                                                                    awsAccountId,
+                                                                    cloudType,
+                                                                },
+                                                            );
                                                         } catch (err) {
                                                             console.log(
                                                                 '⚠️ Could not fetch account details, using defaults',
@@ -1902,29 +1882,11 @@ function WorkflowBuilderContent({
                                                         pipelineData,
                                                     );
 
-                                                    const response =
-                                                        await fetch(
-                                                            'http://localhost:4000/api/pipeline-canvas',
-                                                            {
-                                                                method: 'POST',
-                                                                headers: {
-                                                                    'Content-Type':
-                                                                        'application/json',
-                                                                },
-                                                                body: JSON.stringify(
-                                                                    pipelineData,
-                                                                ),
-                                                            },
-                                                        );
-
-                                                    if (!response.ok) {
-                                                        throw new Error(
-                                                            `Failed to save pipeline: ${response.statusText}`,
-                                                        );
-                                                    }
-
                                                     const savedPipeline =
-                                                        await response.json();
+                                                        await api.post<any>(
+                                                            '/api/pipeline-canvas',
+                                                            pipelineData,
+                                                        );
                                                     console.log(
                                                         '✅ Pipeline saved successfully:',
                                                         savedPipeline,
@@ -2402,24 +2364,10 @@ function WorkflowBuilderContent({
                                     pipelineData,
                                 );
 
-                                const response = await fetch(
-                                    'http://localhost:4000/api/pipeline-canvas',
-                                    {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify(pipelineData),
-                                    },
+                                const savedPipeline = await api.post<any>(
+                                    '/api/pipeline-canvas',
+                                    pipelineData,
                                 );
-
-                                if (!response.ok) {
-                                    throw new Error(
-                                        `Failed to save pipeline: ${response.statusText}`,
-                                    );
-                                }
-
-                                const savedPipeline = await response.json();
                                 console.log(
                                     'Pipeline saved successfully:',
                                     savedPipeline,
