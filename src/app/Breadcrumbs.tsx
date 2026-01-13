@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {Icon} from './Icons';
+import {Icon} from '@/components/Icons';
 import {api} from '@/utils/api';
 import AccountSettingsPanel from './AccountSettingsPanel';
 
