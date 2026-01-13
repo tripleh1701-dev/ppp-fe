@@ -63,6 +63,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         '/api/groups',
         '/api/pipeline-canvas',
         '/api/account-licenses',
+        '/api/user-management',
+        '/api/global-settings',
     ];
 
     const isSysAppEndpoint = sysAppEndpoints.some(
@@ -84,10 +86,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             cleanPath = '/api/v1' + cleanPath.slice(4); // Replace /api/ with /api/v1/
         }
     } else {
-        // Local development: transform user-management paths to include /v1/
-        if (cleanPath.startsWith('/api/user-management')) {
-            cleanPath = '/api/v1' + cleanPath.slice(4); // /api/user-management → /api/v1/user-management
-        }
+        // Local development: user-management paths stay as-is (controller uses /api/user-management prefix)
         // sysAppEndpoints stay as-is for local (e.g., /api/accounts)
     }
 
