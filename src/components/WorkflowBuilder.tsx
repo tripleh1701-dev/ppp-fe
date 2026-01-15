@@ -220,6 +220,9 @@ function WorkflowBuilderContent({
                 if (pipelineData.details) {
                     setDescription(pipelineData.details);
                 }
+                if (pipelineData.product) {
+                    setSelectedProduct(pipelineData.product);
+                }
                 if (pipelineData.service) {
                     setDeploymentType(pipelineData.service);
                 }
@@ -345,14 +348,21 @@ function WorkflowBuilderContent({
     const [description, setDescription] = useState('');
 
     // Dynamic dropdown options from API
+    const [productOptions, setProductOptions] = useState<
+        Array<{id: string; name: string}>
+    >([]);
     const [serviceOptions, setServiceOptions] = useState<
         Array<{id: string; name: string}>
     >([]);
     const [entityOptions, setEntityOptions] = useState<
         Array<{id: string; name: string}>
     >([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
     const [loadingServices, setLoadingServices] = useState(true);
     const [loadingEntities, setLoadingEntities] = useState(false);
+
+    // Selected product state
+    const [selectedProduct, setSelectedProduct] = useState<string>('');
 
     // Breadcrumb context state - reactive to account/enterprise selection
     const [breadcrumbAccountId, setBreadcrumbAccountId] = useState<string>('');
@@ -436,18 +446,106 @@ function WorkflowBuilderContent({
         };
     }, []);
 
-    // Fetch services from global settings based on account/enterprise (reactive to breadcrumb)
+    // Fetch products based on selected enterprise from breadcrumb
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                setLoadingProducts(true);
+
+                // Only fetch if we have the required context from breadcrumb
+                if (!breadcrumbAccountId || !breadcrumbEnterpriseId) {
+                    console.log(
+                        'Missing account/enterprise context for fetching products',
+                    );
+                    setProductOptions([]);
+                    setLoadingProducts(false);
+                    return;
+                }
+
+                console.log('📦 Fetching products for:', {
+                    accountId: breadcrumbAccountId,
+                    enterpriseId: breadcrumbEnterpriseId,
+                });
+
+                // Fetch enterprise-products-services linkages
+                const enterpriseConfigs =
+                    (await api.get<
+                        Array<{
+                            enterprise: {id: string; name: string};
+                            product: {id: string; name: string};
+                            services: Array<{id: string; name: string}>;
+                        }>
+                    >('/api/enterprise-products-services')) || [];
+
+                // Get the enterprise name from localStorage or breadcrumb context
+                const enterpriseName =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem(
+                              'selectedEnterpriseName',
+                          ) || ''
+                        : '';
+
+                // Filter products by the selected enterprise
+                const productsForEnterprise = enterpriseConfigs.filter(
+                    (config) =>
+                        config.enterprise.id === breadcrumbEnterpriseId ||
+                        config.enterprise.name === enterpriseName,
+                );
+
+                // Extract unique product names
+                const uniqueProducts = Array.from(
+                    new Set(
+                        productsForEnterprise
+                            .map((config) => config.product.name)
+                            .filter(
+                                (product) => product && product.trim() !== '',
+                            ),
+                    ),
+                );
+
+                // Convert to the expected format
+                const productList = uniqueProducts.map((productName, index) => {
+                    const productConfig = productsForEnterprise.find(
+                        (config) => config.product.name === productName,
+                    );
+                    return {
+                        id: productConfig?.product.id || `product-${index}`,
+                        name: productName,
+                    };
+                });
+
+                console.log(
+                    '📦 Loaded products:',
+                    productList.length,
+                    productList,
+                );
+                setProductOptions(productList);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                setProductOptions([]);
+            } finally {
+                setLoadingProducts(false);
+            }
+        };
+        fetchProducts();
+    }, [breadcrumbAccountId, breadcrumbEnterpriseId]);
+
+    // Reset service when product changes
+    useEffect(() => {
+        // Clear the service selection when product changes
+        if (selectedProduct) {
+            setDeploymentType('');
+        }
+    }, [selectedProduct]);
+
+    // Fetch services based on account/enterprise AND selected product (reactive to breadcrumb and product selection)
     useEffect(() => {
         const fetchServices = async () => {
             try {
                 setLoadingServices(true);
 
                 // Only fetch if we have the required context from breadcrumb
-                if (
-                    !breadcrumbAccountId ||
-                    !breadcrumbAccountName ||
-                    !breadcrumbEnterpriseId
-                ) {
+                if (!breadcrumbAccountId || !breadcrumbEnterpriseId) {
                     console.log(
                         'Missing account/enterprise context for fetching services',
                     );
@@ -456,57 +554,88 @@ function WorkflowBuilderContent({
                     return;
                 }
 
+                // If no product is selected, show empty services (user must select product first)
+                if (!selectedProduct) {
+                    console.log(
+                        'No product selected, waiting for product selection to fetch services',
+                    );
+                    setServiceOptions([]);
+                    setLoadingServices(false);
+                    return;
+                }
+
                 console.log('📦 Fetching services for:', {
                     accountId: breadcrumbAccountId,
-                    accountName: breadcrumbAccountName,
                     enterpriseId: breadcrumbEnterpriseId,
+                    product: selectedProduct,
                 });
 
-                // Fetch services from global settings API
-                const data = await api.get<any[]>(
-                    `/api/global-settings?accountId=${breadcrumbAccountId}&accountName=${encodeURIComponent(
-                        breadcrumbAccountName,
-                    )}&enterpriseId=${breadcrumbEnterpriseId}`,
+                // Fetch enterprise-products-services linkages to get services for selected enterprise + product
+                const enterpriseConfigs =
+                    (await api.get<
+                        Array<{
+                            enterprise: {id: string; name: string};
+                            product: {id: string; name: string};
+                            services: Array<{id: string; name: string}>;
+                        }>
+                    >('/api/enterprise-products-services')) || [];
+
+                // Get the enterprise name from localStorage or breadcrumb context
+                const enterpriseName =
+                    typeof window !== 'undefined'
+                        ? window.localStorage.getItem(
+                              'selectedEnterpriseName',
+                          ) || ''
+                        : '';
+
+                // Filter to find the config that matches both enterprise AND product
+                const matchingConfigs = enterpriseConfigs.filter(
+                    (config) =>
+                        (config.enterprise.id === breadcrumbEnterpriseId ||
+                            config.enterprise.name === enterpriseName) &&
+                        config.product.name === selectedProduct,
                 );
 
-                // Extract unique services from all workstream configurations
-                if (Array.isArray(data)) {
-                    const allServices = new Set<string>();
-                    data.forEach((workstream: any) => {
-                        const config = workstream.configuration;
-                        if (config && typeof config === 'object') {
-                            // Collect all tools from all categories as services
-                            const categories = [
-                                'plan',
-                                'code',
-                                'build',
-                                'test',
-                                'release',
-                                'deploy',
-                                'others',
-                            ];
-                            categories.forEach((cat) => {
-                                if (Array.isArray(config[cat])) {
-                                    config[cat].forEach((tool: string) => {
-                                        if (tool) allServices.add(tool);
-                                    });
-                                }
-                            });
-                        }
-                    });
+                // Extract unique service names from matching configs
+                const allServices = new Set<string>();
+                matchingConfigs.forEach((config) => {
+                    if (config.services && Array.isArray(config.services)) {
+                        config.services.forEach((service) => {
+                            if (service.name && service.name.trim() !== '') {
+                                allServices.add(service.name);
+                            }
+                        });
+                    }
+                });
 
-                    // Convert to options format
-                    const serviceList = Array.from(allServices).map(
-                        (service) => ({
-                            id: service,
-                            name: service,
-                        }),
-                    );
-                    console.log('📦 Loaded services:', serviceList.length);
-                    setServiceOptions(serviceList);
-                } else {
-                    setServiceOptions([]);
-                }
+                // Convert to options format
+                const serviceList = Array.from(allServices).map(
+                    (serviceName) => {
+                        // Find the service ID from the configs
+                        let serviceId = serviceName;
+                        for (const config of matchingConfigs) {
+                            const foundService = config.services?.find(
+                                (s) => s.name === serviceName,
+                            );
+                            if (foundService?.id) {
+                                serviceId = foundService.id;
+                                break;
+                            }
+                        }
+                        return {
+                            id: serviceId,
+                            name: serviceName,
+                        };
+                    },
+                );
+
+                console.log(
+                    '📦 Loaded services for product:',
+                    selectedProduct,
+                    serviceList.length,
+                    serviceList,
+                );
+                setServiceOptions(serviceList);
             } catch (error) {
                 console.error('Error fetching services:', error);
                 setServiceOptions([]);
@@ -515,7 +644,7 @@ function WorkflowBuilderContent({
             }
         };
         fetchServices();
-    }, [breadcrumbAccountId, breadcrumbAccountName, breadcrumbEnterpriseId]);
+    }, [breadcrumbAccountId, breadcrumbEnterpriseId, selectedProduct]);
 
     // Fetch workstreams from global settings based on selected account and enterprise (reactive to breadcrumb)
     useEffect(() => {
@@ -716,8 +845,10 @@ function WorkflowBuilderContent({
                     `${deploymentType} pipeline for ${enterprise} ${entity}`,
                 details: {
                     enterprise: enterprise || 'Unknown',
+                    product: selectedProduct || 'Unknown',
                     entity: entity || 'Unknown',
                 },
+                product: selectedProduct || 'Unknown',
                 deploymentType: deploymentType as 'Integration' | 'Extension',
                 creationDate: new Date().toLocaleDateString('en-GB', {
                     day: '2-digit',
@@ -772,6 +903,7 @@ function WorkflowBuilderContent({
                 name: templateData.name,
                 description: templateData.description,
                 enterprise: templateData.details.enterprise,
+                product: templateData.details.product,
                 entity: templateData.details.entity,
                 deploymentType: templateData.deploymentType,
             });
@@ -1599,6 +1731,35 @@ function WorkflowBuilderContent({
                         {/* Gradient Separator */}
                         <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full'></div>
 
+                        {/* Product Section */}
+                        <div className='flex items-center gap-2'>
+                            <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
+                                Product:
+                            </span>
+                            <select
+                                value={selectedProduct}
+                                onChange={(
+                                    e: React.ChangeEvent<HTMLSelectElement>,
+                                ) => setSelectedProduct(e.target.value)}
+                                className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
+                                disabled={isReadOnly || loadingProducts}
+                            >
+                                <option value=''>
+                                    {loadingProducts
+                                        ? 'Loading products...'
+                                        : 'Select Product'}
+                                </option>
+                                {productOptions.map((option) => (
+                                    <option key={option.id} value={option.name}>
+                                        {option.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Gradient Separator */}
+                        <div className='w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full'></div>
+
                         {/* Service Section */}
                         <div className='flex items-center gap-2'>
                             <span className='text-xs font-medium text-gray-600 whitespace-nowrap'>
@@ -1610,11 +1771,22 @@ function WorkflowBuilderContent({
                                     e: React.ChangeEvent<HTMLSelectElement>,
                                 ) => setDeploymentType(e.target.value)}
                                 className='text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer'
-                                disabled={isReadOnly || loadingServices}
+                                disabled={
+                                    isReadOnly ||
+                                    loadingServices ||
+                                    !selectedProduct
+                                }
+                                title={
+                                    !selectedProduct
+                                        ? 'Please select a product first'
+                                        : ''
+                                }
                             >
                                 <option value=''>
                                     {loadingServices
                                         ? 'Loading services...'
+                                        : !selectedProduct
+                                        ? 'Select Product First'
                                         : 'Select Service'}
                                 </option>
                                 {serviceOptions.map((option) => (
@@ -1780,11 +1952,12 @@ function WorkflowBuilderContent({
 
                                                     if (
                                                         !pipelineName ||
+                                                        !selectedProduct ||
                                                         !deploymentType ||
                                                         !entity
                                                     ) {
                                                         alert(
-                                                            'Please fill in Pipeline Name, Service, and Entity fields before saving.',
+                                                            'Please fill in Pipeline Name, Product, Service, and Workstream fields before saving.',
                                                         );
                                                         return;
                                                     }
@@ -1796,6 +1969,9 @@ function WorkflowBuilderContent({
                                                             'Saved pipeline',
                                                         enterprise:
                                                             enterpriseName ||
+                                                            'Default',
+                                                        product:
+                                                            selectedProduct ||
                                                             'Default',
                                                         entity:
                                                             entity || 'Default',
@@ -1859,6 +2035,8 @@ function WorkflowBuilderContent({
                                                             pipelineName,
                                                         details:
                                                             description || '',
+                                                        product:
+                                                            selectedProduct,
                                                         service: deploymentType,
                                                         entity: entity,
                                                         status: 'Active',

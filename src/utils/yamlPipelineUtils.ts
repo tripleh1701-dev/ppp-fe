@@ -11,6 +11,7 @@ export interface PipelineYAML {
         name: string;
         description?: string;
         enterprise?: string;
+        product?: string;
         entity?: string;
         deploymentType: 'Integration' | 'Extension';
         createdAt: string;
@@ -61,6 +62,7 @@ export function convertToYAML(
         name: string;
         description?: string;
         enterprise?: string;
+        product?: string;
         entity?: string;
         deploymentType: 'Integration' | 'Extension';
     },
@@ -128,6 +130,7 @@ export function convertToYAML(
             name: metadata.name,
             description: metadata.description,
             enterprise: metadata.enterprise,
+            product: metadata.product,
             entity: metadata.entity,
             deploymentType: metadata.deploymentType,
             createdAt: new Date().toISOString(),
