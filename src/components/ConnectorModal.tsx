@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Plug, Save, Edit2, XCircle, ChevronDown } from 'lucide-react';
-import { BookmarkIcon } from '@heroicons/react/24/outline';
-import { motion, AnimatePresence } from 'framer-motion';
-import { createPortal } from 'react-dom';
-import { generateId } from '@/utils/id-generator';
-import { api } from '@/utils/api';
-import { Icon } from '@/components/Icons';
-import { TOOLS_CONFIG, getToolConfig, CATEGORY_ORDER } from '@/config/toolsConfig';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {X, Plus, Plug, Save, Edit2, XCircle, ChevronDown} from 'lucide-react';
+import {BookmarkIcon} from '@heroicons/react/24/outline';
+import {motion, AnimatePresence} from 'framer-motion';
+import {createPortal} from 'react-dom';
+import {generateId} from '@/utils/id-generator';
+import {api} from '@/utils/api';
+import {Icon} from '@/components/Icons';
+import {
+    TOOLS_CONFIG,
+    getToolConfig,
+    CATEGORY_ORDER,
+} from '@/config/toolsConfig';
 
 export interface Connector {
     id: string;
@@ -68,15 +72,21 @@ function OAuthButton({
     selectedEnterprise,
     workstream,
     product,
-    service
+    service,
 }: {
     connectorId: string;
     githubOAuthClientId: string | null;
     loadingOAuthClientId: boolean;
     credentialName: string;
     connectors: Connector[];
-    setOauthStatus: React.Dispatch<React.SetStateAction<{[connectorId: string]: 'idle' | 'pending' | 'success' | 'error'}>>;
-    setOauthMessages: React.Dispatch<React.SetStateAction<{[connectorId: string]: string}>>;
+    setOauthStatus: React.Dispatch<
+        React.SetStateAction<{
+            [connectorId: string]: 'idle' | 'pending' | 'success' | 'error';
+        }>
+    >;
+    setOauthMessages: React.Dispatch<
+        React.SetStateAction<{[connectorId: string]: string}>
+    >;
     disabled: boolean;
     oauthWindowsRef: React.MutableRefObject<Map<string, Window | null>>;
     selectedAccountId: string;
@@ -98,12 +108,12 @@ function OAuthButton({
             if (!githubOAuthClientId || loadingOAuthClientId) {
                 e.preventDefault();
                 e.stopPropagation();
-                setOauthStatus(prev => ({ ...prev, [connectorId]: 'error' }));
-                setOauthMessages(prev => ({ 
-                    ...prev, 
-                    [connectorId]: loadingOAuthClientId 
-                        ? 'Loading OAuth configuration...' 
-                        : 'GitHub OAuth Client ID is not configured. Please configure it in GitHub OAuth Apps settings.'
+                setOauthStatus((prev) => ({...prev, [connectorId]: 'error'}));
+                setOauthMessages((prev) => ({
+                    ...prev,
+                    [connectorId]: loadingOAuthClientId
+                        ? 'Loading OAuth configuration...'
+                        : 'GitHub OAuth Client ID is not configured. Please configure it in GitHub OAuth Apps settings.',
                 }));
                 return;
             }
@@ -114,28 +124,35 @@ function OAuthButton({
 
             // CRITICAL: Set status to pending IMMEDIATELY when button is clicked
             // This ensures the UI shows "OAuth in Progress" with loader right away
-            setOauthStatus(prev => ({ ...prev, [connectorId]: 'pending' }));
-            setOauthMessages(prev => ({ ...prev, [connectorId]: 'OAuth in Progress' }));
+            setOauthStatus((prev) => ({...prev, [connectorId]: 'pending'}));
+            setOauthMessages((prev) => ({
+                ...prev,
+                [connectorId]: 'OAuth in Progress',
+            }));
 
             // Prepare URL data with all context parameters
             const state = crypto.randomUUID().replace(/-/g, '');
             const baseRedirectUri = `${window.location.origin}/security-governance/credentials/github/oauth2/callback`;
-            
+
             // CRITICAL: Build redirect_uri with ALL context parameters as query params
             // GitHub will redirect back to this exact URL, preserving the query parameters
             const redirectParams = new URLSearchParams();
-            if (selectedAccountId) redirectParams.set('accountId', selectedAccountId);
-            if (selectedAccountName) redirectParams.set('accountName', selectedAccountName);
-            if (selectedEnterpriseId) redirectParams.set('enterpriseId', selectedEnterpriseId);
-            if (selectedEnterprise) redirectParams.set('enterpriseName', selectedEnterprise);
+            if (selectedAccountId)
+                redirectParams.set('accountId', selectedAccountId);
+            if (selectedAccountName)
+                redirectParams.set('accountName', selectedAccountName);
+            if (selectedEnterpriseId)
+                redirectParams.set('enterpriseId', selectedEnterpriseId);
+            if (selectedEnterprise)
+                redirectParams.set('enterpriseName', selectedEnterprise);
             if (workstream) redirectParams.set('workstream', workstream);
             if (product) redirectParams.set('product', product);
             if (service) redirectParams.set('service', service);
-            
-            const redirectUri = redirectParams.toString() 
+
+            const redirectUri = redirectParams.toString()
                 ? `${baseRedirectUri}?${redirectParams.toString()}`
                 : baseRedirectUri;
-            
+
             // Build OAuth authorization URL with redirect_uri that includes context parameters
             const queryParams = new URLSearchParams({
                 client_id: githubOAuthClientId,
@@ -144,34 +161,41 @@ function OAuthButton({
                 redirect_uri: redirectUri, // This URL includes all context parameters
                 state: state,
             });
-            
+
             const oauthUrl = `https://github.com/login/oauth/authorize?${queryParams.toString()}`;
-            
+
             // CRITICAL: Store OAuth data BEFORE opening window
             // Use multiple storage mechanisms for maximum reliability across tabs
             // Clear previous OAuth flags first
             localStorage.removeItem('githubOAuthSuccess');
             localStorage.removeItem('githubOAuthError');
             localStorage.removeItem('githubOAuthShouldReopenModal');
-            
+
             // Store in sessionStorage (shared across tabs from same origin)
             sessionStorage.setItem('latestCSRFToken', state);
             sessionStorage.setItem('githubOAuthConnectorId', connectorId);
             sessionStorage.setItem('githubOAuthCredentialName', credentialName);
-            
+
             // Store in localStorage (backup and for monitoring interval)
             localStorage.setItem('latestCSRFToken', state);
             localStorage.setItem('githubOAuthConnectorId', connectorId);
             localStorage.setItem('githubOAuthCredentialName', credentialName);
-            
+
             // Store in cookie as ultimate fallback (cookies are definitely shared)
             // Cookie expires in 10 minutes
-            const cookieExpiry = new Date(Date.now() + 10 * 60 * 1000).toUTCString();
+            const cookieExpiry = new Date(
+                Date.now() + 10 * 60 * 1000,
+            ).toUTCString();
             document.cookie = `githubOAuthCSRFToken=${state}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
             document.cookie = `githubOAuthConnectorId=${connectorId}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
-            document.cookie = `githubOAuthCredentialName=${encodeURIComponent(credentialName)}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
-            
-            console.log('🔑 [OAuth] Stored CSRF token in sessionStorage:', state);
+            document.cookie = `githubOAuthCredentialName=${encodeURIComponent(
+                credentialName,
+            )}; expires=${cookieExpiry}; path=/; SameSite=Lax`;
+
+            console.log(
+                '🔑 [OAuth] Stored CSRF token in sessionStorage:',
+                state,
+            );
             console.log('🔑 [OAuth] Stored CSRF token in localStorage:', state);
             console.log('🔑 [OAuth] Stored CSRF token in cookie:', state);
             console.log('🔑 [OAuth] Stored connector ID:', connectorId);
@@ -185,101 +209,154 @@ function OAuthButton({
                 product: product || '(empty)',
                 service: service || '(empty)',
             });
-            console.log('🔑 [OAuth] Redirect URI (with context params):', redirectUri);
+            console.log(
+                '🔑 [OAuth] Redirect URI (with context params):',
+                redirectUri,
+            );
             console.log('🔑 [OAuth] Full OAuth Authorization URL:', oauthUrl);
-            
+
             // CRITICAL: Open window IMMEDIATELY using native event
             // This bypasses React's synthetic event system
             // Note: We need window.opener to be available, so we can't use 'noopener'
             // Using 'noreferrer' for security instead
-            const oauthWindow = window.open(oauthUrl, '_blank', 'width=600,height=700,noreferrer');
-            
+            const oauthWindow = window.open(
+                oauthUrl,
+                '_blank',
+                'width=600,height=700,noreferrer',
+            );
+
             // Handle window opening result
             if (oauthWindow) {
                 console.log('✅ [OAuth] Window opened successfully');
                 // Store window reference so we can close it later
                 oauthWindowsRef.current.set(connectorId, oauthWindow);
             } else {
-                console.warn('⚠️ [OAuth] window.open() returned null - popup may have been blocked');
-                console.warn('⚠️ [OAuth] User can manually navigate to:', oauthUrl);
+                console.warn(
+                    '⚠️ [OAuth] window.open() returned null - popup may have been blocked',
+                );
+                console.warn(
+                    '⚠️ [OAuth] User can manually navigate to:',
+                    oauthUrl,
+                );
                 // Don't clean up storage - keep it so monitoring can detect completion
                 // Status will remain 'pending' until success/error is detected
                 // Monitoring will continue below
             }
-            
+
             // Monitor OAuth completion
             // Check both localStorage and listen for storage events for faster detection
             const checkOAuthStatus = () => {
-                const storedConnectorId = localStorage.getItem('githubOAuthConnectorId');
+                const storedConnectorId = localStorage.getItem(
+                    'githubOAuthConnectorId',
+                );
                 const oauthSuccess = localStorage.getItem('githubOAuthSuccess');
                 const oauthError = localStorage.getItem('githubOAuthError');
-                
+
                 // Only process if this is for our connector
                 if (storedConnectorId !== connectorId) {
                     return false;
                 }
-                
+
                 if (oauthSuccess === 'true') {
-                    console.log('✅ [OAuth] Success detected for connector:', connectorId);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'success' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: 'OAuth configured successfully' }));
-                    
+                    console.log(
+                        '✅ [OAuth] Success detected for connector:',
+                        connectorId,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'success',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]: 'OAuth configured successfully',
+                    }));
+
                     // Clean up
                     localStorage.removeItem('githubOAuthSuccess');
                     localStorage.removeItem('githubOAuthShouldReopenModal');
-                    
+
                     // Close the OAuth window if it's still open
-                    const storedWindow = oauthWindowsRef.current.get(connectorId);
+                    const storedWindow =
+                        oauthWindowsRef.current.get(connectorId);
                     if (storedWindow && !storedWindow.closed) {
                         try {
-                            console.log('🔄 [OAuth] Closing OAuth window from parent...');
+                            console.log(
+                                '🔄 [OAuth] Closing OAuth window from parent...',
+                            );
                             storedWindow.close();
                             oauthWindowsRef.current.delete(connectorId);
                         } catch (e) {
-                            console.error('❌ [OAuth] Error closing window from parent:', e);
+                            console.error(
+                                '❌ [OAuth] Error closing window from parent:',
+                                e,
+                            );
                         }
                     }
                     return true; // Indicate we found success
                 } else if (oauthSuccess === 'false' || oauthError) {
-                    console.log('❌ [OAuth] Error detected for connector:', connectorId);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'error' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: oauthError || 'OAuth authorization failed' }));
-                    
+                    console.log(
+                        '❌ [OAuth] Error detected for connector:',
+                        connectorId,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'error',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]:
+                            oauthError || 'OAuth authorization failed',
+                    }));
+
                     // Clean up
                     localStorage.removeItem('githubOAuthError');
                     localStorage.removeItem('githubOAuthSuccess');
-                    
+
                     // Close the OAuth window if it's still open
-                    const storedWindow = oauthWindowsRef.current.get(connectorId);
+                    const storedWindow =
+                        oauthWindowsRef.current.get(connectorId);
                     if (storedWindow && !storedWindow.closed) {
                         try {
                             storedWindow.close();
                             oauthWindowsRef.current.delete(connectorId);
                         } catch (e) {
-                            console.error('❌ [OAuth] Error closing window:', e);
+                            console.error(
+                                '❌ [OAuth] Error closing window:',
+                                e,
+                            );
                         }
                     }
                     return true; // Indicate we found error
                 }
                 return false; // Still waiting
             };
-            
+
             // Check immediately
             if (checkOAuthStatus()) {
                 return; // Already completed
             }
-            
+
             // Listen for storage events (fires when localStorage changes in other tabs/windows)
             const handleStorageChange = (e: StorageEvent) => {
-                if (e.key === 'githubOAuthSuccess' || e.key === 'githubOAuthError') {
-                    console.log('📦 [OAuth] Storage event detected:', e.key, e.newValue);
+                if (
+                    e.key === 'githubOAuthSuccess' ||
+                    e.key === 'githubOAuthError'
+                ) {
+                    console.log(
+                        '📦 [OAuth] Storage event detected:',
+                        e.key,
+                        e.newValue,
+                    );
                     if (checkOAuthStatus()) {
-                        window.removeEventListener('storage', handleStorageChange);
+                        window.removeEventListener(
+                            'storage',
+                            handleStorageChange,
+                        );
                     }
                 }
             };
             window.addEventListener('storage', handleStorageChange);
-            
+
             // Also poll periodically as fallback (in case storage events don't fire)
             const checkInterval = setInterval(() => {
                 if (checkOAuthStatus()) {
@@ -287,7 +364,7 @@ function OAuthButton({
                     window.removeEventListener('storage', handleStorageChange);
                     return;
                 }
-                
+
                 // Check if window closed - but keep monitoring even if closed
                 // User might complete OAuth in a different tab/window
                 if (oauthWindow) {
@@ -296,7 +373,9 @@ function OAuthButton({
                             // Window closed - but don't reset status yet
                             // Keep monitoring for success/error in case user completes OAuth elsewhere
                             oauthWindowsRef.current.delete(connectorId);
-                            console.log('🔄 [OAuth] OAuth window closed, but continuing to monitor for completion...');
+                            console.log(
+                                '🔄 [OAuth] OAuth window closed, but continuing to monitor for completion...',
+                            );
                             // Don't clear interval or reset status - let it keep monitoring
                         }
                     } catch (e) {
@@ -305,7 +384,7 @@ function OAuthButton({
                 }
                 // If oauthWindow is null (blocked), keep monitoring - status stays 'pending'
             }, 300); // Check every 300ms for faster response
-            
+
             // Cleanup after 10 minutes
             setTimeout(() => {
                 clearInterval(checkInterval);
@@ -317,16 +396,25 @@ function OAuthButton({
         // mousedown is considered more "direct" user interaction by popup blockers
         // than click, which goes through React's synthetic event system
         button.addEventListener('mousedown', handleNativeClick, true);
-        
+
         return () => {
             button.removeEventListener('mousedown', handleNativeClick, true);
         };
-    }, [connectorId, githubOAuthClientId, loadingOAuthClientId, credentialName, connectors, setOauthStatus, setOauthMessages, disabled]);
+    }, [
+        connectorId,
+        githubOAuthClientId,
+        loadingOAuthClientId,
+        credentialName,
+        connectors,
+        setOauthStatus,
+        setOauthMessages,
+        disabled,
+    ]);
 
     return (
         <button
             ref={buttonRef}
-            type="button"
+            type='button'
             disabled={disabled}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm hover:shadow-md ${
                 disabled
@@ -334,11 +422,9 @@ function OAuthButton({
                     : 'bg-blue-600 hover:bg-blue-700'
             }`}
         >
-            <Icon name="github" size={16} className="text-white" />
+            <Icon name='github' size={16} className='text-white' />
             <span>
-                {loadingOAuthClientId 
-                    ? 'Loading...' 
-                    : 'Link to GitHub'}
+                {loadingOAuthClientId ? 'Loading...' : 'Link to GitHub'}
             </span>
         </button>
     );
@@ -363,7 +449,11 @@ function CategoryDropdown({
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number} | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
 
     const calculateDropdownPosition = useCallback(() => {
         if (!containerRef.current) return;
@@ -391,7 +481,10 @@ function CategoryDropdown({
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (!containerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+            if (
+                !containerRef.current?.contains(target) &&
+                !dropdownRef.current?.contains(target)
+            ) {
                 setOpen(false);
             }
         };
@@ -399,12 +492,14 @@ function CategoryDropdown({
         return () => document.removeEventListener('click', onDoc, true);
     }, []);
 
-    const displayValue = value ? value.charAt(0).toUpperCase() + value.slice(1) : placeholder;
+    const displayValue = value
+        ? value.charAt(0).toUpperCase() + value.slice(1)
+        : placeholder;
 
     return (
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className='relative w-full'>
             <button
-                type="button"
+                type='button'
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
                 className={`w-full text-left px-2 py-1 pr-8 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
@@ -414,45 +509,57 @@ function CategoryDropdown({
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
                 <span>{displayValue}</span>
-                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                    className={`h-4 w-4 text-gray-500 transition-transform ${
+                        open ? 'rotate-180' : ''
+                    }`}
+                />
             </button>
-            {open && dropdownPos && !disabled && createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
-                    style={{
-                        position: 'fixed',
-                        top: dropdownPos.top,
-                        left: dropdownPos.left,
-                        width: dropdownPos.width,
-                        maxHeight: '240px',
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <div className="max-h-60 overflow-auto p-2">
-                        {options.length === 0 ? (
-                            <div className="px-3 py-2 text-slate-500 text-center text-sm">No categories found</div>
-                        ) : (
-                            options.map((option) => (
-                                <button
-                                    key={option}
-                                    type="button"
-                                    onClick={() => {
-                                        onChange(option);
-                                        setOpen(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
-                                        value === option ? 'bg-blue-100 font-medium' : ''
-                                    }`}
-                                >
-                                    {option.charAt(0).toUpperCase() + option.slice(1)}
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </div>,
-                document.body
-            )}
+            {open &&
+                dropdownPos &&
+                !disabled &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxHeight: '240px',
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <div className='max-h-60 overflow-auto p-2'>
+                            {options.length === 0 ? (
+                                <div className='px-3 py-2 text-slate-500 text-center text-sm'>
+                                    No categories found
+                                </div>
+                            ) : (
+                                options.map((option) => (
+                                    <button
+                                        key={option}
+                                        type='button'
+                                        onClick={() => {
+                                            onChange(option);
+                                            setOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
+                                            value === option
+                                                ? 'bg-blue-100 font-medium'
+                                                : ''
+                                        }`}
+                                    >
+                                        {option.charAt(0).toUpperCase() +
+                                            option.slice(1)}
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
@@ -474,7 +581,11 @@ function EncryptionTypeDropdown({
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number} | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
 
     const options = ['Plaintext', 'Encrypted'];
 
@@ -504,7 +615,10 @@ function EncryptionTypeDropdown({
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (!containerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+            if (
+                !containerRef.current?.contains(target) &&
+                !dropdownRef.current?.contains(target)
+            ) {
                 setOpen(false);
             }
         };
@@ -515,53 +629,73 @@ function EncryptionTypeDropdown({
     const displayValue = value || placeholder;
 
     return (
-        <div ref={containerRef} className="relative">
+        <div ref={containerRef} className='relative'>
             <button
-                type="button"
+                type='button'
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
                 className={`px-2 py-1 pr-6 text-sm font-normal text-black not-italic focus:outline-none bg-transparent border-0 hover:bg-gray-50 rounded flex items-center gap-1 ${
-                    disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                    disabled
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'cursor-pointer'
                 }`}
-                style={{ color: '#000000', fontStyle: 'normal', fontFamily: 'inherit' }}
+                style={{
+                    color: '#000000',
+                    fontStyle: 'normal',
+                    fontFamily: 'inherit',
+                }}
             >
                 <span>{displayValue}</span>
-                <ChevronDown className={`h-3 w-3 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                    className={`h-3 w-3 text-gray-500 transition-transform ${
+                        open ? 'rotate-180' : ''
+                    }`}
+                />
             </button>
-            {open && dropdownPos && !disabled && createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
-                    style={{
-                        position: 'fixed',
-                        top: dropdownPos.top,
-                        left: dropdownPos.left,
-                        width: dropdownPos.width,
-                        maxHeight: '240px',
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <div className="max-h-60 overflow-auto p-2">
-                        {options.map((option) => (
-                            <button
-                                key={option}
-                                type="button"
-                                onClick={() => {
-                                    onChange(option);
-                                    setOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
-                                    value === option ? 'bg-blue-100 font-medium' : ''
-                                }`}
-                                style={{ color: '#000000', fontStyle: 'normal', fontWeight: value === option ? '500' : 'normal' }}
-                            >
-                                {option}
-                            </button>
-                        ))}
-                    </div>
-                </div>,
-                document.body
-            )}
+            {open &&
+                dropdownPos &&
+                !disabled &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxHeight: '240px',
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <div className='max-h-60 overflow-auto p-2'>
+                            {options.map((option) => (
+                                <button
+                                    key={option}
+                                    type='button'
+                                    onClick={() => {
+                                        onChange(option);
+                                        setOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
+                                        value === option
+                                            ? 'bg-blue-100 font-medium'
+                                            : ''
+                                    }`}
+                                    style={{
+                                        color: '#000000',
+                                        fontStyle: 'normal',
+                                        fontWeight:
+                                            value === option ? '500' : 'normal',
+                                    }}
+                                >
+                                    {option}
+                                </button>
+                            ))}
+                        </div>
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
@@ -587,7 +721,11 @@ function AuthenticationTypeDropdown({
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number} | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
 
     const calculateDropdownPosition = useCallback(() => {
         if (!containerRef.current) return;
@@ -615,7 +753,10 @@ function AuthenticationTypeDropdown({
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (!containerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+            if (
+                !containerRef.current?.contains(target) &&
+                !dropdownRef.current?.contains(target)
+            ) {
                 setOpen(false);
             }
         };
@@ -634,9 +775,9 @@ function AuthenticationTypeDropdown({
     };
 
     return (
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className='relative w-full'>
             <button
-                type="button"
+                type='button'
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
                 className={`w-full text-left px-2 py-1 pr-8 border rounded-lg text-sm font-normal text-black not-italic focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
@@ -644,50 +785,70 @@ function AuthenticationTypeDropdown({
                         ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                style={{ 
-                    color: '#000000', 
+                style={{
+                    color: '#000000',
                     fontStyle: 'normal',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
                 }}
             >
                 <span>{displayValue}</span>
-                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                    className={`h-4 w-4 text-gray-500 transition-transform ${
+                        open ? 'rotate-180' : ''
+                    }`}
+                />
             </button>
-            {open && dropdownPos && !disabled && createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
-                    style={{
-                        position: 'fixed',
-                        top: dropdownPos.top,
-                        left: dropdownPos.left,
-                        width: dropdownPos.width,
-                        maxHeight: '240px',
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <div className="max-h-60 overflow-auto p-2">
-                        {options.length === 0 ? (
-                            <div className="px-3 py-2 text-slate-500 text-center text-sm">No options found</div>
-                        ) : (
-                            options.map((option) => (
-                                <button
-                                    key={option}
-                                    type="button"
-                                    onClick={() => handleOptionClick(option)}
-                                    className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
-                                        value === option ? 'bg-blue-100 font-medium' : ''
-                                    }`}
-                                    style={{ color: '#000000', fontStyle: 'normal', fontWeight: value === option ? '500' : 'normal' }}
-                                >
-                                    {option}
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </div>,
-                document.body
-            )}
+            {open &&
+                dropdownPos &&
+                !disabled &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxHeight: '240px',
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <div className='max-h-60 overflow-auto p-2'>
+                            {options.length === 0 ? (
+                                <div className='px-3 py-2 text-slate-500 text-center text-sm'>
+                                    No options found
+                                </div>
+                            ) : (
+                                options.map((option) => (
+                                    <button
+                                        key={option}
+                                        type='button'
+                                        onClick={() =>
+                                            handleOptionClick(option)
+                                        }
+                                        className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 ${
+                                            value === option
+                                                ? 'bg-blue-100 font-medium'
+                                                : ''
+                                        }`}
+                                        style={{
+                                            color: '#000000',
+                                            fontStyle: 'normal',
+                                            fontWeight:
+                                                value === option
+                                                    ? '500'
+                                                    : 'normal',
+                                        }}
+                                    >
+                                        {option}
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
@@ -713,7 +874,11 @@ function ConnectorDropdown({
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number} | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{
+        top: number;
+        left: number;
+        width: number;
+    } | null>(null);
 
     const calculateDropdownPosition = useCallback(() => {
         if (!containerRef.current) return;
@@ -741,7 +906,10 @@ function ConnectorDropdown({
     useEffect(() => {
         const onDoc = (e: MouseEvent) => {
             const target = e.target as Node;
-            if (!containerRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+            if (
+                !containerRef.current?.contains(target) &&
+                !dropdownRef.current?.contains(target)
+            ) {
                 setOpen(false);
             }
         };
@@ -752,68 +920,89 @@ function ConnectorDropdown({
     const displayValue = value || placeholder;
 
     return (
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className='relative w-full'>
             <button
-                type="button"
+                type='button'
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
-                className={`w-full text-left ${iconName && value ? 'pl-8' : 'pl-2'} pr-8 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
+                className={`w-full text-left ${
+                    iconName && value ? 'pl-8' : 'pl-2'
+                } pr-8 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] flex items-center justify-between ${
                     isError
                         ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
                         : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
                 } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className='flex items-center gap-2 flex-1 min-w-0'>
                     {iconName && value && (
-                        <Icon name={iconName} size={16} className="text-gray-600 flex-shrink-0" />
+                        <Icon
+                            name={iconName}
+                            size={16}
+                            className='text-gray-600 flex-shrink-0'
+                        />
                     )}
-                    <span className="truncate">{displayValue}</span>
+                    <span className='truncate'>{displayValue}</span>
                 </div>
-                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                    className={`h-4 w-4 text-gray-500 transition-transform flex-shrink-0 ${
+                        open ? 'rotate-180' : ''
+                    }`}
+                />
             </button>
-            {open && dropdownPos && !disabled && createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl"
-                    style={{
-                        position: 'fixed',
-                        top: dropdownPos.top,
-                        left: dropdownPos.left,
-                        width: dropdownPos.width,
-                        maxHeight: '240px',
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <div className="max-h-60 overflow-auto p-2">
-                        {options.length === 0 ? (
-                            <div className="px-3 py-2 text-slate-500 text-center text-sm">No connectors found</div>
-                        ) : (
-                            options.map((option) => {
-                                const toolConfig = getToolConfig(option);
-                                return (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => {
-                                            onChange(option);
-                                            setOpen(false);
-                                        }}
-                                        className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 flex items-center gap-2 ${
-                                            value === option ? 'bg-blue-100 font-medium' : ''
-                                        }`}
-                                    >
-                                        {toolConfig && (
-                                            <Icon name={toolConfig.iconName} size={16} className="text-gray-600" />
-                                        )}
-                                        {option}
-                                    </button>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>,
-                document.body
-            )}
+            {open &&
+                dropdownPos &&
+                !disabled &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className='z-[9999] rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        style={{
+                            position: 'fixed',
+                            top: dropdownPos.top,
+                            left: dropdownPos.left,
+                            width: dropdownPos.width,
+                            maxHeight: '240px',
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <div className='max-h-60 overflow-auto p-2'>
+                            {options.length === 0 ? (
+                                <div className='px-3 py-2 text-slate-500 text-center text-sm'>
+                                    No connectors found
+                                </div>
+                            ) : (
+                                options.map((option) => {
+                                    const toolConfig = getToolConfig(option);
+                                    return (
+                                        <button
+                                            key={option}
+                                            type='button'
+                                            onClick={() => {
+                                                onChange(option);
+                                                setOpen(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-blue-50 flex items-center gap-2 ${
+                                                value === option
+                                                    ? 'bg-blue-100 font-medium'
+                                                    : ''
+                                            }`}
+                                        >
+                                            {toolConfig && (
+                                                <Icon
+                                                    name={toolConfig.iconName}
+                                                    size={16}
+                                                    className='text-gray-600'
+                                                />
+                                            )}
+                                            {option}
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 }
@@ -831,49 +1020,73 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     selectedAccountName = '',
     workstream = '',
     product = '',
-    service = ''
+    service = '',
 }) => {
-    const [connectors, setConnectors] = useState<Connector[]>([{
-        id: generateId(),
-        category: '',
-        connector: '',
-        authenticationType: '',
-        serviceKeyDetails: undefined,
-        oauth2ClientId: '',
-        oauth2ClientSecret: '',
-        oauth2TokenUrl: '',
-        username: '',
-        usernameEncryption: 'Plaintext',
-        apiKey: '',
-        apiKeyEncryption: 'Encrypted', // Default to Encrypted
-        personalAccessToken: '',
-        tokenEncryption: 'Plaintext',
-        status: true, // Default to Active (true)
-        description: ''
-    }]);
-    
+    const [connectors, setConnectors] = useState<Connector[]>([
+        {
+            id: generateId(),
+            category: '',
+            connector: '',
+            authenticationType: '',
+            serviceKeyDetails: undefined,
+            oauth2ClientId: '',
+            oauth2ClientSecret: '',
+            oauth2TokenUrl: '',
+            username: '',
+            usernameEncryption: 'Plaintext',
+            apiKey: '',
+            apiKeyEncryption: 'Encrypted', // Default to Encrypted
+            personalAccessToken: '',
+            tokenEncryption: 'Plaintext',
+            status: true, // Default to Active (true)
+            description: '',
+        },
+    ]);
+
     // Global Settings data state
-    const [globalSettingsData, setGlobalSettingsData] = useState<Record<string, string[]>>({});
-    const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+    const [globalSettingsData, setGlobalSettingsData] = useState<
+        Record<string, string[]>
+    >({});
+    const [availableCategories, setAvailableCategories] = useState<string[]>(
+        [],
+    );
     const [loadingGlobalSettings, setLoadingGlobalSettings] = useState(false);
-    const [editingConnectorId, setEditingConnectorId] = useState<string | null>(null);
-    const [activelyEditingNewConnector, setActivelyEditingNewConnector] = useState<Set<string>>(new Set());
+    const [editingConnectorId, setEditingConnectorId] = useState<string | null>(
+        null,
+    );
+    const [activelyEditingNewConnector, setActivelyEditingNewConnector] =
+        useState<Set<string>>(new Set());
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
-    const [originalConnectors, setOriginalConnectors] = useState<Connector[]>([]);
-    const [validationErrors, setValidationErrors] = useState<{[key: string]: string[]}>({});
-    const [validationMessages, setValidationMessages] = useState<{[key: string]: Record<string, string>}>({});
-    
+    const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] =
+        useState(false);
+    const [originalConnectors, setOriginalConnectors] = useState<Connector[]>(
+        [],
+    );
+    const [validationErrors, setValidationErrors] = useState<{
+        [key: string]: string[];
+    }>({});
+    const [validationMessages, setValidationMessages] = useState<{
+        [key: string]: Record<string, string>;
+    }>({});
+
     // OAuth state tracking
-    const [oauthStatus, setOauthStatus] = useState<{[connectorId: string]: 'idle' | 'pending' | 'success' | 'error'}>({});
-    const [oauthMessages, setOauthMessages] = useState<{[connectorId: string]: string}>({});
-    const [githubOAuthClientId, setGithubOAuthClientId] = useState<string | null>(null);
+    const [oauthStatus, setOauthStatus] = useState<{
+        [connectorId: string]: 'idle' | 'pending' | 'success' | 'error';
+    }>({});
+    const [oauthMessages, setOauthMessages] = useState<{
+        [connectorId: string]: string;
+    }>({});
+    const [githubOAuthClientId, setGithubOAuthClientId] = useState<
+        string | null
+    >(null);
     const [loadingOAuthClientId, setLoadingOAuthClientId] = useState(false);
     // Store OAuth window references so we can close them from the parent
     const oauthWindowsRef = useRef<Map<string, Window | null>>(new Map());
     // Ref to track OAuth status for preserving during modal reopen
-    const oauthStatusRef = useRef<{[connectorId: string]: 'idle' | 'pending' | 'success' | 'error'}>({});
-    
+    const oauthStatusRef = useRef<{
+        [connectorId: string]: 'idle' | 'pending' | 'success' | 'error';
+    }>({});
+
     // Sync ref with state whenever status changes
     useEffect(() => {
         oauthStatusRef.current = oauthStatus;
@@ -884,26 +1097,32 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         return !!(connector.category?.trim() && connector.connector?.trim());
     };
 
-    const validateConnector = (connector: Connector): { errors: string[]; messages: Record<string, string> } => {
+    const validateConnector = (
+        connector: Connector,
+    ): {errors: string[]; messages: Record<string, string>} => {
         const errors: string[] = [];
         const messages: Record<string, string> = {};
-        
+
         // Validate Category - required
         if (!connector.category || !connector.category.trim()) {
             errors.push('category');
             messages.category = 'Category is required';
         }
-        
+
         // Validate Connector - required
         if (!connector.connector || !connector.connector.trim()) {
             errors.push('connector');
             messages.connector = 'Connector is required';
         }
-        
+
         // Validate Authentication Type - optional now
 
         // Cloud Foundry (Deploy) - OAuth2 required fields
-        if (connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && connector.authenticationType === 'OAuth2') {
+        if (
+            connector.category === 'deploy' &&
+            connector.connector === 'Cloud Foundry' &&
+            connector.authenticationType === 'OAuth2'
+        ) {
             if (!connector.serviceKeyDetails) {
                 errors.push('serviceKeyDetails');
                 messages.serviceKeyDetails = 'Service Key Details is required';
@@ -912,7 +1131,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 errors.push('oauth2ClientId');
                 messages.oauth2ClientId = 'Client ID is required';
             }
-            if (!connector.oauth2ClientSecret || !connector.oauth2ClientSecret.trim()) {
+            if (
+                !connector.oauth2ClientSecret ||
+                !connector.oauth2ClientSecret.trim()
+            ) {
                 errors.push('oauth2ClientSecret');
                 messages.oauth2ClientSecret = 'Client Secret is required';
             }
@@ -921,7 +1143,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 messages.oauth2TokenUrl = 'Token URL is required';
             }
         }
-        
+
         // Validate Username and API Key - required if authentication type is Username and API Key (Jira)
         if (connector.authenticationType === 'Username and API Key') {
             if (!connector.username || !connector.username.trim()) {
@@ -933,50 +1155,72 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 messages.apiKey = 'API Key is required';
             }
         }
-        
+
         // Validate Username and Token - required if authentication type is Username and Token (GitHub)
         if (connector.authenticationType === 'Username and Token') {
             if (!connector.username || !connector.username.trim()) {
                 errors.push('username');
                 messages.username = 'Username is required';
             }
-            if (!connector.personalAccessToken || !connector.personalAccessToken.trim()) {
+            if (
+                !connector.personalAccessToken ||
+                !connector.personalAccessToken.trim()
+            ) {
                 errors.push('personalAccessToken');
-                messages.personalAccessToken = 'Personal Access Token is required';
+                messages.personalAccessToken =
+                    'Personal Access Token is required';
             }
         }
-        
+
         // Validate Personal Access Token - required if authentication type is Personal Access Token (Jira)
         if (connector.authenticationType === 'Personal Access Token') {
-            if (!connector.personalAccessToken || !connector.personalAccessToken.trim()) {
+            if (
+                !connector.personalAccessToken ||
+                !connector.personalAccessToken.trim()
+            ) {
                 errors.push('personalAccessToken');
-                messages.personalAccessToken = 'Personal Access Token is required';
+                messages.personalAccessToken =
+                    'Personal Access Token is required';
             }
         }
-        
+
         // Validate GitHub App - required if authentication type is GitHub App
         if (connector.authenticationType === 'GitHub App') {
-            if (!connector.githubInstallationId || !connector.githubInstallationId.trim()) {
+            if (
+                !connector.githubInstallationId ||
+                !connector.githubInstallationId.trim()
+            ) {
                 errors.push('githubInstallationId');
-                messages.githubInstallationId = 'GitHub Installation Id is required';
+                messages.githubInstallationId =
+                    'GitHub Installation Id is required';
             }
-            if (!connector.githubApplicationId || !connector.githubApplicationId.trim()) {
+            if (
+                !connector.githubApplicationId ||
+                !connector.githubApplicationId.trim()
+            ) {
                 errors.push('githubApplicationId');
-                messages.githubApplicationId = 'GitHub Application Id is required';
+                messages.githubApplicationId =
+                    'GitHub Application Id is required';
             }
-            if (!connector.githubPrivateKey || !connector.githubPrivateKey.trim()) {
+            if (
+                !connector.githubPrivateKey ||
+                !connector.githubPrivateKey.trim()
+            ) {
                 errors.push('githubPrivateKey');
                 messages.githubPrivateKey = 'GitHub Private Key is required';
             }
         }
-        
+
         // Validate Description (optional, but if provided should be valid)
-        if (connector.description && connector.description.trim().length > 500) {
+        if (
+            connector.description &&
+            connector.description.trim().length > 500
+        ) {
             errors.push('description');
             messages.description = 'Description must not exceed 500 characters';
         }
-        
-        return { errors, messages };
+
+        return {errors, messages};
     };
 
     const validateAllConnectors = (): boolean => {
@@ -984,7 +1228,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         const messages: {[key: string]: Record<string, string>} = {};
         let hasErrors = false;
 
-        connectors.forEach(connector => {
+        connectors.forEach((connector) => {
             const validation = validateConnector(connector);
             if (validation.errors.length > 0) {
                 errors[connector.id] = validation.errors;
@@ -1010,23 +1254,41 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
             if (event.data.type === 'GITHUB_OAUTH_SUCCESS') {
                 const connectorId = event.data.connectorId;
-                if (connectorId && connectors.some(c => c.id === connectorId)) {
-                    console.log('✅ [OAuth] GitHub OAuth successful for connector:', connectorId);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'success' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: 'OAuth configured successfully' }));
-                    
+                if (
+                    connectorId &&
+                    connectors.some((c) => c.id === connectorId)
+                ) {
+                    console.log(
+                        '✅ [OAuth] GitHub OAuth successful for connector:',
+                        connectorId,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'success',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]: 'OAuth configured successfully',
+                    }));
+
                     // Close the OAuth window
-                    const oauthWindow = oauthWindowsRef.current.get(connectorId);
+                    const oauthWindow =
+                        oauthWindowsRef.current.get(connectorId);
                     if (oauthWindow && !oauthWindow.closed) {
                         try {
-                            console.log('🔄 [OAuth] Closing OAuth window after success message...');
+                            console.log(
+                                '🔄 [OAuth] Closing OAuth window after success message...',
+                            );
                             oauthWindow.close();
                             oauthWindowsRef.current.delete(connectorId);
                         } catch (e) {
-                            console.error('❌ [OAuth] Error closing window:', e);
+                            console.error(
+                                '❌ [OAuth] Error closing window:',
+                                e,
+                            );
                         }
                     }
-                    
+
                     // Clean up localStorage
                     if (typeof window !== 'undefined') {
                         localStorage.removeItem('githubOAuthConnectorId');
@@ -1036,23 +1298,41 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 }
             } else if (event.data.type === 'GITHUB_OAUTH_ERROR') {
                 const connectorId = event.data.connectorId;
-                const errorMessage = event.data.error || 'OAuth authorization failed';
-                if (connectorId && connectors.some(c => c.id === connectorId)) {
-                    console.error('❌ [OAuth] GitHub OAuth failed for connector:', connectorId, errorMessage);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'error' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: errorMessage }));
-                    
+                const errorMessage =
+                    event.data.error || 'OAuth authorization failed';
+                if (
+                    connectorId &&
+                    connectors.some((c) => c.id === connectorId)
+                ) {
+                    console.error(
+                        '❌ [OAuth] GitHub OAuth failed for connector:',
+                        connectorId,
+                        errorMessage,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'error',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]: errorMessage,
+                    }));
+
                     // Close the OAuth window
-                    const oauthWindow = oauthWindowsRef.current.get(connectorId);
+                    const oauthWindow =
+                        oauthWindowsRef.current.get(connectorId);
                     if (oauthWindow && !oauthWindow.closed) {
                         try {
                             oauthWindow.close();
                             oauthWindowsRef.current.delete(connectorId);
                         } catch (e) {
-                            console.error('❌ [OAuth] Error closing window:', e);
+                            console.error(
+                                '❌ [OAuth] Error closing window:',
+                                e,
+                            );
                         }
                     }
-                    
+
                     // Clean up localStorage
                     if (typeof window !== 'undefined') {
                         localStorage.removeItem('githubOAuthConnectorId');
@@ -1067,7 +1347,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 const oauthWindow = oauthWindowsRef.current.get(connectorId);
                 if (oauthWindow && !oauthWindow.closed) {
                     try {
-                        console.log('🔄 [OAuth] Closing window in response to CLOSE_OAUTH_WINDOW message');
+                        console.log(
+                            '🔄 [OAuth] Closing window in response to CLOSE_OAUTH_WINDOW message',
+                        );
                         oauthWindow.close();
                         oauthWindowsRef.current.delete(connectorId);
                     } catch (e) {
@@ -1081,24 +1363,51 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         if (typeof window !== 'undefined') {
             const connectorId = localStorage.getItem('githubOAuthConnectorId');
             const oauthSuccess = localStorage.getItem('githubOAuthSuccess');
-            const shouldReopenModal = localStorage.getItem('githubOAuthShouldReopenModal');
-            
-            if (connectorId && shouldReopenModal === 'true' && connectors.some(c => c.id === connectorId)) {
+            const shouldReopenModal = localStorage.getItem(
+                'githubOAuthShouldReopenModal',
+            );
+
+            if (
+                connectorId &&
+                shouldReopenModal === 'true' &&
+                connectors.some((c) => c.id === connectorId)
+            ) {
                 if (oauthSuccess === 'true') {
-                    console.log('✅ [OAuth] GitHub OAuth successful for connector:', connectorId);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'success' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: 'OAuth configured successfully' }));
-                    
+                    console.log(
+                        '✅ [OAuth] GitHub OAuth successful for connector:',
+                        connectorId,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'success',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]: 'OAuth configured successfully',
+                    }));
+
                     // Clean up localStorage
                     localStorage.removeItem('githubOAuthConnectorId');
                     localStorage.removeItem('githubOAuthSuccess');
                     localStorage.removeItem('githubOAuthShouldReopenModal');
                 } else if (oauthSuccess === 'false') {
-                    const errorMessage = localStorage.getItem('githubOAuthError') || 'OAuth authentication failed';
-                    console.error('❌ [OAuth] GitHub OAuth failed for connector:', connectorId, errorMessage);
-                    setOauthStatus(prev => ({ ...prev, [connectorId]: 'error' }));
-                    setOauthMessages(prev => ({ ...prev, [connectorId]: errorMessage }));
-                    
+                    const errorMessage =
+                        localStorage.getItem('githubOAuthError') ||
+                        'OAuth authentication failed';
+                    console.error(
+                        '❌ [OAuth] GitHub OAuth failed for connector:',
+                        connectorId,
+                        errorMessage,
+                    );
+                    setOauthStatus((prev) => ({
+                        ...prev,
+                        [connectorId]: 'error',
+                    }));
+                    setOauthMessages((prev) => ({
+                        ...prev,
+                        [connectorId]: errorMessage,
+                    }));
+
                     // Clean up localStorage
                     localStorage.removeItem('githubOAuthConnectorId');
                     localStorage.removeItem('githubOAuthSuccess');
@@ -1117,114 +1426,166 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
     // Track if modal was previously open to prevent resetting on parent re-renders
     const wasOpenRef = useRef(false);
-    
+
     // Reset connectors when modal opens/closes
     useEffect(() => {
         if (isOpen) {
             const wasClosed = !wasOpenRef.current;
             wasOpenRef.current = true;
-            
+
             // Only reset if modal was just opened (transition from closed to open)
             // Don't reset if modal is staying open (already had connectors)
             if (wasClosed) {
-                console.log('🔍 ConnectorModal opened with initialConnectors:', initialConnectors);
+                console.log(
+                    '🔍 ConnectorModal opened with initialConnectors:',
+                    initialConnectors,
+                );
                 if (initialConnectors.length > 0) {
-                    console.log('🔌 Loading initial connectors:', initialConnectors);
+                    console.log(
+                        '🔌 Loading initial connectors:',
+                        initialConnectors,
+                    );
                     setConnectors(initialConnectors);
-                    setOriginalConnectors(JSON.parse(JSON.stringify(initialConnectors))); // Deep copy
+                    setOriginalConnectors(
+                        JSON.parse(JSON.stringify(initialConnectors)),
+                    ); // Deep copy
                     setActivelyEditingNewConnector(new Set());
                     setEditingConnectorId(null); // Clear any editing state to show summary view
-                    console.log('🔌 Loaded', initialConnectors.length, 'saved connector(s) - will show summary view if complete');
+                    console.log(
+                        '🔌 Loaded',
+                        initialConnectors.length,
+                        'saved connector(s) - will show summary view if complete',
+                    );
                 } else if (connectors.length === 0) {
                     // Only create new connector if we don't have any connectors yet
                     const newId = generateId();
-                    const newConnectors = [{
-                        id: newId,
-                        category: '',
-                        connector: '',
-                        authenticationType: '',
-                        username: '',
-                        usernameEncryption: 'Plaintext',
-                        apiKey: '',
-                        apiKeyEncryption: 'Encrypted', // Default to Encrypted
-                        personalAccessToken: '',
-                        tokenEncryption: 'Plaintext',
-                        status: true, // Default to Active (true)
-                        description: ''
-                    }];
+                    const newConnectors = [
+                        {
+                            id: newId,
+                            category: '',
+                            connector: '',
+                            authenticationType: '',
+                            username: '',
+                            usernameEncryption: 'Plaintext',
+                            apiKey: '',
+                            apiKeyEncryption: 'Encrypted', // Default to Encrypted
+                            personalAccessToken: '',
+                            tokenEncryption: 'Plaintext',
+                            status: true, // Default to Active (true)
+                            description: '',
+                        },
+                    ];
                     setConnectors(newConnectors);
-                    setOriginalConnectors(JSON.parse(JSON.stringify(newConnectors))); // Deep copy
+                    setOriginalConnectors(
+                        JSON.parse(JSON.stringify(newConnectors)),
+                    ); // Deep copy
                     // Mark this new connector as actively being edited
                     setActivelyEditingNewConnector(new Set([newId]));
                 } else {
                     // Modal staying open with existing connectors - preserve them
-                    console.log('🔍 ConnectorModal staying open - preserving existing connectors:', connectors.length);
+                    console.log(
+                        '🔍 ConnectorModal staying open - preserving existing connectors:',
+                        connectors.length,
+                    );
                 }
                 setHasUnsavedChanges(false);
-                
+
                 // Don't reset OAuth status when modal opens - preserve pending and success statuses
                 // This allows "OAuth in Progress" to persist until authorization completes
                 // Also check localStorage for any active OAuth flows
-                setOauthStatus(prev => {
-                const preserved: {[connectorId: string]: 'idle' | 'pending' | 'success' | 'error'} = {};
-                
-                // First, preserve existing pending/success statuses
-                Object.keys(prev).forEach(connectorId => {
-                    if (prev[connectorId] === 'pending' || prev[connectorId] === 'success') {
-                        preserved[connectorId] = prev[connectorId];
-                    }
-                });
-                
-                // Also check localStorage for active OAuth flows
-                if (typeof window !== 'undefined') {
-                    const storedConnectorId = localStorage.getItem('githubOAuthConnectorId');
-                    const oauthSuccess = localStorage.getItem('githubOAuthSuccess');
-                    
-                    if (storedConnectorId && connectors.some(c => c.id === storedConnectorId)) {
-                        if (oauthSuccess === 'true') {
-                            preserved[storedConnectorId] = 'success';
-                        } else if (oauthSuccess !== 'false') {
-                            // If there's a connector ID but no success/error yet, it's pending
-                            preserved[storedConnectorId] = 'pending';
+                setOauthStatus((prev) => {
+                    const preserved: {
+                        [connectorId: string]:
+                            | 'idle'
+                            | 'pending'
+                            | 'success'
+                            | 'error';
+                    } = {};
+
+                    // First, preserve existing pending/success statuses
+                    Object.keys(prev).forEach((connectorId) => {
+                        if (
+                            prev[connectorId] === 'pending' ||
+                            prev[connectorId] === 'success'
+                        ) {
+                            preserved[connectorId] = prev[connectorId];
+                        }
+                    });
+
+                    // Also check localStorage for active OAuth flows
+                    if (typeof window !== 'undefined') {
+                        const storedConnectorId = localStorage.getItem(
+                            'githubOAuthConnectorId',
+                        );
+                        const oauthSuccess =
+                            localStorage.getItem('githubOAuthSuccess');
+
+                        if (
+                            storedConnectorId &&
+                            connectors.some((c) => c.id === storedConnectorId)
+                        ) {
+                            if (oauthSuccess === 'true') {
+                                preserved[storedConnectorId] = 'success';
+                            } else if (oauthSuccess !== 'false') {
+                                // If there's a connector ID but no success/error yet, it's pending
+                                preserved[storedConnectorId] = 'pending';
+                            }
                         }
                     }
-                }
-                
-                // Update ref with preserved statuses
-                oauthStatusRef.current = preserved;
-                return preserved;
-            });
-            // Preserve messages for pending/success statuses
-            setOauthMessages(prevMessages => {
-                const preserved: {[connectorId: string]: string} = {};
-                Object.keys(prevMessages).forEach(connectorId => {
-                    const status = oauthStatusRef.current[connectorId];
-                    if (status === 'pending' || status === 'success') {
-                        preserved[connectorId] = prevMessages[connectorId];
-                    }
+
+                    // Update ref with preserved statuses
+                    oauthStatusRef.current = preserved;
+                    return preserved;
                 });
-                // Set default messages for pending statuses found in localStorage
-                Object.keys(oauthStatusRef.current).forEach(connectorId => {
-                    if (oauthStatusRef.current[connectorId] === 'pending' && !preserved[connectorId]) {
-                        preserved[connectorId] = 'OAuth in Progress';
-                    } else if (oauthStatusRef.current[connectorId] === 'success' && !preserved[connectorId]) {
-                        preserved[connectorId] = 'OAuth configured successfully';
-                    }
+                // Preserve messages for pending/success statuses
+                setOauthMessages((prevMessages) => {
+                    const preserved: {[connectorId: string]: string} = {};
+                    Object.keys(prevMessages).forEach((connectorId) => {
+                        const status = oauthStatusRef.current[connectorId];
+                        if (status === 'pending' || status === 'success') {
+                            preserved[connectorId] = prevMessages[connectorId];
+                        }
+                    });
+                    // Set default messages for pending statuses found in localStorage
+                    Object.keys(oauthStatusRef.current).forEach(
+                        (connectorId) => {
+                            if (
+                                oauthStatusRef.current[connectorId] ===
+                                    'pending' &&
+                                !preserved[connectorId]
+                            ) {
+                                preserved[connectorId] = 'OAuth in Progress';
+                            } else if (
+                                oauthStatusRef.current[connectorId] ===
+                                    'success' &&
+                                !preserved[connectorId]
+                            ) {
+                                preserved[connectorId] =
+                                    'OAuth configured successfully';
+                            }
+                        },
+                    );
+                    return preserved;
                 });
-                return preserved;
-            });
             } else {
                 // Modal is staying open - but check if initialConnectors changed (new row selected)
                 // If initialConnectors has data and we don't have connectors, load them
                 if (initialConnectors.length > 0 && connectors.length === 0) {
-                    console.log('🔌 Loading initial connectors while staying open:', initialConnectors);
+                    console.log(
+                        '🔌 Loading initial connectors while staying open:',
+                        initialConnectors,
+                    );
                     setConnectors(initialConnectors);
-                    setOriginalConnectors(JSON.parse(JSON.stringify(initialConnectors))); // Deep copy
+                    setOriginalConnectors(
+                        JSON.parse(JSON.stringify(initialConnectors)),
+                    ); // Deep copy
                     setActivelyEditingNewConnector(new Set());
                     setEditingConnectorId(null);
                 } else {
                     // Modal is staying open - preserve state, don't reset
-                    console.log('🔍 ConnectorModal staying open - preserving state');
+                    console.log(
+                        '🔍 ConnectorModal staying open - preserving state',
+                    );
                 }
             }
         } else {
@@ -1237,7 +1598,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     // Track changes to detect unsaved changes
     useEffect(() => {
         if (isOpen && originalConnectors.length > 0) {
-            const hasChanges = JSON.stringify(connectors) !== JSON.stringify(originalConnectors);
+            const hasChanges =
+                JSON.stringify(connectors) !==
+                JSON.stringify(originalConnectors);
             setHasUnsavedChanges(hasChanges);
         }
     }, [connectors, originalConnectors, isOpen]);
@@ -1245,14 +1608,15 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     // After state updates, check if all connectors are saved and clear hasUnsavedChanges
     useEffect(() => {
         if (!isOpen) return;
-        
-        const allComplete = connectors.every(c => isConnectorComplete(c));
-        const allSaved = connectors.every(c => 
-            isConnectorComplete(c) && 
-            !activelyEditingNewConnector.has(c.id) && 
-            editingConnectorId !== c.id
+
+        const allComplete = connectors.every((c) => isConnectorComplete(c));
+        const allSaved = connectors.every(
+            (c) =>
+                isConnectorComplete(c) &&
+                !activelyEditingNewConnector.has(c.id) &&
+                editingConnectorId !== c.id,
         );
-        
+
         if (allComplete && allSaved && connectors.length > 0) {
             setHasUnsavedChanges(false);
         }
@@ -1261,256 +1625,442 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     // Load GitHub OAuth Client ID from API
     useEffect(() => {
         if (!isOpen) return;
-        
+
         const loadGitHubOAuthClientId = async () => {
             setLoadingOAuthClientId(true);
             try {
                 // Get account, enterprise, and workstream (entity) from props or localStorage
-                const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
-                const accountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
-                const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
-                const enterpriseName = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
-                
+                const accountId =
+                    selectedAccountId ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountId')
+                        : null);
+                const accountName =
+                    selectedAccountName ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountName')
+                        : null);
+                const enterpriseId =
+                    selectedEnterpriseId ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedEnterpriseId')
+                        : null);
+                const enterpriseName =
+                    selectedEnterprise ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedEnterpriseName')
+                        : null);
+
                 // Build API URL with query parameters
                 let apiUrl = '/api/oauth/github/client-id';
                 const params = new URLSearchParams();
                 if (accountId) params.append('accountId', accountId);
                 if (accountName) params.append('accountName', accountName);
                 if (enterpriseId) params.append('enterpriseId', enterpriseId);
-                if (enterpriseName) params.append('enterpriseName', enterpriseName);
+                if (enterpriseName)
+                    params.append('enterpriseName', enterpriseName);
                 if (workstream) params.append('workstream', workstream);
                 if (params.toString()) apiUrl += `?${params.toString()}`;
-                
-                console.log('🔑 [OAuth] Fetching GitHub OAuth Client ID from:', apiUrl);
-                
+
+                console.log(
+                    '🔑 [OAuth] Fetching GitHub OAuth Client ID from:',
+                    apiUrl,
+                );
+
                 try {
-                    const response = await api.get<{ clientId: string } | { error: string } | any>(apiUrl);
-                    
+                    const response = await api.get<
+                        {clientId: string} | {error: string} | any
+                    >(apiUrl);
+
                     console.log('📥 [OAuth] API Response:', response);
                     console.log('📥 [OAuth] Response type:', typeof response);
-                    console.log('📥 [OAuth] Response keys:', response ? Object.keys(response) : 'null');
-                    
+                    console.log(
+                        '📥 [OAuth] Response keys:',
+                        response ? Object.keys(response) : 'null',
+                    );
+
                     // Handle different response formats
                     if (response && typeof response === 'object') {
                         // Check if response has clientId property
                         if ('clientId' in response && response.clientId) {
-                            console.log('✅ [OAuth] GitHub OAuth Client ID loaded successfully:', response.clientId.substring(0, 10) + '...');
+                            console.log(
+                                '✅ [OAuth] GitHub OAuth Client ID loaded successfully:',
+                                response.clientId.substring(0, 10) + '...',
+                            );
                             setGithubOAuthClientId(response.clientId);
                             return;
                         }
                         // Check if response has client_id (snake_case)
                         if ('client_id' in response && response.client_id) {
-                            console.log('✅ [OAuth] GitHub OAuth Client ID loaded successfully (snake_case):', response.client_id.substring(0, 10) + '...');
+                            console.log(
+                                '✅ [OAuth] GitHub OAuth Client ID loaded successfully (snake_case):',
+                                response.client_id.substring(0, 10) + '...',
+                            );
                             setGithubOAuthClientId(response.client_id);
                             return;
                         }
                         // Check if response is a string (direct client ID)
-                        if (typeof response === 'string' && response.trim() !== '') {
-                            console.log('✅ [OAuth] GitHub OAuth Client ID loaded successfully (string):', response.substring(0, 10) + '...');
+                        if (
+                            typeof response === 'string' &&
+                            response.trim() !== ''
+                        ) {
+                            console.log(
+                                '✅ [OAuth] GitHub OAuth Client ID loaded successfully (string):',
+                                response.substring(0, 10) + '...',
+                            );
                             setGithubOAuthClientId(response);
                             return;
                         }
                     }
-                    
-                    console.warn('⚠️ [OAuth] GitHub OAuth Client ID not found in response:', response);
+
+                    console.warn(
+                        '⚠️ [OAuth] GitHub OAuth Client ID not found in response:',
+                        response,
+                    );
                     setGithubOAuthClientId(null);
                 } catch (apiError: any) {
                     // Check if it's a 404 (endpoint doesn't exist)
-                    if (apiError?.message?.includes('404') || apiError?.message?.includes('Not Found')) {
-                        console.error('❌ [OAuth] API endpoint not found. Backend endpoint /api/oauth/github/client-id needs to be implemented.');
-                        console.error('📝 [OAuth] Please implement GET /api/oauth/github/client-id endpoint in your backend.');
+                    if (
+                        apiError?.message?.includes('404') ||
+                        apiError?.message?.includes('Not Found')
+                    ) {
+                        console.error(
+                            '❌ [OAuth] API endpoint not found. Backend endpoint /api/oauth/github/client-id needs to be implemented.',
+                        );
+                        console.error(
+                            '📝 [OAuth] Please implement GET /api/oauth/github/client-id endpoint in your backend.',
+                        );
                     } else {
-                        console.error('❌ [OAuth] Failed to load GitHub OAuth Client ID:', apiError);
+                        console.error(
+                            '❌ [OAuth] Failed to load GitHub OAuth Client ID:',
+                            apiError,
+                        );
                     }
                     setGithubOAuthClientId(null);
                 }
             } catch (error: any) {
-                console.error('❌ [OAuth] Unexpected error loading GitHub OAuth Client ID:', error);
+                console.error(
+                    '❌ [OAuth] Unexpected error loading GitHub OAuth Client ID:',
+                    error,
+                );
                 console.error('❌ [OAuth] Error details:', {
                     message: error?.message,
-                    stack: error?.stack
+                    stack: error?.stack,
                 });
                 setGithubOAuthClientId(null);
             } finally {
                 setLoadingOAuthClientId(false);
             }
         };
-        
+
         loadGitHubOAuthClientId();
-    }, [isOpen, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream]);
+    }, [
+        isOpen,
+        selectedAccountId,
+        selectedAccountName,
+        selectedEnterpriseId,
+        selectedEnterprise,
+        workstream,
+    ]);
 
     // Load Global Settings data when modal opens
     useEffect(() => {
         if (!isOpen) return;
-        
+
         const loadGlobalSettingsData = async () => {
             setLoadingGlobalSettings(true);
             try {
                 // Get account, enterprise, and workstream (entity) from props or localStorage
-                const accountId = selectedAccountId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountId') : null);
-                const accountName = selectedAccountName || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedAccountName') : null);
-                const enterpriseId = selectedEnterpriseId || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseId') : null);
-                const enterpriseName = selectedEnterprise || (typeof window !== 'undefined' ? window.localStorage.getItem('selectedEnterpriseName') : null);
-                
-                if (!accountId || !accountName || !enterpriseId || !workstream) {
-                    console.log('⚠️ [ConnectorModal] Missing required context for loading global settings:', {
-                        accountId: !!accountId,
-                        accountName: !!accountName,
-                        enterpriseId: !!enterpriseId,
-                        workstream: !!workstream
-                    });
+                const accountId =
+                    selectedAccountId ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountId')
+                        : null);
+                const accountName =
+                    selectedAccountName ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedAccountName')
+                        : null);
+                const enterpriseId =
+                    selectedEnterpriseId ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedEnterpriseId')
+                        : null);
+                const enterpriseName =
+                    selectedEnterprise ||
+                    (typeof window !== 'undefined'
+                        ? window.localStorage.getItem('selectedEnterpriseName')
+                        : null);
+
+                if (
+                    !accountId ||
+                    !accountName ||
+                    !enterpriseId ||
+                    !workstream
+                ) {
+                    console.log(
+                        '⚠️ [ConnectorModal] Missing required context for loading global settings:',
+                        {
+                            accountId: !!accountId,
+                            accountName: !!accountName,
+                            enterpriseId: !!enterpriseId,
+                            workstream: !!workstream,
+                        },
+                    );
                     setGlobalSettingsData({});
                     setAvailableCategories([]);
                     setLoadingGlobalSettings(false);
                     return;
                 }
-                
-                console.log('📡 [ConnectorModal] Loading global settings for:', {
-                    accountId,
-                    accountName,
-                    enterpriseId,
-                    enterpriseName,
-                    workstream
-                });
-                
+
+                console.log(
+                    '📡 [ConnectorModal] Loading global settings for:',
+                    {
+                        accountId,
+                        accountName,
+                        enterpriseId,
+                        enterpriseName,
+                        workstream,
+                    },
+                );
+
                 // Fetch global settings data filtered by account, enterprise, and entity (workstream)
-                const response = await api.get<Array<{
-                    id?: string;
-                    entityName?: string;
-                    accountId?: string;
-                    accountName?: string;
-                    enterpriseId?: string;
-                    enterpriseName?: string;
-                    configurationDetails?: Record<string, string[]>;
-                    categories?: Record<string, string[]>;
-                    configuration?: Record<string, string[]> | string;
-                }>>(
-                    `/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(accountName)}&enterpriseId=${enterpriseId}`
-                ) || [];
-                
-                console.log('📦 [ConnectorModal] Global settings API response:', response);
-                
+                const response =
+                    (await api.get<
+                        Array<{
+                            id?: string;
+                            entityName?: string;
+                            workstreamName?: string;
+                            accountId?: string;
+                            accountName?: string;
+                            enterpriseId?: string;
+                            enterpriseName?: string;
+                            configurationDetails?: Record<string, string[]>;
+                            categories?: Record<string, string[]>;
+                            configuration?: Record<string, string[]> | string;
+                        }>
+                    >(
+                        `/api/global-settings?accountId=${accountId}&accountName=${encodeURIComponent(
+                            accountName,
+                        )}&enterpriseId=${enterpriseId}`,
+                    )) || [];
+
+                console.log(
+                    '📦 [ConnectorModal] Global settings API response:',
+                    response,
+                );
+
                 // Find the setting that matches the workstream (entity)
-                console.log('🔍 [ConnectorModal] Searching for workstream:', workstream);
-                console.log('🔍 [ConnectorModal] Available entities in response:', response.map((s: any) => s.entityName || s.entity));
-                
+                console.log(
+                    '🔍 [ConnectorModal] Searching for workstream:',
+                    workstream,
+                );
+                console.log(
+                    '🔍 [ConnectorModal] Available workstreams in response:',
+                    response.map(
+                        (s: any) =>
+                            s.workstreamName || s.entityName || s.entity,
+                    ),
+                );
+
                 const entitySetting = response.find((setting: any) => {
-                    const settingEntityName = setting.entityName || setting.entity || '';
-                    const matches = settingEntityName.toLowerCase().trim() === workstream.toLowerCase().trim();
+                    // Support both workstreamName (from global-settings) and entityName (legacy)
+                    const settingWorkstreamName =
+                        setting.workstreamName ||
+                        setting.entityName ||
+                        setting.entity ||
+                        '';
+                    const matches =
+                        settingWorkstreamName.toLowerCase().trim() ===
+                        workstream.toLowerCase().trim();
                     if (matches) {
-                        console.log('✅ [ConnectorModal] Found matching entity:', settingEntityName);
+                        console.log(
+                            '✅ [ConnectorModal] Found matching workstream:',
+                            settingWorkstreamName,
+                        );
                     }
                     return matches;
                 });
-                
+
                 if (entitySetting) {
                     // Extract configurationDetails (category -> tools mapping)
-                    const configDetails = entitySetting.configurationDetails || 
-                                        entitySetting.categories || 
-                                        (typeof entitySetting.configuration === 'object' && entitySetting.configuration !== null 
-                                            ? entitySetting.configuration 
-                                            : {});
-                    
-                    console.log('📦 [ConnectorModal] Found entity setting configuration:', configDetails);
-                    console.log('📦 [ConnectorModal] Configuration keys (categories):', Object.keys(configDetails));
-                    
+                    const configDetails =
+                        entitySetting.configurationDetails ||
+                        entitySetting.categories ||
+                        (typeof entitySetting.configuration === 'object' &&
+                        entitySetting.configuration !== null
+                            ? entitySetting.configuration
+                            : {});
+
+                    console.log(
+                        '📦 [ConnectorModal] Found entity setting configuration:',
+                        configDetails,
+                    );
+                    console.log(
+                        '📦 [ConnectorModal] Configuration keys (categories):',
+                        Object.keys(configDetails),
+                    );
+
                     // Set global settings data
                     setGlobalSettingsData(configDetails);
-                    
+
                     // Extract available categories (only categories that have tools)
                     // Order categories using CATEGORY_ORDER to match Global Settings modal
-                    const allCategories = Object.keys(configDetails).filter(category => {
-                        const tools = configDetails[category];
-                        const hasTools = Array.isArray(tools) && tools.length > 0;
-                        if (hasTools) {
-                            console.log(`  ✅ Category "${category}" has ${tools.length} tools:`, tools);
-                        }
-                        return hasTools;
-                    });
-                    
+                    const allCategories = Object.keys(configDetails).filter(
+                        (category) => {
+                            const tools = configDetails[category];
+                            const hasTools =
+                                Array.isArray(tools) && tools.length > 0;
+                            if (hasTools) {
+                                console.log(
+                                    `  ✅ Category "${category}" has ${tools.length} tools:`,
+                                    tools,
+                                );
+                            }
+                            return hasTools;
+                        },
+                    );
+
                     // Sort categories according to CATEGORY_ORDER, then add any others at the end
                     const orderedCategories = [
-                        ...CATEGORY_ORDER.filter(cat => allCategories.includes(cat)),
-                        ...allCategories.filter(cat => !CATEGORY_ORDER.includes(cat as any))
+                        ...CATEGORY_ORDER.filter((cat) =>
+                            allCategories.includes(cat),
+                        ),
+                        ...allCategories.filter(
+                            (cat) => !CATEGORY_ORDER.includes(cat as any),
+                        ),
                     ];
-                    
+
                     setAvailableCategories(orderedCategories);
-                    console.log('✅ [ConnectorModal] Loaded categories (ordered):', orderedCategories);
+                    console.log(
+                        '✅ [ConnectorModal] Loaded categories (ordered):',
+                        orderedCategories,
+                    );
                 } else {
-                    console.log('⚠️ [ConnectorModal] No global settings found for workstream:', workstream);
-                    console.log('⚠️ [ConnectorModal] Available entities:', response.map((s: any) => ({
-                        entityName: s.entityName || s.entity,
-                        accountId: s.accountId,
-                        enterpriseId: s.enterpriseId
-                    })));
+                    console.log(
+                        '⚠️ [ConnectorModal] No global settings found for workstream:',
+                        workstream,
+                    );
+                    console.log(
+                        '⚠️ [ConnectorModal] Available workstreams:',
+                        response.map((s: any) => ({
+                            workstreamName:
+                                s.workstreamName || s.entityName || s.entity,
+                            accountId: s.accountId,
+                            enterpriseId: s.enterpriseId,
+                        })),
+                    );
                     setGlobalSettingsData({});
                     setAvailableCategories([]);
                 }
             } catch (error) {
-                console.error('❌ [ConnectorModal] Failed to load global settings:', error);
+                console.error(
+                    '❌ [ConnectorModal] Failed to load global settings:',
+                    error,
+                );
                 setGlobalSettingsData({});
                 setAvailableCategories([]);
             } finally {
                 setLoadingGlobalSettings(false);
             }
         };
-        
+
         loadGlobalSettingsData();
-    }, [isOpen, selectedAccountId, selectedAccountName, selectedEnterpriseId, selectedEnterprise, workstream]);
+    }, [
+        isOpen,
+        selectedAccountId,
+        selectedAccountName,
+        selectedEnterpriseId,
+        selectedEnterprise,
+        workstream,
+    ]);
 
     // Helper function to get tools for a category
-    const getToolsForCategory = useCallback((category: string): string[] => {
-        if (!category || !globalSettingsData[category]) {
-            return [];
-        }
-        return globalSettingsData[category] || [];
-    }, [globalSettingsData]);
+    const getToolsForCategory = useCallback(
+        (category: string): string[] => {
+            if (!category || !globalSettingsData[category]) {
+                return [];
+            }
+            return globalSettingsData[category] || [];
+        },
+        [globalSettingsData],
+    );
 
     // Define tool order for each category (matching Global Settings modal)
     const TOOL_ORDER_BY_CATEGORY: Record<string, string[]> = {
         plan: ['Jira', 'Azure DevOps', 'Trello', 'Asana', 'Other'],
-        code: ['GitHub', 'GitLab', 'Azure Repos', 'Bitbucket', 'SonarQube', 'Other'],
-        build: ['Jenkins', 'GitHub Actions', 'CircleCI', 'AWS CodeBuild', 'Google Cloud Build', 'Azure DevOps', 'Other'],
+        code: [
+            'GitHub',
+            'GitLab',
+            'Azure Repos',
+            'Bitbucket',
+            'SonarQube',
+            'Other',
+        ],
+        build: [
+            'Jenkins',
+            'GitHub Actions',
+            'CircleCI',
+            'AWS CodeBuild',
+            'Google Cloud Build',
+            'Azure DevOps',
+            'Other',
+        ],
         test: ['Cypress', 'Selenium', 'Jest', 'Tricentis Tosca', 'Other'],
         release: ['Argo CD', 'ServiceNow', 'Azure DevOps', 'Other'],
-        deploy: ['Kubernetes', 'Helm', 'Terraform', 'Ansible', 'Docker', 'AWS CodePipeline', 'Cloud Foundry', 'Other'],
+        deploy: [
+            'Kubernetes',
+            'Helm',
+            'Terraform',
+            'Ansible',
+            'Docker',
+            'AWS CodePipeline',
+            'Cloud Foundry',
+            'Other',
+        ],
         others: ['Prometheus', 'Grafana', 'Slack', 'Other'],
     };
 
     // Define authentication types available for each connector
     const AUTH_TYPES_BY_CONNECTOR: Record<string, string[]> = {
-        'Jira': ['Username and API Key', 'Personal Access Token'],
-        'GitHub': ['Username and Token', 'GitHub App', 'OAuth'],
+        Jira: ['Username and API Key', 'Personal Access Token'],
+        GitHub: ['Username and Token', 'GitHub App', 'OAuth'],
         'Cloud Foundry': ['OAuth2'],
         // Add more connectors as needed
     };
 
     // Helper function to get authentication types for a connector
-    const getAuthTypesForConnector = useCallback((connectorName: string): string[] => {
-        if (!connectorName) return [];
-        return AUTH_TYPES_BY_CONNECTOR[connectorName] || [];
-    }, []);
+    const getAuthTypesForConnector = useCallback(
+        (connectorName: string): string[] => {
+            if (!connectorName) return [];
+            return AUTH_TYPES_BY_CONNECTOR[connectorName] || [];
+        },
+        [],
+    );
 
     // Helper function to get ordered tools for a category
-    const getOrderedToolsForCategory = useCallback((category: string): string[] => {
-        const tools = getToolsForCategory(category);
-        if (tools.length === 0) return [];
-        
-        // Get the order for this category
-        const order = TOOL_ORDER_BY_CATEGORY[category] || [];
-        
-        // Sort tools according to the order, then add any remaining tools at the end
-        const ordered = [
-            ...order.filter(tool => tools.includes(tool)),
-            ...tools.filter(tool => !order.includes(tool))
-        ];
-        
-        return ordered;
-    }, [getToolsForCategory]);
+    const getOrderedToolsForCategory = useCallback(
+        (category: string): string[] => {
+            const tools = getToolsForCategory(category);
+            if (tools.length === 0) return [];
+
+            // Get the order for this category
+            const order = TOOL_ORDER_BY_CATEGORY[category] || [];
+
+            // Sort tools according to the order, then add any remaining tools at the end
+            const ordered = [
+                ...order.filter((tool) => tools.includes(tool)),
+                ...tools.filter((tool) => !order.includes(tool)),
+            ];
+
+            return ordered;
+        },
+        [getToolsForCategory],
+    );
 
     const addNewConnector = () => {
         const newId = generateId();
-        setConnectors(prev => [
+        setConnectors((prev) => [
             ...prev,
             {
                 id: newId,
@@ -1524,74 +2074,89 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                 personalAccessToken: '',
                 tokenEncryption: 'Plaintext',
                 status: true, // Default to Active (true)
-                description: ''
-            }
+                description: '',
+            },
         ]);
         // Mark this new connector as actively being edited
-        setActivelyEditingNewConnector(prev => {
+        setActivelyEditingNewConnector((prev) => {
             const newSet = new Set(prev);
             newSet.add(newId);
             return newSet;
         });
     };
 
-    const updateConnector = useCallback((id: string, field: keyof Omit<Connector, 'id'>, value: string | boolean) => {
-        console.log('Updating connector:', { id, field, value });
-        
-        // Mark this connector as actively being edited if it wasn't already
-        setActivelyEditingNewConnector(prev => {
-            const newSet = new Set(prev);
-            newSet.add(id);
-            return newSet;
-        });
-        
-        // Clear validation errors and messages for this field when user starts typing
-        setValidationErrors(prev => {
-            const newErrors = { ...prev };
-            if (newErrors[id]) {
-                newErrors[id] = newErrors[id].filter(error => error !== field);
-                if (newErrors[id].length === 0) {
-                    delete newErrors[id];
-                }
-            }
-            return newErrors;
-        });
-        
-        setValidationMessages(prev => {
-            const newMessages = { ...prev };
-            if (newMessages[id]) {
-                const fieldMessages = { ...newMessages[id] };
-                delete fieldMessages[field as string];
-                if (Object.keys(fieldMessages).length === 0) {
-                    delete newMessages[id];
-                } else {
-                    newMessages[id] = fieldMessages;
-                }
-            }
-            return newMessages;
-        });
-        
-        setConnectors(prev => {
-            const updated = prev.map(connector => {
-                if (connector.id === id) {
-                    const updatedConnector = { ...connector, [field]: value };
-                    // If connector field is being updated, also update the icon name
-                    if (field === 'connector' && typeof value === 'string') {
-                        const toolConfig = getToolConfig(value);
-                        updatedConnector.connectorIconName = toolConfig?.iconName || undefined;
-                    }
-                    return updatedConnector;
-                }
-                return connector;
+    const updateConnector = useCallback(
+        (
+            id: string,
+            field: keyof Omit<Connector, 'id'>,
+            value: string | boolean,
+        ) => {
+            console.log('Updating connector:', {id, field, value});
+
+            // Mark this connector as actively being edited if it wasn't already
+            setActivelyEditingNewConnector((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(id);
+                return newSet;
             });
-            console.log('Updated connectors:', updated);
-            return updated;
-        });
-    }, []);
+
+            // Clear validation errors and messages for this field when user starts typing
+            setValidationErrors((prev) => {
+                const newErrors = {...prev};
+                if (newErrors[id]) {
+                    newErrors[id] = newErrors[id].filter(
+                        (error) => error !== field,
+                    );
+                    if (newErrors[id].length === 0) {
+                        delete newErrors[id];
+                    }
+                }
+                return newErrors;
+            });
+
+            setValidationMessages((prev) => {
+                const newMessages = {...prev};
+                if (newMessages[id]) {
+                    const fieldMessages = {...newMessages[id]};
+                    delete fieldMessages[field as string];
+                    if (Object.keys(fieldMessages).length === 0) {
+                        delete newMessages[id];
+                    } else {
+                        newMessages[id] = fieldMessages;
+                    }
+                }
+                return newMessages;
+            });
+
+            setConnectors((prev) => {
+                const updated = prev.map((connector) => {
+                    if (connector.id === id) {
+                        const updatedConnector = {...connector, [field]: value};
+                        // If connector field is being updated, also update the icon name
+                        if (
+                            field === 'connector' &&
+                            typeof value === 'string'
+                        ) {
+                            const toolConfig = getToolConfig(value);
+                            updatedConnector.connectorIconName =
+                                toolConfig?.iconName || undefined;
+                        }
+                        return updatedConnector;
+                    }
+                    return connector;
+                });
+                console.log('Updated connectors:', updated);
+                return updated;
+            });
+        },
+        [],
+    );
 
     const removeConnector = (id: string) => {
         if (connectors.length > 1) {
-            setConnectors(prev => prev.filter(connector => connector.id !== id));
+            setConnectors((prev) =>
+                prev.filter((connector) => connector.id !== id),
+            );
         }
     };
 
@@ -1600,10 +2165,11 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             return; // Don't save if validation fails
         }
 
-        const validConnectors = connectors.filter(connector => 
-            connector.category.trim() || connector.connector.trim()
+        const validConnectors = connectors.filter(
+            (connector) =>
+                connector.category.trim() || connector.connector.trim(),
         );
-        
+
         if (onSave) {
             onSave(validConnectors);
         }
@@ -1615,79 +2181,95 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
     const handleSaveIndividualConnector = (connector: Connector) => {
         // Get the latest connector from state to ensure we have the most up-to-date values
-        const currentConnector = connectors.find(c => c.id === connector.id) || connector;
-        const connectorToSave = { ...currentConnector };
-        
+        const currentConnector =
+            connectors.find((c) => c.id === connector.id) || connector;
+        const connectorToSave = {...currentConnector};
+
         const connectorValidation = validateConnector(connectorToSave);
         if (connectorValidation.errors.length > 0) {
             // Update validation errors to show the errors for this connector
-            setValidationErrors(prevErrors => ({
+            setValidationErrors((prevErrors) => ({
                 ...prevErrors,
-                [connectorToSave.id]: connectorValidation.errors
+                [connectorToSave.id]: connectorValidation.errors,
             }));
-            setValidationMessages(prevMessages => ({
+            setValidationMessages((prevMessages) => ({
                 ...prevMessages,
-                [connectorToSave.id]: connectorValidation.messages
+                [connectorToSave.id]: connectorValidation.messages,
             }));
             return; // Don't proceed if there are validation errors
         }
 
         // Clear any existing validation errors for this connector
-        setValidationErrors(prevErrors => {
-            const newErrors = { ...prevErrors };
+        setValidationErrors((prevErrors) => {
+            const newErrors = {...prevErrors};
             delete newErrors[connectorToSave.id];
             return newErrors;
         });
 
-        setValidationMessages(prevMessages => {
-            const newMessages = { ...prevMessages };
+        setValidationMessages((prevMessages) => {
+            const newMessages = {...prevMessages};
             delete newMessages[connectorToSave.id];
             return newMessages;
         });
 
         // Update the connector in the current state
-        const updatedConnectors = connectors.map(c => c.id === connectorToSave.id ? connectorToSave : c);
+        const updatedConnectors = connectors.map((c) =>
+            c.id === connectorToSave.id ? connectorToSave : c,
+        );
         setConnectors(updatedConnectors);
-        
+
         // Remove from actively editing when connector saves - this triggers summary view
-        setActivelyEditingNewConnector(prev => {
+        setActivelyEditingNewConnector((prev) => {
             const newSet = new Set(prev);
             newSet.delete(connectorToSave.id);
-            console.log('💾 [ConnectorModal] Removed from activelyEditingNewConnector:', connectorToSave.id, 'Remaining:', Array.from(newSet));
+            console.log(
+                '💾 [ConnectorModal] Removed from activelyEditingNewConnector:',
+                connectorToSave.id,
+                'Remaining:',
+                Array.from(newSet),
+            );
             return newSet;
         });
-        
+
         // Also clear the editingConnectorId if this connector was being edited
         if (editingConnectorId === connectorToSave.id) {
-            console.log('💾 [ConnectorModal] Clearing editingConnectorId:', connectorToSave.id);
+            console.log(
+                '💾 [ConnectorModal] Clearing editingConnectorId:',
+                connectorToSave.id,
+            );
             setEditingConnectorId(null);
         }
-        
+
         console.log('💾 [ConnectorModal] After save - connector state:', {
             id: connectorToSave.id,
             category: connectorToSave.category,
             connector: connectorToSave.connector,
             isComplete: isConnectorComplete(connectorToSave),
-            currentlyActivelyEditing: activelyEditingNewConnector.has(connectorToSave.id),
-            currentlyExplicitlyEditing: editingConnectorId === connectorToSave.id
+            currentlyActivelyEditing: activelyEditingNewConnector.has(
+                connectorToSave.id,
+            ),
+            currentlyExplicitlyEditing:
+                editingConnectorId === connectorToSave.id,
         });
-        
+
         // Update originalConnectors to reflect that this connector is now saved
-        setOriginalConnectors(prev => {
+        setOriginalConnectors((prev) => {
             const updatedOriginal = [...prev];
-            const existingIndex = updatedOriginal.findIndex(c => c.id === connectorToSave.id);
+            const existingIndex = updatedOriginal.findIndex(
+                (c) => c.id === connectorToSave.id,
+            );
             if (existingIndex >= 0) {
-                updatedOriginal[existingIndex] = { ...connectorToSave };
+                updatedOriginal[existingIndex] = {...connectorToSave};
             } else {
-                updatedOriginal.push({ ...connectorToSave });
+                updatedOriginal.push({...connectorToSave});
             }
             return updatedOriginal;
         });
-        
+
         // Save individual connector to database immediately - use setTimeout to avoid updating parent during render
         if (onSaveIndividual) {
-            const validConnectors = updatedConnectors.filter(c => 
-                c.category.trim() || c.connector.trim()
+            const validConnectors = updatedConnectors.filter(
+                (c) => c.category.trim() || c.connector.trim(),
             );
             // Defer the call to avoid updating parent during render
             setTimeout(() => {
@@ -1698,19 +2280,21 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
     const handleClose = () => {
         // Check if any connector is actively being edited (incomplete or explicitly editing)
-        const hasActiveEditing = connectors.some(c => 
-            activelyEditingNewConnector.has(c.id) || 
-            editingConnectorId === c.id || 
-            !isConnectorComplete(c)
+        const hasActiveEditing = connectors.some(
+            (c) =>
+                activelyEditingNewConnector.has(c.id) ||
+                editingConnectorId === c.id ||
+                !isConnectorComplete(c),
         );
-        
+
         if (hasUnsavedChanges || hasActiveEditing) {
             setShowUnsavedChangesDialog(true);
         } else {
             // All connectors are saved and showing summary view - allow closing
             // Save current connectors before closing (includes individually saved connectors)
-            const validConnectors = connectors.filter(connector => 
-                connector.category.trim() || connector.connector.trim()
+            const validConnectors = connectors.filter(
+                (connector) =>
+                    connector.category.trim() || connector.connector.trim(),
             );
             if (onSave) {
                 onSave(validConnectors);
@@ -1721,8 +2305,9 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 
     const handleDiscardChanges = () => {
         // Even when discarding changes, save any individually saved connectors
-        const validConnectors = originalConnectors.filter(connector => 
-            connector.category.trim() || connector.connector.trim()
+        const validConnectors = originalConnectors.filter(
+            (connector) =>
+                connector.category.trim() || connector.connector.trim(),
         );
         if (onSave) {
             onSave(validConnectors);
@@ -1739,754 +2324,1687 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] overflow-hidden">
+        <div className='fixed inset-0 z-[9999] overflow-hidden'>
             {/* Backdrop */}
-            <div 
-                className="absolute inset-0 bg-black bg-opacity-50"
+            <div
+                className='absolute inset-0 bg-black bg-opacity-50'
                 onClick={handleClose}
             />
-            
+
             {/* Modal Panel */}
-            <motion.div 
-                className="absolute right-0 top-0 h-screen w-[500px] shadow-2xl border-l border-gray-200 flex overflow-hidden"
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ 
-                    type: "spring",
+            <motion.div
+                className='absolute right-0 top-0 h-screen w-[500px] shadow-2xl border-l border-gray-200 flex overflow-hidden'
+                initial={{x: '100%'}}
+                animate={{x: 0}}
+                exit={{x: '100%'}}
+                transition={{
+                    type: 'spring',
                     stiffness: 300,
-                    damping: 30
+                    damping: 30,
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Left Panel - Sidebar Image */}
-                <div className="w-10 bg-slate-800 text-white flex flex-col relative h-screen">
-                    <img 
-                        src="/images/logos/sidebar.png" 
-                        alt="Sidebar" 
-                        className="w-full h-full object-cover"
+                <div className='w-10 bg-slate-800 text-white flex flex-col relative h-screen'>
+                    <img
+                        src='/images/logos/sidebar.png'
+                        alt='Sidebar'
+                        className='w-full h-full object-cover'
                     />
-                    
+
                     {/* Middle Text - Rotated and Bold */}
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
-                        <div className="flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide">
-                            <Plug className="h-4 w-4" />
+                    <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-90 origin-center z-10'>
+                        <div className='flex items-center space-x-2 text-sm font-bold text-white whitespace-nowrap tracking-wide'>
+                            <Plug className='h-4 w-4' />
                             <span>Manage Connector</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col bg-white">
+                <div className='flex-1 flex flex-col bg-white'>
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0">
-                        <div className="flex items-center justify-between">
+                    <div className='bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 px-6 py-4 border-b border-blue-500/20 flex-shrink-0'>
+                        <div className='flex items-center justify-between'>
                             <div>
-                                <p className="text-blue-100 text-base">Configure Connector</p>
+                                <p className='text-blue-100 text-base'>
+                                    Configure Connector
+                                </p>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className='flex items-center space-x-2'>
                                 <button
                                     onClick={handleClose}
-                                    className="p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                                    className='p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg'
                                 >
-                                    <X className="h-5 w-5" />
+                                    <X className='h-5 w-5' />
                                 </button>
                             </div>
                         </div>
-                        
+
                         {/* Credential Info */}
-                        <div className="mt-4">
-                            <div className="text-blue-100 text-sm font-medium mb-1">Credential Name</div>
-                            <div className="bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center">
-                                <div className="text-white font-medium truncate text-xs">{credentialName || '\u00A0'}</div>
+                        <div className='mt-4'>
+                            <div className='text-blue-100 text-sm font-medium mb-1'>
+                                Credential Name
+                            </div>
+                            <div className='bg-white/10 rounded px-2 py-1 backdrop-blur-sm border border-white/20 min-h-[28px] flex items-center'>
+                                <div className='text-white font-medium truncate text-xs'>
+                                    {credentialName || '\u00A0'}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                {/* Content Area - Fixed height and proper overflow */}
-                <div className="flex-1 bg-gray-50 overflow-hidden">
-                    <div className="h-full overflow-y-auto px-6 py-6">
-                        <div className="space-y-6">
-                            {/* Connector Cards */}
-                            {connectors.map((connector, index) => (
-                                <div 
-                                    key={connector.id} 
-                                    className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"
-                                >
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2 bg-blue-100 rounded-lg">
-                                                <Plug className="h-4 w-4 text-blue-600" />
-                                            </div>
-                                            <h3 className="text-base font-semibold text-gray-900">
-                                                Connector
-                                            </h3>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            {/* Show Save button when actively editing (either incomplete connector or explicitly editing) */}
-                                            {(activelyEditingNewConnector.has(connector.id) || editingConnectorId === connector.id || !isConnectorComplete(connector)) && (
-                                                <button
-                                                    onClick={() => handleSaveIndividualConnector(connector)}
-                                                    className="flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50"
-                                                >
-                                                    <BookmarkIcon className="h-4 w-4" />
-                                                    <span>Save</span>
-                                                </button>
-                                            )}
-                                            {isConnectorComplete(connector) && !activelyEditingNewConnector.has(connector.id) && editingConnectorId !== connector.id && (
-                                                <button
-                                                    onClick={() => {
-                                                        if (editingConnectorId === connector.id) {
-                                                            setEditingConnectorId(null);
-                                                        } else {
-                                                            setEditingConnectorId(connector.id);
-                                                            // Add back to actively editing when clicking Edit from summary
-                                                            setActivelyEditingNewConnector(prev => {
-                                                                const newSet = new Set(prev);
-                                                                newSet.add(connector.id);
-                                                                return newSet;
-                                                            });
-                                                        }
-                                                    }}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                                                >
-                                                    <Edit2 className="h-3 w-3" />
-                                                    <span>{editingConnectorId === connector.id ? 'Cancel' : 'Edit'}</span>
-                                                </button>
-                                            )}
-                                            {connectors.length > 1 && (
-                                                <button
-                                                    onClick={() => removeConnector(connector.id)}
-                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors"
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Connector Form Fields - Always show for incomplete connectors, actively editing connectors, or when explicitly editing */}
-                                    {(() => {
-                                        const isComplete = isConnectorComplete(connector);
-                                        const isActivelyEditing = activelyEditingNewConnector.has(connector.id);
-                                        const isExplicitlyEditing = editingConnectorId === connector.id;
-                                        const showEditForm = (!isComplete || isActivelyEditing || isExplicitlyEditing);
-                                        
-                                        // Debug logging
-                                        if (isComplete && !showEditForm) {
-                                            console.log('📋 [ConnectorModal] Showing summary view for connector:', connector.id, {
-                                                isComplete,
-                                                isActivelyEditing,
-                                                isExplicitlyEditing,
-                                                connectorCategory: connector.category,
-                                                connectorName: connector.connector
-                                            });
-                                        }
-                                        
-                                        return showEditForm;
-                                    })() ? (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Category *
-                                                    </label>
-                                                    <CategoryDropdown
-                                                        value={connector.category || ''}
-                                                        onChange={(newCategory) => {
-                                                            updateConnector(connector.id, 'category', newCategory);
-                                                            // Clear connector when category changes
-                                                            if (newCategory !== connector.category) {
-                                                                updateConnector(connector.id, 'connector', '');
-                                                            }
-                                                        }}
-                                                        options={availableCategories}
-                                                        disabled={loadingGlobalSettings || availableCategories.length === 0}
-                                                        isError={validationErrors[connector.id]?.includes('category') || false}
-                                                        placeholder="Select category..."
-                                                    />
-                                                    {validationErrors[connector.id]?.includes('category') && (
-                                                        <p className="text-red-500 text-xs mt-1">
-                                                            {validationMessages[connector.id]?.category || 'Category is required'}
-                                                        </p>
-                                                    )}
-                                                    {loadingGlobalSettings && (
-                                                        <p className="text-gray-500 text-xs mt-1">Loading categories...</p>
-                                                    )}
-                                                    {!loadingGlobalSettings && availableCategories.length === 0 && (
-                                                        <p className="text-gray-500 text-xs mt-1">No categories available for this workstream</p>
-                                                    )}
+                    {/* Content Area - Fixed height and proper overflow */}
+                    <div className='flex-1 bg-gray-50 overflow-hidden'>
+                        <div className='h-full overflow-y-auto px-6 py-6'>
+                            <div className='space-y-6'>
+                                {/* Connector Cards */}
+                                {connectors.map((connector, index) => (
+                                    <div
+                                        key={connector.id}
+                                        className='bg-white border border-gray-200 rounded-xl p-6 shadow-sm'
+                                    >
+                                        <div className='flex items-center justify-between mb-4'>
+                                            <div className='flex items-center space-x-3'>
+                                                <div className='p-2 bg-blue-100 rounded-lg'>
+                                                    <Plug className='h-4 w-4 text-blue-600' />
                                                 </div>
-                                                
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Connector *
-                                                    </label>
-                                                    <ConnectorDropdown
-                                                        value={connector.connector || ''}
-                                                        onChange={(newConnector) => {
-                                                            updateConnector(connector.id, 'connector', newConnector);
-                                                            // Clear authentication type when connector changes
-                                                            if (newConnector !== connector.connector) {
-                                                                updateConnector(connector.id, 'authenticationType', '');
-                                                            }
-                                                        }}
-                                                        options={connector.category ? getOrderedToolsForCategory(connector.category) : []}
-                                                        disabled={loadingGlobalSettings || !connector.category || getOrderedToolsForCategory(connector.category).length === 0}
-                                                        isError={validationErrors[connector.id]?.includes('connector') || false}
-                                                        placeholder="Select connector..."
-                                                        iconName={connector.connectorIconName}
-                                                    />
-                                                    {validationErrors[connector.id]?.includes('connector') && (
-                                                        <p className="text-red-500 text-xs mt-1">
-                                                            {validationMessages[connector.id]?.connector || 'Connector is required'}
-                                                        </p>
-                                                    )}
-                                                    {connector.category && getOrderedToolsForCategory(connector.category).length === 0 && (
-                                                        <p className="text-gray-500 text-xs mt-1">No connectors available for this category</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Authentication Details Section */}
-                                            <div className="border-t border-gray-200 pt-4 mt-4">
-                                                <h3 className="text-base font-semibold text-gray-900 mb-4">
-                                                    Authentication Details
+                                                <h3 className='text-base font-semibold text-gray-900'>
+                                                    Connector
                                                 </h3>
-                                                {/* Cloud Foundry (Deploy): Service Key Details */}
-                                                {connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                            Service Key Details *
+                                            </div>
+                                            <div className='flex items-center space-x-2'>
+                                                {/* Show Save button when actively editing (either incomplete connector or explicitly editing) */}
+                                                {(activelyEditingNewConnector.has(
+                                                    connector.id,
+                                                ) ||
+                                                    editingConnectorId ===
+                                                        connector.id ||
+                                                    !isConnectorComplete(
+                                                        connector,
+                                                    )) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleSaveIndividualConnector(
+                                                                connector,
+                                                            )
+                                                        }
+                                                        className='flex items-center space-x-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 ring-2 ring-blue-300 ring-opacity-50'
+                                                    >
+                                                        <BookmarkIcon className='h-4 w-4' />
+                                                        <span>Save</span>
+                                                    </button>
+                                                )}
+                                                {isConnectorComplete(
+                                                    connector,
+                                                ) &&
+                                                    !activelyEditingNewConnector.has(
+                                                        connector.id,
+                                                    ) &&
+                                                    editingConnectorId !==
+                                                        connector.id && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (
+                                                                    editingConnectorId ===
+                                                                    connector.id
+                                                                ) {
+                                                                    setEditingConnectorId(
+                                                                        null,
+                                                                    );
+                                                                } else {
+                                                                    setEditingConnectorId(
+                                                                        connector.id,
+                                                                    );
+                                                                    // Add back to actively editing when clicking Edit from summary
+                                                                    setActivelyEditingNewConnector(
+                                                                        (
+                                                                            prev,
+                                                                        ) => {
+                                                                            const newSet =
+                                                                                new Set(
+                                                                                    prev,
+                                                                                );
+                                                                            newSet.add(
+                                                                                connector.id,
+                                                                            );
+                                                                            return newSet;
+                                                                        },
+                                                                    );
+                                                                }
+                                                            }}
+                                                            className='flex items-center space-x-1 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors'
+                                                        >
+                                                            <Edit2 className='h-3 w-3' />
+                                                            <span>
+                                                                {editingConnectorId ===
+                                                                connector.id
+                                                                    ? 'Cancel'
+                                                                    : 'Edit'}
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                {connectors.length > 1 && (
+                                                    <button
+                                                        onClick={() =>
+                                                            removeConnector(
+                                                                connector.id,
+                                                            )
+                                                        }
+                                                        className='text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors'
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Connector Form Fields - Always show for incomplete connectors, actively editing connectors, or when explicitly editing */}
+                                        {(() => {
+                                            const isComplete =
+                                                isConnectorComplete(connector);
+                                            const isActivelyEditing =
+                                                activelyEditingNewConnector.has(
+                                                    connector.id,
+                                                );
+                                            const isExplicitlyEditing =
+                                                editingConnectorId ===
+                                                connector.id;
+                                            const showEditForm =
+                                                !isComplete ||
+                                                isActivelyEditing ||
+                                                isExplicitlyEditing;
+
+                                            // Debug logging
+                                            if (isComplete && !showEditForm) {
+                                                console.log(
+                                                    '📋 [ConnectorModal] Showing summary view for connector:',
+                                                    connector.id,
+                                                    {
+                                                        isComplete,
+                                                        isActivelyEditing,
+                                                        isExplicitlyEditing,
+                                                        connectorCategory:
+                                                            connector.category,
+                                                        connectorName:
+                                                            connector.connector,
+                                                    },
+                                                );
+                                            }
+
+                                            return showEditForm;
+                                        })() ? (
+                                            <div className='space-y-4'>
+                                                <div className='grid grid-cols-2 gap-4'>
+                                                    <div>
+                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                            Category *
                                                         </label>
-                                                        <div className="flex items-center gap-6">
-                                                            {(['API', 'IFlow'] as const).map((opt) => (
-                                                                <label key={opt} className="flex items-center gap-2 text-sm text-slate-700">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name={`serviceKeyDetails-${connector.id}`}
-                                                                        value={opt}
-                                                                        checked={connector.serviceKeyDetails === opt}
-                                                                        onChange={() => updateConnector(connector.id, 'serviceKeyDetails', opt)}
-                                                                    />
-                                                                    <span>{opt}</span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                        {validationErrors[connector.id]?.includes('serviceKeyDetails') && (
-                                                            <p className="text-red-500 text-xs mt-1">
-                                                                {validationMessages[connector.id]?.serviceKeyDetails || 'Service Key Details is required'}
+                                                        <CategoryDropdown
+                                                            value={
+                                                                connector.category ||
+                                                                ''
+                                                            }
+                                                            onChange={(
+                                                                newCategory,
+                                                            ) => {
+                                                                updateConnector(
+                                                                    connector.id,
+                                                                    'category',
+                                                                    newCategory,
+                                                                );
+                                                                // Clear connector when category changes
+                                                                if (
+                                                                    newCategory !==
+                                                                    connector.category
+                                                                ) {
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'connector',
+                                                                        '',
+                                                                    );
+                                                                }
+                                                            }}
+                                                            options={
+                                                                availableCategories
+                                                            }
+                                                            disabled={
+                                                                loadingGlobalSettings ||
+                                                                availableCategories.length ===
+                                                                    0
+                                                            }
+                                                            isError={
+                                                                validationErrors[
+                                                                    connector.id
+                                                                ]?.includes(
+                                                                    'category',
+                                                                ) || false
+                                                            }
+                                                            placeholder='Select category...'
+                                                        />
+                                                        {validationErrors[
+                                                            connector.id
+                                                        ]?.includes(
+                                                            'category',
+                                                        ) && (
+                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                {validationMessages[
+                                                                    connector.id
+                                                                ]?.category ||
+                                                                    'Category is required'}
                                                             </p>
                                                         )}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Authentication Type
-                                                    </label>
-                                                    <AuthenticationTypeDropdown
-                                                        value={connector.authenticationType || ''}
-                                                        onChange={(newValue) => {
-                                                            updateConnector(connector.id, 'authenticationType', newValue);
-                                                        }}
-                                                        onValueChange={(newValue) => {
-                                                            // Clear OAuth2 fields when auth type changes away from OAuth2
-                                                            if (newValue !== 'OAuth2') {
-                                                                updateConnector(connector.id, 'serviceKeyDetails', '');
-                                                                updateConnector(connector.id, 'oauth2ClientId', '');
-                                                                updateConnector(connector.id, 'oauth2ClientSecret', '');
-                                                                updateConnector(connector.id, 'oauth2TokenUrl', '');
-                                                            }
-                                                            // Set default encryption values when authentication type changes
-                                                            if (newValue === 'Username and API Key') {
-                                                                if (!connector.usernameEncryption) {
-                                                                    updateConnector(connector.id, 'usernameEncryption', 'Plaintext');
-                                                                }
-                                                                if (!connector.apiKeyEncryption) {
-                                                                    updateConnector(connector.id, 'apiKeyEncryption', 'Encrypted');
-                                                                }
-                                                            } else if (newValue === 'Personal Access Token') {
-                                                                if (!connector.tokenEncryption) {
-                                                                    updateConnector(connector.id, 'tokenEncryption', 'Plaintext');
-                                                                }
-                                                            } else if (newValue === 'Username and Token') {
-                                                                // For GitHub: Username and Token
-                                                                if (!connector.usernameEncryption) {
-                                                                    updateConnector(connector.id, 'usernameEncryption', 'Plaintext');
-                                                                }
-                                                                if (!connector.tokenEncryption) {
-                                                                    updateConnector(connector.id, 'tokenEncryption', 'Plaintext');
-                                                                }
-                                                            } else if (newValue === 'GitHub App') {
-                                                                // For GitHub: GitHub App
-                                                                if (!connector.githubInstallationIdEncryption) {
-                                                                    updateConnector(connector.id, 'githubInstallationIdEncryption', 'Plaintext');
-                                                                }
-                                                                if (!connector.githubApplicationIdEncryption) {
-                                                                    updateConnector(connector.id, 'githubApplicationIdEncryption', 'Plaintext');
-                                                                }
-                                                            }
-                                                        }}
-                                                        options={getAuthTypesForConnector(connector.connector)}
-                                                        disabled={!connector.category || !connector.connector || getAuthTypesForConnector(connector.connector).length === 0}
-                                                        isError={validationErrors[connector.id]?.includes('authenticationType') || false}
-                                                        placeholder="Select authentication type..."
-                                                    />
-                                                    {validationErrors[connector.id]?.includes('authenticationType') && (
-                                                        <p className="text-red-500 text-xs mt-1">
-                                                            {validationMessages[connector.id]?.authenticationType || 'Authentication Type is required'}
-                                                        </p>
-                                                    )}
-                                                    
-                                                    {/* Conditional fields for Username and API Key (Jira) */}
-                                                    {connector.authenticationType === 'Username and API Key' && (
-                                                        <div className="mt-4 space-y-4">
-                                                            {/* Username field with encryption dropdown */}
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="block text-sm font-medium text-gray-700">
-                                                                        Username *
-                                                                    </label>
-                                                                    <EncryptionTypeDropdown
-                                                                        value={connector.usernameEncryption || 'Plaintext'}
-                                                                        onChange={(newValue) => updateConnector(connector.id, 'usernameEncryption', newValue)}
-                                                                        disabled={false}
-                                                                        isError={false}
-                                                                        placeholder="Plaintext"
-                                                                    />
-                                                                </div>
-                                                                <input
-                                                                    type={connector.usernameEncryption === 'Encrypted' ? 'password' : 'text'}
-                                                                    value={connector.username || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'username', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('username')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('username') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.username || 'Username is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* API Key field */}
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    API Key *
-                                                                </label>
-                                                                <input
-                                                                    type="password"
-                                                                    value={connector.apiKey || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'apiKey', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('apiKey')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('apiKey') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.apiKey || 'API Key is required'}
-                                                                    </p>
-                                                                )}
-                                                                <div className="mt-1 text-xs text-gray-500">
-                                                                    Default encryption: Encrypted
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Conditional fields for Username and Token (GitHub) */}
-                                                    {connector.authenticationType === 'Username and Token' && (
-                                                        <div className="mt-4 space-y-4">
-                                                            {/* Username field with encryption dropdown */}
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="block text-sm font-medium text-gray-700">
-                                                                        Username *
-                                                                    </label>
-                                                                    <EncryptionTypeDropdown
-                                                                        value={connector.usernameEncryption || 'Plaintext'}
-                                                                        onChange={(newValue) => updateConnector(connector.id, 'usernameEncryption', newValue)}
-                                                                        disabled={false}
-                                                                        isError={false}
-                                                                        placeholder="Plaintext"
-                                                                    />
-                                                                </div>
-                                                                <input
-                                                                    type={connector.usernameEncryption === 'Encrypted' ? 'password' : 'text'}
-                                                                    value={connector.username || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'username', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('username')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('username') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.username || 'Username is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* Personal Access Token field */}
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    Personal Access Token *
-                                                                </label>
-                                                                <input
-                                                                    type="password"
-                                                                    value={connector.personalAccessToken || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'personalAccessToken', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('personalAccessToken')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('personalAccessToken') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.personalAccessToken || 'Personal Access Token is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Conditional fields for Personal Access Token (Jira) */}
-                                                    {connector.authenticationType === 'Personal Access Token' && (
-                                                        <div className="mt-4">
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                Personal Access Token *
-                                                            </label>
-                                                            <input
-                                                                type="password"
-                                                                value={connector.personalAccessToken || ''}
-                                                                onChange={(e) => updateConnector(connector.id, 'personalAccessToken', e.target.value)}
-                                                                className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                    validationErrors[connector.id]?.includes('personalAccessToken')
-                                                                        ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                        : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                }`}
-                                                            />
-                                                            {validationErrors[connector.id]?.includes('personalAccessToken') && (
-                                                                <p className="text-red-500 text-xs mt-1">
-                                                                    {validationMessages[connector.id]?.personalAccessToken || 'Personal Access Token is required'}
+                                                        {loadingGlobalSettings && (
+                                                            <p className='text-gray-500 text-xs mt-1'>
+                                                                Loading
+                                                                categories...
+                                                            </p>
+                                                        )}
+                                                        {!loadingGlobalSettings &&
+                                                            availableCategories.length ===
+                                                                0 && (
+                                                                <p className='text-gray-500 text-xs mt-1'>
+                                                                    No
+                                                                    categories
+                                                                    available
+                                                                    for this
+                                                                    workstream
                                                                 </p>
                                                             )}
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Conditional fields for GitHub App */}
-                                                    {connector.authenticationType === 'GitHub App' && (
-                                                        <div className="mt-4 space-y-4">
-                                                            {/* GitHub Installation Id field with encryption dropdown */}
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="block text-sm font-medium text-gray-700">
-                                                                        GitHub Installation Id *
-                                                                    </label>
-                                                                    <EncryptionTypeDropdown
-                                                                        value={connector.githubInstallationIdEncryption || 'Plaintext'}
-                                                                        onChange={(newValue) => updateConnector(connector.id, 'githubInstallationIdEncryption', newValue)}
-                                                                        disabled={false}
-                                                                        isError={false}
-                                                                        placeholder="Plaintext"
-                                                                    />
-                                                                </div>
-                                                                <input
-                                                                    type={connector.githubInstallationIdEncryption === 'Encrypted' ? 'password' : 'text'}
-                                                                    value={connector.githubInstallationId || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'githubInstallationId', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('githubInstallationId')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('githubInstallationId') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.githubInstallationId || 'GitHub Installation Id is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* GitHub Application Id field with encryption dropdown */}
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="block text-sm font-medium text-gray-700">
-                                                                        GitHub Application Id *
-                                                                    </label>
-                                                                    <EncryptionTypeDropdown
-                                                                        value={connector.githubApplicationIdEncryption || 'Plaintext'}
-                                                                        onChange={(newValue) => updateConnector(connector.id, 'githubApplicationIdEncryption', newValue)}
-                                                                        disabled={false}
-                                                                        isError={false}
-                                                                        placeholder="Plaintext"
-                                                                    />
-                                                                </div>
-                                                                <input
-                                                                    type={connector.githubApplicationIdEncryption === 'Encrypted' ? 'password' : 'text'}
-                                                                    value={connector.githubApplicationId || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'githubApplicationId', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('githubApplicationId')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('githubApplicationId') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.githubApplicationId || 'GitHub Application Id is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* GitHub Private Key field */}
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    GitHub Private Key *
+                                                    </div>
+
+                                                    <div>
+                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                            Connector *
+                                                        </label>
+                                                        <ConnectorDropdown
+                                                            value={
+                                                                connector.connector ||
+                                                                ''
+                                                            }
+                                                            onChange={(
+                                                                newConnector,
+                                                            ) => {
+                                                                updateConnector(
+                                                                    connector.id,
+                                                                    'connector',
+                                                                    newConnector,
+                                                                );
+                                                                // Clear authentication type when connector changes
+                                                                if (
+                                                                    newConnector !==
+                                                                    connector.connector
+                                                                ) {
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'authenticationType',
+                                                                        '',
+                                                                    );
+                                                                }
+                                                            }}
+                                                            options={
+                                                                connector.category
+                                                                    ? getOrderedToolsForCategory(
+                                                                          connector.category,
+                                                                      )
+                                                                    : []
+                                                            }
+                                                            disabled={
+                                                                loadingGlobalSettings ||
+                                                                !connector.category ||
+                                                                getOrderedToolsForCategory(
+                                                                    connector.category,
+                                                                ).length === 0
+                                                            }
+                                                            isError={
+                                                                validationErrors[
+                                                                    connector.id
+                                                                ]?.includes(
+                                                                    'connector',
+                                                                ) || false
+                                                            }
+                                                            placeholder='Select connector...'
+                                                            iconName={
+                                                                connector.connectorIconName
+                                                            }
+                                                        />
+                                                        {validationErrors[
+                                                            connector.id
+                                                        ]?.includes(
+                                                            'connector',
+                                                        ) && (
+                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                {validationMessages[
+                                                                    connector.id
+                                                                ]?.connector ||
+                                                                    'Connector is required'}
+                                                            </p>
+                                                        )}
+                                                        {connector.category &&
+                                                            getOrderedToolsForCategory(
+                                                                connector.category,
+                                                            ).length === 0 && (
+                                                                <p className='text-gray-500 text-xs mt-1'>
+                                                                    No
+                                                                    connectors
+                                                                    available
+                                                                    for this
+                                                                    category
+                                                                </p>
+                                                            )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Authentication Details Section */}
+                                                <div className='border-t border-gray-200 pt-4 mt-4'>
+                                                    <h3 className='text-base font-semibold text-gray-900 mb-4'>
+                                                        Authentication Details
+                                                    </h3>
+                                                    {/* Cloud Foundry (Deploy): Service Key Details */}
+                                                    {connector.category ===
+                                                        'deploy' &&
+                                                        connector.connector ===
+                                                            'Cloud Foundry' && (
+                                                            <div className='mb-4'>
+                                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                    Service Key
+                                                                    Details *
                                                                 </label>
-                                                                <input
-                                                                    type="password"
-                                                                    value={connector.githubPrivateKey || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'githubPrivateKey', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('githubPrivateKey')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('githubPrivateKey') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.githubPrivateKey || 'GitHub Private Key is required'}
+                                                                <div className='flex items-center gap-6'>
+                                                                    {(
+                                                                        [
+                                                                            'API',
+                                                                            'IFlow',
+                                                                        ] as const
+                                                                    ).map(
+                                                                        (
+                                                                            opt,
+                                                                        ) => (
+                                                                            <label
+                                                                                key={
+                                                                                    opt
+                                                                                }
+                                                                                className='flex items-center gap-2 text-sm text-slate-700'
+                                                                            >
+                                                                                <input
+                                                                                    type='radio'
+                                                                                    name={`serviceKeyDetails-${connector.id}`}
+                                                                                    value={
+                                                                                        opt
+                                                                                    }
+                                                                                    checked={
+                                                                                        connector.serviceKeyDetails ===
+                                                                                        opt
+                                                                                    }
+                                                                                    onChange={() =>
+                                                                                        updateConnector(
+                                                                                            connector.id,
+                                                                                            'serviceKeyDetails',
+                                                                                            opt,
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                                <span>
+                                                                                    {
+                                                                                        opt
+                                                                                    }
+                                                                                </span>
+                                                                            </label>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                                {validationErrors[
+                                                                    connector.id
+                                                                ]?.includes(
+                                                                    'serviceKeyDetails',
+                                                                ) && (
+                                                                    <p className='text-red-500 text-xs mt-1'>
+                                                                        {validationMessages[
+                                                                            connector
+                                                                                .id
+                                                                        ]
+                                                                            ?.serviceKeyDetails ||
+                                                                            'Service Key Details is required'}
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Conditional fields for OAuth */}
-                                                    {connector.authenticationType === 'OAuth' && (
-                                                        <div className="mt-4">
-                                                            <div className="flex items-center justify-between mb-4">
+                                                        )}
+                                                    <div>
+                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                            Authentication Type
+                                                        </label>
+                                                        <AuthenticationTypeDropdown
+                                                            value={
+                                                                connector.authenticationType ||
+                                                                ''
+                                                            }
+                                                            onChange={(
+                                                                newValue,
+                                                            ) => {
+                                                                updateConnector(
+                                                                    connector.id,
+                                                                    'authenticationType',
+                                                                    newValue,
+                                                                );
+                                                            }}
+                                                            onValueChange={(
+                                                                newValue,
+                                                            ) => {
+                                                                // Clear OAuth2 fields when auth type changes away from OAuth2
+                                                                if (
+                                                                    newValue !==
+                                                                    'OAuth2'
+                                                                ) {
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'serviceKeyDetails',
+                                                                        '',
+                                                                    );
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'oauth2ClientId',
+                                                                        '',
+                                                                    );
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'oauth2ClientSecret',
+                                                                        '',
+                                                                    );
+                                                                    updateConnector(
+                                                                        connector.id,
+                                                                        'oauth2TokenUrl',
+                                                                        '',
+                                                                    );
+                                                                }
+                                                                // Set default encryption values when authentication type changes
+                                                                if (
+                                                                    newValue ===
+                                                                    'Username and API Key'
+                                                                ) {
+                                                                    if (
+                                                                        !connector.usernameEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'usernameEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        !connector.apiKeyEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'apiKeyEncryption',
+                                                                            'Encrypted',
+                                                                        );
+                                                                    }
+                                                                } else if (
+                                                                    newValue ===
+                                                                    'Personal Access Token'
+                                                                ) {
+                                                                    if (
+                                                                        !connector.tokenEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'tokenEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                } else if (
+                                                                    newValue ===
+                                                                    'Username and Token'
+                                                                ) {
+                                                                    // For GitHub: Username and Token
+                                                                    if (
+                                                                        !connector.usernameEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'usernameEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        !connector.tokenEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'tokenEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                } else if (
+                                                                    newValue ===
+                                                                    'GitHub App'
+                                                                ) {
+                                                                    // For GitHub: GitHub App
+                                                                    if (
+                                                                        !connector.githubInstallationIdEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'githubInstallationIdEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                    if (
+                                                                        !connector.githubApplicationIdEncryption
+                                                                    ) {
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'githubApplicationIdEncryption',
+                                                                            'Plaintext',
+                                                                        );
+                                                                    }
+                                                                }
+                                                            }}
+                                                            options={getAuthTypesForConnector(
+                                                                connector.connector,
+                                                            )}
+                                                            disabled={
+                                                                !connector.category ||
+                                                                !connector.connector ||
+                                                                getAuthTypesForConnector(
+                                                                    connector.connector,
+                                                                ).length === 0
+                                                            }
+                                                            isError={
+                                                                validationErrors[
+                                                                    connector.id
+                                                                ]?.includes(
+                                                                    'authenticationType',
+                                                                ) || false
+                                                            }
+                                                            placeholder='Select authentication type...'
+                                                        />
+                                                        {validationErrors[
+                                                            connector.id
+                                                        ]?.includes(
+                                                            'authenticationType',
+                                                        ) && (
+                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                {validationMessages[
+                                                                    connector.id
+                                                                ]
+                                                                    ?.authenticationType ||
+                                                                    'Authentication Type is required'}
+                                                            </p>
+                                                        )}
+
+                                                        {/* Conditional fields for Username and API Key (Jira) */}
+                                                        {connector.authenticationType ===
+                                                            'Username and API Key' && (
+                                                            <div className='mt-4 space-y-4'>
+                                                                {/* Username field with encryption dropdown */}
                                                                 <div>
-                                                                    <p className="text-sm font-medium text-gray-700 mb-1">GitHub OAuth Authentication</p>
-                                                                    <p className="text-xs text-gray-500">Connect your GitHub account using OAuth</p>
+                                                                    <div className='flex items-center justify-between mb-2'>
+                                                                        <label className='block text-sm font-medium text-gray-700'>
+                                                                            Username
+                                                                            *
+                                                                        </label>
+                                                                        <EncryptionTypeDropdown
+                                                                            value={
+                                                                                connector.usernameEncryption ||
+                                                                                'Plaintext'
+                                                                            }
+                                                                            onChange={(
+                                                                                newValue,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'usernameEncryption',
+                                                                                    newValue,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                false
+                                                                            }
+                                                                            isError={
+                                                                                false
+                                                                            }
+                                                                            placeholder='Plaintext'
+                                                                        />
+                                                                    </div>
+                                                                    <input
+                                                                        type={
+                                                                            connector.usernameEncryption ===
+                                                                            'Encrypted'
+                                                                                ? 'password'
+                                                                                : 'text'
+                                                                        }
+                                                                        value={
+                                                                            connector.username ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'username',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'username',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'username',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.username ||
+                                                                                'Username is required'}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
-                                                                <OAuthButton
-                                                                    connectorId={connector.id}
-                                                                    githubOAuthClientId={githubOAuthClientId}
-                                                                    loadingOAuthClientId={loadingOAuthClientId}
-                                                                    credentialName={credentialName}
-                                                                    connectors={connectors}
-                                                                    setOauthStatus={setOauthStatus}
-                                                                    setOauthMessages={setOauthMessages}
-                                                                    disabled={loadingOAuthClientId || !githubOAuthClientId || oauthStatus[connector.id] === 'pending'}
-                                                                    oauthWindowsRef={oauthWindowsRef}
-                                                                    selectedAccountId={selectedAccountId}
-                                                                    selectedAccountName={selectedAccountName}
-                                                                    selectedEnterpriseId={selectedEnterpriseId}
-                                                                    selectedEnterprise={selectedEnterprise}
-                                                                    workstream={workstream}
-                                                                    product={product}
-                                                                    service={service}
-                                                                />
+
+                                                                {/* API Key field */}
+                                                                <div>
+                                                                    <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                        API Key
+                                                                        *
+                                                                    </label>
+                                                                    <input
+                                                                        type='password'
+                                                                        value={
+                                                                            connector.apiKey ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'apiKey',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'apiKey',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'apiKey',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.apiKey ||
+                                                                                'API Key is required'}
+                                                                        </p>
+                                                                    )}
+                                                                    <div className='mt-1 text-xs text-gray-500'>
+                                                                        Default
+                                                                        encryption:
+                                                                        Encrypted
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            
-                                                            {/* OAuth Status Messages */}
-                                                            {oauthStatus[connector.id] === 'success' && (
-                                                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <svg className="h-5 w-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                        </svg>
-                                                                        <p className="text-sm font-medium text-green-800">
-                                                                            {oauthMessages[connector.id] || 'OAuth configured successfully'}
+                                                        )}
+
+                                                        {/* Conditional fields for Username and Token (GitHub) */}
+                                                        {connector.authenticationType ===
+                                                            'Username and Token' && (
+                                                            <div className='mt-4 space-y-4'>
+                                                                {/* Username field with encryption dropdown */}
+                                                                <div>
+                                                                    <div className='flex items-center justify-between mb-2'>
+                                                                        <label className='block text-sm font-medium text-gray-700'>
+                                                                            Username
+                                                                            *
+                                                                        </label>
+                                                                        <EncryptionTypeDropdown
+                                                                            value={
+                                                                                connector.usernameEncryption ||
+                                                                                'Plaintext'
+                                                                            }
+                                                                            onChange={(
+                                                                                newValue,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'usernameEncryption',
+                                                                                    newValue,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                false
+                                                                            }
+                                                                            isError={
+                                                                                false
+                                                                            }
+                                                                            placeholder='Plaintext'
+                                                                        />
+                                                                    </div>
+                                                                    <input
+                                                                        type={
+                                                                            connector.usernameEncryption ===
+                                                                            'Encrypted'
+                                                                                ? 'password'
+                                                                                : 'text'
+                                                                        }
+                                                                        value={
+                                                                            connector.username ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'username',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'username',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'username',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.username ||
+                                                                                'Username is required'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Personal Access Token field */}
+                                                                <div>
+                                                                    <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                        Personal
+                                                                        Access
+                                                                        Token *
+                                                                    </label>
+                                                                    <input
+                                                                        type='password'
+                                                                        value={
+                                                                            connector.personalAccessToken ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'personalAccessToken',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'personalAccessToken',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'personalAccessToken',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.personalAccessToken ||
+                                                                                'Personal Access Token is required'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Conditional fields for Personal Access Token (Jira) */}
+                                                        {connector.authenticationType ===
+                                                            'Personal Access Token' && (
+                                                            <div className='mt-4'>
+                                                                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                    Personal
+                                                                    Access Token
+                                                                    *
+                                                                </label>
+                                                                <input
+                                                                    type='password'
+                                                                    value={
+                                                                        connector.personalAccessToken ||
+                                                                        ''
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        updateConnector(
+                                                                            connector.id,
+                                                                            'personalAccessToken',
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                        validationErrors[
+                                                                            connector
+                                                                                .id
+                                                                        ]?.includes(
+                                                                            'personalAccessToken',
+                                                                        )
+                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                    }`}
+                                                                />
+                                                                {validationErrors[
+                                                                    connector.id
+                                                                ]?.includes(
+                                                                    'personalAccessToken',
+                                                                ) && (
+                                                                    <p className='text-red-500 text-xs mt-1'>
+                                                                        {validationMessages[
+                                                                            connector
+                                                                                .id
+                                                                        ]
+                                                                            ?.personalAccessToken ||
+                                                                            'Personal Access Token is required'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Conditional fields for GitHub App */}
+                                                        {connector.authenticationType ===
+                                                            'GitHub App' && (
+                                                            <div className='mt-4 space-y-4'>
+                                                                {/* GitHub Installation Id field with encryption dropdown */}
+                                                                <div>
+                                                                    <div className='flex items-center justify-between mb-2'>
+                                                                        <label className='block text-sm font-medium text-gray-700'>
+                                                                            GitHub
+                                                                            Installation
+                                                                            Id *
+                                                                        </label>
+                                                                        <EncryptionTypeDropdown
+                                                                            value={
+                                                                                connector.githubInstallationIdEncryption ||
+                                                                                'Plaintext'
+                                                                            }
+                                                                            onChange={(
+                                                                                newValue,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'githubInstallationIdEncryption',
+                                                                                    newValue,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                false
+                                                                            }
+                                                                            isError={
+                                                                                false
+                                                                            }
+                                                                            placeholder='Plaintext'
+                                                                        />
+                                                                    </div>
+                                                                    <input
+                                                                        type={
+                                                                            connector.githubInstallationIdEncryption ===
+                                                                            'Encrypted'
+                                                                                ? 'password'
+                                                                                : 'text'
+                                                                        }
+                                                                        value={
+                                                                            connector.githubInstallationId ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'githubInstallationId',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'githubInstallationId',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'githubInstallationId',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.githubInstallationId ||
+                                                                                'GitHub Installation Id is required'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* GitHub Application Id field with encryption dropdown */}
+                                                                <div>
+                                                                    <div className='flex items-center justify-between mb-2'>
+                                                                        <label className='block text-sm font-medium text-gray-700'>
+                                                                            GitHub
+                                                                            Application
+                                                                            Id *
+                                                                        </label>
+                                                                        <EncryptionTypeDropdown
+                                                                            value={
+                                                                                connector.githubApplicationIdEncryption ||
+                                                                                'Plaintext'
+                                                                            }
+                                                                            onChange={(
+                                                                                newValue,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'githubApplicationIdEncryption',
+                                                                                    newValue,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                false
+                                                                            }
+                                                                            isError={
+                                                                                false
+                                                                            }
+                                                                            placeholder='Plaintext'
+                                                                        />
+                                                                    </div>
+                                                                    <input
+                                                                        type={
+                                                                            connector.githubApplicationIdEncryption ===
+                                                                            'Encrypted'
+                                                                                ? 'password'
+                                                                                : 'text'
+                                                                        }
+                                                                        value={
+                                                                            connector.githubApplicationId ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'githubApplicationId',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'githubApplicationId',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'githubApplicationId',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.githubApplicationId ||
+                                                                                'GitHub Application Id is required'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* GitHub Private Key field */}
+                                                                <div>
+                                                                    <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                        GitHub
+                                                                        Private
+                                                                        Key *
+                                                                    </label>
+                                                                    <input
+                                                                        type='password'
+                                                                        value={
+                                                                            connector.githubPrivateKey ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            updateConnector(
+                                                                                connector.id,
+                                                                                'githubPrivateKey',
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                            validationErrors[
+                                                                                connector
+                                                                                    .id
+                                                                            ]?.includes(
+                                                                                'githubPrivateKey',
+                                                                            )
+                                                                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                        }`}
+                                                                    />
+                                                                    {validationErrors[
+                                                                        connector
+                                                                            .id
+                                                                    ]?.includes(
+                                                                        'githubPrivateKey',
+                                                                    ) && (
+                                                                        <p className='text-red-500 text-xs mt-1'>
+                                                                            {validationMessages[
+                                                                                connector
+                                                                                    .id
+                                                                            ]
+                                                                                ?.githubPrivateKey ||
+                                                                                'GitHub Private Key is required'}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Conditional fields for OAuth */}
+                                                        {connector.authenticationType ===
+                                                            'OAuth' && (
+                                                            <div className='mt-4'>
+                                                                <div className='flex items-center justify-between mb-4'>
+                                                                    <div>
+                                                                        <p className='text-sm font-medium text-gray-700 mb-1'>
+                                                                            GitHub
+                                                                            OAuth
+                                                                            Authentication
+                                                                        </p>
+                                                                        <p className='text-xs text-gray-500'>
+                                                                            Connect
+                                                                            your
+                                                                            GitHub
+                                                                            account
+                                                                            using
+                                                                            OAuth
                                                                         </p>
                                                                     </div>
+                                                                    <OAuthButton
+                                                                        connectorId={
+                                                                            connector.id
+                                                                        }
+                                                                        githubOAuthClientId={
+                                                                            githubOAuthClientId
+                                                                        }
+                                                                        loadingOAuthClientId={
+                                                                            loadingOAuthClientId
+                                                                        }
+                                                                        credentialName={
+                                                                            credentialName
+                                                                        }
+                                                                        connectors={
+                                                                            connectors
+                                                                        }
+                                                                        setOauthStatus={
+                                                                            setOauthStatus
+                                                                        }
+                                                                        setOauthMessages={
+                                                                            setOauthMessages
+                                                                        }
+                                                                        disabled={
+                                                                            loadingOAuthClientId ||
+                                                                            !githubOAuthClientId ||
+                                                                            oauthStatus[
+                                                                                connector
+                                                                                    .id
+                                                                            ] ===
+                                                                                'pending'
+                                                                        }
+                                                                        oauthWindowsRef={
+                                                                            oauthWindowsRef
+                                                                        }
+                                                                        selectedAccountId={
+                                                                            selectedAccountId
+                                                                        }
+                                                                        selectedAccountName={
+                                                                            selectedAccountName
+                                                                        }
+                                                                        selectedEnterpriseId={
+                                                                            selectedEnterpriseId
+                                                                        }
+                                                                        selectedEnterprise={
+                                                                            selectedEnterprise
+                                                                        }
+                                                                        workstream={
+                                                                            workstream
+                                                                        }
+                                                                        product={
+                                                                            product
+                                                                        }
+                                                                        service={
+                                                                            service
+                                                                        }
+                                                                    />
                                                                 </div>
-                                                            )}
-                                                            
-                                                            {oauthStatus[connector.id] === 'error' && (
-                                                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <svg className="h-5 w-5 text-red-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                        </svg>
-                                                                        <p className="text-sm font-medium text-red-800">
-                                                                            {oauthMessages[connector.id] || 'OAuth authorization failed'}
-                                                                        </p>
+
+                                                                {/* OAuth Status Messages */}
+                                                                {oauthStatus[
+                                                                    connector.id
+                                                                ] ===
+                                                                    'success' && (
+                                                                    <div className='bg-green-50 border border-green-200 rounded-lg p-3 mb-3'>
+                                                                        <div className='flex items-center gap-2'>
+                                                                            <svg
+                                                                                className='h-5 w-5 text-green-600 flex-shrink-0'
+                                                                                fill='none'
+                                                                                viewBox='0 0 24 24'
+                                                                                stroke='currentColor'
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap='round'
+                                                                                    strokeLinejoin='round'
+                                                                                    strokeWidth={
+                                                                                        2
+                                                                                    }
+                                                                                    d='M5 13l4 4L19 7'
+                                                                                />
+                                                                            </svg>
+                                                                            <p className='text-sm font-medium text-green-800'>
+                                                                                {oauthMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ] ||
+                                                                                    'OAuth configured successfully'}
+                                                                            </p>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {oauthStatus[connector.id] === 'pending' && (
-                                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 flex-shrink-0"></div>
-                                                                        <p className="text-sm font-medium text-blue-800">
-                                                                            {oauthMessages[connector.id] || 'OAuth in Progress'}
-                                                                        </p>
+                                                                )}
+
+                                                                {oauthStatus[
+                                                                    connector.id
+                                                                ] ===
+                                                                    'error' && (
+                                                                    <div className='bg-red-50 border border-red-200 rounded-lg p-3 mb-3'>
+                                                                        <div className='flex items-center gap-2'>
+                                                                            <svg
+                                                                                className='h-5 w-5 text-red-600 flex-shrink-0'
+                                                                                fill='none'
+                                                                                viewBox='0 0 24 24'
+                                                                                stroke='currentColor'
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap='round'
+                                                                                    strokeLinejoin='round'
+                                                                                    strokeWidth={
+                                                                                        2
+                                                                                    }
+                                                                                    d='M6 18L18 6M6 6l12 12'
+                                                                                />
+                                                                            </svg>
+                                                                            <p className='text-sm font-medium text-red-800'>
+                                                                                {oauthMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ] ||
+                                                                                    'OAuth authorization failed'}
+                                                                            </p>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {!oauthStatus[connector.id] && (
-                                                                <div className="space-y-2">
-                                                                    {loadingOAuthClientId && (
-                                                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                                                                                <p className="text-xs text-blue-800">
-                                                                                    Loading OAuth configuration...
-                                                                                </p>
+                                                                )}
+
+                                                                {oauthStatus[
+                                                                    connector.id
+                                                                ] ===
+                                                                    'pending' && (
+                                                                    <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3'>
+                                                                        <div className='flex items-center gap-2'>
+                                                                            <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 flex-shrink-0'></div>
+                                                                            <p className='text-sm font-medium text-blue-800'>
+                                                                                {oauthMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ] ||
+                                                                                    'OAuth in Progress'}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {!oauthStatus[
+                                                                    connector.id
+                                                                ] && (
+                                                                    <div className='space-y-2'>
+                                                                        {loadingOAuthClientId && (
+                                                                            <div className='bg-blue-50 border border-blue-200 rounded-lg p-3'>
+                                                                                <div className='flex items-center gap-2'>
+                                                                                    <div className='animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600'></div>
+                                                                                    <p className='text-xs text-blue-800'>
+                                                                                        Loading
+                                                                                        OAuth
+                                                                                        configuration...
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {!loadingOAuthClientId && !githubOAuthClientId && (
-                                                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                                                            <p className="text-xs text-yellow-800 font-medium mb-1">
-                                                                                ⚠️ GitHub OAuth Client ID not configured in backend
+                                                                        )}
+                                                                        {!loadingOAuthClientId &&
+                                                                            !githubOAuthClientId && (
+                                                                                <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-3'>
+                                                                                    <p className='text-xs text-yellow-800 font-medium mb-1'>
+                                                                                        ⚠️
+                                                                                        GitHub
+                                                                                        OAuth
+                                                                                        Client
+                                                                                        ID
+                                                                                        not
+                                                                                        configured
+                                                                                        in
+                                                                                        backend
+                                                                                    </p>
+                                                                                    <p className='text-xs text-yellow-700 mb-2'>
+                                                                                        The
+                                                                                        backend
+                                                                                        endpoint
+                                                                                        is
+                                                                                        returning
+                                                                                        an
+                                                                                        error.
+                                                                                        Please
+                                                                                        set
+                                                                                        the{' '}
+                                                                                        <code className='bg-yellow-100 px-1 rounded'>
+                                                                                            GITHUB_CLIENT_ID
+                                                                                        </code>{' '}
+                                                                                        environment
+                                                                                        variable
+                                                                                        in
+                                                                                        your
+                                                                                        backend{' '}
+                                                                                        <code className='bg-yellow-100 px-1 rounded'>
+                                                                                            .env
+                                                                                        </code>{' '}
+                                                                                        file.
+                                                                                    </p>
+                                                                                    <p className='text-xs text-yellow-700'>
+                                                                                        <strong>
+                                                                                            Backend
+                                                                                            Setup
+                                                                                            Required:
+                                                                                        </strong>{' '}
+                                                                                        Add{' '}
+                                                                                        <code className='bg-yellow-100 px-1 rounded'>
+                                                                                            GITHUB_CLIENT_ID=your_client_id_from_github
+                                                                                        </code>{' '}
+                                                                                        to
+                                                                                        your
+                                                                                        backend{' '}
+                                                                                        <code className='bg-yellow-100 px-1 rounded'>
+                                                                                            .env
+                                                                                        </code>{' '}
+                                                                                        file
+                                                                                        and
+                                                                                        restart
+                                                                                        your
+                                                                                        backend
+                                                                                        server.
+                                                                                        Check
+                                                                                        the
+                                                                                        browser
+                                                                                        console
+                                                                                        (F12)
+                                                                                        for
+                                                                                        detailed
+                                                                                        error
+                                                                                        messages.
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                        {!loadingOAuthClientId &&
+                                                                            githubOAuthClientId && (
+                                                                                <div className='bg-blue-50 border border-blue-200 rounded-lg p-3'>
+                                                                                    <p className='text-xs text-blue-800'>
+                                                                                        Click
+                                                                                        &quot;Link
+                                                                                        to
+                                                                                        GitHub&quot;
+                                                                                        to
+                                                                                        authenticate
+                                                                                        with
+                                                                                        your
+                                                                                        GitHub
+                                                                                        account.
+                                                                                        You
+                                                                                        will
+                                                                                        be
+                                                                                        redirected
+                                                                                        to
+                                                                                        GitHub&apos;s
+                                                                                        OAuth
+                                                                                        authorization
+                                                                                        page
+                                                                                        in
+                                                                                        a
+                                                                                        new
+                                                                                        tab.
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Conditional fields for OAuth2 (Cloud Foundry) */}
+                                                        {connector.authenticationType ===
+                                                            'OAuth2' &&
+                                                            connector.category ===
+                                                                'deploy' &&
+                                                            connector.connector ===
+                                                                'Cloud Foundry' && (
+                                                                <div className='mt-4 space-y-4'>
+                                                                    <div>
+                                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                            Client
+                                                                            ID *
+                                                                        </label>
+                                                                        <input
+                                                                            type='text'
+                                                                            value={
+                                                                                connector.oauth2ClientId ||
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'oauth2ClientId',
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                                validationErrors[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]?.includes(
+                                                                                    'oauth2ClientId',
+                                                                                )
+                                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                            }`}
+                                                                        />
+                                                                        {validationErrors[
+                                                                            connector
+                                                                                .id
+                                                                        ]?.includes(
+                                                                            'oauth2ClientId',
+                                                                        ) && (
+                                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                                {validationMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]
+                                                                                    ?.oauth2ClientId ||
+                                                                                    'Client ID is required'}
                                                                             </p>
-                                                                            <p className="text-xs text-yellow-700 mb-2">
-                                                                                The backend endpoint is returning an error. Please set the <code className="bg-yellow-100 px-1 rounded">GITHUB_CLIENT_ID</code> environment variable in your backend <code className="bg-yellow-100 px-1 rounded">.env</code> file.
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                            Client
+                                                                            Secret
+                                                                            *
+                                                                        </label>
+                                                                        <input
+                                                                            type='password'
+                                                                            value={
+                                                                                connector.oauth2ClientSecret ||
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'oauth2ClientSecret',
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                                validationErrors[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]?.includes(
+                                                                                    'oauth2ClientSecret',
+                                                                                )
+                                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                            }`}
+                                                                        />
+                                                                        {validationErrors[
+                                                                            connector
+                                                                                .id
+                                                                        ]?.includes(
+                                                                            'oauth2ClientSecret',
+                                                                        ) && (
+                                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                                {validationMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]
+                                                                                    ?.oauth2ClientSecret ||
+                                                                                    'Client Secret is required'}
                                                                             </p>
-                                                                            <p className="text-xs text-yellow-700">
-                                                                                <strong>Backend Setup Required:</strong> Add <code className="bg-yellow-100 px-1 rounded">GITHUB_CLIENT_ID=your_client_id_from_github</code> to your backend <code className="bg-yellow-100 px-1 rounded">.env</code> file and restart your backend server. Check the browser console (F12) for detailed error messages.
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                                                                            Token
+                                                                            URL
+                                                                            *
+                                                                        </label>
+                                                                        <input
+                                                                            type='text'
+                                                                            value={
+                                                                                connector.oauth2TokenUrl ||
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                updateConnector(
+                                                                                    connector.id,
+                                                                                    'oauth2TokenUrl',
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
+                                                                                validationErrors[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]?.includes(
+                                                                                    'oauth2TokenUrl',
+                                                                                )
+                                                                                    ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                                                                    : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
+                                                                            }`}
+                                                                        />
+                                                                        {validationErrors[
+                                                                            connector
+                                                                                .id
+                                                                        ]?.includes(
+                                                                            'oauth2TokenUrl',
+                                                                        ) && (
+                                                                            <p className='text-red-500 text-xs mt-1'>
+                                                                                {validationMessages[
+                                                                                    connector
+                                                                                        .id
+                                                                                ]
+                                                                                    ?.oauth2TokenUrl ||
+                                                                                    'Token URL is required'}
                                                                             </p>
-                                                                        </div>
-                                                                    )}
-                                                                    {!loadingOAuthClientId && githubOAuthClientId && (
-                                                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                                                            <p className="text-xs text-blue-800">
-                                                                                Click &quot;Link to GitHub&quot; to authenticate with your GitHub account. You will be redirected to GitHub&apos;s OAuth authorization page in a new tab.
-                                                                            </p>
-                                                                        </div>
-                                                                    )}
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Conditional fields for OAuth2 (Cloud Foundry) */}
-                                                    {connector.authenticationType === 'OAuth2' && connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
-                                                        <div className="mt-4 space-y-4">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    Client ID *
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={connector.oauth2ClientId || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2ClientId', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('oauth2ClientId')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('oauth2ClientId') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.oauth2ClientId || 'Client ID is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    Client Secret *
-                                                                </label>
-                                                                <input
-                                                                    type="password"
-                                                                    value={connector.oauth2ClientSecret || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2ClientSecret', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('oauth2ClientSecret')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('oauth2ClientSecret') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.oauth2ClientSecret || 'Client Secret is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                    Token URL *
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={connector.oauth2TokenUrl || ''}
-                                                                    onChange={(e) => updateConnector(connector.id, 'oauth2TokenUrl', e.target.value)}
-                                                                    className={`w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors bg-white min-h-[28px] ${
-                                                                        validationErrors[connector.id]?.includes('oauth2TokenUrl')
-                                                                            ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
-                                                                            : 'border-blue-300 focus:ring-blue-200 focus:border-blue-500'
-                                                                    }`}
-                                                                />
-                                                                {validationErrors[connector.id]?.includes('oauth2TokenUrl') && (
-                                                                    <p className="text-red-500 text-xs mt-1">
-                                                                        {validationMessages[connector.id]?.oauth2TokenUrl || 'Token URL is required'}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        /* Show connector summary when not editing */
-                                        <div className="bg-white border border-slate-300 rounded-lg p-5 shadow-sm">
-                                            <div className="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-200">
-                                                <Plug className="h-4 w-4 text-slate-600" />
-                                                <span className="text-sm font-semibold text-slate-800">Connector Information</span>
-                                            </div>
-                                            
-                                            <div className="space-y-4">
-                                                {/* Name and Type */}
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Category</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.category || 'N/A'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Connector</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.connector || 'N/A'}</div>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        ) : (
+                                            /* Show connector summary when not editing */
+                                            <div className='bg-white border border-slate-300 rounded-lg p-5 shadow-sm'>
+                                                <div className='flex items-center space-x-2 mb-4 pb-3 border-b border-slate-200'>
+                                                    <Plug className='h-4 w-4 text-slate-600' />
+                                                    <span className='text-sm font-semibold text-slate-800'>
+                                                        Connector Information
+                                                    </span>
+                                                </div>
 
-                                                {/* Authentication Details */}
-                                                <div className="border-t border-slate-200 pt-4 mt-4 space-y-4">
-                                                    {connector.category === 'deploy' && connector.connector === 'Cloud Foundry' && (
+                                                <div className='space-y-4'>
+                                                    {/* Name and Type */}
+                                                    <div className='grid grid-cols-2 gap-4'>
                                                         <div>
-                                                            <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Service Key Details</div>
-                                                            <div className="text-sm font-medium text-slate-600">{connector.serviceKeyDetails || 'N/A'}</div>
+                                                            <div className='text-xs font-bold text-slate-800 uppercase tracking-wide mb-1'>
+                                                                Category
+                                                            </div>
+                                                            <div className='text-sm font-medium text-slate-600'>
+                                                                {connector.category ||
+                                                                    'N/A'}
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-1">Authentication Type</div>
-                                                        <div className="text-sm font-medium text-slate-600">{connector.authenticationType || 'N/A'}</div>
+                                                        <div>
+                                                            <div className='text-xs font-bold text-slate-800 uppercase tracking-wide mb-1'>
+                                                                Connector
+                                                            </div>
+                                                            <div className='text-sm font-medium text-slate-600'>
+                                                                {connector.connector ||
+                                                                    'N/A'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Authentication Details */}
+                                                    <div className='border-t border-slate-200 pt-4 mt-4 space-y-4'>
+                                                        {connector.category ===
+                                                            'deploy' &&
+                                                            connector.connector ===
+                                                                'Cloud Foundry' && (
+                                                                <div>
+                                                                    <div className='text-xs font-bold text-slate-800 uppercase tracking-wide mb-1'>
+                                                                        Service
+                                                                        Key
+                                                                        Details
+                                                                    </div>
+                                                                    <div className='text-sm font-medium text-slate-600'>
+                                                                        {connector.serviceKeyDetails ||
+                                                                            'N/A'}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        <div>
+                                                            <div className='text-xs font-bold text-slate-800 uppercase tracking-wide mb-1'>
+                                                                Authentication
+                                                                Type
+                                                            </div>
+                                                            <div className='text-sm font-medium text-slate-600'>
+                                                                {connector.authenticationType ||
+                                                                    'N/A'}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                            
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
                 </div>
             </motion.div>
 
@@ -2494,39 +4012,42 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             <AnimatePresence>
                 {showUnsavedChangesDialog && (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+                        initial={{opacity: 0}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                        className='fixed inset-0 z-[10000] flex items-center justify-center p-4'
                     >
-                        <div className="absolute inset-0 bg-black bg-opacity-60" />
+                        <div className='absolute inset-0 bg-black bg-opacity-60' />
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="relative bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+                            initial={{scale: 0.95, opacity: 0}}
+                            animate={{scale: 1, opacity: 1}}
+                            exit={{scale: 0.95, opacity: 0}}
+                            className='relative bg-white rounded-xl shadow-2xl max-w-md w-full p-6'
                         >
-                            <div className="flex items-center space-x-3 mb-4">
-                                <div className="p-2 bg-amber-100 rounded-full">
-                                    <XCircle className="h-5 w-5 text-amber-600" />
+                            <div className='flex items-center space-x-3 mb-4'>
+                                <div className='p-2 bg-amber-100 rounded-full'>
+                                    <XCircle className='h-5 w-5 text-amber-600' />
                                 </div>
-                                <h3 className="text-lg font-semibold text-slate-900">Unsaved Changes</h3>
+                                <h3 className='text-lg font-semibold text-slate-900'>
+                                    Unsaved Changes
+                                </h3>
                             </div>
-                            
-                            <p className="text-slate-600 mb-6">
-                                You have unsaved changes. Would you like to save them before closing?
+
+                            <p className='text-slate-600 mb-6'>
+                                You have unsaved changes. Would you like to save
+                                them before closing?
                             </p>
-                            
-                            <div className="flex justify-end space-x-3">
+
+                            <div className='flex justify-end space-x-3'>
                                 <button
                                     onClick={handleDiscardChanges}
-                                    className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                                    className='px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors'
                                 >
                                     No, Discard
                                 </button>
                                 <button
                                     onClick={handleKeepEditing}
-                                    className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                    className='px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors'
                                 >
                                     Yes, Keep Editing
                                 </button>
@@ -2540,4 +4061,3 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
 };
 
 export default ConnectorModal;
-

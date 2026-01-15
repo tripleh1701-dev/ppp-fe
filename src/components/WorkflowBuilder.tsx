@@ -60,6 +60,23 @@ import {
     getAllPipelineYAMLs,
 } from '@/utils/yamlPipelineUtils';
 
+// Helper function to get the base path for navigation
+// Detects base path from current URL (e.g., /prod/ui from production deployment)
+const getBasePath = (): string => {
+    if (typeof window === 'undefined') return '';
+
+    const pathname = window.location.pathname;
+    // Match patterns like /prod/ui or /prod from the URL
+    const match = pathname.match(/^(\/prod(?:\/ui)?)/);
+    return match ? match[1] : '';
+};
+
+// Helper function to navigate with proper base path
+const navigateTo = (path: string): void => {
+    const basePath = getBasePath();
+    window.location.href = `${basePath}${path}`;
+};
+
 // Component configuration
 const nodeTypes = {
     workflowNode: WorkflowNode,
@@ -934,7 +951,7 @@ function WorkflowBuilderContent({
                         'Template saved successfully! Would you like to go back to the templates page?',
                     )
                 ) {
-                    window.location.href = '/pipelines/templates';
+                    navigateTo('/pipelines/templates');
                 }
             }, 500);
         } catch (error) {
@@ -2081,8 +2098,9 @@ function WorkflowBuilderContent({
                                                         setShowNotification(
                                                             false,
                                                         );
-                                                        window.location.href =
-                                                            '/pipelines/summary';
+                                                        navigateTo(
+                                                            '/pipelines/summary',
+                                                        );
                                                     }, 2000);
                                                 } catch (error) {
                                                     console.error(
@@ -2564,7 +2582,7 @@ function WorkflowBuilderContent({
                                 );
 
                                 // Redirect to summary page
-                                window.location.href = '/pipelines/summary';
+                                navigateTo('/pipelines/summary');
                             } catch (error) {
                                 console.error('Save error:', error);
                                 alert(
