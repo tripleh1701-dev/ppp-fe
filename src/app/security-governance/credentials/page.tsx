@@ -715,9 +715,10 @@ export default function ManageCredentials() {
             );
 
             // Extract unique credential names from current Credentials (local state only)
+            const credentialsArray = Array.isArray(credentials) ? credentials : [];
             const uniqueCredentialNames = Array.from(
                 new Set(
-                    credentials
+                    credentialsArray
                         .map((credential) => credential.credentialName)
                         .filter(Boolean),
                 ),
@@ -729,7 +730,7 @@ export default function ManageCredentials() {
             // Extract unique entities from current Credentials (local state only)
             const uniqueEntities = Array.from(
                 new Set(
-                    credentials
+                    credentialsArray
                         .map((credential) => credential.entity)
                         .filter(Boolean),
                 ),
