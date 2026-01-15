@@ -2946,7 +2946,8 @@ function AsyncChipSelect({
                             credentialName?: string;
                         }>
                     >(rolesUrl)) || [];
-                allData = response
+                const responseArray = Array.isArray(response) ? response : ((response as any)?.data ? (Array.isArray((response as any).data) ? (response as any).data : []) : []);
+                allData = responseArray
                     .map((item: any) => ({
                     id: item.id || item.roleId || String(Math.random()),
                         name: item.name || item.credentialName || '',
@@ -2971,10 +2972,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) entitiesUrl += `?${params.toString()}`;
 
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
+                const entitiesResponse = (await api.get<Array<{id: string; name: string}>>(
                         entitiesUrl,
                     )) || [];
+                allData = Array.isArray(entitiesResponse) ? entitiesResponse : ((entitiesResponse as any)?.data ? (Array.isArray((entitiesResponse as any).data) ? (entitiesResponse as any).data : []) : []);
             } else if (type === 'product') {
                 // Get account/enterprise context from localStorage
                 const selectedAccountId =
@@ -2994,10 +2995,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) productsUrl += `?${params.toString()}`;
 
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
+                const productsResponse = (await api.get<Array<{id: string; name: string}>>(
                         productsUrl,
                     )) || [];
+                allData = Array.isArray(productsResponse) ? productsResponse : ((productsResponse as any)?.data ? (Array.isArray((productsResponse as any).data) ? (productsResponse as any).data : []) : []);
             } else if (type === 'service') {
                 // Get account/enterprise context from localStorage
                 const selectedAccountId =
@@ -3017,10 +3018,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) servicesUrl += `?${params.toString()}`;
 
-                allData =
-                    (await api.get<Array<{id: string; name: string}>>(
+                const servicesResponse = (await api.get<Array<{id: string; name: string}>>(
                         servicesUrl,
                     )) || [];
+                allData = Array.isArray(servicesResponse) ? servicesResponse : ((servicesResponse as any)?.data ? (Array.isArray((servicesResponse as any).data) ? (servicesResponse as any).data : []) : []);
             } else {
                 // Default empty
                 allData = [];
